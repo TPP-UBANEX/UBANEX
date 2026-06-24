@@ -11,6 +11,10 @@ export class ConvocatoriasService {
   ) {}
 
   findAll() {
-    return this.repo.find();
+    return this.repo.find({ order: { fechaApertura: 'DESC' } });
+  }
+
+  findOne(id: string) {
+    return this.repo.findOne({ where: { id } });
   }
 }

@@ -4,6 +4,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConvocatoriasModule } from './convocatorias/convocatorias.module';
+import { ProyectosModule } from './proyectos/proyectos.module';
+import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
+import { RendicionesModule } from './rendiciones/rendiciones.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -19,6 +23,10 @@ import { ConvocatoriasModule } from './convocatorias/convocatorias.module';
       }),
     }),
     ConvocatoriasModule,
+    ProyectosModule,
+    EvaluacionesModule,
+    RendicionesModule,
+    UsuariosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

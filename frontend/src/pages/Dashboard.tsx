@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -8,15 +9,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { proyectos, convocatorias, actividades, estadoBadge } from '@/data/mock'
+import { api } from '@/lib/api'
+import type { Proyecto, Convocatoria } from '@/data/types'
+import { estadoBadge } from '@/data/types'
 import { FileText, Users, DollarSign, ClipboardCheck } from 'lucide-react'
 
 export function Dashboard() {
+  const [proyectos, setProyectos] = useState<Proyecto[]>([])
+  const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
+
+  useEffect(() => {
+    api.proyectos.list().then(setProyectos)
+    api.convocatorias.list().then(setConvocatorias)
+  }, [])
+
   const stats = [
     { label: 'Proyectos Activos', value: proyectos.filter(p => p.estado === 'ejecucion').length, icon: Users, color: 'text-blue-600' },
     { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === 'abierta').length, icon: FileText, color: 'text-green-600' },
     { label: 'Evaluaciones Pendientes', value: proyectos.filter(p => p.estado === 'evaluacion').length, icon: ClipboardCheck, color: 'text-amber-600' },
-    { label: 'Rendiciones por Revisar', value: 0, icon: DollarSign, color: 'text-purple-600' },
+    { label: 'Rendiciones Pendientes', value: 0, icon: DollarSign, color: 'text-purple-600' },
   ]
 
   return (
@@ -43,23 +54,25 @@ export function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Últimas Actividades</CardTitle>
+            <CardTitle className="text-sm font-medium">Convocatorias Activas</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Fecha</TableHead>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Apertura</TableHead>
+                  <TableHead>Cierre</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {actividades.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="text-sm">{a.descripcion}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{a.usuario}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{a.fecha}</TableCell>
+                {convocatorias.filter(c => c.estado === 'abierta').map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
+                    <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{c.fechaApertura}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{c.fechaCierre}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -81,13 +94,11 @@ export function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {proyectos.slice(0, 5).map((p) => (
+                {proyectos.slice(0, 5).map(p => (
                   <TableRow key={p.id}>
                     <TableCell className="text-sm">{p.titulo}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{p.director}</TableCell>
-                    <TableCell>
-                      <Badge variant={estadoBadge[p.estado]}>{p.estado}</Badge>
-                    </TableCell>
+                    <TableCell><Badge variant={estadoBadge[p.estado]}>{p.estado}</Badge></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

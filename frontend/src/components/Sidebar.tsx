@@ -1,32 +1,32 @@
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   FileText,
   ClipboardCheck,
-  DollarSign,
-  FolderCheck,
   FolderOpen,
+  Users,
   ChevronLeft,
 } from 'lucide-react'
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'convocatorias', label: 'Convocatorias', icon: FileText },
-  { id: 'evaluacion', label: 'Evaluación', icon: ClipboardCheck },
-  { id: 'rendicion', label: 'Rendición', icon: DollarSign },
-  { id: 'cierre', label: 'Cierre', icon: FolderCheck },
-  { id: 'proyectos', label: 'Proyectos', icon: FolderOpen },
+  { id: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { id: '/convocatorias', label: 'Convocatorias', icon: FileText },
+  { id: '/proyectos', label: 'Proyectos', icon: FolderOpen },
+  { id: '/evaluacion', label: 'Evaluación', icon: ClipboardCheck },
+  { id: '/usuarios', label: 'Usuarios', icon: Users },
 ]
 
 interface SidebarProps {
-  currentPage: string
-  onNavigate: (page: string) => void
   collapsed: boolean
   onToggle: () => void
 }
 
-export function Sidebar({ currentPage, onNavigate, collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
+
   return (
     <aside
       className={cn(
@@ -51,12 +51,12 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggle }: Sideba
         {menuItems.map((item) => (
           <Button
             key={item.id}
-            variant={currentPage === item.id ? 'secondary' : 'ghost'}
+            variant={location.pathname === item.id ? 'secondary' : 'ghost'}
             className={cn(
               'w-full justify-start gap-3',
               collapsed && 'justify-center px-2'
             )}
-            onClick={() => onNavigate(item.id)}
+            onClick={() => navigate(item.id)}
           >
             <item.icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="text-sm">{item.label}</span>}
