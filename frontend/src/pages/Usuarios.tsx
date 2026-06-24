@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Usuario } from '@/data/types'
 import { estadoBadge } from '@/data/types'
@@ -35,9 +36,12 @@ export function Usuarios() {
   const [open, setOpen] = useState(false)
   const [rolFiltro, setRolFiltro] = useState('todos')
   const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.usuarios.list().then(setData)
+    api.usuarios.list()
+      .then(setData)
+      .finally(() => setLoading(false))
   }, [])
 
   const filtrados = data.filter(u => {
@@ -89,7 +93,9 @@ export function Usuarios() {
         {stats.map(s => (
           <Card key={s.label}>
             <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">{s.label}</CardTitle></CardHeader>
-            <CardContent><p className={`text-2xl font-bold ${s.color}`}>{s.value}</p></CardContent>
+            <CardContent>
+              {loading ? <Skeleton className="h-8 w-8" /> : <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>}
+            </CardContent>
           </Card>
         ))}
       </div>
@@ -114,28 +120,40 @@ export function Usuarios() {
       <Card>
         <CardHeader><CardTitle className="text-sm font-medium">Usuarios</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Facultad</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtrados.map(u => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.nombre}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
-                  <TableCell><Badge variant={estadoBadge[u.rol]}>{u.rol}</Badge></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{u.facultad || '-'}</TableCell>
-                  <TableCell><Button variant="ghost" size="sm">Editar</Button></TableCell>
-                </TableRow>
+          {loading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex gap-4">
+                  {[...Array(5)].map((_, j) => (
+                    <Skeleton key={j} className="h-4 flex-1" />
+                  ))}
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Facultad</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtrados.map(u => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.nombre}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+                    <TableCell><Badge variant={estadoBadge[u.rol]}>{u.rol}</Badge></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{u.facultad || '-'}</TableCell>
+                    <TableCell><Button variant="ghost" size="sm">Editar</Button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

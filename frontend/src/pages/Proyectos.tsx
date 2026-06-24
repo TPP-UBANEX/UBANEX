@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Proyecto, Convocatoria } from '@/data/types'
 import { estadoBadge } from '@/data/types'
@@ -32,10 +33,16 @@ export function Proyectos() {
   const [filtroEtapa, setFiltroEtapa] = useState('todas')
   const [filtroConv, setFiltroConv] = useState('todas')
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.proyectos.list().then(setProyectos)
-    api.convocatorias.list().then(setConvocatorias)
+    Promise.all([
+      api.proyectos.list(),
+      api.convocatorias.list(),
+    ]).then(([p, c]) => {
+      setProyectos(p)
+      setConvocatorias(c)
+    }).finally(() => setLoading(false))
   }, [])
 
   const filtrados = proyectos.filter(p => {
@@ -98,55 +105,80 @@ export function Proyectos() {
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium">Listado de Proyectos</CardTitle></CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Director</TableHead>
-                  <TableHead>Facultad</TableHead>
-                  <TableHead>Etapa</TableHead>
-                  <TableHead>Puntaje</TableHead>
-                  <TableHead>Monto</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtrados.map(p => (
-                  <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${p.id}`)}>
-                    <TableCell className="font-medium">{p.titulo}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{p.director}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{p.facultad}</TableCell>
-                    <TableCell><Badge variant={estadoBadge[p.estado]}>{p.estado}</Badge></TableCell>
-                    <TableCell className="text-sm">{p.puntaje ?? '-'}</TableCell>
-                    <TableCell className="text-sm">{p.montoAsignado ? `$${p.montoAsignado.toLocaleString()}` : '-'}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); navigate(`/proyectos/${p.id}`) }}>Ver</Button>
-                    </TableCell>
-                  </TableRow>
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="flex gap-4">
+                    {[...Array(7)].map((_, j) => (
+                      <Skeleton key={j} className="h-4 flex-1" />
+                    ))}
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Director</TableHead>
+                    <TableHead>Facultad</TableHead>
+                    <TableHead>Etapa</TableHead>
+                    <TableHead>Puntaje</TableHead>
+                    <TableHead>Monto</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtrados.map(p => (
+                    <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${p.id}`)}>
+                      <TableCell className="font-medium">{p.titulo}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.director}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.facultad}</TableCell>
+                      <TableCell><Badge variant={estadoBadge[p.estado]}>{p.estado}</Badge></TableCell>
+                      <TableCell className="text-sm">{p.puntaje ?? '-'}</TableCell>
+                      <TableCell className="text-sm">{p.montoAsignado ? `$${p.montoAsignado.toLocaleString()}` : '-'}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); navigate(`/proyectos/${p.id}`) }}>Ver</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-7 gap-3 overflow-x-auto">
-          {pipelineColumns.map(col => (
-            <div key={col.key} className="min-w-[160px]">
-              <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{col.label}</div>
-              <div className="space-y-2">
-                {proyectos.filter(p => p.estado === col.key).map(p => (
-                  <Card key={p.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${p.id}`)}>
-                    <CardContent className="p-3 space-y-1">
-                      <p className="text-sm font-medium leading-tight">{p.titulo}</p>
-                      <p className="text-xs text-muted-foreground">{p.director}</p>
-                      {p.puntaje && <Badge variant="outline" className="text-xs">{p.puntaje} pts</Badge>}
-                    </CardContent>
-                  </Card>
+        loading ? (
+          <div className="grid grid-cols-7 gap-3">
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className="space-y-3">
+                <Skeleton className="h-4 w-20" />
+                {[...Array(2)].map((_, j) => (
+                  <Skeleton key={j} className="h-24 w-full rounded-lg" />
                 ))}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-3 overflow-x-auto">
+            {pipelineColumns.map(col => (
+              <div key={col.key} className="min-w-[160px]">
+                <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{col.label}</div>
+                <div className="space-y-2">
+                  {proyectos.filter(p => p.estado === col.key).map(p => (
+                    <Card key={p.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${p.id}`)}>
+                      <CardContent className="p-3 space-y-1">
+                        <p className="text-sm font-medium leading-tight">{p.titulo}</p>
+                        <p className="text-xs text-muted-foreground">{p.director}</p>
+                        {p.puntaje && <Badge variant="outline" className="text-xs">{p.puntaje} pts</Badge>}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   )

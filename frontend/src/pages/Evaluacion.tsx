@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Evaluacion } from '@/data/types'
 import { ClipboardCheck } from 'lucide-react'
@@ -26,9 +27,12 @@ export function Evaluacion() {
   const [evaluaciones, setEvaluaciones] = useState<Evaluacion[]>([])
   const [selected, setSelected] = useState<Evaluacion | null>(null)
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.evaluaciones.list().then(setEvaluaciones)
+    api.evaluaciones.list()
+      .then(setEvaluaciones)
+      .finally(() => setLoading(false))
   }, [])
 
   const pendientes = evaluaciones.filter(e => e.estado === 'pendiente')
@@ -42,9 +46,18 @@ export function Evaluacion() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">En Evaluación</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{evaluaciones.length}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Pendientes</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{pendientes.length}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Completadas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{completadas.length}</p></CardContent></Card>
+        {[
+          { label: 'En Evaluación', value: evaluaciones.length },
+          { label: 'Pendientes', value: pendientes.length },
+          { label: 'Completadas', value: completadas.length },
+        ].map(s => (
+          <Card key={s.label}>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">{s.label}</CardTitle></CardHeader>
+            <CardContent>
+              {loading ? <Skeleton className="h-8 w-8" /> : <p className="text-2xl font-bold">{s.value}</p>}
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <Tabs defaultValue="pendientes">
@@ -57,49 +70,53 @@ export function Evaluacion() {
           <Card>
             <CardHeader><CardTitle className="text-sm font-medium">Evaluaciones Asignadas</CardTitle></CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Proyecto</TableHead>
-                    <TableHead>Evaluador</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendientes.map(e => (
-                    <TableRow key={e.id}>
-                      <TableCell className="font-medium text-sm">{e.proyectoTitulo || e.proyectoId}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.evaluador}</TableCell>
-                      <TableCell><Badge variant="outline">{e.tipo}</Badge></TableCell>
-                      <TableCell>
-                        <Dialog open={open && selected?.id === e.id} onOpenChange={(v) => { setOpen(v); if (v) { setSelected(e) } }}>
-                          <DialogTrigger asChild>
-                            <Button size="sm" onClick={() => { setSelected(e); setOpen(true) }}>
-                              <ClipboardCheck className="h-4 w-4 mr-2" />Evaluar
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader><DialogTitle>Evaluar: {e.proyectoTitulo || e.proyectoId}</DialogTitle></DialogHeader>
-                            <div className="space-y-4 pt-4">
-                              <div className="text-sm"><span className="text-muted-foreground">Tipo:</span> {e.tipo} · <span className="text-muted-foreground">Evaluador:</span> {e.evaluador}</div>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Puntaje (0-100)</label>
-                                <input type="number" min={0} max={100} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Observaciones</label>
-                                <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Observaciones..." />
-                              </div>
-                              <Button className="w-full" onClick={() => setOpen(false)}>Guardar</Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </TableCell>
+              {loading ? (
+                <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="flex gap-4">{[...Array(4)].map((_, j) => <Skeleton key={j} className="h-4 flex-1" />)}</div>)}</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Proyecto</TableHead>
+                      <TableHead>Evaluador</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {pendientes.map(e => (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-medium text-sm">{e.proyectoTitulo || e.proyectoId}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{e.evaluador}</TableCell>
+                        <TableCell><Badge variant="outline">{e.tipo}</Badge></TableCell>
+                        <TableCell>
+                          <Dialog open={open && selected?.id === e.id} onOpenChange={(v) => { setOpen(v); if (v) setSelected(e) }}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" onClick={() => { setSelected(e); setOpen(true) }}>
+                                <ClipboardCheck className="h-4 w-4 mr-2" />Evaluar
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader><DialogTitle>Evaluar: {e.proyectoTitulo || e.proyectoId}</DialogTitle></DialogHeader>
+                              <div className="space-y-4 pt-4">
+                                <div className="text-sm"><span className="text-muted-foreground">Tipo:</span> {e.tipo} · <span className="text-muted-foreground">Evaluador:</span> {e.evaluador}</div>
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Puntaje (0-100)</label>
+                                  <input type="number" min={0} max={100} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Observaciones</label>
+                                  <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Observaciones..." />
+                                </div>
+                                <Button className="w-full" onClick={() => setOpen(false)}>Guardar</Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -108,28 +125,32 @@ export function Evaluacion() {
           <Card>
             <CardHeader><CardTitle className="text-sm font-medium">Historial</CardTitle></CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Proyecto</TableHead>
-                    <TableHead>Evaluador</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Puntaje</TableHead>
-                    <TableHead>Observaciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {completadas.map(e => (
-                    <TableRow key={e.id}>
-                      <TableCell className="text-sm font-medium">{e.proyectoTitulo || e.proyectoId}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.evaluador}</TableCell>
-                      <TableCell><Badge variant="outline">{e.tipo}</Badge></TableCell>
-                      <TableCell className="text-sm font-bold">{e.puntaje}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{e.observaciones}</TableCell>
+              {loading ? (
+                <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="flex gap-4">{[...Array(5)].map((_, j) => <Skeleton key={j} className="h-4 flex-1" />)}</div>)}</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Proyecto</TableHead>
+                      <TableHead>Evaluador</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Puntaje</TableHead>
+                      <TableHead>Observaciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {completadas.map(e => (
+                      <TableRow key={e.id}>
+                        <TableCell className="text-sm font-medium">{e.proyectoTitulo || e.proyectoId}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{e.evaluador}</TableCell>
+                        <TableCell><Badge variant="outline">{e.tipo}</Badge></TableCell>
+                        <TableCell className="text-sm font-bold">{e.puntaje}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{e.observaciones}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

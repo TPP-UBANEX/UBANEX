@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Convocatoria, Proyecto } from '@/data/types'
 import { estadoBadge } from '@/data/types'
@@ -22,14 +23,22 @@ export function ConvocatoriaDetail() {
   const navigate = useNavigate()
   const [conv, setConv] = useState<Convocatoria | null>(null)
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    api.convocatorias.get(id).then(setConv)
-    api.proyectos.list({ convocatoriaId: id }).then(setProyectos)
+    Promise.all([
+      api.convocatorias.get(id),
+      api.proyectos.list({ convocatoriaId: id }),
+    ]).then(([c, p]) => {
+      setConv(c)
+      setProyectos(p)
+    }).finally(() => setLoading(false))
   }, [id])
 
-  if (!conv) return <div className="p-6"><p className="text-muted-foreground">Cargando...</p></div>
+  if (loading) return <DetailSkeleton />
+
+  if (!conv) return <div className="p-6"><p className="text-muted-foreground">Convocatoria no encontrada</p></div>
 
   const conteo = {
     presentado: proyectos.filter(p => p.estado === 'presentado').length,
@@ -118,6 +127,29 @@ export function ConvocatoriaDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex gap-4 items-center">
+        <Skeleton className="h-8 w-8 rounded-md" />
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-64" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="rounded-lg border bg-card p-4 space-y-3">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-8 w-8" />
+          </div>
+        ))}
+      </div>
+      <Skeleton className="h-64 w-full rounded-lg" />
     </div>
   )
 }

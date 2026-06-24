@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Convocatoria } from '@/data/types'
 import { estadoBadge } from '@/data/types'
@@ -38,9 +39,12 @@ export function Convocatorias() {
   const [search, setSearch] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todas')
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.convocatorias.list().then(setData)
+    api.convocatorias.list()
+      .then(setData)
+      .finally(() => setLoading(false))
   }, [])
 
   const filtradas = data.filter(c => {
@@ -66,7 +70,7 @@ export function Convocatorias() {
           <DialogContent>
             <DialogHeader><DialogTitle>Nueva Convocatoria</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-4">
-              <Input placeholder="Nombre de la convocatoria" />
+              <Input placeholder="Nombre" />
               <Input placeholder="Descripción" />
               <div className="grid grid-cols-2 gap-4">
                 <Input type="date" />
@@ -101,13 +105,13 @@ export function Convocatorias() {
           <TabsTrigger value="pasadas">Pasadas ({pasadas.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="todas" className="mt-4">
-          <TablaConvocatorias data={filtradas} onClick={id => navigate(`/convocatorias/${id}`)} />
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={filtradas} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
         <TabsContent value="activas" className="mt-4">
-          <TablaConvocatorias data={activas} onClick={id => navigate(`/convocatorias/${id}`)} />
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={activas} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
         <TabsContent value="pasadas" className="mt-4">
-          <TablaConvocatorias data={pasadas} onClick={id => navigate(`/convocatorias/${id}`)} />
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={pasadas} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
       </Tabs>
     </div>
@@ -117,7 +121,7 @@ export function Convocatorias() {
 function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: (id: string) => void }) {
   return (
     <Card>
-      <CardHeader><CardTitle className="text-sm font-medium">Listado de Convocatorias</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-sm font-medium">Listado</CardTitle></CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
@@ -143,6 +147,25 @@ function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: 
             ))}
           </TableBody>
         </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+function TableSkeleton() {
+  return (
+    <Card>
+      <CardHeader><Skeleton className="h-4 w-24" /></CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex gap-4">
+              {[...Array(5)].map((_, j) => (
+                <Skeleton key={j} className="h-4 flex-1" />
+              ))}
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   )
