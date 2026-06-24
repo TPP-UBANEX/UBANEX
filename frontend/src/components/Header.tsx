@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ThemeToggle } from './ThemeToggle'
 import { Bell, LogOut, Settings, User } from 'lucide-react'
 
 export function Header() {
@@ -18,7 +19,8 @@ export function Header() {
         <div className="w-2 h-2 rounded-full bg-green-500" />
         <span className="text-xs text-muted-foreground">Sistema de Gestión UBANEX</span>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
         <button className="relative p-2 hover:bg-accent rounded-md">
           <Bell className="h-4 w-4 text-muted-foreground" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full" />
