@@ -1,21 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { Header } from '@/components/Header'
+import { Sidebar } from '@/components/Sidebar'
+import { Dashboard } from '@/pages/Dashboard'
+import { Convocatorias } from '@/pages/Convocatorias'
+import { Evaluacion } from '@/pages/Evaluacion'
+import { Rendicion } from '@/pages/Rendicion'
+import { Cierre } from '@/pages/Cierre'
+import { Proyectos } from '@/pages/Proyectos'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const pages: Record<string, React.ReactNode> = {
+  dashboard: <Dashboard />,
+  convocatorias: <Convocatorias />,
+  evaluacion: <Evaluacion />,
+  rendicion: <Rendicion />,
+  cierre: <Cierre />,
+  proyectos: <Proyectos />,
+}
 
 function App() {
-  const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    fetch(API_URL)
-      .then(res => res.json())
-      .then(data => setMessage(data.message))
-      .catch(() => setMessage('Error connecting to API'))
-  }, [])
+  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div>
-      <h1>UBANEX</h1>
-      <p>{message}</p>
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar
+        currentPage={currentPage}
+        onNavigate={setCurrentPage}
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-y-auto bg-muted/20">
+          {pages[currentPage] || <Dashboard />}
+        </main>
+      </div>
     </div>
   )
 }
