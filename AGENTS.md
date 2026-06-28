@@ -42,6 +42,8 @@ UBANEX/
 - Usar `import` en lugar de `require` (backend usa CommonJS, frontend usa ESM).
 
 ### Backend (NestJS)
+- Arquitectura orientada a DDD (Domain-Driven Design): separar en capas **domain** (entidades, value objects, repositorios), **application** (casos de uso, DTOs) e **infrastructure** (persistencia, servicios externos).
+- **Lenguaje ubicuo en español** — todo el código del dominio, nombres de clases, métodos, variables, comentarios y commits deben usar términos del dominio UBA en español (ej: `Convocatoria`, `Proyecto`, `Evaluacion`, `Rendicion`, `DirectorDeProyecto`).
 - Cada módulo en su propia carpeta con nombre en plural (`usuarios/`, `convocatorias/`).
 - Los endpoints REST usan plural: `GET /convocatorias`, `POST /proyectos`.
 - Entidades TypeORM decoradas con `@Entity()`, `@PrimaryGeneratedColumn()`, etc.
