@@ -5,7 +5,9 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "lint": "eslint src/",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
     "@nestjs/common": "^10.4.0",
@@ -20,8 +22,14 @@
     "typeorm": "^1.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@nestjs/cli": "^10.4.0",
     "@types/morgan": "^1.9.10",
-    "typescript": "^5.6.0"
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0"
   }
 }
