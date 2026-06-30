@@ -12,6 +12,7 @@ classDiagram
         +fechasPresentacion: RangoFechas
         +fechasEvaluacion: RangoFechas
         +fechasEjecucion: RangoFechas
+        +cuotaFederativa: number
     }
 
     class EstadoConvocatoria {
@@ -69,6 +70,7 @@ classDiagram
 - `Configuracion` y `Cierre` no tienen fechas asociadas.
 - `TemplateFormulario` define los campos dinámicos del formulario de presentación. Puede reutilizarse entre convocatorias (`esDefault`).
 - Un `CampoFormulario` puede tener `opciones` solo cuando su `tipo` es `checkbox` o `select`.
+- `cuotaFederativa` define el mínimo de proyectos a adjudicar por unidad académica en esa convocatoria.
 
 ---
 
@@ -79,6 +81,7 @@ classDiagram
     class Proyecto {
         +id: string
         +nombre: string
+        +esConsolidado: boolean
     }
 
     class Edicion {
@@ -164,7 +167,8 @@ classDiagram
 
 ### Notas
 
-- `Proyecto` es una entidad raíz con datos estables que persisten entre años (ej: nombre).
+- `Proyecto` es una entidad raíz con datos estables que persisten entre años (ej: nombre, `esConsolidado`).
+- `esConsolidado = true` indica que el proyecto tiene el mismo equipo directivo 2 años consecutivos. Su Edición saltea la etapa `Evaluacion` en la convocatoria actual.
 - `Edicion` representa la instancia de un proyecto dentro de una convocatoria específica. Un proyecto puede tener múltiples ediciones a lo largo del tiempo.
 - El estado `NoAdjudicado` es terminal (no hay suplencia).
 - El `Presupuesto` se compone de exactamente 3 rubros fijos: `ViaticosYSeguros`, `BienesDeConsumo` y `BienesDeUso`.
@@ -201,6 +205,7 @@ classDiagram
     class EvaluacionInstitucional {
         +id: string
         +estado: EstadoEvaluacion
+        +observaciones: string
     }
 
     class EvaluacionCruzada {
@@ -319,3 +324,208 @@ classDiagram
   - Es **regla de negocio** excluyente: no se pueden mezclar roles de gestión con roles de ejecución.
 - `estadoDirector` solo aplica cuando el usuario tiene `DirectorDeProyecto` en sus roles (PendienteDeValidacion → Validado | Rechazado).
 - `creadoPor` referencia al Usuario que creó la cuenta (aplica para Evaluadores y Asistentes).
+
+---
+
+## Rendición
+
+```mermaid
+classDiagram
+    class Rendicion {
+        +id: string
+    }
+
+    class Comprobante {
+        +id: string
+        +rubro: TipoRubro
+        +archivo: string
+        +fechaSubida: Date
+        +estado: EstadoComprobante
+        +comentarioRechazo: string
+    }
+
+    class EstadoComprobante {
+        <<enumeration>>
+        EnRevision
+        Aceptado
+        Rechazado
+    }
+
+    Edicion --> Rendicion : tiene (1 a 1)
+    Rendicion *-- Comprobante : contiene
+    Comprobante *-- EstadoComprobante : estado
+    Comprobante --> TipoRubro : rubro
+    Comprobante --> Usuario : subido por
+    Comprobante --> Usuario : revisado por
+    Comprobante --> Comprobante : reemplaza a
+```
+
+### Notas
+
+- Una única `Rendicion` por `Edicion`. Activa durante la etapa `Ejecucion` de la convocatoria.
+- El director y/o codirector suben `Comprobante`s (archivos PDF o imagen), cada uno asociado a un rubro del presupuesto.
+- Cada comprobante tiene un estado individual: `EnRevision → Aceptado | Rechazado`.
+- Cuando un usuario de rectorado rechaza un comprobante, puede dejar un `comentarioRechazo` explicativo. El director puede subir un nuevo comprobante que reemplace al rechazado (relación `reemplaza a`).
+- `Rendicion` no tiene estado global — se considera "en curso" mientras la convocatoria esté en `Ejecucion`.
+
+---
+
+## Seguimiento de Ejecución
+
+```mermaid
+classDiagram
+    class Hito {
+        +id: string
+        +titulo: string
+        +descripcion: string
+        +fechaInicio: Date
+        +fechaFin: Date
+        +integrantes: string
+        +categoria: CategoriaHito
+    }
+
+    class CategoriaHito {
+        <<enumeration>>
+    }
+
+    Edicion --> Hito : tiene (0 a N)
+    Hito *-- CategoriaHito : categoria
+```
+
+### Notas
+
+- Los directores registran `Hito`s durante la etapa `Ejecucion` para documentar las actividades realizadas con su equipo.
+- `CategoriaHito` es un enumerado fijo (valores por definir).
+- `integrantes` es texto libre (nombres de estudiantes y colaboradores), no referencia a `Usuario`.
+- El director puede editar o eliminar hitos mientras la edición esté en etapa `Ejecucion`.
+- Visibilidad: solo usuarios de la Secretaría de la UA correspondiente y de Rectorado pueden consultar los hitos de un proyecto.
+
+---
+
+## Adjudicación y Orden de Mérito
+
+```mermaid
+classDiagram
+    class OrdenDeMerito {
+        +id: string
+    }
+
+    class PuestoEnOrden {
+        +posicion: number
+        +notaFinal: number
+    }
+
+    class Adjudicacion {
+        +id: string
+        +fechaResolucion: Date
+    }
+
+    class EdicionAdjudicada {
+        +montoAsignado: number
+    }
+
+    Convocatoria --> OrdenDeMerito : tiene (1 a 1)
+    OrdenDeMerito *-- PuestoEnOrden : contiene
+    PuestoEnOrden --> Edicion : proyecto
+
+    Convocatoria --> Adjudicacion : tiene (1 a 1)
+    Adjudicacion *-- EdicionAdjudicada : incluye
+    EdicionAdjudicada --> Edicion : proyecto adjudicado
+```
+
+### Notas
+
+- `OrdenDeMerito` se genera automáticamente al finalizar la etapa `Evaluacion`. Ordena todos los proyectos evaluados por `notaFinal` descendente.
+- La `notaFinal` se calcula combinando la evaluación institucional (1) y las evaluaciones cruzadas (2). La fórmula exacta se definirá posteriormente.
+- Los proyectos con `esConsolidado = true` aparecen primeros en el orden de mérito, ordenados por nota final entre sí.
+- `Adjudicacion` es la resolución formal emitida por Rectorado que selecciona proyectos del orden de mérito y les asigna un monto.
+- `cuotaFederativa` actúa como piso: si al aplicar el orden de mérito una UA tiene menos proyectos adjudicados que la cuota, se toman los siguientes mejores proyectos de esa UA aunque tengan menor nota que otros de UAs que ya superaron la cuota.
+
+---
+
+## Cierre
+
+```mermaid
+classDiagram
+    class InformeFinal {
+        +id: string
+        +estado: EstadoInforme
+        +contenido: string
+        +archivoAdjunto: string
+        +fechaCreacion: Date
+        +fechaConfirmacion: Date
+    }
+
+    class EstadoInforme {
+        <<enumeration>>
+        Borrador
+        Confirmado
+    }
+
+    Edicion --> InformeFinal : tiene (1 a 1)
+    InformeFinal *-- EstadoInforme : estado
+```
+
+### Notas
+
+- Cuando la convocatoria pasa a `Ejecucion`, se crea un `InformeFinal` vacío asociado a cada `Edicion`.
+- El sistema autogenera el `contenido` inicial a partir de los hitos registrados durante la ejecución. El director puede editarlo libremente y opcionalmente adjuntar un `archivoAdjunto` (PDF).
+- Cuando la convocatoria pasa a `Cierre`, se exige que el `InformeFinal` esté `Confirmado` **y** que la `AutoevaluacionImpacto` esté `Completada` para que la `Edicion` pase a `Cerrado`.
+- Una vez confirmado, queda como registro definitivo (nadie lo aprueba).
+
+---
+
+## Autoevaluación de Impacto
+
+```mermaid
+classDiagram
+    class TemplateAutoevaluacionImpacto {
+        +id: string
+        +nombre: string
+        +esDefault: boolean
+    }
+
+    class PreguntaAutoevaluacion {
+        <<value object>>
+        +tipo: TipoPregunta
+        +texto: string
+        +esObligatorio: boolean
+        +orden: number
+        +opciones: string[]
+        +escalaMin: number
+        +escalaMax: number
+    }
+
+    class TipoPregunta {
+        <<enumeration>>
+        texto
+        booleano
+        escalaNumerica
+        select
+        checkbox
+    }
+
+    class AutoevaluacionImpacto {
+        +id: string
+        +estado: EstadoAutoevaluacion
+    }
+
+    class EstadoAutoevaluacion {
+        <<enumeration>>
+        Borrador
+        Completada
+    }
+
+    Convocatoria --> TemplateAutoevaluacionImpacto : tiene (1 a 1)
+    TemplateAutoevaluacionImpacto *-- PreguntaAutoevaluacion : preguntas
+    PreguntaAutoevaluacion *-- TipoPregunta : tipo
+    Edicion --> AutoevaluacionImpacto : tiene (1 a 1)
+    AutoevaluacionImpacto *-- EstadoAutoevaluacion : estado
+```
+
+### Notas
+
+- `TemplateAutoevaluacionImpacto` es configurable por convocatoria (creado por Rectorado), con `esDefault` para reutilizar entre convocatorias.
+- Cada pregunta puede ser de tipo `texto`, `booleano`, `escalaNumerica` (con mínimo y máximo por pregunta), `select` o `checkbox` (con `opciones` predefinidas).
+- La completa el director o codirector de la Edición durante la etapa `Ejecucion`. Puede guardarse como `Borrador` y retomarse después.
+- Es requisito obligatorio para el cierre: la Edición no pasa a `Cerrado` hasta que la autoevaluación esté `Completada`.
