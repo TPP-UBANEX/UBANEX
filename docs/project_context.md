@@ -155,127 +155,143 @@ Se profundizó en:
 
 # 4. Proceso UBANEX
 
-## Módulo 1 – Apertura y Presentación
+## Módulo 1 – Convocatorias y Presentación
 
 ### Objetivo
 
-Permitir presentar proyectos.
+Gestionar el ciclo completo de las convocatorias y la presentación de proyectos.
 
-### Funcionalidades
+### Convocatoria
 
-* Publicar convocatorias.
-* Crear formularios dinámicos.
-* Configurar campos obligatorios y opcionales.
-* Adjuntar documentación.
-* Gestionar estados.
+- Cada convocatoria tiene **año** y **5 estados** que se corresponden con las etapas del proceso: `Configuración → Presentación → Evaluación → Ejecución → Cierre`.
+- Las etapas `Presentación`, `Evaluación` y `Ejecución` tienen **fechas de inicio y fin** configurables al crear la convocatoria. `Configuración` y `Cierre` no tienen fechas asociadas.
 
-### Características importantes
+### Formularios dinámicos
 
-Los formularios deben permitir:
+- Cada convocatoria define su propio **template de formulario** (estructura de campos) para la presentación de proyectos.
+- Los templates pueden reutilizarse entre convocatorias (opción **default**).
+- Tipos de campo disponibles: `texto`, `booleano`, `checkbox`, `select`, `archivo`.
+- Cada campo se configura como obligatorio u opcional.
 
-* Texto.
-* Booleanos.
-* Checkboxes.
-* Selects.
-* Integrantes.
-* Roles.
-* Objetivos.
-* Actividades.
-* Archivos.
+### Proyecto y Edición
 
-### Restricciones
-
-* Director puede editar hasta el cierre.
-* Rectorado puede editar excepcionalmente luego.
+- Un **Proyecto** es una entidad raíz con datos estables que persisten entre años (ej: nombre).
+- Una **Edición** es la instancia de un proyecto dentro de una convocatoria específica. Un proyecto puede tener múltiples ediciones a lo largo del tiempo.
+- Cada edición pertenece a una **Unidad Académica** (la facultad de su director).
+- Estados de una edición: `Borrador → Presentado → PendienteDeCambios → EnEvaluación → Adjudicado | NoAdjudicado → EnEjecución → Cerrado`.
+- `NoAdjudicado` es terminal.
+- Cada edición tiene un **director** (obligatorio) y un **codirector** (opcional), ambos con rol DirectorDeProyecto.
+- Un director puede participar en máximo **2 proyectos por convocatoria** (1 como director + 1 como codirector).
 
 ---
 
-# Módulo 2 – Evaluación y Adjudicación
+## Módulo 2 – Evaluación y Adjudicación
 
-## Evaluación Institucional
+### Unidad Académica
 
-Realizada por:
+- La UBA tiene **14 unidades académicas** (facultades).
+- Cada proyecto/edición pertenece a la UA de su director.
+- Los evaluadores pertenecen a una UA específica.
+- Las Secretarías de Extensión pertenecen cada una a su UA. El Rectorado es órgano central y no pertenece a ninguna UA.
 
-* Secretarías de extensión.
+### Emparejamiento
 
-Características:
+- Por cada convocatoria, el Rectorado define **7 parejas de unidades académicas** (14 UAs total). Cada UA se empareja con una única otra.
 
-* Revisión administrativa.
-* Puntaje numérico.
+### Evaluación Institucional
 
----
+Realizada por la Secretaría de Extensión de la UA del proyecto:
 
-## Evaluación Cruzada
+- La pueden completar tanto **Autoridades** como **Asistentes** de Secretaría.
+- La **confirmación** final la da exclusivamente una **Autoridad** de Secretaría.
+- Tiene estado `Borrador | Confirmada`.
 
-Realizada por:
+#### Estructura
 
-* Evaluadores docentes.
+- **Categorías** configurables por convocatoria (default: "Puntaje diferencial", "Articulación del proyecto"). Cada categoría contiene **subcategorías** con:
+  - nombre del criterio
+  - tipo de valor (numérico con mínimo y máximo, o booleano) — excluyentes
+  - fundamentación opcional
+- **Checklist** — sección independiente de ítems booleanos que **no suma** a la ponderación final.
+- La **ponderación final** se obtiene de la suma de las categorías.
 
-Características:
+### Evaluación Cruzada
 
-* Evaluación de contenido.
-* Puntaje numérico.
+Realizada por **Evaluadores docentes** de las UAs emparejadas:
 
----
+- Cada evaluador evalúa proyectos **propios** (de su UA) y **ajenos** (de la UA emparejada).
+- Un evaluador puede evaluar múltiples proyectos.
+- Cada edición recibe **0 a 3 evaluaciones cruzadas**: propia, ajena, y eventualmente una tercera de una UA de resolución para inconsistencias extraordinarias.
+- El evaluador mismo confirma su evaluación (no requiere autoridad superior).
+- Tiene estado `Borrador | Confirmada`.
 
-## Reglas importantes
+#### Estructura
 
-### Conflictos de interés
+- **5 categorías** configurables por convocatoria (default: Justificación y Formulación 25pts, Capacitación de Alumnos 20pts, Adecuación Instrumental y Factibilidad 10pts, Vinculación con el Medio 12pts, Impacto Social 15pts).
+- Cada categoría contiene **ítems** con nombre, puntaje máximo y puntaje asignado.
+- Al final se muestra un **cuadro de puntuación** con categorías, puntajes máximos y puntajes asignados, más la **ponderación final** (suma de máximos y suma de asignados). Es calculado, no almacenado.
+
+### Templates de evaluación
+
+- Ambos tipos de evaluación tienen **templates configurables** por convocatoria, análogos a los formularios dinámicos.
+- Pueden reutilizarse entre convocatorias (opción default).
+
+### Reglas importantes
+
+#### Conflictos de interés
 
 No puede evaluarse:
 
 * Su propio proyecto.
 * Proyecto donde participe.
 
-### Asignaciones
+#### Asignaciones
 
-Rectorado:
+- Rectorado define los cruces entre facultades (emparejamiento).
+- La evaluación cruzada es abierta: todos los evaluadores de una pareja de UAs pueden evaluar cualquier proyecto, pero cada proyecto recibe una sola evaluación proveniente de cada UA.
 
-* Define cruces entre facultades.
+### Puntajes
 
-Secretarías:
+- Ambas evaluaciones generan puntaje por separado.
+- No rechazan proyectos directamente. El rechazo o aprobación surge posteriormente.
 
-* Asignan evaluadores a proyectos.
+### Proyectos consolidados
 
----
+Proyecto financiado y ejecutado durante dos años consecutivos con mismo equipo directivo. Reciben tratamiento diferencial.
 
-## Puntajes
-
-Ambas evaluaciones generan puntaje.
-
-No rechazan proyectos directamente.
-
-El rechazo o aprobación surge posteriormente.
-
----
-
-## Proyectos consolidados
-
-Definición:
-
-Proyecto financiado y ejecutado durante dos años consecutivos con mismo equipo directivo.
-
-Reciben tratamiento diferencial.
-
----
-
-## Orden de mérito
+### Orden de mérito
 
 Se construye utilizando:
-
-* Puntajes.
+* Puntajes de ambas evaluaciones.
 * Prioridades institucionales.
 * Cuota federativa.
 
 ---
 
-# Módulo 3 – Ejecución y Rendición
+## Módulo 3 – Ejecución y Rendición
 
 Comienza cuando se firma la resolución de adjudicación.
 
-## Funcionalidades
+### Presupuesto
 
-* Presupuestos.
+- Cada edición tiene un **presupuesto** asociado desde su creación (puede estar vacío en estado Borrador).
+- El presupuesto tiene un **monto total** y se compone de **3 rubros fijos**:
+
+#### Rubro 1: Viáticos y Seguros
+- Desglosado por **tipo de persona** (Docente / Estudiante).
+- Cada partida incluye: descripción, período, monto.
+- El subtotal del rubro suma los montos de ambos tipos de persona.
+
+#### Rubro 2: Bienes de Consumo
+- Cada partida incluye: descripción, cantidad, precio unitario, monto.
+- Subtotal calculado.
+
+#### Rubro 3: Bienes de Uso
+- Misma estructura que Bienes de Consumo.
+
+### Funcionalidades
+
+* Presupuestos (con el desglose por rubros).
 * Comprobantes.
 * Facturas.
 * Tickets.
@@ -286,11 +302,9 @@ Actualmente:
 
 Todo se realiza mediante Google Drive.
 
----
+### Mejoras buscadas
 
-## Mejoras buscadas
-
-* Clasificación por rubros.
+* Clasificación por rubros (ya definido en el modelo de dominio).
 * Trazabilidad.
 * Historial.
 * Estados de aprobación.
@@ -314,61 +328,75 @@ Documentación:
 
 # 5. Roles del Sistema
 
-## Rectorado
+### Unidad Académica
+
+Las 14 facultades de la UBA son la unidad organizativa central del sistema. Cada una tiene su propia Secretaría de Extensión. El Rectorado es un órgano central que no pertenece a ninguna UA.
+
+### Rectorado
+
+#### Autoridad de Rectorado (1 a 3 en total)
 
 Funciones:
-
-* Crear convocatorias.
-* Configurar formularios.
+* Crear y configurar convocatorias (etapas, fechas, templates).
+* Definir emparejamientos de UAs.
 * Validar proyectos.
-* Definir cruces.
 * Emitir adjudicaciones.
-* Administrar usuarios.
-
-Permisos especiales:
-
+* Administrar usuarios del sistema (crear Asistentes de Rectorado, Autoridades de Secretaría).
 * Modificar convocatorias incluso luego del cierre.
 
----
+#### Asistente de Rectorado (0 a N)
 
-## Secretarías de Extensión
-
-Funciones:
-
-* Validar proyectos.
-* Gestionar evaluadores.
-* Realizar evaluación institucional.
-* Crear usuarios.
+Puede realizar muchas de las funciones de las Autoridades, pero **no puede dar confirmaciones finales** ni realizar acciones críticas como emitir adjudicaciones o modificar convocatorias cerradas.
 
 ---
 
-## Director de Proyecto
+### Secretarías de Extensión (por Unidad Académica)
+
+#### Autoridad de Secretaría (1 a 3 por UA)
 
 Funciones:
+* Validar proyectos de su UA.
+* Realizar y **confirmar** evaluaciones institucionales.
+* Crear Evaluadores de su UA.
+* Crear Asistentes de Secretaría de su UA.
+* Validar la habilitación de Directores de Proyecto de su UA.
 
-* Crear proyectos.
-* Editarlos.
-* Adjuntar documentación.
+#### Asistente de Secretaría (0 a N por UA)
+
+Puede realizar muchas de las funciones de las Autoridades de Secretaría (incluyendo completar evaluaciones institucionales), pero **no puede confirmar** evaluaciones, validar directores ni crear usuarios.
+
+---
+
+### Director de Proyecto (0 a N)
+
+Funciones:
+* Crear proyectos y ediciones.
+* Editarlos y adjuntar documentación.
 * Responder observaciones.
 * Gestionar rendiciones.
 
-Restricción:
+Registro y validación:
+* Se registra por sí mismo en la aplicación.
+* Requiere **validación** por una Autoridad de Secretaría de su UA.
+* Estados: `PendienteDeValidación → Validado | Rechazado`.
 
-Máximo dos participaciones por convocatoria.
+Restricción:
+* Máximo 2 participaciones por convocatoria (1 como director + 1 como codirector).
 
 ---
 
-## Evaluadores
+### Evaluador (0 a N por UA)
 
 Funciones:
-
-* Evaluar proyectos.
+* Evaluar proyectos (propios y ajenos de la UA emparejada).
 * Asignar puntajes.
 * Emitir observaciones.
 
-Restricciones:
+Registro:
+* Es creado por una **Autoridad de Secretaría** de su UA (no se registra solo).
 
-No pueden tener conflicto de interés.
+Restricciones:
+* No puede tener conflicto de interés.
 
 ---
 
@@ -526,31 +554,42 @@ Características:
 
 ## Rectorado
 
-Actividades:
+### Autoridad de Rectorado
 
-* Configurar convocatoria.
-* Gestionar formularios.
+* Configurar convocatoria (etapas, fechas, templates).
+* Gestionar formularios y templates de evaluación.
+* Definir emparejamiento de UAs.
 * Validar proyectos.
-* Gestionar evaluadores.
 * Emitir adjudicaciones.
+* Administrar usuarios del sistema.
+
+### Asistente de Rectorado
+
+* Colaborar en la configuración de convocatorias.
+* Gestionar formularios.
+* Revisar proyectos.
 
 ---
 
 ## Secretaría
 
-Actividades:
+### Autoridad de Secretaría
+
+* Validar proyectos de su UA.
+* Evaluar institucionalmente y **confirmar** evaluaciones.
+* Gestionar evaluadores (crearlos).
+* Validar directores de proyecto.
+
+### Asistente de Secretaría
 
 * Revisar proyectos.
-* Evaluar institucionalmente.
-* Gestionar evaluadores.
+* Completar evaluaciones institucionales (sin confirmar).
 
 ---
 
-## Director
+## Director de Proyecto
 
-Actividades:
-
-* Crear proyecto.
+* Crear proyecto y ediciones.
 * Presentar documentación.
 * Gestionar ejecución.
 * Gestionar rendición.
@@ -559,9 +598,7 @@ Actividades:
 
 ## Evaluador
 
-Actividades:
-
-* Revisar proyectos.
+* Revisar proyectos (propios y ajenos).
 * Asignar puntajes.
 * Emitir observaciones.
 
@@ -571,12 +608,18 @@ Actividades:
 
 Frontend:
 
-* React.
-* Shadcn UI.
+* React 18.
+* TypeScript 5.
+* Vite 5.
+* TailwindCSS 3.
+* shadcn/ui.
+* React Router 7.
 
 Backend:
 
-* Node.js.
+* NestJS 10.
+* TypeScript 5.
+* TypeORM 1.x.
 
 Base de datos:
 
@@ -584,7 +627,7 @@ Base de datos:
 
 Campos dinámicos:
 
-* JSON.
+* JSON (para almacenar respuestas de formularios dinámicos).
 
 ---
 
@@ -700,7 +743,7 @@ Duración:
 
 ## Infraestructura
 
-* ¿Dónde se almacenarán los documentos?
+* ¿Dónde se almacenarán los documentos adjuntos (archivos de formularios, comprobantes de rendición)?
 * ¿Hay límite de espacio?
 * ¿Existe infraestructura FIUBA disponible?
 
@@ -711,15 +754,15 @@ Duración:
 
 ## Evaluación
 
-* Fórmula exacta del puntaje final.
+* Fórmula exacta del puntaje final (cómo se combinan evaluación institucional y cruzada para el orden de mérito).
 * Reglas precisas de cuota federativa.
-* Manejo de suplentes.
+* Manejo de suplentes y de la tercera UA de resolución de inconsistencias.
 
 ## Rendición
 
-* Flujo exacto de aprobación.
-* Estados posibles.
-* Responsables finales.
+* Flujo exacto de aprobación de rendiciones.
+* Estados posibles de una rendición.
+* Responsables finales de la aprobación (autoridad de Secretaría, Rectorado, etc.).
 
 ---
 
@@ -728,12 +771,13 @@ Duración:
 Proyecto definido.
 Relevamiento avanzado.
 Documento de propuesta prácticamente terminado.
+Modelo de dominio completo en `docs/dominio/modelo.md` (diagramas Mermaid: Convocatoria, Proyecto y Edición, Evaluación, Usuarios y Roles).
 Próximos artefactos:
 
 * Product Vision.
-* User Story Mapping.
+* User Story Mapping (borrador inicial en esta sección).
 * WBS.
 * Wireframes.
 * Backlog.
-* Diagramas.
+* Implementación de entidades del modelo de dominio.
 * Presentación de defensa.
