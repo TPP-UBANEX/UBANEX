@@ -279,7 +279,7 @@ classDiagram
         +id: string
         +email: string
         +nombreCompleto: string
-        +rol: RolUsuario
+        +roles: RolUsuario[]
         +estadoDirector: EstadoDirector
         +habilitado: boolean
     }
@@ -301,8 +301,8 @@ classDiagram
         Rechazado
     }
 
-    Usuario *-- RolUsuario : rol
-    Usuario *-- EstadoDirector : estadoDirector (si rol = DirectorDeProyecto)
+    Usuario *-- RolUsuario : roles
+    Usuario *-- EstadoDirector : estadoDirector (si tiene DirectorDeProyecto en roles)
     Usuario --> UnidadAcademica : pertenece a (nullable)
     Usuario --> Usuario : creado por
 ```
@@ -313,5 +313,9 @@ classDiagram
 - **Secretaría de Extensión**: 1 a 3 Autoridades, 0 a N Asistentes por UA. Cada usuario de Secretaría pertenece a una UA específica.
 - **Director de Proyecto**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Puede estar asignado a una `Edicion` como director o codirector. Máximo 2 proyectos por convocatoria (1 como director + 1 como codirector).
 - **Evaluador**: 0 a N por UA. Creado por Autoridad de Secretaría de dicha UA.
-- `estadoDirector` solo aplica cuando `rol = DirectorDeProyecto` (PendienteDeValidacion → Validado | Rechazado).
+- Un usuario puede acumular múltiples roles a lo largo del tiempo (ej: fue DirectorDeProyecto en una convocatoria y luego Evaluador en otra), pero todos deben pertenecer al mismo **grupo**:
+  - **Gestión**: AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria
+  - **Ejecución**: DirectorDeProyecto, Evaluador
+  - Es **regla de negocio** excluyente: no se pueden mezclar roles de gestión con roles de ejecución.
+- `estadoDirector` solo aplica cuando el usuario tiene `DirectorDeProyecto` en sus roles (PendienteDeValidacion → Validado | Rechazado).
 - `creadoPor` referencia al Usuario que creó la cuenta (aplica para Evaluadores y Asistentes).
