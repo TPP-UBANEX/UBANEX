@@ -35,12 +35,6 @@ export class UsuariosController {
   }
 
   @Get(':id')
-  @Roles(
-    RolUsuario.AutoridadDeRectorado,
-    RolUsuario.AsistenteDeRectorado,
-    RolUsuario.AutoridadDeSecretaria,
-    RolUsuario.AsistenteDeSecretaria,
-  )
   obtener(@Param('id') id: string) {
     return this.service.obtener(id);
   }
