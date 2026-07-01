@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { ThemeToggle } from './ThemeToggle'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LogOut, Bell } from 'lucide-react'
 
 export function Header() {
+  const navigate = useNavigate()
   const { user, logout } = useAuth()
 
   const iniciales = user?.nombreCompleto
@@ -54,7 +56,7 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive">
+            <DropdownMenuItem onClick={() => { logout(); navigate('/login') }} className="text-destructive">
               <LogOut className="h-4 w-4 mr-2" />
               Cerrar sesión
             </DropdownMenuItem>
