@@ -1,3 +1,62 @@
+export enum RolUsuario {
+  AutoridadDeRectorado = 'AutoridadDeRectorado',
+  AsistenteDeRectorado = 'AsistenteDeRectorado',
+  AutoridadDeSecretaria = 'AutoridadDeSecretaria',
+  AsistenteDeSecretaria = 'AsistenteDeSecretaria',
+  DirectorDeProyecto = 'DirectorDeProyecto',
+  Evaluador = 'Evaluador',
+}
+
+export enum EstadoDirector {
+  PendienteDeValidacion = 'PendienteDeValidacion',
+  Validado = 'Validado',
+  Rechazado = 'Rechazado',
+}
+
+export interface UnidadAcademica {
+  id: string
+  nombre: string
+}
+
+export interface Usuario {
+  id: string
+  nombreCompleto: string
+  email: string
+  roles: RolUsuario[]
+  unidadAcademica?: UnidadAcademica
+  unidadAcademicaId?: string
+  estadoDirector?: EstadoDirector
+  habilitado: boolean
+  creadoPor?: Usuario
+  creadoPorId?: string
+}
+
+export interface AuthResponse {
+  accessToken: string
+}
+
+export interface LoginDto {
+  email: string
+  password: string
+}
+
+export interface RegisterDto {
+  nombreCompleto: string
+  email: string
+  password: string
+  unidadAcademicaId?: string
+}
+
+export interface CrearUsuarioDto {
+  nombreCompleto: string
+  email: string
+  password: string
+  roles: RolUsuario[]
+  unidadAcademicaId?: string
+}
+
+// --- Entidades existentes (se mantienen, se actualizarán en fases siguientes) ---
+
 export interface Convocatoria {
   id: string
   nombre: string
@@ -39,14 +98,6 @@ export interface Rendicion {
   estado: string
   fecha: string
   comprobanteUrl?: string
-}
-
-export interface Usuario {
-  id: string
-  nombre: string
-  email: string
-  rol: string
-  facultad?: string
 }
 
 export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {

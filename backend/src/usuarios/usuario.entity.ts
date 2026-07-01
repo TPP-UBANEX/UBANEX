@@ -1,4 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn,
+} from 'typeorm';
+import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
+import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { EstadoDirector } from '../common/enums/estado-director.enum';
 
 @Entity()
 export class Usuario {
@@ -6,14 +11,34 @@ export class Usuario {
   id: string;
 
   @Column()
-  nombre: string;
+  nombreCompleto: string;
 
-  @Column()
+  @Column({ unique: true })
   email: string;
 
   @Column()
-  rol: string;
+  password: string;
+
+  @Column('simple-array', { default: '' })
+  roles: RolUsuario[];
+
+  @ManyToOne(() => UnidadAcademica, { nullable: true })
+  @JoinColumn({ name: 'unidadAcademicaId' })
+  unidadAcademica: UnidadAcademica;
 
   @Column({ nullable: true })
-  facultad: string;
+  unidadAcademicaId: string;
+
+  @Column({ nullable: true, type: 'varchar' })
+  estadoDirector: EstadoDirector | null;
+
+  @Column({ default: true })
+  habilitado: boolean;
+
+  @ManyToOne(() => Usuario, { nullable: true })
+  @JoinColumn({ name: 'creadoPorId' })
+  creadoPor: Usuario;
+
+  @Column({ nullable: true })
+  creadoPorId: string;
 }

@@ -28,8 +28,24 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Usuario } from '@/data/types'
-import { estadoBadge } from '@/data/types'
+import { RolUsuario } from '@/data/types'
 import { Plus, Search } from 'lucide-react'
+
+const rolLabels: Record<string, string> = {
+  [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
+  [RolUsuario.AsistenteDeRectorado]: 'Asistente Rectorado',
+  [RolUsuario.AutoridadDeSecretaria]: 'Autoridad Secretaría',
+  [RolUsuario.AsistenteDeSecretaria]: 'Asistente Secretaría',
+  [RolUsuario.DirectorDeProyecto]: 'Director',
+  [RolUsuario.Evaluador]: 'Evaluador',
+}
+
+function rolColor(rol: string): string {
+  if (rol.includes('Rectorado')) return 'text-blue-600'
+  if (rol.includes('Secretaria')) return 'text-green-600'
+  if (rol === RolUsuario.Evaluador) return 'text-amber-600'
+  return 'text-purple-600'
+}
 
 export function Usuarios() {
   const [data, setData] = useState<Usuario[]>([])
@@ -45,16 +61,16 @@ export function Usuarios() {
   }, [])
 
   const filtrados = data.filter(u => {
-    if (rolFiltro !== 'todos' && u.rol !== rolFiltro) return false
-    if (search && !u.nombre.toLowerCase().includes(search.toLowerCase())) return false
+    if (rolFiltro !== 'todos' && !u.roles.includes(rolFiltro as RolUsuario)) return false
+    if (search && !u.nombreCompleto.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
   const stats = [
-    { label: 'Rectorado', value: data.filter(u => u.rol === 'rectorado').length, color: 'text-blue-600' },
-    { label: 'Secretarías', value: data.filter(u => u.rol === 'secretaria').length, color: 'text-green-600' },
-    { label: 'Evaluadores', value: data.filter(u => u.rol === 'evaluador').length, color: 'text-amber-600' },
-    { label: 'Directores', value: data.filter(u => u.rol === 'director').length, color: 'text-purple-600' },
+    { label: 'Rectorado', value: data.filter(u => u.roles.some(r => r.includes('Rectorado'))).length, color: 'text-blue-600' },
+    { label: 'Secretarías', value: data.filter(u => u.roles.some(r => r.includes('Secretaria'))).length, color: 'text-green-600' },
+    { label: 'Evaluadores', value: data.filter(u => u.roles.includes(RolUsuario.Evaluador)).length, color: 'text-amber-600' },
+    { label: 'Directores', value: data.filter(u => u.roles.includes(RolUsuario.DirectorDeProyecto)).length, color: 'text-purple-600' },
   ]
 
   return (
@@ -71,18 +87,20 @@ export function Usuarios() {
           <DialogContent>
             <DialogHeader><DialogTitle>Nuevo Usuario</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-4">
-              <Input placeholder="Nombre" />
+              <Input placeholder="Nombre completo" />
               <Input placeholder="Email" type="email" />
               <Select>
                 <SelectTrigger><SelectValue placeholder="Rol" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="rectorado">Rectorado</SelectItem>
-                  <SelectItem value="secretaria">Secretaría</SelectItem>
-                  <SelectItem value="evaluador">Evaluador</SelectItem>
-                  <SelectItem value="director">Director</SelectItem>
+                  <SelectItem value={RolUsuario.AutoridadDeRectorado}>Autoridad Rectorado</SelectItem>
+                  <SelectItem value={RolUsuario.AsistenteDeRectorado}>Asistente Rectorado</SelectItem>
+                  <SelectItem value={RolUsuario.AutoridadDeSecretaria}>Autoridad Secretaría</SelectItem>
+                  <SelectItem value={RolUsuario.AsistenteDeSecretaria}>Asistente Secretaría</SelectItem>
+                  <SelectItem value={RolUsuario.Evaluador}>Evaluador</SelectItem>
+                  <SelectItem value={RolUsuario.DirectorDeProyecto}>Director</SelectItem>
                 </SelectContent>
               </Select>
-              <Input placeholder="Facultad (opcional)" />
+              <Input placeholder="Unidad Académica (opcional)" />
               <Button className="w-full" onClick={() => setOpen(false)}>Crear</Button>
             </div>
           </DialogContent>
@@ -106,13 +124,15 @@ export function Usuarios() {
           <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={rolFiltro} onValueChange={setRolFiltro}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="rectorado">Rectorado</SelectItem>
-            <SelectItem value="secretaria">Secretaría</SelectItem>
-            <SelectItem value="evaluador">Evaluador</SelectItem>
-            <SelectItem value="director">Director</SelectItem>
+            <SelectItem value={RolUsuario.AutoridadDeRectorado}>Autoridad Rectorado</SelectItem>
+            <SelectItem value={RolUsuario.AsistenteDeRectorado}>Asistente Rectorado</SelectItem>
+            <SelectItem value={RolUsuario.AutoridadDeSecretaria}>Autoridad Secretaría</SelectItem>
+            <SelectItem value={RolUsuario.AsistenteDeSecretaria}>Asistente Secretaría</SelectItem>
+            <SelectItem value={RolUsuario.Evaluador}>Evaluador</SelectItem>
+            <SelectItem value={RolUsuario.DirectorDeProyecto}>Director</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -136,18 +156,28 @@ export function Usuarios() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Facultad</TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead>Unidad Académica</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtrados.map(u => (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.nombre}</TableCell>
+                    <TableCell className="font-medium">{u.nombreCompleto}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
-                    <TableCell><Badge variant={estadoBadge[u.rol]}>{u.rol}</Badge></TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{u.facultad || '-'}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {u.roles.map(r => (
+                          <Badge key={r} variant="outline" className={rolColor(r)}>
+                            {rolLabels[r] || r}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {u.unidadAcademica?.nombre || '-'}
+                    </TableCell>
                     <TableCell><Button variant="ghost" size="sm">Editar</Button></TableCell>
                   </TableRow>
                 ))}

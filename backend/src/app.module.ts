@@ -8,6 +8,8 @@ import { ProyectosModule } from './proyectos/proyectos.module';
 import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
 import { RendicionesModule } from './rendiciones/rendiciones.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { UnidadesAcademicasModule } from './unidades-academicas/unidades-academicas.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     EvaluacionesModule,
     RendicionesModule,
     UsuariosModule,
+    UnidadesAcademicasModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
