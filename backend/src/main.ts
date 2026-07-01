@@ -42,7 +42,26 @@ async function bootstrap() {
 
   console.log('Corriendo seeds...');
 
-  const derecho = await seedUnidadAcademica(uas, 'Facultad de Derecho');
+  const uasNombres = [
+    'Facultad de Derecho',
+    'Facultad de Ciencias Económicas',
+    'Facultad de Ciencias Sociales',
+    'Facultad de Filosofía y Letras',
+    'Facultad de Ingeniería',
+    'Facultad de Medicina',
+    'Facultad de Ciencias Exactas y Naturales',
+    'Facultad de Arquitectura, Diseño y Urbanismo',
+    'Facultad de Agronomía',
+    'Facultad de Farmacia y Bioquímica',
+    'Facultad de Odontología',
+    'Facultad de Psicología',
+    'Facultad de Ciencias Veterinarias',
+    'Ciclo Básico Común (CBC)',
+  ];
+
+  const [derecho] = await Promise.all(
+    uasNombres.map((nombre) => seedUnidadAcademica(uas, nombre)),
+  );
 
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Admin Rectorado',
