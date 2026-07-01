@@ -17,12 +17,12 @@ export class AuthService {
   async login(dto: LoginDto) {
     const usuario = await this.usuariosService.obtenerPorEmail(dto.email);
     if (!usuario) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException('Usuario o contraseña incorrecto!');
     }
 
     const passwordValida = await bcrypt.compare(dto.password, usuario.password);
     if (!passwordValida) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException('Usuario o contraseña incorrecto!');
     }
 
     if (!usuario.habilitado) {

@@ -20,8 +20,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
-    const error = await res.text().catch(() => res.statusText)
-    throw new Error(` ${method} ${path} failed: ${error}`)
+    const body = await res.json().catch(() => null)
+    const mensaje = body?.message || res.statusText
+    throw new Error(mensaje)
   }
   return res.json()
 }
