@@ -257,7 +257,7 @@ No puede evaluarse:
 
 ### Proyectos consolidados
 
-Proyecto financiado y ejecutado durante dos años consecutivos con mismo equipo directivo. Reciben tratamiento diferencial.
+Proyecto con `esConsolidado = true`: mismo equipo directivo durante dos años consecutivos. Su Edición **saltea la etapa de Evaluación** en la convocatoria actual y pasa directamente a Adjudicación (si cumple requisitos). Aparece primero en el orden de mérito, ordenado por nota final entre sí.
 
 ### Orden de mérito
 
@@ -266,9 +266,15 @@ Se construye utilizando:
 * Prioridades institucionales.
 * Cuota federativa.
 
+### Adjudicación
+
+- Es la **resolución formal** emitida por Rectorado que selecciona proyectos del orden de mérito y les asigna un monto.
+- El **Orden de Mérito** se genera **automáticamente** al finalizar la etapa `Evaluación`. Ordena todas las ediciones evaluadas por nota final descendente. Los proyectos consolidados aparecen primeros, ordenados por nota final entre sí.
+- La **cuota federativa** actúa como piso: si al aplicar el orden de mérito una UA tiene menos proyectos adjudicados que la cuota, se toman los siguientes mejores proyectos de esa UA, aunque tengan menor nota que otros de UAs que ya superaron la cuota.
+
 ---
 
-## Módulo 3 – Ejecución y Rendición
+## Módulo 3 – Ejecución, Rendición y Seguimiento
 
 Comienza cuando se firma la resolución de adjudicación.
 
@@ -289,40 +295,51 @@ Comienza cuando se firma la resolución de adjudicación.
 #### Rubro 3: Bienes de Uso
 - Misma estructura que Bienes de Consumo.
 
-### Funcionalidades
+### Rendición
 
-* Presupuestos (con el desglose por rubros).
-* Comprobantes.
-* Facturas.
-* Tickets.
-* Observaciones.
-* Readecuaciones presupuestarias.
+- Una única **Rendición** por Edición, activa durante la etapa `Ejecución`.
+- El director y/o codirector suben **Comprobantes** (archivos PDF o imagen), cada uno asociado a uno de los 3 rubros del presupuesto.
+- Cada comprobante tiene estado individual: `EnRevisión → Aceptado | Rechazado`.
+- La revisión de comprobantes la realiza Rectorado. Si se rechaza, se deja un **comentario** explicativo. El director puede subir un nuevo comprobante que **reemplace** al rechazado.
 
-Actualmente:
+Actualmente todo se realiza mediante Google Drive.
 
-Todo se realiza mediante Google Drive.
+### Seguimiento de Ejecución (Hitos)
+
+- Durante la etapa `Ejecución`, los directores registran **Hitos** para documentar actividades realizadas con su equipo.
+- Cada hito incluye: título, descripción, fecha de inicio, fecha de fin, integrantes (texto libre) y categoría (enumerado fijo por definir).
+- Visibilidad: solo usuarios de la Secretaría de la UA correspondiente y de Rectorado pueden consultar los hitos de un proyecto.
 
 ### Mejoras buscadas
 
-* Clasificación por rubros (ya definido en el modelo de dominio).
-* Trazabilidad.
-* Historial.
-* Estados de aprobación.
-* Comentarios.
+* Trazabilidad de comprobantes y su estado.
+* Historial de reemplazos de comprobantes rechazados.
+* Registro de hitos de ejecución.
 
 ---
 
-# Módulo 4 – Informes de Cierre
+## Módulo 4 – Cierre
 
-Objetivo:
+### Informe Final
 
-Cerrar formalmente los proyectos.
+- Cuando la convocatoria pasa a `Ejecución`, se crea un **InformeFinal** vacío asociado a cada Edición.
+- El sistema autogenera el contenido inicial a partir de los **hitos** registrados durante la ejecución. El director puede editarlo libremente y opcionalmente adjuntar un archivo PDF.
+- Estado: `Borrador → Confirmado`. Una vez confirmado, queda como registro definitivo (nadie lo aprueba).
 
-Documentación:
+### Autoevaluación de Impacto
 
-* Informes finales.
-* Evidencias.
-* Productos académicos.
+- Cada convocatoria define su propio **Template de Autoevaluación de Impacto** (configurable por Rectorado, reutilizable entre convocatorias, opción default).
+- Tipos de pregunta disponibles: texto, booleano, escala numérica (con mínimo y máximo), select, checkbox.
+- La completa el director o codirector durante la etapa `Ejecución`. Puede guardarse como `Borrador` y retomarse después.
+- Estado: `Borrador → Completada`.
+
+### Requisitos para el cierre
+
+Para que una Edición pase a `Cerrado` se requiere:
+
+- [ ] InformeFinal en estado `Confirmado`.
+- [ ] Autoevaluación de Impacto en estado `Completada`.
+- [ ] Rendición con todos los comprobantes en estado `Aceptado`.
 
 ---
 
@@ -331,6 +348,17 @@ Documentación:
 ### Unidad Académica
 
 Las 14 facultades de la UBA son la unidad organizativa central del sistema. Cada una tiene su propia Secretaría de Extensión. El Rectorado es un órgano central que no pertenece a ninguna UA.
+
+### Grupos de roles
+
+Los roles se dividen en dos **grupos excluyentes** — un usuario no puede mezclar roles de distintos grupos:
+
+| Grupo | Roles |
+|---|---|
+| **Gestión** | AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria |
+| **Ejecución** | DirectorDeProyecto, Evaluador |
+
+Un usuario puede acumular múltiples roles a lo largo del tiempo (ej: fue Director en una convocatoria y luego Evaluador en otra), pero todos deben pertenecer al mismo grupo.
 
 ### Rectorado
 
@@ -498,10 +526,11 @@ Sistema web modular compuesto por:
 
 1. Convocatorias y presentación.
 2. Evaluación.
-3. Adjudicación.
-4. Ejecución.
-5. Rendición.
-6. Cierre.
+3. Adjudicación y orden de mérito.
+4. Ejecución y seguimiento (hitos).
+5. Rendición (comprobantes).
+6. Autoevaluación de impacto.
+7. Cierre (informe final).
 
 Características:
 
@@ -562,6 +591,9 @@ Características:
 * Validar proyectos.
 * Emitir adjudicaciones.
 * Administrar usuarios del sistema.
+* Generar orden de mérito y emitir adjudicaciones.
+* Revisar y aceptar/rechazar comprobantes de rendición.
+* Configurar template de autoevaluación de impacto.
 
 ### Asistente de Rectorado
 
@@ -592,7 +624,10 @@ Características:
 * Crear proyecto y ediciones.
 * Presentar documentación.
 * Gestionar ejecución.
-* Gestionar rendición.
+* Registrar hitos de ejecución.
+* Subir comprobantes de rendición.
+* Completar autoevaluación de impacto.
+* Completar y confirmar informe final.
 
 ---
 
@@ -601,6 +636,14 @@ Características:
 * Revisar proyectos (propios y ajenos).
 * Asignar puntajes.
 * Emitir observaciones.
+
+---
+
+## Sistema (automatizaciones)
+
+* Generar orden de mérito al finalizar evaluación.
+* Crear informe final al iniciar ejecución (autogenerado desde hitos).
+* Verificar requisitos de cierre antes de permitir el estado Cerrado.
 
 ---
 
@@ -763,6 +806,17 @@ Duración:
 * Flujo exacto de aprobación de rendiciones.
 * Estados posibles de una rendición.
 * Responsables finales de la aprobación (autoridad de Secretaría, Rectorado, etc.).
+
+## Ejecución y Seguimiento
+
+* ¿Cuáles son las categorías fijas de hitos?
+* ¿Quién revisa los comprobantes de rendición exactamente (Rectorado, Secretaría, ambos)?
+* ¿Hay un límite de reemplazos de comprobantes rechazados?
+
+## Autoevaluación de Impacto
+
+* ¿El template de autoevaluación se comparte entre convocatorias como los formularios (esDefault)?
+* ¿Hay un mínimo de preguntas obligatorias?
 
 ---
 
