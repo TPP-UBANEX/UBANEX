@@ -28,6 +28,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import type { Usuario, UnidadAcademica } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import { Plus, Search, Loader2 } from 'lucide-react'
@@ -60,6 +61,16 @@ const rolesDisponibles: Record<string, RolUsuario[]> = {
   ],
 }
 
+function puedeEditarUsuario(logueado: Usuario, target: Usuario): boolean {
+  if (logueado.id === target.id) return true
+  if (logueado.roles.includes(RolUsuario.AutoridadDeRectorado)) return true
+  if (
+    logueado.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
+    logueado.unidadAcademicaId === target.unidadAcademicaId
+  ) return true
+  return false
+}
+
 export function Usuarios() {
   const { user } = useAuth()
   const [data, setData] = useState<Usuario[]>([])
@@ -69,14 +80,17 @@ export function Usuarios() {
   const [loading, setLoading] = useState(true)
   const [uaList, setUaList] = useState<UnidadAcademica[]>([])
 
-  useEffect(() => {
+  const cargarDatos = () =>
     Promise.all([
       api.usuarios.list(),
       api.unidadesAcademicas.list(),
     ]).then(([users, uas]) => {
       setData(users)
       setUaList(uas)
-    }).finally(() => setLoading(false))
+    })
+
+  useEffect(() => {
+    cargarDatos().finally(() => setLoading(false))
   }, [])
 
   const puedeCrear = user?.roles.some(r =>
@@ -85,7 +99,11 @@ export function Usuarios() {
   const rolesCreables = user ? rolesDisponibles[user.roles.find(r => r in rolesDisponibles) ?? ''] ?? [] : []
   const esSecretaria = user?.roles.includes(RolUsuario.AutoridadDeSecretaria)
 
-  const filtrados = data.filter(u => {
+  const dataFiltradaUA = user?.roles.includes(RolUsuario.AutoridadDeSecretaria)
+    ? data.filter(u => u.unidadAcademicaId === user.unidadAcademicaId)
+    : data
+
+  const filtrados = dataFiltradaUA.filter(u => {
     if (rolFiltro !== 'todos' && !u.roles.includes(rolFiltro as RolUsuario)) return false
     if (search && !u.nombreCompleto.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -117,7 +135,7 @@ export function Usuarios() {
               uaId={esSecretaria ? user?.unidadAcademicaId : undefined}
               onCreated={() => {
                 setOpen(false)
-                api.usuarios.list().then(setData)
+                cargarDatos()
               }}
             />
           </Dialog>
@@ -195,7 +213,18 @@ export function Usuarios() {
                     <TableCell className="text-sm text-muted-foreground">
                       {u.unidadAcademica?.nombre || '-'}
                     </TableCell>
-                    <TableCell><Button variant="ghost" size="sm">Editar</Button></TableCell>
+                    <TableCell>
+                      {user && puedeEditarUsuario(user, u) && (
+                        <EditarUsuarioDialog
+                          usuario={u}
+                          uaList={uaList}
+                          onUpdated={cargarDatos}
+                          trigger={
+                            <Button variant="ghost" size="sm">Editar</Button>
+                          }
+                        />
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

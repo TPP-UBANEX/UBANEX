@@ -21,6 +21,10 @@ export class UnidadesAcademicasService {
     return this.repo.find({ order: { nombre: 'ASC' } });
   }
 
+  async obtenerPorNombre(nombre: string): Promise<UnidadAcademica | null> {
+    return this.repo.findOne({ where: { nombre } });
+  }
+
   async obtener(id: string): Promise<UnidadAcademica> {
     const entity = await this.repo.findOne({ where: { id } });
     if (!entity) throw new NotFoundException(`Unidad académica ${id} no encontrada`);

@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, BadRequestException,
+  Injectable, NotFoundException, BadRequestException, ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -96,11 +96,39 @@ export class UsuariosService {
     return this.repo.findOne({ where: { email } });
   }
 
-  async actualizar(id: string, dto: ActualizarUsuarioDto): Promise<Usuario> {
+  async actualizar(id: string, dto: ActualizarUsuarioDto, usuarioLogueado?: Usuario): Promise<Usuario> {
     const entity = await this.obtener(id);
-    if (dto.roles) validarGruposRoles(dto.roles);
-    Object.assign(entity, dto);
-    return this.repo.save(entity);
+
+    const esAutoEdicion = usuarioLogueado && usuarioLogueado.id === id;
+    const esRectorado = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeRectorado);
+    const esSecretaria = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeSecretaria);
+    const mismaUA = esSecretaria && usuarioLogueado?.unidadAcademicaId === entity.unidadAcademicaId;
+
+    if (esAutoEdicion) {
+      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      if (dto.email !== undefined) entity.email = dto.email;
+      if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
+      return this.repo.save(entity);
+    }
+
+    if (esRectorado) {
+      if (dto.roles) validarGruposRoles(dto.roles);
+      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      if (dto.email !== undefined) entity.email = dto.email;
+      if (dto.roles !== undefined) entity.roles = dto.roles;
+      if (dto.unidadAcademicaId !== undefined) entity.unidadAcademicaId = dto.unidadAcademicaId;
+      if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
+      return this.repo.save(entity);
+    }
+
+    if (esSecretaria && mismaUA) {
+      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      if (dto.email !== undefined) entity.email = dto.email;
+      if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
+      return this.repo.save(entity);
+    }
+
+    throw new ForbiddenException('No tiene permisos para editar este usuario');
   }
 
   async actualizarEstadoDirector(

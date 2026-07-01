@@ -46,9 +46,12 @@ export class UsuariosController {
   }
 
   @Patch(':id')
-  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria)
-  actualizar(@Param('id') id: string, @Body() dto: ActualizarUsuarioDto) {
-    return this.service.actualizar(id, dto);
+  actualizar(
+    @Param('id') id: string,
+    @Body() dto: ActualizarUsuarioDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.actualizar(id, dto, usuario);
   }
 
   @Patch(':id/estado-director')
