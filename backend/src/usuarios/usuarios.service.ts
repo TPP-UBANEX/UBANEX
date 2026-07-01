@@ -42,7 +42,7 @@ export class UsuariosService {
     private readonly repo: Repository<Usuario>,
   ) {}
 
-  async crear(dto: CrearUsuarioDto): Promise<Usuario> {
+  async crear(dto: CrearUsuarioDto, creador?: Usuario): Promise<Usuario> {
     validarGruposRoles(dto.roles);
 
     const existente = await this.repo.findOne({ where: { email: dto.email } });
@@ -50,8 +50,29 @@ export class UsuariosService {
       throw new BadRequestException('El email ya está registrado');
     }
 
+    // Validaciones según el rol del creador
+    if (creador) {
+      const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria);
+      if (esSecretaria) {
+        const rolesPermitidos = [RolUsuario.Evaluador, RolUsuario.AsistenteDeSecretaria];
+        const todosPermitidos = dto.roles.every((r) => rolesPermitidos.includes(r));
+        if (!todosPermitidos) {
+          throw new BadRequestException(
+            'Autoridad de Secretaría solo puede crear Evaluadores y Asistentes de Secretaría',
+          );
+        }
+        if (!dto.unidadAcademicaId) {
+          dto.unidadAcademicaId = creador.unidadAcademicaId;
+        }
+      }
+    }
+
     const password = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const entity = this.repo.create({ ...dto, password });
+    const entity = this.repo.create({
+      ...dto,
+      password,
+      creadoPorId: creador?.id,
+    });
     return this.repo.save(entity);
   }
 

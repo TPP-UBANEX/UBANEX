@@ -27,9 +27,10 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Usuario } from '@/data/types'
+import { useAuth } from '@/lib/auth-context'
+import type { Usuario, UnidadAcademica } from '@/data/types'
 import { RolUsuario } from '@/data/types'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Loader2 } from 'lucide-react'
 
 const rolLabels: Record<string, string> = {
   [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
@@ -47,18 +48,42 @@ function rolColor(rol: string): string {
   return 'text-purple-600'
 }
 
+const rolesDisponibles: Record<string, RolUsuario[]> = {
+  [RolUsuario.AutoridadDeRectorado]: [
+    RolUsuario.AsistenteDeRectorado,
+    RolUsuario.AutoridadDeSecretaria,
+    RolUsuario.AsistenteDeSecretaria,
+  ],
+  [RolUsuario.AutoridadDeSecretaria]: [
+    RolUsuario.AsistenteDeSecretaria,
+    RolUsuario.Evaluador,
+  ],
+}
+
 export function Usuarios() {
+  const { user } = useAuth()
   const [data, setData] = useState<Usuario[]>([])
   const [open, setOpen] = useState(false)
   const [rolFiltro, setRolFiltro] = useState('todos')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [uaList, setUaList] = useState<UnidadAcademica[]>([])
 
   useEffect(() => {
-    api.usuarios.list()
-      .then(setData)
-      .finally(() => setLoading(false))
+    Promise.all([
+      api.usuarios.list(),
+      api.unidadesAcademicas.list(),
+    ]).then(([users, uas]) => {
+      setData(users)
+      setUaList(uas)
+    }).finally(() => setLoading(false))
   }, [])
+
+  const puedeCrear = user?.roles.some(r =>
+    [RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria].includes(r as RolUsuario)
+  )
+  const rolesCreables = user ? rolesDisponibles[user.roles.find(r => r in rolesDisponibles) ?? ''] ?? [] : []
+  const esSecretaria = user?.roles.includes(RolUsuario.AutoridadDeSecretaria)
 
   const filtrados = data.filter(u => {
     if (rolFiltro !== 'todos' && !u.roles.includes(rolFiltro as RolUsuario)) return false
@@ -80,31 +105,23 @@ export function Usuarios() {
           <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
           <p className="text-sm text-muted-foreground">Administración de usuarios</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Nuevo Usuario</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nuevo Usuario</DialogTitle></DialogHeader>
-            <div className="space-y-4 pt-4">
-              <Input placeholder="Nombre completo" />
-              <Input placeholder="Email" type="email" />
-              <Select>
-                <SelectTrigger><SelectValue placeholder="Rol" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={RolUsuario.AutoridadDeRectorado}>Autoridad Rectorado</SelectItem>
-                  <SelectItem value={RolUsuario.AsistenteDeRectorado}>Asistente Rectorado</SelectItem>
-                  <SelectItem value={RolUsuario.AutoridadDeSecretaria}>Autoridad Secretaría</SelectItem>
-                  <SelectItem value={RolUsuario.AsistenteDeSecretaria}>Asistente Secretaría</SelectItem>
-                  <SelectItem value={RolUsuario.Evaluador}>Evaluador</SelectItem>
-                  <SelectItem value={RolUsuario.DirectorDeProyecto}>Director</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input placeholder="Unidad Académica (opcional)" />
-              <Button className="w-full" onClick={() => setOpen(false)}>Crear</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {puedeCrear && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" />Nuevo Usuario</Button>
+            </DialogTrigger>
+            <NuevoUsuarioDialog
+              rolesCreables={rolesCreables}
+              uaList={uaList}
+              esSecretaria={esSecretaria}
+              uaId={esSecretaria ? user?.unidadAcademicaId : undefined}
+              onCreated={() => {
+                setOpen(false)
+                api.usuarios.list().then(setData)
+              }}
+            />
+          </Dialog>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -187,5 +204,104 @@ export function Usuarios() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function NuevoUsuarioDialog({
+  rolesCreables, uaList, esSecretaria, uaId, onCreated,
+}: {
+  rolesCreables: RolUsuario[]
+  uaList: UnidadAcademica[]
+  esSecretaria?: boolean
+  uaId?: string
+  onCreated: () => void
+}) {
+  const [nombreCompleto, setNombreCompleto] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [rol, setRol] = useState('')
+  const [unidadAcademicaId, setUnidadAcademicaId] = useState(uaId ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!rol) return
+    setError('')
+    setSubmitting(true)
+    try {
+      await api.usuarios.crear({
+        nombreCompleto,
+        email,
+        password,
+        roles: [rol as RolUsuario],
+        unidadAcademicaId: unidadAcademicaId || undefined,
+      })
+      setNombreCompleto('')
+      setEmail('')
+      setPassword('')
+      setRol('')
+      setUnidadAcademicaId(uaId ?? '')
+      onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al crear usuario')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <DialogContent>
+      <DialogHeader><DialogTitle>Nuevo Usuario</DialogTitle></DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+            {error}
+          </div>
+        )}
+        <Input
+          placeholder="Nombre completo"
+          value={nombreCompleto}
+          onChange={e => setNombreCompleto(e.target.value)}
+          required
+        />
+        <Input
+          placeholder="Email"
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          required
+        />
+        <Input
+          placeholder="Contraseña"
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          required
+        />
+        <Select value={rol} onValueChange={setRol} required>
+          <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
+          <SelectContent>
+            {rolesCreables.map(r => (
+              <SelectItem key={r} value={r}>{rolLabels[r]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {!esSecretaria && (
+          <Select value={unidadAcademicaId} onValueChange={setUnidadAcademicaId}>
+            <SelectTrigger><SelectValue placeholder="Unidad Académica (opcional)" /></SelectTrigger>
+            <SelectContent>
+              {uaList.map(ua => (
+                <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Button type="submit" className="w-full" disabled={submitting}>
+          {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {submitting ? 'Creando...' : 'Crear'}
+        </Button>
+      </form>
+    </DialogContent>
   )
 }
