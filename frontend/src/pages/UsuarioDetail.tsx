@@ -1,17 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import { UsuarioHistorial } from '@/components/UsuarioHistorial'
 import type { Usuario, UnidadAcademica } from '@/data/types'
 import { RolUsuario, EstadoDirector } from '@/data/types'
-import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck } from 'lucide-react'
+import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2 } from 'lucide-react'
 
 const rolLabels: Record<string, string> = {
   [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
@@ -52,25 +60,31 @@ export function UsuarioDetail() {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [uaList, setUaList] = useState<UnidadAcademica[]>([])
   const [loading, setLoading] = useState(true)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resetExito, setResetExito] = useState(false)
 
-  const cargarDatos = () => {
+  const cargarDatos = useCallback(async () => {
     if (!id) return
     setLoading(true)
-    Promise.all([
-      api.usuarios.get(id),
-      api.unidadesAcademicas.list(),
-    ])
-      .then(([u, uas]) => {
-        setUsuario(u)
-        setUaList(uas)
-      })
-      .catch(() => navigate('/usuarios'))
-      .finally(() => setLoading(false))
-  }
+    try {
+      const [u, uas] = await Promise.all([
+        api.usuarios.get(id),
+        api.unidadesAcademicas.list(),
+      ])
+      setUsuario(u)
+      setUaList(uas)
+      setLoading(false)
+    } catch {
+      navigate('/usuarios')
+    }
+  }, [id, navigate])
 
   useEffect(() => {
-    cargarDatos()
-  }, [id])
+    let cancel = false
+    cargarDatos().then(() => { if (cancel) return })
+    return () => { cancel = true }
+  }, [cargarDatos])
 
   if (loading) {
     return (
@@ -102,6 +116,18 @@ export function UsuarioDetail() {
     })
   }
 
+  const handleResetPassword = async () => {
+    setResetSubmitting(true)
+    try {
+      await api.usuarios.resetPassword(usuario.id)
+      setResetExito(true)
+    } catch {
+      setResetExito(false)
+    } finally {
+      setResetSubmitting(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -122,15 +148,66 @@ export function UsuarioDetail() {
             <p className="text-sm text-muted-foreground">{usuario.email}</p>
           </div>
         </div>
-        {puedeEditar && (
-          <EditarUsuarioDialog
-            usuario={usuario}
-            uaList={uaList}
-            onUpdated={cargarDatos}
-            trigger={<Button>Editar</Button>}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {!esMiPerfil && (
+            <Button variant="outline" onClick={() => setResetOpen(true)}>
+              <KeyRound className="h-4 w-4 mr-2" />
+              Resetear contraseña
+            </Button>
+          )}
+          {puedeEditar && (
+            <EditarUsuarioDialog
+              usuario={usuario}
+              uaList={uaList}
+              onUpdated={cargarDatos}
+              trigger={<Button>Editar</Button>}
+            />
+          )}
+        </div>
       </div>
+
+      <Dialog open={resetOpen} onOpenChange={(open) => { setResetOpen(open); if (!open) setResetExito(false) }}>
+        <DialogContent>
+          {resetExito ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  Contraseña reseteada
+                </DialogTitle>
+                <DialogDescription>
+                  Se envió una contraseña temporal al email <strong>{usuario.email}</strong>.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={() => { setResetOpen(false); setResetExito(false) }}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Resetear contraseña</DialogTitle>
+                <DialogDescription>
+                  Se generará una nueva contraseña temporal y se enviará a{' '}
+                  <strong>{usuario.email}</strong>.
+                  El usuario deberá cambiarla al iniciar sesión.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setResetOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleResetPassword} disabled={resetSubmitting}>
+                  {resetSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {resetSubmitting ? 'Enviando...' : 'Enviar contraseña temporal'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

@@ -59,6 +59,17 @@ export class UsuariosController {
     return this.service.actualizarEstadoDirector(id, dto, usuario);
   }
 
+  @Post(':id/reset-password')
+  @Roles(
+    RolUsuario.AutoridadDeRectorado,
+    RolUsuario.AsistenteDeRectorado,
+    RolUsuario.AutoridadDeSecretaria,
+    RolUsuario.AsistenteDeSecretaria,
+  )
+  resetPassword(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
+    return this.service.resetPassword(id, usuario);
+  }
+
   @Delete(':id')
   @Roles(RolUsuario.AutoridadDeRectorado)
   eliminar(@Param('id') id: string, @CurrentUser() usuario: Usuario) {

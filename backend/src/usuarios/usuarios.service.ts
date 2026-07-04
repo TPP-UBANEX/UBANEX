@@ -4,6 +4,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { Usuario } from './usuario.entity';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
@@ -13,6 +14,7 @@ import { PaginatedResponse } from '../common/interfaces/paginated-response.inter
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { MailService } from '../common/mail/mail.service';
 
 const SALT_ROUNDS = 10;
 
@@ -45,6 +47,7 @@ export class UsuariosService {
     @InjectRepository(Usuario)
     private readonly repo: Repository<Usuario>,
     private readonly auditoria: AuditoriaService,
+    private readonly mail: MailService,
   ) {}
 
   async crear(dto: CrearUsuarioDto, creador?: Usuario): Promise<Usuario> {
@@ -245,6 +248,20 @@ export class UsuariosService {
       });
     }
     return saved;
+  }
+
+  async resetPassword(id: string, usuarioLogueado: Usuario): Promise<{ message: string }> {
+    const entity = await this.obtener(id);
+    const tempPassword = crypto.randomBytes(4).toString('hex');
+    entity.password = await bcrypt.hash(tempPassword, SALT_ROUNDS);
+    await this.repo.save(entity);
+    await this.mail.enviarPasswordTemporal(entity.email, entity.nombreCompleto, tempPassword);
+    await this.auditoria.registrar({
+      usuarioId: id, accion: TipoAccionAuditoria.RESET_PASSWORD,
+      descripcion: 'Contraseña reseteada',
+      responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
+    });
+    return { message: 'Contraseña temporal enviada al email del usuario' };
   }
 
   async eliminar(id: string, usuarioLogueado?: Usuario): Promise<void> {
