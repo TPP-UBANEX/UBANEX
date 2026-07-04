@@ -20,6 +20,7 @@ import { useAuth } from '@/lib/auth-context'
 import type { Usuario, UnidadAcademica } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
   [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
@@ -75,6 +76,7 @@ export function EditarUsuarioDialog({
       await api.usuarios.actualizar(usuario.id, data)
       setOpen(false)
       onUpdated()
+      toast.success('Usuario actualizado correctamente')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar')
     } finally {

@@ -181,6 +181,9 @@ export class UsuariosService {
     let huboCambioRol = false;
 
     if (esAutoEdicion) {
+      if (dto.habilitado !== undefined) {
+        throw new ForbiddenException('No puedes cambiar tu propio estado');
+      }
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
@@ -199,9 +202,16 @@ export class UsuariosService {
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) { entity.roles = dto.roles; huboCambioRol = true; }
       if (dto.unidadAcademicaId !== undefined) entity.unidadAcademicaId = dto.unidadAcademicaId;
+      if (dto.habilitado !== undefined) entity.habilitado = dto.habilitado;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
       const saved = await this.repo.save(entity);
-      if (huboCambioRol) {
+      if (dto.habilitado !== undefined) {
+        await this.auditoria.registrar({
+          usuarioId: id, accion: dto.habilitado ? TipoAccionAuditoria.REACTIVACION : TipoAccionAuditoria.INACTIVACION,
+          descripcion: dto.habilitado ? 'Usuario habilitado' : 'Usuario deshabilitado',
+          responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+        });
+      } else if (huboCambioRol) {
         await this.auditoria.registrar({
           usuarioId: id, accion: TipoAccionAuditoria.CAMBIO_ROL,
           descripcion: `Roles cambiados: [${rolesAnteriores.join(', ')}] → [${dto.roles!.join(', ')}]`,
@@ -220,13 +230,32 @@ export class UsuariosService {
     if (esSecretaria && mismaUA) {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
+      if (dto.habilitado !== undefined) {
+        const gestionRoles = [
+          RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado,
+          RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria,
+        ]
+        const tieneRolGestion = entity.roles.some(r => gestionRoles.includes(r))
+        if (tieneRolGestion) {
+          throw new ForbiddenException('No puedes cambiar el estado de usuarios de Gestión')
+        }
+        entity.habilitado = dto.habilitado
+      }
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
       const saved = await this.repo.save(entity);
-      await this.auditoria.registrar({
-        usuarioId: id, accion: TipoAccionAuditoria.EDICION,
-        descripcion: 'Datos actualizados por Secretaría',
-        responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
-      });
+      if (dto.habilitado !== undefined) {
+        await this.auditoria.registrar({
+          usuarioId: id, accion: dto.habilitado ? TipoAccionAuditoria.REACTIVACION : TipoAccionAuditoria.INACTIVACION,
+          descripcion: dto.habilitado ? 'Usuario habilitado' : 'Usuario deshabilitado',
+          responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+        });
+      } else {
+        await this.auditoria.registrar({
+          usuarioId: id, accion: TipoAccionAuditoria.EDICION,
+          descripcion: 'Datos actualizados por Secretaría',
+          responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+        });
+      }
       return saved;
     }
 

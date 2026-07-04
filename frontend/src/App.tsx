@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState } from 'react'
+import { Toaster } from 'sonner'
 import { Header } from '@/components/Header'
 import { Sidebar } from '@/components/Sidebar'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
@@ -37,6 +38,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Toaster richColors position="top-right" />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/*" element={

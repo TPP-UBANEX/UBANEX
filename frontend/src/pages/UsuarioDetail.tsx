@@ -19,7 +19,8 @@ import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import { UsuarioHistorial } from '@/components/UsuarioHistorial'
 import type { Usuario, UnidadAcademica } from '@/data/types'
 import { RolUsuario, EstadoDirector } from '@/data/types'
-import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
   [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
@@ -63,6 +64,8 @@ export function UsuarioDetail() {
   const [resetOpen, setResetOpen] = useState(false)
   const [resetSubmitting, setResetSubmitting] = useState(false)
   const [resetExito, setResetExito] = useState(false)
+  const [disableOpen, setDisableOpen] = useState(false)
+  const [disableSubmitting, setDisableSubmitting] = useState(false)
 
   const cargarDatos = useCallback(async () => {
     if (!id) return
@@ -104,6 +107,16 @@ export function UsuarioDetail() {
   const puedeEditar = user?.id === usuario.id
     || user?.roles.includes(RolUsuario.AutoridadDeRectorado)
     || (user?.roles.includes(RolUsuario.AutoridadDeSecretaria) && user?.unidadAcademicaId === usuario.unidadAcademicaId)
+  const tieneRolGestion = usuario.roles.some(r =>
+    r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado ||
+    r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria
+  )
+  const puedeCambiarEstado = !esMiPerfil && (
+    user?.roles.includes(RolUsuario.AutoridadDeRectorado) ||
+    (user?.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
+     user?.unidadAcademicaId === usuario.unidadAcademicaId &&
+     !tieneRolGestion)
+  )
 
   const formatearFecha = (fecha?: string) => {
     if (!fecha) return 'Sin actividad'
@@ -116,13 +129,30 @@ export function UsuarioDetail() {
     })
   }
 
+  const handleToggleEstado = async () => {
+    const nuevoEstado = !usuario.habilitado
+    setDisableSubmitting(true)
+    try {
+      await api.usuarios.actualizar(usuario.id, { habilitado: nuevoEstado })
+      toast.success(nuevoEstado ? 'Usuario habilitado correctamente' : 'Usuario deshabilitado correctamente')
+      setDisableOpen(false)
+      cargarDatos()
+    } catch {
+      toast.error(nuevoEstado ? 'Error al habilitar el usuario' : 'Error al deshabilitar el usuario')
+    } finally {
+      setDisableSubmitting(false)
+    }
+  }
+
   const handleResetPassword = async () => {
     setResetSubmitting(true)
     try {
       await api.usuarios.resetPassword(usuario.id)
       setResetExito(true)
+      toast.success('Contraseña temporal enviada correctamente')
     } catch {
       setResetExito(false)
+      toast.error('Error al enviar la contraseña temporal')
     } finally {
       setResetSubmitting(false)
     }
@@ -162,6 +192,14 @@ export function UsuarioDetail() {
               onUpdated={cargarDatos}
               trigger={<Button>Editar</Button>}
             />
+          )}
+          {puedeCambiarEstado && (
+            <Button
+              variant={usuario.habilitado ? 'destructive' : 'default'}
+              onClick={() => setDisableOpen(true)}
+            >
+              {usuario.habilitado ? 'Deshabilitar' : 'Habilitar'}
+            </Button>
           )}
         </div>
       </div>
@@ -206,6 +244,39 @@ export function UsuarioDetail() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={disableOpen} onOpenChange={setDisableOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {usuario.habilitado ? 'Deshabilitar usuario' : 'Habilitar usuario'}
+            </DialogTitle>
+            <DialogDescription>
+              {usuario.habilitado ? (
+                <>¿Estás seguro de que deseas deshabilitar a <strong>{usuario.nombreCompleto}</strong>? El usuario no podrá iniciar sesión hasta que sea habilitado nuevamente.</>
+              ) : (
+                <>¿Estás seguro de que deseas habilitar a <strong>{usuario.nombreCompleto}</strong>? El usuario podrá iniciar sesión nuevamente.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDisableOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant={usuario.habilitado ? 'destructive' : 'default'}
+              onClick={handleToggleEstado}
+              disabled={disableSubmitting}
+            >
+              {disableSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {disableSubmitting
+                ? (usuario.habilitado ? 'Deshabilitando...' : 'Habilitando...')
+                : (usuario.habilitado ? 'Deshabilitar' : 'Habilitar')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -51,7 +51,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {menuItems.map((item) => (
           <Button
             key={item.id}
-            variant={location.pathname === item.id ? 'secondary' : 'ghost'}
+            variant={location.pathname === item.id || location.pathname.startsWith(item.id + '/') ? 'secondary' : 'ghost'}
             className={cn(
               'w-full justify-start gap-3',
               collapsed && 'justify-center px-2'

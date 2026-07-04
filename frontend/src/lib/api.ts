@@ -64,7 +64,7 @@ export const api = {
     get: (id: string) => get<import('@/data/types').Usuario>(`/usuarios/${id}`),
     crear: (data: import('@/data/types').CrearUsuarioDto) =>
       post<import('@/data/types').Usuario>('/usuarios', data),
-    actualizar: (id: string, data: Partial<import('@/data/types').CrearUsuarioDto>) =>
+    actualizar: (id: string, data: Partial<import('@/data/types').CrearUsuarioDto> & { habilitado?: boolean }) =>
       patch<import('@/data/types').Usuario>(`/usuarios/${id}`, data),
     actualizarEstadoDirector: (id: string, estadoDirector: string) =>
       patch<import('@/data/types').Usuario>(`/usuarios/${id}/estado-director`, { estadoDirector }),

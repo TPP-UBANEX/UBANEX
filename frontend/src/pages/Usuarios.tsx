@@ -33,6 +33,7 @@ import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import type { Usuario, UnidadAcademica, PaginatedResponse } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import { Plus, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
   [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
@@ -158,6 +159,7 @@ export function Usuarios() {
               onCreated={() => {
                 setOpen(false)
                 cargarDatos()
+                toast.success('Usuario creado correctamente')
               }}
             />
           </Dialog>
