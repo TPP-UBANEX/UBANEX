@@ -1,26 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import * as sgMail from '@sendgrid/mail';
 
 @Injectable()
 export class MailService {
-  private transporter: nodemailer.Transporter;
-
   constructor(private config: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      host: this.config.get<string>('SMTP_HOST'),
-      port: this.config.get<number>('SMTP_PORT'),
-      secure: false,
-      auth: {
-        user: this.config.get<string>('SMTP_USER'),
-        pass: this.config.get<string>('SMTP_PASS'),
-      },
-    });
+    const apiKey = this.config.get<string>('SENDGRID_API_KEY');
+    if (!apiKey) throw new Error('SENDGRID_API_KEY no configurada');
+    sgMail.setApiKey(apiKey);
   }
 
   async enviarPasswordTemporal(destino: string, nombre: string, password: string): Promise<void> {
-    await this.transporter.sendMail({
-      from: this.config.get<string>('SMTP_FROM'),
+    const from = this.config.get<string>('SMTP_FROM') || 'UBANEX <noreplyubanex@gmail.com>';
+    await sgMail.send({
+      from,
       to: destino,
       subject: 'UBANEX — Nueva contraseña temporal',
       html: `
