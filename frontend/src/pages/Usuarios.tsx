@@ -77,7 +77,8 @@ export function Usuarios() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
-  const [rolFiltro, setRolFiltro] = useState('todos')
+  const [rolFiltro, setRolFiltro] = useState('')
+  const [uaFiltro, setUaFiltro] = useState('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -104,7 +105,8 @@ export function Usuarios() {
         page,
         limit: 10,
         search: debouncedSearch || undefined,
-        rol: rolFiltro !== 'todos' ? rolFiltro : undefined,
+        rol: rolFiltro && rolFiltro !== 'todos' ? rolFiltro : undefined,
+        unidadAcademicaId: uaFiltro && uaFiltro !== 'todas' ? uaFiltro : undefined,
       })
       setResponse(res)
     } catch {
@@ -112,7 +114,7 @@ export function Usuarios() {
     } finally {
       setLoading(false)
     }
-  }, [page, debouncedSearch, rolFiltro])
+  }, [page, debouncedSearch, rolFiltro, uaFiltro])
 
   useEffect(() => {
     cargarDatos()
@@ -122,6 +124,7 @@ export function Usuarios() {
     [RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria].includes(r as RolUsuario)
   )
   const rolesCreables = user ? rolesDisponibles[user.roles.find(r => r in rolesDisponibles) ?? ''] ?? [] : []
+  const esRectorado = user?.roles.includes(RolUsuario.AutoridadDeRectorado)
   const esSecretaria = user?.roles.includes(RolUsuario.AutoridadDeSecretaria)
 
   const stats = response?.stats ? [
@@ -183,7 +186,7 @@ export function Usuarios() {
           <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={rolFiltro} onValueChange={v => { setRolFiltro(v); setPage(1) }}>
-          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Roles" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value={RolUsuario.AutoridadDeRectorado}>Autoridad Rectorado</SelectItem>
@@ -194,6 +197,17 @@ export function Usuarios() {
             <SelectItem value={RolUsuario.DirectorDeProyecto}>Director</SelectItem>
           </SelectContent>
         </Select>
+        {esRectorado && (
+          <Select value={uaFiltro} onValueChange={v => { setUaFiltro(v); setPage(1) }}>
+            <SelectTrigger className="w-56"><SelectValue placeholder="Unidad Académica" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas</SelectItem>
+              {uaList.map(ua => (
+                <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <Card>
