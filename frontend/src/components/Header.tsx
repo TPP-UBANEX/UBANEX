@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { ThemeToggle } from './ThemeToggle'
-import { EditarUsuarioDialog } from './EditarUsuarioDialog'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -14,17 +12,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LogOut, Bell, User } from 'lucide-react'
-import { api } from '@/lib/api'
-import type { UnidadAcademica } from '@/data/types'
 
 export function Header() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const [uaList, setUaList] = useState<UnidadAcademica[]>([])
-
-  useEffect(() => {
-    api.unidadesAcademicas.list().then(setUaList).catch(() => {})
-  }, [])
 
   const iniciales = user?.nombreCompleto
     ?.split(' ')
@@ -65,19 +56,10 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {user && (
-              <EditarUsuarioDialog
-                usuario={user}
-                uaList={uaList}
-                onUpdated={() => window.location.reload()}
-                trigger={
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <User className="h-4 w-4 mr-2" />
-                    Mi Perfil
-                  </DropdownMenuItem>
-                }
-              />
-            )}
+            <DropdownMenuItem onClick={() => navigate(`/usuarios/${user?.id}`)}>
+              <User className="h-4 w-4 mr-2" />
+              Mi Perfil
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => { logout(); navigate('/login') }} className="text-destructive">
               <LogOut className="h-4 w-4 mr-2" />

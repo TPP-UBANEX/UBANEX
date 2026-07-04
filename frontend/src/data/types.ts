@@ -27,6 +27,7 @@ export interface Usuario {
   unidadAcademicaId?: string
   estadoDirector?: EstadoDirector
   habilitado: boolean
+  ultimaActividad?: string
   creadoPor?: Usuario
   creadoPorId?: string
 }
@@ -52,6 +53,32 @@ export interface CrearUsuarioDto {
   email: string
   password: string
   roles: RolUsuario[]
+  unidadAcademicaId?: string
+}
+
+export interface PaginationMeta {
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: PaginationMeta
+  stats?: {
+    rectorado: number
+    secretarias: number
+    evaluadores: number
+    directores: number
+  }
+}
+
+export interface UsuariosQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  rol?: string
   unidadAcademicaId?: string
 }
 

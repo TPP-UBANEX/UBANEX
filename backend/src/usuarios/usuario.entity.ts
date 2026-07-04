@@ -35,6 +35,9 @@ export class Usuario {
   @Column({ default: true })
   habilitado: boolean;
 
+  @Column({ nullable: true, type: 'timestamp' })
+  ultimaActividad: Date | null;
+
   @ManyToOne(() => Usuario, { nullable: true })
   @JoinColumn({ name: 'creadoPorId' })
   creadoPor: Usuario;

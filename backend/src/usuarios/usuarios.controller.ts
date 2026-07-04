@@ -1,10 +1,11 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards,
 } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -30,13 +31,13 @@ export class UsuariosController {
     RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
   )
-  listar() {
-    return this.service.listar();
+  listar(@Query() dto: PaginationDto, @CurrentUser() usuario: Usuario) {
+    return this.service.listar(dto, usuario);
   }
 
   @Get(':id')
-  obtener(@Param('id') id: string) {
-    return this.service.obtener(id);
+  obtener(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
+    return this.service.obtener(id, usuario);
   }
 
   @Patch(':id')

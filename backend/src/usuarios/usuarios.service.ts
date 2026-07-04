@@ -8,6 +8,8 @@ import { Usuario } from './usuario.entity';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 
 const SALT_ROUNDS = 10;
@@ -76,19 +78,72 @@ export class UsuariosService {
     return this.repo.save(entity);
   }
 
-  listar(): Promise<Usuario[]> {
-    return this.repo.find({
-      relations: { unidadAcademica: true, creadoPor: true },
-      order: { nombreCompleto: 'ASC' },
-    });
+  async listar(dto: PaginationDto, usuarioLogueado: Usuario): Promise<PaginatedResponse<Usuario>> {
+    const { page = 1, limit = 10, search, rol, unidadAcademicaId } = dto;
+
+    const query = this.repo.createQueryBuilder('usuario')
+      .leftJoinAndSelect('usuario.unidadAcademica', 'unidadAcademica')
+      .leftJoinAndSelect('usuario.creadoPor', 'creadoPor');
+
+    const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria);
+
+    if (esSecretaria) {
+      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
+    } else if (unidadAcademicaId) {
+      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId });
+    }
+
+    if (search) {
+      query.andWhere('usuario.nombreCompleto ILIKE :search', { search: `%${search}%` });
+    }
+    if (rol) {
+      query.andWhere('usuario.roles LIKE :rol', { rol: `%${rol}%` });
+    }
+
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
+    query.orderBy('usuario.nombreCompleto', 'ASC');
+
+    const [data, total] = await query.getManyAndCount();
+
+    const stats = {
+      rectorado: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Rectorado%' })
+        .getCount(),
+      secretarias: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
+        .getCount(),
+      evaluadores: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Evaluador%' })
+        .getCount(),
+      directores: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Director%' })
+        .getCount(),
+    };
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      stats,
+    };
   }
 
-  async obtener(id: string): Promise<Usuario> {
+  async obtener(id: string, usuarioLogueado?: Usuario): Promise<Usuario> {
     const entity = await this.repo.findOne({
       where: { id },
       relations: { unidadAcademica: true, creadoPor: true },
     });
     if (!entity) throw new NotFoundException(`Usuario ${id} no encontrado`);
+
+    if (usuarioLogueado) {
+      await this.repo.update(usuarioLogueado.id, { ultimaActividad: new Date() });
+    }
+
     return entity;
   }
 

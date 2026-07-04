@@ -51,7 +51,16 @@ export const api = {
       post<{ accessToken: string }>('/auth/register', data),
   },
   usuarios: {
-    list: () => get<import('@/data/types').Usuario[]>('/usuarios'),
+    list: (params?: import('@/data/types').UsuariosQueryParams) => {
+      const qs = params
+        ? '?' + new URLSearchParams(
+            Object.fromEntries(
+              Object.entries(params).filter(([_, v]) => v !== undefined && v !== '')
+            )
+          ).toString()
+        : ''
+      return get<import('@/data/types').PaginatedResponse<import('@/data/types').Usuario>>(`/usuarios${qs}`)
+    },
     get: (id: string) => get<import('@/data/types').Usuario>(`/usuarios/${id}`),
     crear: (data: import('@/data/types').CrearUsuarioDto) =>
       post<import('@/data/types').Usuario>('/usuarios', data),

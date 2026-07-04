@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,9 +30,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
-import type { Usuario, UnidadAcademica } from '@/data/types'
+import type { Usuario, UnidadAcademica, PaginatedResponse } from '@/data/types'
 import { RolUsuario } from '@/data/types'
-import { Plus, Search, Loader2 } from 'lucide-react'
+import { Plus, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const rolLabels: Record<string, string> = {
   [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
@@ -72,26 +73,49 @@ function puedeEditarUsuario(logueado: Usuario, target: Usuario): boolean {
 }
 
 export function Usuarios() {
+  const navigate = useNavigate()
   const { user } = useAuth()
-  const [data, setData] = useState<Usuario[]>([])
   const [open, setOpen] = useState(false)
   const [rolFiltro, setRolFiltro] = useState('todos')
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [response, setResponse] = useState<PaginatedResponse<Usuario> | null>(null)
   const [uaList, setUaList] = useState<UnidadAcademica[]>([])
 
-  const cargarDatos = () =>
-    Promise.all([
-      api.usuarios.list(),
-      api.unidadesAcademicas.list(),
-    ]).then(([users, uas]) => {
-      setData(users)
-      setUaList(uas)
-    })
+  useEffect(() => {
+    api.unidadesAcademicas.list().then(setUaList).catch(() => {})
+  }, [])
 
   useEffect(() => {
-    cargarDatos().finally(() => setLoading(false))
-  }, [])
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const cargarDatos = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.usuarios.list({
+        page,
+        limit: 10,
+        search: debouncedSearch || undefined,
+        rol: rolFiltro !== 'todos' ? rolFiltro : undefined,
+      })
+      setResponse(res)
+    } catch {
+      setResponse(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, debouncedSearch, rolFiltro])
+
+  useEffect(() => {
+    cargarDatos()
+  }, [cargarDatos])
 
   const puedeCrear = user?.roles.some(r =>
     [RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria].includes(r as RolUsuario)
@@ -99,22 +123,20 @@ export function Usuarios() {
   const rolesCreables = user ? rolesDisponibles[user.roles.find(r => r in rolesDisponibles) ?? ''] ?? [] : []
   const esSecretaria = user?.roles.includes(RolUsuario.AutoridadDeSecretaria)
 
-  const dataFiltradaUA = user?.roles.includes(RolUsuario.AutoridadDeSecretaria)
-    ? data.filter(u => u.unidadAcademicaId === user.unidadAcademicaId)
-    : data
-
-  const filtrados = dataFiltradaUA.filter(u => {
-    if (rolFiltro !== 'todos' && !u.roles.includes(rolFiltro as RolUsuario)) return false
-    if (search && !u.nombreCompleto.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
-
-  const stats = [
-    { label: 'Rectorado', value: data.filter(u => u.roles.some(r => r.includes('Rectorado'))).length, color: 'text-blue-600' },
-    { label: 'Secretarías', value: data.filter(u => u.roles.some(r => r.includes('Secretaria'))).length, color: 'text-green-600' },
-    { label: 'Evaluadores', value: data.filter(u => u.roles.includes(RolUsuario.Evaluador)).length, color: 'text-amber-600' },
-    { label: 'Directores', value: data.filter(u => u.roles.includes(RolUsuario.DirectorDeProyecto)).length, color: 'text-purple-600' },
+  const stats = response?.stats ? [
+    { label: 'Rectorado', value: response.stats.rectorado, color: 'text-blue-600' },
+    { label: 'Secretarías', value: response.stats.secretarias, color: 'text-green-600' },
+    { label: 'Evaluadores', value: response.stats.evaluadores, color: 'text-amber-600' },
+    { label: 'Directores', value: response.stats.directores, color: 'text-purple-600' },
+  ] : [
+    { label: 'Rectorado', value: '\u2014', color: 'text-muted-foreground' },
+    { label: 'Secretarías', value: '\u2014', color: 'text-muted-foreground' },
+    { label: 'Evaluadores', value: '\u2014', color: 'text-muted-foreground' },
+    { label: 'Directores', value: '\u2014', color: 'text-muted-foreground' },
   ]
+
+  const usuarios = response?.data ?? []
+  const meta = response?.meta
 
   return (
     <div className="p-6 space-y-6">
@@ -158,7 +180,7 @@ export function Usuarios() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={rolFiltro} onValueChange={setRolFiltro}>
+        <Select value={rolFiltro} onValueChange={v => { setRolFiltro(v); setPage(1) }}>
           <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
@@ -173,7 +195,14 @@ export function Usuarios() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-sm font-medium">Usuarios</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium">Usuarios</CardTitle>
+          {meta && (
+            <span className="text-xs text-muted-foreground">
+              {meta.total} usuario{meta.total !== 1 ? 's' : ''} &middot; p&aacute;gina {meta.page} de {meta.totalPages || 1}
+            </span>
+          )}
+        </CardHeader>
         <CardContent>
           {loading ? (
             <div className="space-y-3">
@@ -185,6 +214,10 @@ export function Usuarios() {
                 </div>
               ))}
             </div>
+          ) : usuarios.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No se encontraron usuarios
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -197,8 +230,12 @@ export function Usuarios() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtrados.map(u => (
-                  <TableRow key={u.id}>
+                {usuarios.map(u => (
+                  <TableRow
+                    key={u.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/usuarios/${u.id}`)}
+                  >
                     <TableCell className="font-medium">{u.nombreCompleto}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                     <TableCell>
@@ -213,7 +250,7 @@ export function Usuarios() {
                     <TableCell className="text-sm text-muted-foreground">
                       {u.unidadAcademica?.nombre || '-'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
                       {user && puedeEditarUsuario(user, u) && (
                         <EditarUsuarioDialog
                           usuario={u}
@@ -232,6 +269,44 @@ export function Usuarios() {
           )}
         </CardContent>
       </Card>
+
+      {meta && meta.totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
+            .filter(p => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 2)
+            .map((p, idx, arr) => (
+              <span key={p} className="flex items-center gap-1">
+                {idx > 0 && arr[idx - 1] !== p - 1 && (
+                  <span className="text-muted-foreground px-1">...</span>
+                )}
+                <Button
+                  variant={p === page ? 'default' : 'outline'}
+                  size="sm"
+                  className="min-w-[2rem]"
+                  onClick={() => setPage(p)}
+                >
+                  {p}
+                </Button>
+              </span>
+            ))}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= meta.totalPages}
+            onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

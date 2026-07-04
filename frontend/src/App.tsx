@@ -12,6 +12,7 @@ import { Proyectos } from '@/pages/Proyectos'
 import { ProyectoDetail } from '@/pages/ProyectoDetail'
 import { Evaluacion } from '@/pages/Evaluacion'
 import { Usuarios } from '@/pages/Usuarios'
+import { UsuarioDetail } from '@/pages/UsuarioDetail'
 
 function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -49,6 +50,7 @@ function App() {
                   <Route path="/proyectos/:id" element={<ProyectoDetail />} />
                   <Route path="/evaluacion" element={<Evaluacion />} />
                   <Route path="/usuarios" element={<Usuarios />} />
+                  <Route path="/usuarios/:id" element={<UsuarioDetail />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>
