@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
+import { UsuarioHistorial } from '@/components/UsuarioHistorial'
 import type { Usuario, UnidadAcademica } from '@/data/types'
 import { RolUsuario, EstadoDirector } from '@/data/types'
 import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck } from 'lucide-react'
@@ -200,6 +201,12 @@ export function UsuarioDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          <UsuarioHistorial usuarioId={usuario.id} />
+        </CardContent>
+      </Card>
     </div>
   )
 }

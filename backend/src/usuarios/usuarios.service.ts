@@ -11,6 +11,8 @@ import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dt
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 const SALT_ROUNDS = 10;
 
@@ -42,6 +44,7 @@ export class UsuariosService {
   constructor(
     @InjectRepository(Usuario)
     private readonly repo: Repository<Usuario>,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async crear(dto: CrearUsuarioDto, creador?: Usuario): Promise<Usuario> {
@@ -75,7 +78,19 @@ export class UsuariosService {
       password,
       creadoPorId: creador?.id,
     });
-    return this.repo.save(entity);
+    const saved = await this.repo.save(entity);
+
+    if (creador) {
+      await this.auditoria.registrar({
+        usuarioId: saved.id,
+        accion: TipoAccionAuditoria.CREACION,
+        descripcion: `Usuario creado con roles: ${dto.roles.join(', ')}`,
+        responsableId: creador.id,
+        responsableNombre: creador.nombreCompleto,
+      });
+    }
+
+    return saved;
   }
 
   async listar(dto: PaginationDto, usuarioLogueado: Usuario): Promise<PaginatedResponse<Usuario>> {
@@ -159,44 +174,89 @@ export class UsuariosService {
     const esSecretaria = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeSecretaria);
     const mismaUA = esSecretaria && usuarioLogueado?.unidadAcademicaId === entity.unidadAcademicaId;
 
+    const rolesAnteriores = [...entity.roles];
+    let huboCambioRol = false;
+
     if (esAutoEdicion) {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
-      return this.repo.save(entity);
+      const saved = await this.repo.save(entity);
+      await this.auditoria.registrar({
+        usuarioId: id, accion: TipoAccionAuditoria.EDICION,
+        descripcion: 'El usuario editó su propio perfil',
+        responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+      });
+      return saved;
     }
 
     if (esRectorado) {
       if (dto.roles) validarGruposRoles(dto.roles);
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
-      if (dto.roles !== undefined) entity.roles = dto.roles;
+      if (dto.roles !== undefined) { entity.roles = dto.roles; huboCambioRol = true; }
       if (dto.unidadAcademicaId !== undefined) entity.unidadAcademicaId = dto.unidadAcademicaId;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
-      return this.repo.save(entity);
+      const saved = await this.repo.save(entity);
+      if (huboCambioRol) {
+        await this.auditoria.registrar({
+          usuarioId: id, accion: TipoAccionAuditoria.CAMBIO_ROL,
+          descripcion: `Roles cambiados: [${rolesAnteriores.join(', ')}] → [${dto.roles!.join(', ')}]`,
+          responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+        });
+      } else {
+        await this.auditoria.registrar({
+          usuarioId: id, accion: TipoAccionAuditoria.EDICION,
+          descripcion: 'Datos personales actualizados',
+          responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+        });
+      }
+      return saved;
     }
 
     if (esSecretaria && mismaUA) {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
-      return this.repo.save(entity);
+      const saved = await this.repo.save(entity);
+      await this.auditoria.registrar({
+        usuarioId: id, accion: TipoAccionAuditoria.EDICION,
+        descripcion: 'Datos actualizados por Secretaría',
+        responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+      });
+      return saved;
     }
 
     throw new ForbiddenException('No tiene permisos para editar este usuario');
   }
 
   async actualizarEstadoDirector(
-    id: string, dto: ActualizarEstadoDirectorDto,
+    id: string, dto: ActualizarEstadoDirectorDto, usuarioLogueado?: Usuario,
   ): Promise<Usuario> {
     const entity = await this.obtener(id);
+    const estadoAnterior = entity.estadoDirector;
     entity.estadoDirector = dto.estadoDirector;
-    return this.repo.save(entity);
+    const saved = await this.repo.save(entity);
+    if (usuarioLogueado) {
+      await this.auditoria.registrar({
+        usuarioId: id, accion: TipoAccionAuditoria.VALIDACION_DIRECTOR,
+        descripcion: `Estado director: ${estadoAnterior || 'PendienteDeValidacion'} → ${dto.estadoDirector}`,
+        responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
+      });
+    }
+    return saved;
   }
 
-  async eliminar(id: string): Promise<void> {
+  async eliminar(id: string, usuarioLogueado?: Usuario): Promise<void> {
     const entity = await this.obtener(id);
     entity.habilitado = false;
     await this.repo.save(entity);
+    if (usuarioLogueado) {
+      await this.auditoria.registrar({
+        usuarioId: id, accion: TipoAccionAuditoria.INACTIVACION,
+        descripcion: 'Usuario deshabilitado',
+        responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
+      });
+    }
   }
 }

@@ -82,6 +82,27 @@ export interface UsuariosQueryParams {
   unidadAcademicaId?: string
 }
 
+export enum TipoAccionAuditoria {
+  CREACION = 'CREACION',
+  EDICION = 'EDICION',
+  CAMBIO_ROL = 'CAMBIO_ROL',
+  INACTIVACION = 'INACTIVACION',
+  REACTIVACION = 'REACTIVACION',
+  RESET_PASSWORD = 'RESET_PASSWORD',
+  VALIDACION_DIRECTOR = 'VALIDACION_DIRECTOR',
+}
+
+export interface Auditoria {
+  id: string
+  usuarioId: string
+  accion: TipoAccionAuditoria
+  descripcion: string
+  responsableId: string
+  responsableNombre: string
+  fecha: string
+  motivo: string | null
+}
+
 // --- Entidades existentes (se mantienen, se actualizarán en fases siguientes) ---
 
 export interface Convocatoria {

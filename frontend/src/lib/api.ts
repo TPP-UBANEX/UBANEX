@@ -69,6 +69,7 @@ export const api = {
     actualizarEstadoDirector: (id: string, estadoDirector: string) =>
       patch<import('@/data/types').Usuario>(`/usuarios/${id}/estado-director`, { estadoDirector }),
     eliminar: (id: string) => del(`/usuarios/${id}`),
+    auditoria: (id: string) => get<import('@/data/types').Auditoria[]>(`/usuarios/${id}/auditoria`),
   },
   unidadesAcademicas: {
     list: () => get<import('@/data/types').UnidadAcademica[]>('/unidades-academicas'),

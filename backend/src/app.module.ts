@@ -10,6 +10,7 @@ import { RendicionesModule } from './rendiciones/rendiciones.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { UnidadesAcademicasModule } from './unidades-academicas/unidades-academicas.module';
 import { AuthModule } from './auth/auth.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AuthModule } from './auth/auth.module';
     UsuariosModule,
     UnidadesAcademicasModule,
     AuthModule,
+    AuditoriaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

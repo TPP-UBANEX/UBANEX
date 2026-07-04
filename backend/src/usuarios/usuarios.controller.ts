@@ -54,13 +54,14 @@ export class UsuariosController {
   actualizarEstadoDirector(
     @Param('id') id: string,
     @Body() dto: ActualizarEstadoDirectorDto,
+    @CurrentUser() usuario: Usuario,
   ) {
-    return this.service.actualizarEstadoDirector(id, dto);
+    return this.service.actualizarEstadoDirector(id, dto, usuario);
   }
 
   @Delete(':id')
   @Roles(RolUsuario.AutoridadDeRectorado)
-  eliminar(@Param('id') id: string) {
-    return this.service.eliminar(id);
+  eliminar(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
+    return this.service.eliminar(id, usuario);
   }
 }
