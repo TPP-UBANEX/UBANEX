@@ -302,6 +302,16 @@ export class UsuariosService {
 
   async resetPassword(id: string, usuarioLogueado: Usuario): Promise<{ message: string }> {
     const entity = await this.obtener(id);
+
+    const esRectorado = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeRectorado) ||
+      usuarioLogueado.roles.includes(RolUsuario.AsistenteDeRectorado);
+    const esSecretariaMismaUA = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
+      usuarioLogueado.unidadAcademicaId === entity.unidadAcademicaId;
+
+    if (!esRectorado && !esSecretariaMismaUA) {
+      throw new ForbiddenException('No tiene permisos para resetear la contraseña de este usuario');
+    }
+
     const tempPassword = crypto.randomBytes(4).toString('hex');
     entity.password = await bcrypt.hash(tempPassword, SALT_ROUNDS);
     await this.repo.save(entity);
