@@ -62,7 +62,7 @@ export class UsuariosService {
     if (creador) {
       const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria);
       if (esSecretaria) {
-        const rolesPermitidos = [RolUsuario.Evaluador, RolUsuario.AsistenteDeSecretaria];
+        const rolesPermitidos = [RolUsuario.Evaluador, RolUsuario.AsistenteDeSecretaria, RolUsuario.DirectorDeProyecto];
         const todosPermitidos = dto.roles.every((r) => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
           throw new BadRequestException(
@@ -103,7 +103,8 @@ export class UsuariosService {
       .leftJoinAndSelect('usuario.unidadAcademica', 'unidadAcademica')
       .leftJoinAndSelect('usuario.creadoPor', 'creadoPor');
 
-    const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria);
+    const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
+      usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria);
 
     if (esSecretaria) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
@@ -230,6 +231,20 @@ export class UsuariosService {
     if (esSecretaria && mismaUA) {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
+      if (dto.roles !== undefined) {
+        const rolesPermitidos = [RolUsuario.DirectorDeProyecto, RolUsuario.Evaluador];
+        const todosPermitidos = dto.roles.every(r => rolesPermitidos.includes(r));
+        if (!todosPermitidos) {
+          throw new BadRequestException('Solo puedes asignar roles de Director de Proyecto y Evaluador');
+        }
+        const nuevosRoles = [
+          ...entity.roles.filter(r => !rolesPermitidos.includes(r)),
+          ...dto.roles,
+        ];
+        validarGruposRoles(nuevosRoles);
+        entity.roles = nuevosRoles;
+        huboCambioRol = true;
+      }
       if (dto.habilitado !== undefined) {
         const gestionRoles = [
           RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado,
@@ -247,6 +262,12 @@ export class UsuariosService {
         await this.auditoria.registrar({
           usuarioId: id, accion: dto.habilitado ? TipoAccionAuditoria.REACTIVACION : TipoAccionAuditoria.INACTIVACION,
           descripcion: dto.habilitado ? 'Usuario habilitado' : 'Usuario deshabilitado',
+          responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
+        });
+      } else if (huboCambioRol) {
+        await this.auditoria.registrar({
+          usuarioId: id, accion: TipoAccionAuditoria.CAMBIO_ROL,
+          descripcion: `Roles cambiados: [${rolesAnteriores.join(', ')}] → [${entity.roles.join(', ')}]`,
           responsableId: usuarioLogueado!.id, responsableNombre: usuarioLogueado!.nombreCompleto,
         });
       } else {

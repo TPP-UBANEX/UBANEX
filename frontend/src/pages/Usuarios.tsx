@@ -29,7 +29,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
+
 import type { Usuario, UnidadAcademica, PaginatedResponse } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import { Plus, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -59,18 +59,9 @@ const rolesDisponibles: Record<string, RolUsuario[]> = {
   ],
   [RolUsuario.AutoridadDeSecretaria]: [
     RolUsuario.AsistenteDeSecretaria,
+    RolUsuario.DirectorDeProyecto,
     RolUsuario.Evaluador,
   ],
-}
-
-function puedeEditarUsuario(logueado: Usuario, target: Usuario): boolean {
-  if (logueado.id === target.id) return true
-  if (logueado.roles.includes(RolUsuario.AutoridadDeRectorado)) return true
-  if (
-    logueado.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
-    logueado.unidadAcademicaId === target.unidadAcademicaId
-  ) return true
-  return false
 }
 
 export function Usuarios() {
@@ -139,7 +130,7 @@ export function Usuarios() {
     { label: 'Directores', value: '\u2014', color: 'text-muted-foreground' },
   ]
 
-  const usuarios = response?.data ?? []
+  const usuarios = (response?.data ?? []).filter(u => u.id !== user?.id)
   const meta = response?.meta
 
   return (
@@ -242,7 +233,7 @@ export function Usuarios() {
                   <TableHead>Email</TableHead>
                   <TableHead>Roles</TableHead>
                   <TableHead>Unidad Académica</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="text-center">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -266,17 +257,10 @@ export function Usuarios() {
                     <TableCell className="text-sm text-muted-foreground">
                       {u.unidadAcademica?.nombre || '-'}
                     </TableCell>
-                    <TableCell onClick={e => e.stopPropagation()}>
-                      {user && puedeEditarUsuario(user, u) && (
-                        <EditarUsuarioDialog
-                          usuario={u}
-                          uaList={uaList}
-                          onUpdated={cargarDatos}
-                          trigger={
-                            <Button variant="ghost" size="sm">Editar</Button>
-                          }
-                        />
-                      )}
+                    <TableCell onClick={e => e.stopPropagation()} className="text-center">
+                      <Badge variant={u.habilitado ? 'default' : 'secondary'}>
+                        {u.habilitado ? 'Habilitado' : 'Deshabilitado'}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -339,14 +323,14 @@ function NuevoUsuarioDialog({
   const [nombreCompleto, setNombreCompleto] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [rol, setRol] = useState('')
+  const [roles, setRoles] = useState<string[]>([])
   const [unidadAcademicaId, setUnidadAcademicaId] = useState(uaId ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!rol) return
+    if (roles.length === 0) return
     setError('')
     setSubmitting(true)
     try {
@@ -354,13 +338,13 @@ function NuevoUsuarioDialog({
         nombreCompleto,
         email,
         password,
-        roles: [rol as RolUsuario],
+        roles: roles as RolUsuario[],
         unidadAcademicaId: unidadAcademicaId || undefined,
       })
       setNombreCompleto('')
       setEmail('')
       setPassword('')
-      setRol('')
+      setRoles([])
       setUnidadAcademicaId(uaId ?? '')
       onCreated()
     } catch (err) {
@@ -399,14 +383,31 @@ function NuevoUsuarioDialog({
           onChange={e => setPassword(e.target.value)}
           required
         />
-        <Select value={rol} onValueChange={setRol} required>
-          <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
-          <SelectContent>
-            {rolesCreables.map(r => (
-              <SelectItem key={r} value={r}>{rolLabels[r]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Roles</p>
+          <div className="flex flex-wrap gap-2">
+            {rolesCreables.map(r => {
+              const selected = roles.includes(r)
+              return (
+                <Button
+                  key={r}
+                  type="button"
+                  variant={selected ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    if (selected) {
+                      setRoles(roles.filter(x => x !== r))
+                    } else {
+                      setRoles([...roles, r])
+                    }
+                  }}
+                >
+                  {rolLabels[r]}
+                </Button>
+              )
+            })}
+          </div>
+        </div>
         {!esSecretaria && (
           <Select value={unidadAcademicaId} onValueChange={setUnidadAcademicaId}>
             <SelectTrigger><SelectValue placeholder="Unidad Académica (opcional)" /></SelectTrigger>
