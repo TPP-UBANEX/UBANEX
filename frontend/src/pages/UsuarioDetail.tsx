@@ -111,6 +111,11 @@ export function UsuarioDetail() {
     r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado ||
     r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria
   )
+  const puedeResetearPassword = !esMiPerfil && (
+    user?.roles.includes(RolUsuario.AutoridadDeRectorado) ||
+    user?.roles.includes(RolUsuario.AsistenteDeRectorado) ||
+    (user?.roles.includes(RolUsuario.AutoridadDeSecretaria) && user?.unidadAcademicaId === usuario.unidadAcademicaId)
+  )
   const puedeCambiarEstado = !esMiPerfil && (
     user?.roles.includes(RolUsuario.AutoridadDeRectorado) ||
     (user?.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
@@ -179,7 +184,7 @@ export function UsuarioDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!esMiPerfil && (
+          {puedeResetearPassword && (
             <Button variant="outline" onClick={() => setResetOpen(true)}>
               <KeyRound className="h-4 w-4 mr-2" />
               Resetear contraseña

@@ -57,7 +57,11 @@ export function EditarUsuarioDialog({
   const esSecretariaMismaUA =
     user?.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
     user?.unidadAcademicaId === usuario.unidadAcademicaId
-  const puedeEditarRolesUA = esRectorado
+  const puedeEditarRoles = esRectorado || esSecretariaMismaUA
+  const puedeEditarUA = esRectorado
+  const rolesDisponibles: RolUsuario[] = esRectorado
+    ? Object.keys(rolLabels) as RolUsuario[]
+    : [RolUsuario.DirectorDeProyecto, RolUsuario.Evaluador]
   const puedeEditar = esAutoEdicion || esRectorado || esSecretariaMismaUA
 
   if (!puedeEditar) return null
@@ -69,8 +73,10 @@ export function EditarUsuarioDialog({
     try {
       const data: Record<string, unknown> = { nombreCompleto, email }
       if (password) data.password = password
-      if (puedeEditarRolesUA) {
+      if (puedeEditarRoles) {
         if (roles.length > 0) data.roles = roles
+      }
+      if (puedeEditarUA) {
         if (unidadAcademicaId) data.unidadAcademicaId = unidadAcademicaId
       }
       await api.usuarios.actualizar(usuario.id, data)
@@ -112,26 +118,42 @@ export function EditarUsuarioDialog({
             onChange={e => setEmail(e.target.value)}
             required
           />
-          <Input
-            placeholder={esAutoEdicion ? 'Nueva contraseña (dejar vacío para mantener)' : 'Contraseña (opcional)'}
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
-          {puedeEditarRolesUA && (
-            <Select
-              value={roles[0] ?? ''}
-              onValueChange={v => setRoles([v])}
-            >
-              <SelectTrigger><SelectValue placeholder="Rol" /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(rolLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {esAutoEdicion && (
+            <Input
+              placeholder="Nueva contraseña (dejar vacío para mantener)"
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
           )}
-          {puedeEditarRolesUA && (
+          {puedeEditarRoles && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Roles</p>
+              <div className="flex flex-wrap gap-2">
+                {rolesDisponibles.map(rol => {
+                  const selected = roles.includes(rol)
+                  return (
+                    <Button
+                      key={rol}
+                      type="button"
+                      variant={selected ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        if (selected) {
+                          setRoles(roles.filter(r => r !== rol))
+                        } else {
+                          setRoles([...roles, rol])
+                        }
+                      }}
+                    >
+                      {rolLabels[rol]}
+                    </Button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          {puedeEditarUA && (
             <Select value={unidadAcademicaId} onValueChange={setUnidadAcademicaId}>
               <SelectTrigger><SelectValue placeholder="Unidad Académica" /></SelectTrigger>
               <SelectContent>

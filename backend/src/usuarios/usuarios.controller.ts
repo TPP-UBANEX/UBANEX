@@ -64,7 +64,6 @@ export class UsuariosController {
     RolUsuario.AutoridadDeRectorado,
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
-    RolUsuario.AsistenteDeSecretaria,
   )
   resetPassword(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
     return this.service.resetPassword(id, usuario);
