@@ -50,7 +50,7 @@ export class UsuariosController {
   }
 
   @Patch(':id/estado-director')
-  @Roles(RolUsuario.AutoridadDeSecretaria)
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AutoridadDeRectorado)
   actualizarEstadoDirector(
     @Param('id') id: string,
     @Body() dto: ActualizarEstadoDirectorDto,

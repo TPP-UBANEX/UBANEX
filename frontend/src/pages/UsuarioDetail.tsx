@@ -66,6 +66,9 @@ export function UsuarioDetail() {
   const [resetExito, setResetExito] = useState(false)
   const [disableOpen, setDisableOpen] = useState(false)
   const [disableSubmitting, setDisableSubmitting] = useState(false)
+  const [validarOpen, setValidarOpen] = useState(false)
+  const [validarSubmitting, setValidarSubmitting] = useState(false)
+  const [validarAccion, setValidarAccion] = useState<EstadoDirector | null>(null)
 
   const cargarDatos = useCallback(async () => {
     if (!id) return
@@ -117,6 +120,13 @@ export function UsuarioDetail() {
      user?.unidadAcademicaId === usuario.unidadAcademicaId &&
      !tieneRolGestion)
   )
+  const puedeValidarDirector = !esMiPerfil &&
+    usuario.roles.includes(RolUsuario.DirectorDeProyecto) &&
+    (
+      user?.roles.includes(RolUsuario.AutoridadDeRectorado) ||
+      (user?.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
+       user?.unidadAcademicaId === usuario.unidadAcademicaId)
+    )
 
   const formatearFecha = (fecha?: string) => {
     if (!fecha) return 'Sin actividad'
@@ -141,6 +151,23 @@ export function UsuarioDetail() {
       toast.error(nuevoEstado ? 'Error al habilitar el usuario' : 'Error al deshabilitar el usuario')
     } finally {
       setDisableSubmitting(false)
+    }
+  }
+
+  const handleValidarDirector = async () => {
+    if (!validarAccion) return
+    setValidarSubmitting(true)
+    try {
+      await api.usuarios.actualizarEstadoDirector(usuario.id, validarAccion)
+      toast.success(validarAccion === EstadoDirector.Validado
+        ? 'Director validado correctamente'
+        : 'Director rechazado')
+      setValidarOpen(false)
+      cargarDatos()
+    } catch {
+      toast.error('Error al actualizar estado del director')
+    } finally {
+      setValidarSubmitting(false)
     }
   }
 
@@ -280,6 +307,39 @@ export function UsuarioDetail() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={validarOpen} onOpenChange={setValidarOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {validarAccion === EstadoDirector.Validado
+                ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                : <AlertTriangle className="h-5 w-5 text-destructive" />
+              }
+              {validarAccion === EstadoDirector.Validado ? 'Validar director' : 'Rechazar director'}
+            </DialogTitle>
+            <DialogDescription>
+              {validarAccion === EstadoDirector.Validado
+                ? <>¿Estás seguro de validar a <strong>{usuario.nombreCompleto}</strong> como Director de Proyecto? Podrá participar en convocatorias.</>
+                : <>¿Estás seguro de rechazar a <strong>{usuario.nombreCompleto}</strong> como Director de Proyecto? No podrá participar hasta que sea validado.</>
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setValidarOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant={validarAccion === EstadoDirector.Validado ? 'default' : 'destructive'}
+              onClick={handleValidarDirector}
+              disabled={validarSubmitting}
+            >
+              {validarSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {validarSubmitting ? 'Guardando...' : 'Confirmar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -338,6 +398,24 @@ export function UsuarioDetail() {
                 <Badge variant="outline" className={estadoDirectorColor(usuario.estadoDirector)}>
                   {estadoDirectorLabel(usuario.estadoDirector)}
                 </Badge>
+                {puedeValidarDirector && usuario.estadoDirector !== EstadoDirector.Validado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setValidarAccion(EstadoDirector.Validado); setValidarOpen(true) }}
+                  >
+                    Validar
+                  </Button>
+                )}
+                {puedeValidarDirector && usuario.estadoDirector !== EstadoDirector.Rechazado && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setValidarAccion(EstadoDirector.Rechazado); setValidarOpen(true) }}
+                  >
+                    Rechazar
+                  </Button>
+                )}
               </div>
             )}
             <Separator />
