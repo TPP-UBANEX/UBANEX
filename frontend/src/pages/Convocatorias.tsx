@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+
 import {
   Table,
   TableBody,
@@ -29,23 +30,70 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Convocatoria } from '@/data/types'
+import { useAuth } from '@/lib/auth-context'
+import type { Convocatoria, Formulario } from '@/data/types'
+import { RolUsuario } from '@/data/types'
 import { estadoBadge } from '@/data/types'
-import { Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
+import { Plus, Search, FileText } from 'lucide-react'
 
 export function Convocatorias() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [data, setData] = useState<Convocatoria[]>([])
+  const [formularios, setFormularios] = useState<Formulario[]>([])
   const [search, setSearch] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todas')
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [creando, setCreando] = useState(false)
+  const [formularioSeleccionado, setFormularioSeleccionado] = useState<Formulario | null>(null)
+  const [form, setForm] = useState({
+    nombre: '', descripcion: '', anio: new Date().getFullYear(),
+    fechaInicioPresentacion: '', fechaFinPresentacion: '',
+    fechaInicioEvaluacion: '', fechaFinEvaluacion: '',
+    fechaInicioEjecucion: '', fechaFinEjecucion: '',
+  })
 
-  useEffect(() => {
-    api.convocatorias.list()
-      .then(setData)
-      .finally(() => setLoading(false))
-  }, [])
+  const cargar = () => {
+    Promise.all([
+      api.convocatorias.list(),
+      api.formularios.list(),
+    ]).then(([c, f]) => {
+      setData(c)
+      setFormularios(f)
+    }).finally(() => setLoading(false))
+  }
+
+  useEffect(cargar, [])
+
+  const handleCrear = async () => {
+    if (!form.nombre || !form.anio) {
+      toast.error('Completá los campos obligatorios')
+      return
+    }
+    setCreando(true)
+    try {
+      await api.convocatorias.crear({
+        ...form,
+        formularioId: formularioSeleccionado?.id,
+      })
+      toast.success('Convocatoria creada correctamente')
+      setOpen(false)
+      setFormularioSeleccionado(null)
+      setForm({
+        nombre: '', descripcion: '', anio: new Date().getFullYear(),
+        fechaInicioPresentacion: '', fechaFinPresentacion: '',
+        fechaInicioEvaluacion: '', fechaFinEvaluacion: '',
+        fechaInicioEjecucion: '', fechaFinEjecucion: '',
+      })
+      cargar()
+    } catch {
+      toast.error('Error al crear la convocatoria')
+    } finally {
+      setCreando(false)
+    }
+  }
 
   const filtradas = data.filter(c => {
     const matchNombre = c.nombre.toLowerCase().includes(search.toLowerCase())
@@ -53,8 +101,8 @@ export function Convocatorias() {
     return matchNombre && matchEstado
   })
 
-  const activas = data.filter(c => c.estado === 'abierta')
-  const pasadas = data.filter(c => c.estado === 'cerrada' || c.estado === 'evaluacion')
+  const activas = data.filter(c => c.estado === 'presentacion' || c.estado === 'evaluacion')
+  const pasadas = data.filter(c => c.estado === 'ejecucion' || c.estado === 'cierre')
 
   return (
     <div className="p-6 space-y-6">
@@ -63,23 +111,113 @@ export function Convocatorias() {
           <h1 className="text-2xl font-semibold tracking-tight">Convocatorias</h1>
           <p className="text-sm text-muted-foreground">Gestión de convocatorias UBANEX</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        {user?.roles.includes(RolUsuario.AutoridadDeRectorado) && (
+          <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Nueva Convocatoria</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Nueva Convocatoria</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-4">
-              <Input placeholder="Nombre" />
-              <Input placeholder="Descripción" />
-              <div className="grid grid-cols-2 gap-4">
-                <Input type="date" />
-                <Input type="date" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Nombre</p>
+                <Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre de la convocatoria" />
               </div>
-              <Button className="w-full" onClick={() => setOpen(false)}>Crear</Button>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Descripción</p>
+                <Input value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción opcional" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Año</p>
+                <Input type="number" value={form.anio} onChange={e => setForm(f => ({ ...f, anio: parseInt(e.target.value) || 0 }))} />
+              </div>
+              <div className="border rounded-lg p-3 space-y-3">
+                <p className="text-sm font-semibold">Presentación</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Inicio</p>
+                    <Input type="date" value={form.fechaInicioPresentacion} onChange={e => setForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Fin</p>
+                    <Input type="date" value={form.fechaFinPresentacion} onChange={e => setForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="border rounded-lg p-3 space-y-3">
+                <p className="text-sm font-semibold">Evaluación</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Inicio</p>
+                    <Input type="date" value={form.fechaInicioEvaluacion} onChange={e => setForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Fin</p>
+                    <Input type="date" value={form.fechaFinEvaluacion} onChange={e => setForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="border rounded-lg p-3 space-y-3">
+                <p className="text-sm font-semibold">Ejecución</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Inicio</p>
+                    <Input type="date" value={form.fechaInicioEjecucion} onChange={e => setForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Fin</p>
+                    <Input type="date" value={form.fechaFinEjecucion} onChange={e => setForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="border rounded-lg p-3 space-y-2">
+                <p className="text-sm font-semibold">Formulario</p>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    checked={formularioSeleccionado?.id === formularios.find(f => f.esDefault)?.id}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        const defaultForm = formularios.find(f => f.esDefault)
+                        if (defaultForm) setFormularioSeleccionado(defaultForm)
+                      } else {
+                        setFormularioSeleccionado(null)
+                      }
+                    }}
+                  />
+                  Usar formulario default
+                </label>
+                {formularios.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No hay formularios disponibles</p>
+                ) : (
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {formularios.map(f => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${
+                          formularioSeleccionado?.id === f.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'hover:bg-muted'
+                        }`}
+                        onClick={() => setFormularioSeleccionado(f)}
+                      >
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{f.nombre}</span>
+                        {f.esDefault && <span className="text-xs opacity-70 ml-auto">Default</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button className="w-full" onClick={handleCrear} disabled={creando}>
+                {creando ? 'Creando...' : 'Crear'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -91,9 +229,11 @@ export function Convocatorias() {
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas</SelectItem>
-            <SelectItem value="abierta">Activas</SelectItem>
-            <SelectItem value="evaluacion">En evaluación</SelectItem>
-            <SelectItem value="cerrada">Cerradas</SelectItem>
+            <SelectItem value="configuracion">Configuración</SelectItem>
+            <SelectItem value="presentacion">Presentación</SelectItem>
+            <SelectItem value="evaluacion">Evaluación</SelectItem>
+            <SelectItem value="ejecucion">Ejecución</SelectItem>
+            <SelectItem value="cierre">Cierre</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -127,9 +267,10 @@ function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: 
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
+              <TableHead>Año</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead>Apertura</TableHead>
-              <TableHead>Cierre</TableHead>
+              <TableHead>Presentación</TableHead>
+              <TableHead>Formulario</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -137,9 +278,16 @@ function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: 
             {data.map(c => (
               <TableRow key={c.id} className="cursor-pointer" onClick={() => onClick(c.id)}>
                 <TableCell className="font-medium">{c.nombre}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
                 <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.fechaApertura}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.fechaCierre}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {c.fechaInicioPresentacion && c.fechaFinPresentacion
+                    ? `${c.fechaInicioPresentacion} — ${c.fechaFinPresentacion}`
+                    : '-'}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {c.formulario?.nombre || '-'}
+                </TableCell>
                 <TableCell>
                   <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onClick(c.id) }}>Ver</Button>
                 </TableCell>

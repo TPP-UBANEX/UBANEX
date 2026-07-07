@@ -11,6 +11,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
 import { UnidadesAcademicasModule } from './unidades-academicas/unidades-academicas.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { FormulariosModule } from './formularios/formularios.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
     UnidadesAcademicasModule,
     AuthModule,
     AuditoriaModule,
+    FormulariosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

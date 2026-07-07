@@ -105,13 +105,28 @@ export interface Auditoria {
 
 // --- Entidades existentes (se mantienen, se actualizarán en fases siguientes) ---
 
+export enum EstadoConvocatoria {
+  Configuracion = 'configuracion',
+  Presentacion = 'presentacion',
+  Evaluacion = 'evaluacion',
+  Ejecucion = 'ejecucion',
+  Cierre = 'cierre',
+}
+
 export interface Convocatoria {
   id: string
   nombre: string
   descripcion: string
-  estado: string
-  fechaApertura: string
-  fechaCierre: string
+  anio: number
+  estado: EstadoConvocatoria
+  fechaInicioPresentacion: string | null
+  fechaFinPresentacion: string | null
+  fechaInicioEvaluacion: string | null
+  fechaFinEvaluacion: string | null
+  fechaInicioEjecucion: string | null
+  fechaFinEjecucion: string | null
+  formularioId: string | null
+  formulario?: Formulario
 }
 
 export interface Proyecto {
@@ -148,10 +163,18 @@ export interface Rendicion {
   comprobanteUrl?: string
 }
 
+export interface Formulario {
+  id: string
+  nombre: string
+  esDefault: boolean
+}
+
 export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  abierta: 'default',
-  cerrada: 'secondary',
-  evaluacion: 'outline',
+  configuracion: 'outline',
+  presentacion: 'default',
+  evaluacion: 'secondary',
+  ejecucion: 'default',
+  cierre: 'secondary',
   presentado: 'outline',
   revision: 'secondary',
   adjudicado: 'default',

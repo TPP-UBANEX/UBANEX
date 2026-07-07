@@ -1,7 +1,7 @@
 export enum EstadoConvocatoria {
-  Configuracion = 'Configuracion',
-  Presentacion = 'Presentacion',
-  Evaluacion = 'Evaluacion',
-  Ejecucion = 'Ejecucion',
-  Cierre = 'Cierre',
+  Configuracion = 'configuracion',
+  Presentacion = 'presentacion',
+  Evaluacion = 'evaluacion',
+  Ejecucion = 'ejecucion',
+  Cierre = 'cierre',
 }
