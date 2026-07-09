@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -64,6 +64,15 @@ export function EditarUsuarioDialog({
     : [RolUsuario.DirectorDeProyecto, RolUsuario.Evaluador]
   const puedeEditar = esAutoEdicion || esRectorado || esSecretariaMismaUA
 
+  useEffect(() => {
+    setNombreCompleto(usuario.nombreCompleto)
+    setEmail(usuario.email)
+    setPassword('')
+    setRoles(usuario.roles)
+    setUnidadAcademicaId(usuario.unidadAcademicaId ?? '')
+    setError('')
+  }, [usuario.id])
+
   if (!puedeEditar) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,7 +86,7 @@ export function EditarUsuarioDialog({
         if (roles.length > 0) data.roles = roles
       }
       if (puedeEditarUA) {
-        if (unidadAcademicaId) data.unidadAcademicaId = unidadAcademicaId
+        data.unidadAcademicaId = unidadAcademicaId || null
       }
       await api.usuarios.actualizar(usuario.id, data)
       setOpen(false)

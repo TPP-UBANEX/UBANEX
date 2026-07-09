@@ -44,6 +44,9 @@ export function ProyectoDetail() {
 
   const esPropietario = edicion && (edicion.directorId === user?.id || edicion.codirectorId === user?.id)
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
+  const esSecretaria = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+  )
 
   const cargarDatos = async () => {
     if (!id) return
@@ -229,6 +232,16 @@ export function ProyectoDetail() {
               <Button size="sm" onClick={handleGuardar} disabled={guardando}>
                 {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Guardar
+              </Button>
+            </>
+          )}
+          {!editando && esSecretaria && edicion?.estado === EstadoEdicion.Presentado && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => toast('Solicitar cambios — funcionalidad pendiente')}>
+                Solicitar cambios
+              </Button>
+              <Button size="sm" onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
+                Iniciar evaluación
               </Button>
             </>
           )}

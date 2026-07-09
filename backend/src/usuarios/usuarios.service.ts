@@ -215,7 +215,11 @@ export class UsuariosService {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) { entity.roles = dto.roles; huboCambioRol = true; }
-      if (dto.unidadAcademicaId !== undefined) entity.unidadAcademicaId = dto.unidadAcademicaId;
+      if (dto.unidadAcademicaId !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        entity.unidadAcademica = null as any;
+        entity.unidadAcademicaId = dto.unidadAcademicaId;
+      }
       if (dto.habilitado !== undefined) entity.habilitado = dto.habilitado;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
       const saved = await this.repo.save(entity);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -40,10 +40,12 @@ const pipelineColumns = [
 export function Proyectos() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const esRevision = searchParams.get('revision') === 'true'
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
   const [search, setSearch] = useState('')
-  const [filtroEtapa, setFiltroEtapa] = useState('todas')
+  const [filtroEtapa, setFiltroEtapa] = useState(esRevision ? EstadoEdicion.Presentado : 'todas')
   const [filtroConv, setFiltroConv] = useState('todas')
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
   const [loading, setLoading] = useState(true)
@@ -63,7 +65,11 @@ export function Proyectos() {
 
   useEffect(() => {
     cargarDatos()
-  }, [])
+  }, [esRevision])
+
+  useEffect(() => {
+    setFiltroEtapa(esRevision ? EstadoEdicion.Presentado : 'todas')
+  }, [esRevision])
 
   const filtrados = ediciones.filter(e => {
     if (filtroEtapa !== 'todas' && e.estado !== filtroEtapa) return false
@@ -76,8 +82,14 @@ export function Proyectos() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Proyectos</h1>
-          <p className="text-sm text-muted-foreground">Pipeline de proyectos de extensión</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {esRevision ? 'Revisión de proyectos' : 'Proyectos'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {esRevision
+              ? 'Proyectos presentados pendientes de revisión'
+              : 'Pipeline de proyectos de extensión'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant={vista === 'tabla' ? 'default' : 'outline'} size="sm" onClick={() => setVista('tabla')}>Tabla</Button>
