@@ -11,21 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, Usuario } from '@/data/types'
-import { estadoBadge, EstadoEdicion, TipoRubro, RolUsuario } from '@/data/types'
-import { ArrowLeft, Loader2, Pencil, Send, Save } from 'lucide-react'
+import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario } from '@/data/types'
+import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 const tipoRubroLabels: Record<TipoRubro, string> = {
@@ -122,6 +114,80 @@ export function ProyectoDetail() {
       setEnviando(false)
     }
   }
+
+  const presupuestoVacio = (): Presupuesto => ({
+    montoTotal: 0,
+    rubros: [
+      { tipo: TipoRubro.ViaticosYSeguros, subtotal: 0, partidas: [] },
+      { tipo: TipoRubro.BienesDeConsumo, subtotal: 0, partidas: [] },
+      { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: [] },
+    ],
+  })
+
+  const addPartida = (rubroIdx: number, tipo: TipoRubro) => {
+    const actual = editPresupuesto || presupuestoVacio()
+    const rubros = [...actual.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    if (tipo === TipoRubro.ViaticosYSeguros) {
+      const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
+      partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodo: '', monto: 0 })
+      rubro.partidas = partidas
+    } else {
+      const partidas = [...(rubro.partidas as BienPresupuesto[])]
+      partidas.push({ descripcion: '', cantidad: 1, precioUnitario: 0, monto: 0 })
+      rubro.partidas = partidas
+    }
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...actual, rubros }))
+  }
+
+  const removePartida = (rubroIdx: number, partidaIdx: number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = rubro.partidas
+    if (rubro.tipo === TipoRubro.ViaticosYSeguros) {
+      rubro.partidas = (partidas as ViaticoPresupuesto[]).filter((_, i) => i !== partidaIdx)
+    } else {
+      rubro.partidas = (partidas as BienPresupuesto[]).filter((_, i) => i !== partidaIdx)
+    }
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+  }
+
+  const updateViatico = (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
+    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
+    if (field === 'monto') {
+      rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
+    }
+    rubro.partidas = partidas
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+  }
+
+  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = [...(rubro.partidas as BienPresupuesto[])]
+    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
+    if (field === 'cantidad' || field === 'precioUnitario') {
+      partidas[pIdx].monto = partidas[pIdx].cantidad * partidas[pIdx].precioUnitario
+    }
+    rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
+    rubro.partidas = partidas
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+  }
+
+  const recalcularPresupuesto = (p: Presupuesto): Presupuesto => ({
+    ...p,
+    montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
+  })
 
   if (loading) return <ProyectoDetailSkeleton />
 
@@ -242,10 +308,14 @@ export function ProyectoDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Presupuesto</CardTitle>
-              <span className="text-sm font-bold">Total: ${(editPresupuesto?.montoTotal ?? edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</span>
+              <span className="text-sm font-bold">
+                Total: ${(editando ? (editPresupuesto?.montoTotal ?? 0) : (edicion?.presupuesto?.montoTotal ?? 0)).toLocaleString()}
+              </span>
             </CardHeader>
             <CardContent className="space-y-4">
-              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando)}
+              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, {
+                addPartida, removePartida, updateViatico, updateBien,
+              })}
             </CardContent>
           </Card>
         </TabsContent>
@@ -293,64 +363,127 @@ export function ProyectoDetail() {
   )
 }
 
-function renderPresupuesto(presupuesto: Presupuesto | null, _editando: boolean) {
+function renderPresupuesto(
+  presupuesto: Presupuesto | null,
+  editando: boolean,
+  handlers?: {
+    addPartida: (rubroIdx: number, tipo: TipoRubro) => void
+    removePartida: (rubroIdx: number, partidaIdx: number) => void
+    updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
+    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
+  },
+) {
   if (!presupuesto || !presupuesto.rubros || presupuesto.rubros.length === 0) {
-    return <p className="text-sm text-muted-foreground text-center py-4">Sin presupuesto cargado</p>
+    return (
+      <div className="text-center py-8">
+        <p className="text-sm text-muted-foreground mb-4">Sin presupuesto cargado</p>
+        {editando && handlers && (
+          <Button type="button" variant="outline" size="sm" onClick={() => handlers.addPartida(0, TipoRubro.ViaticosYSeguros)}>
+            <Plus className="h-3 w-3 mr-1" />Cargar presupuesto
+          </Button>
+        )}
+      </div>
+    )
   }
 
   return (
     <div className="space-y-4">
-      {presupuesto.rubros.map((rubro) => (
+      {presupuesto.rubros.map((rubro, rubroIdx) => (
         <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
-            <span className="text-xs text-muted-foreground">Subtotal: ${rubro.subtotal.toLocaleString()}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Subtotal: ${rubro.subtotal.toLocaleString()}</span>
+              {editando && handlers && (
+                <Button type="button" variant="outline" size="sm" onClick={() => handlers.addPartida(rubroIdx, rubro.tipo as TipoRubro)}>
+                  <Plus className="h-3 w-3 mr-1" />Agregar
+                </Button>
+              )}
+            </div>
           </div>
 
           {rubro.partidas.length === 0 ? (
             <p className="text-xs text-muted-foreground">Sin partidas</p>
           ) : rubro.tipo === TipoRubro.ViaticosYSeguros ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Período</TableHead>
-                  <TableHead>Monto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(rubro.partidas as ViaticoPresupuesto[]).map((p, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-sm">{p.tipoPersona}</TableCell>
-                    <TableCell className="text-sm">{p.descripcion}</TableCell>
-                    <TableCell className="text-sm">{p.periodo}</TableCell>
-                    <TableCell className="text-sm">${p.monto.toLocaleString()}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-2">
+              {(rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => (
+                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
+                  {editando && handlers ? (
+                    <>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Tipo</span>
+                        <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Docente">Docente</SelectItem>
+                            <SelectItem value="Estudiante">Estudiante</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-[2] space-y-1">
+                        <span className="text-xs">Descripción</span>
+                        <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Período</span>
+                        <Input value={p.periodo} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodo', e.target.value)} placeholder="Ej: Oct 2025" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Monto</span>
+                        <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', Number(e.target.value))} />
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm flex-1">{p.tipoPersona}</span>
+                      <span className="text-sm flex-[2]">{p.descripcion}</span>
+                      <span className="text-sm flex-1">{p.periodo}</span>
+                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Cant.</TableHead>
-                  <TableHead>P. Unit.</TableHead>
-                  <TableHead>Monto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(rubro.partidas as BienPresupuesto[]).map((p, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-sm">{p.descripcion}</TableCell>
-                    <TableCell className="text-sm">{p.cantidad}</TableCell>
-                    <TableCell className="text-sm">${p.precioUnitario.toLocaleString()}</TableCell>
-                    <TableCell className="text-sm">${p.monto.toLocaleString()}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-2">
+              {(rubro.partidas as BienPresupuesto[]).map((p, pIdx) => (
+                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
+                  {editando && handlers ? (
+                    <>
+                      <div className="flex-[2] space-y-1">
+                        <span className="text-xs">Descripción</span>
+                        <Input value={p.descripcion} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Resmas de papel" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Cantidad</span>
+                        <Input type="number" min="1" step="1" value={p.cantidad || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'cantidad', Number(e.target.value))} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Precio unit.</span>
+                        <Input type="number" min="0" step="0.01" value={p.precioUnitario || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'precioUnitario', Number(e.target.value))} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Monto</span>
+                        <Input type="number" value={p.monto || ''} disabled className="bg-muted" />
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm flex-[2]">{p.descripcion}</span>
+                      <span className="text-sm flex-1">{p.cantidad}</span>
+                      <span className="text-sm flex-1">${p.precioUnitario.toLocaleString()}</span>
+                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       ))}
