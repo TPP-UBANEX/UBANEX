@@ -103,7 +103,39 @@ export interface Auditoria {
   motivo: string | null
 }
 
-// --- Entidades existentes (se mantienen, se actualizarán en fases siguientes) ---
+// --- Enums de dominio ---
+
+export enum EstadoEdicion {
+  Borrador = 'Borrador',
+  Presentado = 'Presentado',
+  PendienteDeCambios = 'PendienteDeCambios',
+  EnEvaluacion = 'EnEvaluacion',
+  Adjudicado = 'Adjudicado',
+  NoAdjudicado = 'NoAdjudicado',
+  EnEjecucion = 'EnEjecucion',
+  Cerrado = 'Cerrado',
+}
+
+export enum EstadoConvocatoria {
+  Configuracion = 'Configuracion',
+  Presentacion = 'Presentacion',
+  Evaluacion = 'Evaluacion',
+  Ejecucion = 'Ejecucion',
+  Cierre = 'Cierre',
+}
+
+export enum TipoRubro {
+  ViaticosYSeguros = 'ViaticosYSeguros',
+  BienesDeConsumo = 'BienesDeConsumo',
+  BienesDeUso = 'BienesDeUso',
+}
+
+export enum TipoPersona {
+  Docente = 'Docente',
+  Estudiante = 'Estudiante',
+}
+
+// --- Entidades de dominio ---
 
 export interface Convocatoria {
   id: string
@@ -116,14 +148,69 @@ export interface Convocatoria {
 
 export interface Proyecto {
   id: string
+  nombre: string
+  esConsolidado: boolean
+  creadoPor: Usuario
+  creadoPorId: string
+  creadoEn: string
+  ediciones?: Edicion[]
+}
+
+export interface Edicion {
+  id: string
+  proyectoId: string
   convocatoriaId: string
-  titulo: string
-  director: string
-  facultad: string
-  resumen: string
-  estado: string
-  puntaje?: number
-  montoAsignado?: number
+  estado: EstadoEdicion
+  directorId: string
+  director?: Usuario
+  codirectorId?: string
+  codirector?: Usuario
+  unidadAcademicaId: string
+  unidadAcademica?: UnidadAcademica
+  convocatoria?: Convocatoria
+  presupuesto?: Presupuesto
+  datosFormulario?: Record<string, unknown>
+  creadoEn: string
+  actualizadoEn: string
+}
+
+export interface Presupuesto {
+  montoTotal: number
+  rubros: RubroPresupuesto[]
+}
+
+export interface RubroPresupuesto {
+  tipo: TipoRubro
+  subtotal: number
+  partidas: ViaticoPresupuesto[] | BienPresupuesto[]
+}
+
+export interface ViaticoPresupuesto {
+  tipoPersona: TipoPersona
+  descripcion: string
+  periodo: string
+  monto: number
+}
+
+export interface BienPresupuesto {
+  descripcion: string
+  cantidad: number
+  precioUnitario: number
+  monto: number
+}
+
+export interface CrearProyectoDto {
+  nombre: string
+  convocatoriaId: string
+  codirectorId?: string
+  presupuesto?: Presupuesto
+}
+
+export interface ActualizarEdicionDto {
+  nombre?: string
+  codirectorId?: string
+  presupuesto?: Presupuesto
+  datosFormulario?: Record<string, unknown>
 }
 
 export interface Evaluacion {
@@ -167,4 +254,17 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   secretaria: 'secondary',
   evaluador: 'outline',
   director: 'default',
+  Borrador: 'secondary',
+  Presentado: 'outline',
+  PendienteDeCambios: 'secondary',
+  EnEvaluacion: 'outline',
+  Adjudicado: 'default',
+  NoAdjudicado: 'destructive',
+  EnEjecucion: 'default',
+  Cerrado: 'secondary',
+  Configuracion: 'outline',
+  Presentacion: 'default',
+  Evaluacion: 'outline',
+  Ejecucion: 'default',
+  Cierre: 'secondary',
 }
