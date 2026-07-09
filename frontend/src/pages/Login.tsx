@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -65,6 +65,12 @@ export function Login() {
               {loading ? 'Ingresando...' : 'Ingresar'}
             </Button>
           </form>
+          <div className="mt-4 text-center text-sm text-muted-foreground">
+            ¿No tenés cuenta?{' '}
+            <Link to="/register" className="font-medium text-primary hover:underline">
+              Crear cuenta
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

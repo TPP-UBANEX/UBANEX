@@ -12,6 +12,7 @@ import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dt
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { EstadoDirector } from '../common/enums/estado-director.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
@@ -80,6 +81,9 @@ export class UsuariosService {
       ...dto,
       password,
       creadoPorId: creador?.id,
+      estadoDirector: dto.roles.includes(RolUsuario.DirectorDeProyecto)
+        ? EstadoDirector.PendienteDeValidacion
+        : null,
     });
     const saved = await this.repo.save(entity);
 

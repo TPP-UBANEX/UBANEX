@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AuthProvider } from '@/lib/auth-context'
 import { Login } from '@/pages/Login'
+import { Register } from '@/pages/Register'
 import { Dashboard } from '@/pages/Dashboard'
 import { Convocatorias } from '@/pages/Convocatorias'
 import { ConvocatoriaDetail } from '@/pages/ConvocatoriaDetail'
@@ -41,6 +42,7 @@ function App() {
         <Toaster richColors position="top-right" />
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/*" element={
             <ProtectedRoute>
               <Layout>

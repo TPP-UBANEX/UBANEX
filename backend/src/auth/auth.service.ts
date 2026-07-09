@@ -5,6 +5,7 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { EstadoDirector } from '../common/enums/estado-director.enum';
 import { JwtPayload } from './strategies/jwt.strategy';
 
 @Injectable()
@@ -27,6 +28,14 @@ export class AuthService {
 
     if (!usuario.habilitado) {
       throw new UnauthorizedException('Usuario deshabilitado');
+    }
+
+    const esDirectorRechazado = usuario.roles.includes(RolUsuario.DirectorDeProyecto) &&
+      usuario.estadoDirector === EstadoDirector.Rechazado;
+    if (esDirectorRechazado) {
+      throw new UnauthorizedException(
+        'Tu cuenta de Director ha sido rechazada. Contactate con la Secretaría de Extensión de tu facultad.',
+      );
     }
 
     return this.generarToken(usuario);
