@@ -373,22 +373,17 @@ function renderPresupuesto(
     updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
   },
 ) {
-  if (!presupuesto || !presupuesto.rubros || presupuesto.rubros.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground mb-4">Sin presupuesto cargado</p>
-        {editando && handlers && (
-          <Button type="button" variant="outline" size="sm" onClick={() => handlers.addPartida(0, TipoRubro.ViaticosYSeguros)}>
-            <Plus className="h-3 w-3 mr-1" />Cargar presupuesto
-          </Button>
-        )}
-      </div>
-    )
-  }
+  const rubros = presupuesto?.rubros?.length
+    ? presupuesto.rubros
+    : [
+        { tipo: TipoRubro.ViaticosYSeguros, subtotal: 0, partidas: [] as ViaticoPresupuesto[] },
+        { tipo: TipoRubro.BienesDeConsumo, subtotal: 0, partidas: [] as BienPresupuesto[] },
+        { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: [] as BienPresupuesto[] },
+      ]
 
   return (
     <div className="space-y-4">
-      {presupuesto.rubros.map((rubro, rubroIdx) => (
+      {rubros.map((rubro, rubroIdx) => (
         <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
