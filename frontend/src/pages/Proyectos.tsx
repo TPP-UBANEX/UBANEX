@@ -124,16 +124,16 @@ export function Proyectos() {
           </SelectContent>
         </Select>
         <Select value={filtroConv} onValueChange={setFiltroConv}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Convocatoria" /></SelectTrigger>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Todas las convocatorias" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas</SelectItem>
+            <SelectItem value="todas">Todas las convocatorias</SelectItem>
             {convocatorias.map(c => (
               <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={filtroAnio} onValueChange={setFiltroAnio}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Edición" /></SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Edición" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas las ediciones</SelectItem>
             {anios.map(a => (
