@@ -8,5 +8,6 @@ import { Convocatoria } from './convocatoria.entity';
   imports: [TypeOrmModule.forFeature([Convocatoria])],
   controllers: [ConvocatoriasController],
   providers: [ConvocatoriasService],
+  exports: [ConvocatoriasService],
 })
 export class ConvocatoriasModule {}
