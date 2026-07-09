@@ -31,7 +31,7 @@ export function Dashboard() {
   }, [])
 
   const stats = [
-    { label: 'Proyectos Activos', value: ediciones.filter(e => e.estado === EstadoEdicion.Ejecucion).length, icon: Users, color: 'text-blue-600' },
+    { label: 'Proyectos Activos', value: ediciones.filter(e => e.estado === EstadoEdicion.EnEjecucion).length, icon: Users, color: 'text-blue-600' },
     { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === 'Presentacion').length, icon: FileText, color: 'text-green-600' },
     { label: 'Evaluaciones Pendientes', value: ediciones.filter(e => e.estado === EstadoEdicion.EnEvaluacion).length, icon: ClipboardCheck, color: 'text-amber-600' },
     { label: 'Rendiciones Pendientes', value: 0, icon: DollarSign, color: 'text-purple-600' },

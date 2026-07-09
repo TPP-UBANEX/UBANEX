@@ -159,6 +159,7 @@ export interface Proyecto {
 export interface Edicion {
   id: string
   proyectoId: string
+  proyecto?: Proyecto
   convocatoriaId: string
   estado: EstadoEdicion
   directorId: string

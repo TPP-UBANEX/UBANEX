@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, RubroPresupuesto, ViaticoPresupuesto, BienPresupuesto, Usuario } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, Usuario } from '@/data/types'
 import { estadoBadge, EstadoEdicion, TipoRubro, RolUsuario } from '@/data/types'
 import { ArrowLeft, Loader2, Pencil, Send, Save } from 'lucide-react'
 import { toast } from 'sonner'
@@ -50,7 +50,6 @@ export function ProyectoDetail() {
   const [directores, setDirectores] = useState<Usuario[]>([])
   const [guardando, setGuardando] = useState(false)
 
-  const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
   const esPropietario = edicion && (edicion.directorId === user?.id || edicion.codirectorId === user?.id)
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
 
@@ -123,66 +122,6 @@ export function ProyectoDetail() {
       setEnviando(false)
     }
   }
-
-  const addPartida = (rubroIdx: number, tipo: TipoRubro) => {
-    if (!editPresupuesto) return
-    const rubros = [...editPresupuesto.rubros]
-    const rubro = { ...rubros[rubroIdx] }
-    if (tipo === TipoRubro.ViaticosYSeguros) {
-      const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
-      partidas.push({ tipoPersona: 'Docente' as const, descripcion: '', periodo: '', monto: 0 })
-      rubro.partidas = partidas
-    } else {
-      const partidas = [...(rubro.partidas as BienPresupuesto[])]
-      partidas.push({ descripcion: '', cantidad: 1, precioUnitario: 0, monto: 0 })
-      rubro.partidas = partidas
-    }
-    rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
-  }
-
-  const removePartida = (rubroIdx: number, partidaIdx: number) => {
-    if (!editPresupuesto) return
-    const rubros = [...editPresupuesto.rubros]
-    const rubro = { ...rubros[rubroIdx] }
-    rubro.partidas = (rubro.partidas as unknown[]).filter((_, i) => i !== partidaIdx)
-    rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
-  }
-
-  const updateViatico = (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => {
-    if (!editPresupuesto) return
-    const rubros = [...editPresupuesto.rubros]
-    const rubro = { ...rubros[rubroIdx] }
-    const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
-    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
-    if (field === 'monto') {
-      rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
-    }
-    rubro.partidas = partidas
-    rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
-  }
-
-  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
-    if (!editPresupuesto) return
-    const rubros = [...editPresupuesto.rubros]
-    const rubro = { ...rubros[rubroIdx] }
-    const partidas = [...(rubro.partidas as BienPresupuesto[])]
-    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
-    if (field === 'cantidad' || field === 'precioUnitario') {
-      partidas[pIdx].monto = partidas[pIdx].cantidad * partidas[pIdx].precioUnitario
-    }
-    rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
-    rubro.partidas = partidas
-    rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
-  }
-
-  const recalcular = (p: Presupuesto): Presupuesto => ({
-    ...p,
-    montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
-  })
 
   if (loading) return <ProyectoDetailSkeleton />
 
@@ -354,14 +293,14 @@ export function ProyectoDetail() {
   )
 }
 
-function renderPresupuesto(presupuesto: Presupuesto | null, editando: boolean) {
+function renderPresupuesto(presupuesto: Presupuesto | null, _editando: boolean) {
   if (!presupuesto || !presupuesto.rubros || presupuesto.rubros.length === 0) {
     return <p className="text-sm text-muted-foreground text-center py-4">Sin presupuesto cargado</p>
   }
 
   return (
     <div className="space-y-4">
-      {presupuesto.rubros.map((rubro, rubroIdx) => (
+      {presupuesto.rubros.map((rubro) => (
         <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>

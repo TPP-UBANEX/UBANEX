@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Usuario, Presupuesto, RubroPresupuesto, ViaticoPresupuesto, BienPresupuesto } from '@/data/types'
+import type { Convocatoria, Usuario, Presupuesto, ViaticoPresupuesto, BienPresupuesto } from '@/data/types'
 import { EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario } from '@/data/types'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -132,7 +132,12 @@ export function NuevoProyectoDialog({
     setPresupuesto(prev => {
       const rubros = [...prev.rubros]
       const rubro = { ...rubros[rubroIdx] }
-      rubro.partidas = (rubro.partidas as unknown[]).filter((_, i) => i !== partidaIdx)
+      const partidas = rubro.partidas
+      if (rubro.tipo === TipoRubro.ViaticosYSeguros) {
+        rubro.partidas = (partidas as ViaticoPresupuesto[]).filter((_, i) => i !== partidaIdx)
+      } else {
+        rubro.partidas = (partidas as BienPresupuesto[]).filter((_, i) => i !== partidaIdx)
+      }
       rubros[rubroIdx] = rubro
       return recalcularMontoTotal({ ...prev, rubros })
     })

@@ -25,8 +25,8 @@ export class ProyectosController {
 
   @Get()
   listar(
+    @CurrentUser() usuario: Usuario,
     @Query('convocatoriaId') convocatoriaId?: string,
-    @CurrentUser() usuario?: Usuario,
   ) {
     return this.service.listar(usuario, convocatoriaId);
   }
