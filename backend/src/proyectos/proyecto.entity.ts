@@ -1,5 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { Convocatoria } from '../convocatorias/convocatoria.entity';
+import {
+  Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
+import { Usuario } from '../usuarios/usuario.entity';
 
 @Entity()
 export class Proyecto {
@@ -7,30 +10,18 @@ export class Proyecto {
   id: string;
 
   @Column()
-  convocatoriaId: string;
+  nombre: string;
 
-  @ManyToOne(() => Convocatoria)
-  @JoinColumn({ name: 'convocatoriaId' })
-  convocatoria: Convocatoria;
+  @Column({ default: false })
+  esConsolidado: boolean;
 
-  @Column()
-  titulo: string;
-
-  @Column()
-  director: string;
+  @ManyToOne(() => Usuario)
+  @JoinColumn({ name: 'creadoPorId' })
+  creadoPor: Usuario;
 
   @Column()
-  facultad: string;
+  creadoPorId: string;
 
-  @Column({ nullable: true, type: 'text' })
-  resumen: string;
-
-  @Column({ default: 'presentado' })
-  estado: string;
-
-  @Column({ nullable: true })
-  puntaje: number;
-
-  @Column({ nullable: true })
-  montoAsignado: number;
+  @CreateDateColumn()
+  creadoEn: Date;
 }
