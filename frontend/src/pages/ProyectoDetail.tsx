@@ -5,6 +5,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -12,41 +19,170 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Proyecto, Evaluacion, Rendicion } from '@/data/types'
-import { estadoBadge } from '@/data/types'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
+import type { Proyecto, Edicion, Presupuesto, RubroPresupuesto, ViaticoPresupuesto, BienPresupuesto, Usuario } from '@/data/types'
+import { estadoBadge, EstadoEdicion, TipoRubro, RolUsuario } from '@/data/types'
+import { ArrowLeft, Loader2, Pencil, Send, Save } from 'lucide-react'
+import { toast } from 'sonner'
+
+const tipoRubroLabels: Record<TipoRubro, string> = {
+  [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
+  [TipoRubro.BienesDeConsumo]: 'Bienes de Consumo',
+  [TipoRubro.BienesDeUso]: 'Bienes de Uso',
+}
 
 export function ProyectoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
-  const [evaluaciones, setEvaluaciones] = useState<Evaluacion[]>([])
-  const [rendiciones, setRendiciones] = useState<Rendicion[]>([])
-  const [open, setOpen] = useState(false)
+  const [edicion, setEdicion] = useState<Edicion | null>(null)
   const [loading, setLoading] = useState(true)
+  const [enviando, setEnviando] = useState(false)
+
+  const [editando, setEditando] = useState(false)
+  const [editNombre, setEditNombre] = useState('')
+  const [editCodirectorId, setEditCodirectorId] = useState('')
+  const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
+  const [directores, setDirectores] = useState<Usuario[]>([])
+  const [guardando, setGuardando] = useState(false)
+
+  const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
+  const esPropietario = edicion && (edicion.directorId === user?.id || edicion.codirectorId === user?.id)
+  const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
+
+  const cargarDatos = async () => {
+    if (!id) return
+    setLoading(true)
+    try {
+      const p = await api.proyectos.get(id)
+      setProyecto(p)
+      const eds = p.ediciones || []
+      const ed = eds.length > 0 ? eds[0] : null
+      setEdicion(ed)
+
+      if (ed && user?.unidadAcademicaId) {
+        const resp = await api.usuarios.list({ rol: RolUsuario.DirectorDeProyecto, unidadAcademicaId: user.unidadAcademicaId, limit: 50 })
+        setDirectores(resp.data.filter(u => u.id !== user.id))
+      }
+    } catch {
+      toast.error('Error al cargar el proyecto')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (!id) return
-    Promise.all([
-      api.proyectos.get(id),
-      api.evaluaciones.list(id),
-      api.rendiciones.list(id),
-    ]).then(([p, e, r]) => {
-      setProyecto(p)
-      setEvaluaciones(e)
-      setRendiciones(r)
-    }).finally(() => setLoading(false))
+    cargarDatos()
   }, [id])
+
+  const iniciarEdicion = () => {
+    if (!proyecto || !edicion) return
+    setEditNombre(proyecto.nombre)
+    setEditCodirectorId(edicion.codirectorId || '')
+    setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
+    setEditando(true)
+  }
+
+  const cancelarEdicion = () => {
+    setEditando(false)
+  }
+
+  const handleGuardar = async () => {
+    if (!id || !edicion) return
+    setGuardando(true)
+    try {
+      await api.proyectos.actualizarEdicion(id, edicion.id, {
+        nombre: editNombre,
+        codirectorId: editCodirectorId || undefined,
+        presupuesto: editPresupuesto || undefined,
+      })
+      toast.success('Proyecto actualizado')
+      setEditando(false)
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const handleEnviar = async () => {
+    if (!id || !edicion) return
+    setEnviando(true)
+    try {
+      await api.proyectos.enviarEdicion(id, edicion.id)
+      toast.success('Proyecto enviado para corrección')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al enviar')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const addPartida = (rubroIdx: number, tipo: TipoRubro) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    if (tipo === TipoRubro.ViaticosYSeguros) {
+      const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
+      partidas.push({ tipoPersona: 'Docente' as const, descripcion: '', periodo: '', monto: 0 })
+      rubro.partidas = partidas
+    } else {
+      const partidas = [...(rubro.partidas as BienPresupuesto[])]
+      partidas.push({ descripcion: '', cantidad: 1, precioUnitario: 0, monto: 0 })
+      rubro.partidas = partidas
+    }
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
+  }
+
+  const removePartida = (rubroIdx: number, partidaIdx: number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    rubro.partidas = (rubro.partidas as unknown[]).filter((_, i) => i !== partidaIdx)
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
+  }
+
+  const updateViatico = (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
+    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
+    if (field === 'monto') {
+      rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
+    }
+    rubro.partidas = partidas
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
+  }
+
+  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = [...(rubro.partidas as BienPresupuesto[])]
+    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
+    if (field === 'cantidad' || field === 'precioUnitario') {
+      partidas[pIdx].monto = partidas[pIdx].cantidad * partidas[pIdx].precioUnitario
+    }
+    rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
+    rubro.partidas = partidas
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcular({ ...editPresupuesto, rubros }))
+  }
+
+  const recalcular = (p: Presupuesto): Presupuesto => ({
+    ...p,
+    montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
+  })
 
   if (loading) return <ProyectoDetailSkeleton />
 
@@ -60,142 +196,225 @@ export function ProyectoDetail() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{proyecto.titulo}</h1>
-            <Badge variant={estadoBadge[proyecto.estado]}>{proyecto.estado}</Badge>
+            <h1 className="text-2xl font-semibold tracking-tight">{proyecto.nombre}</h1>
+            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{edicion.estado}</Badge>}
           </div>
-          <p className="text-sm text-muted-foreground">{proyecto.director} · {proyecto.facultad}</p>
+          {edicion && (
+            <p className="text-sm text-muted-foreground">
+              {edicion.director?.nombreCompleto || 'Sin director'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
+              {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {esEditable && !editando && (
+            <>
+              <Button variant="outline" size="sm" onClick={iniciarEdicion}>
+                <Pencil className="h-4 w-4 mr-2" />Editar
+              </Button>
+              <Button size="sm" onClick={handleEnviar} disabled={enviando}>
+                {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                Enviar para corrección
+              </Button>
+            </>
+          )}
+          {editando && (
+            <>
+              <Button variant="outline" size="sm" onClick={cancelarEdicion}>Cancelar</Button>
+              <Button size="sm" onClick={handleGuardar} disabled={guardando}>
+                {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Guardar
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Director</CardTitle></CardHeader><CardContent><p className="text-sm">{proyecto.director}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Facultad</CardTitle></CardHeader><CardContent><p className="text-sm">{proyecto.facultad}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Puntaje</CardTitle></CardHeader><CardContent><p className="text-sm font-bold">{proyecto.puntaje ?? '-'}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Monto</CardTitle></CardHeader><CardContent><p className="text-sm font-bold">{proyecto.montoAsignado ? `$${proyecto.montoAsignado.toLocaleString()}` : '-'}</p></CardContent></Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Director</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.director?.nombreCompleto || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.unidadAcademica?.nombre || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Codirector</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.codirector?.nombreCompleto || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
+          <CardContent><p className="text-sm font-bold">${(edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</p></CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="info">
         <TabsList>
           <TabsTrigger value="info">Información</TabsTrigger>
-          <TabsTrigger value="evaluaciones">Evaluaciones ({evaluaciones.length})</TabsTrigger>
-          <TabsTrigger value="rendiciones">Rendiciones ({rendiciones.length})</TabsTrigger>
+          <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
+          <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
+          <TabsTrigger value="rendiciones">Rendiciones</TabsTrigger>
           <TabsTrigger value="cierre">Cierre</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-4">
-          <Card><CardHeader><CardTitle className="text-sm font-medium">Resumen</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{proyecto.resumen}</p></CardContent></Card>
+          {editando ? (
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-medium">Editar proyecto</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Nombre del proyecto</p>
+                  <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Codirector</p>
+                  <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
+                    <SelectTrigger><SelectValue placeholder="Sin codirector" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin codirector</SelectItem>
+                      {directores.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.nombreCompleto}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="text-muted-foreground">Nombre:</span> {proyecto.nombre}</div>
+                  <div><span className="text-muted-foreground">Director:</span> {edicion?.director?.nombreCompleto || '-'}</div>
+                  <div><span className="text-muted-foreground">Codirector:</span> {edicion?.codirector?.nombreCompleto || '-'}</div>
+                  <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
+                  <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
+                  <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
+                  <div><span className="text-muted-foreground">Consolidado:</span> {proyecto.esConsolidado ? 'Sí' : 'No'}</div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="presupuesto" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium">Presupuesto</CardTitle>
+              <span className="text-sm font-bold">Total: ${(editPresupuesto?.montoTotal ?? edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</span>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando)}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="evaluaciones" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Evaluaciones</CardTitle>
-              <Button size="sm"><Plus className="h-4 w-4 mr-2" />Asignar</Button>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-sm font-medium">Evaluaciones</CardTitle></CardHeader>
             <CardContent>
-              {evaluaciones.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Sin evaluaciones</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Evaluador</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Puntaje</TableHead>
-                      <TableHead>Observaciones</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {evaluaciones.map(e => (
-                      <TableRow key={e.id}>
-                        <TableCell className="text-sm">{e.evaluador}</TableCell>
-                        <TableCell><Badge variant="outline">{e.tipo}</Badge></TableCell>
-                        <TableCell className="text-sm font-medium">{e.puntaje || '-'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{e.observaciones || '-'}</TableCell>
-                        <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {edicion?.estado === EstadoEdicion.Borrador || edicion?.estado === EstadoEdicion.Presentado
+                  ? 'El proyecto aún no está en etapa de evaluación.'
+                  : 'Módulo de evaluaciones próximamente.'}
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="rendiciones" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Rendiciones</CardTitle>
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nueva</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader><DialogTitle>Nueva Rendición</DialogTitle></DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <Input placeholder="Rubro" />
-                    <Input type="number" placeholder="Monto" />
-                    <Input type="date" />
-                    <Button className="w-full" onClick={() => setOpen(false)}>Guardar</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-sm font-medium">Rendiciones</CardTitle></CardHeader>
             <CardContent>
-              {rendiciones.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Sin rendiciones</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Rubro</TableHead>
-                      <TableHead>Monto</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rendiciones.map(r => (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-sm">{r.rubro}</TableCell>
-                        <TableCell className="text-sm">${r.monto.toLocaleString()}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{r.fecha}</TableCell>
-                        <TableCell><Badge variant={estadoBadge[r.estado]}>{r.estado}</Badge></TableCell>
-                        <TableCell><Button variant="ghost" size="sm">Comprobante</Button></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {edicion?.estado !== EstadoEdicion.EnEjecucion && edicion?.estado !== EstadoEdicion.Cerrado
+                  ? 'El proyecto aún no está en etapa de ejecución.'
+                  : 'Módulo de rendiciones próximamente.'}
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="cierre" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-sm font-medium">Cierre del Proyecto</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {proyecto.estado === 'cerrado' ? 'Proyecto cerrado.' : 'Complete los pasos para cerrar.'}
+            <CardHeader><CardTitle className="text-sm font-medium">Cierre</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {edicion?.estado === EstadoEdicion.Cerrado
+                  ? 'Proyecto cerrado.'
+                  : 'El cierre estará disponible cuando corresponda.'}
               </p>
-              {proyecto.estado !== 'cerrado' && (
-                <div className="space-y-3">
-                  <Input placeholder="Informe final (PDF)" disabled />
-                  <Button variant="default">Solicitar Cierre</Button>
-                </div>
-              )}
-              {proyecto.estado === 'cerrado' && (
-                <div className="text-sm space-y-1">
-                  <p><span className="text-muted-foreground">Monto:</span> ${proyecto.montoAsignado?.toLocaleString()}</p>
-                  <p><span className="text-muted-foreground">Puntaje:</span> {proyecto.puntaje}</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function renderPresupuesto(presupuesto: Presupuesto | null, editando: boolean) {
+  if (!presupuesto || !presupuesto.rubros || presupuesto.rubros.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">Sin presupuesto cargado</p>
+  }
+
+  return (
+    <div className="space-y-4">
+      {presupuesto.rubros.map((rubro, rubroIdx) => (
+        <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
+            <span className="text-xs text-muted-foreground">Subtotal: ${rubro.subtotal.toLocaleString()}</span>
+          </div>
+
+          {rubro.partidas.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin partidas</p>
+          ) : rubro.tipo === TipoRubro.ViaticosYSeguros ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Período</TableHead>
+                  <TableHead>Monto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(rubro.partidas as ViaticoPresupuesto[]).map((p, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-sm">{p.tipoPersona}</TableCell>
+                    <TableCell className="text-sm">{p.descripcion}</TableCell>
+                    <TableCell className="text-sm">{p.periodo}</TableCell>
+                    <TableCell className="text-sm">${p.monto.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Cant.</TableHead>
+                  <TableHead>P. Unit.</TableHead>
+                  <TableHead>Monto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(rubro.partidas as BienPresupuesto[]).map((p, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-sm">{p.descripcion}</TableCell>
+                    <TableCell className="text-sm">{p.cantidad}</TableCell>
+                    <TableCell className="text-sm">${p.precioUnitario.toLocaleString()}</TableCell>
+                    <TableCell className="text-sm">${p.monto.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -220,7 +439,7 @@ function ProyectoDetailSkeleton() {
       </div>
       <div className="space-y-2">
         <div className="flex gap-2">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-28 rounded-md" />)}
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-8 w-28 rounded-md" />)}
         </div>
         <Skeleton className="h-48 w-full rounded-lg" />
       </div>
