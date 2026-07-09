@@ -26,8 +26,7 @@ export class ProyectosService {
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
     this.validarDirectorHabilitado(usuario);
 
-    const convocatoria = await this.validarConvocatoriaPresentacion(dto.convocatoriaId);
-
+    await this.validarConvocatoriaPresentacion(dto.convocatoriaId);
     await this.validarLimiteParticipaciones(usuario.id, dto.convocatoriaId);
 
     if (dto.codirectorId) {
@@ -41,7 +40,7 @@ export class ProyectosService {
       }),
     );
 
-    const edicion = await this.edicionRepo.save(
+    await this.edicionRepo.save(
       this.edicionRepo.create({
         proyectoId: proyecto.id,
         convocatoriaId: dto.convocatoriaId,
@@ -176,7 +175,7 @@ export class ProyectosService {
     }
   }
 
-  private async validarConvocatoriaPresentacion(convocatoriaId: string): Promise<Convocatoria> {
+  private async validarConvocatoriaPresentacion(convocatoriaId: string): Promise<void> {
     const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
       where: { id: convocatoriaId },
     });
@@ -184,7 +183,6 @@ export class ProyectosService {
     if (convocatoria.estado !== EstadoConvocatoria.Presentacion) {
       throw new BadRequestException('La convocatoria no está en etapa de presentación');
     }
-    return convocatoria;
   }
 
   private async validarLimiteParticipaciones(usuarioId: string, convocatoriaId: string) {
