@@ -1,5 +1,5 @@
 import {
-  IsString, IsOptional, IsUUID, IsObject,
+  IsString, IsOptional, IsUUID, IsObject, IsInt,
 } from 'class-validator';
 
 export class ActualizarEdicionDto {
@@ -10,6 +10,10 @@ export class ActualizarEdicionDto {
   @IsOptional()
   @IsUUID()
   codirectorId?: string;
+
+  @IsOptional()
+  @IsInt()
+  anioEdicion?: number;
 
   @IsOptional()
   @IsObject()

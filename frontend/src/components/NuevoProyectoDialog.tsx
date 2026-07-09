@@ -44,6 +44,7 @@ export function NuevoProyectoDialog({
   const [nombre, setNombre] = useState('')
   const [convocatoriaId, setConvocatoriaId] = useState('')
   const [codirectorId, setCodirectorId] = useState('')
+  const [anioEdicion, setAnioEdicion] = useState<number | null>(new Date().getFullYear())
 
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
   const [directores, setDirectores] = useState<Usuario[]>([])
@@ -83,6 +84,7 @@ export function NuevoProyectoDialog({
         nombre,
         convocatoriaId: convocatoriaId || undefined,
         codirectorId: codirectorId || undefined,
+        anioEdicion: anioEdicion ?? undefined,
         presupuesto: presupuesto.rubros.some(r => r.partidas.length > 0) ? presupuesto : undefined,
       })
       setOpen(false)
@@ -100,6 +102,7 @@ export function NuevoProyectoDialog({
     setNombre('')
     setConvocatoriaId('')
     setCodirectorId('')
+    setAnioEdicion(new Date().getFullYear())
     setPresupuesto({
       montoTotal: 0,
       rubros: [
@@ -224,6 +227,17 @@ export function NuevoProyectoDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Edición (año)</p>
+              <Input
+                type="number"
+                min={2000}
+                max={2100}
+                value={anioEdicion ?? ''}
+                onChange={e => setAnioEdicion(e.target.value ? Number(e.target.value) : null)}
+              />
             </div>
           </div>
 

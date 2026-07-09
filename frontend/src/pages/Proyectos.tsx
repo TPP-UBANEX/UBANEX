@@ -47,6 +47,7 @@ export function Proyectos() {
   const [search, setSearch] = useState('')
   const [filtroEtapa, setFiltroEtapa] = useState(esRevision ? EstadoEdicion.Presentado : 'todas')
   const [filtroConv, setFiltroConv] = useState('todas')
+  const [filtroAnio, setFiltroAnio] = useState('todas')
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
   const [loading, setLoading] = useState(true)
 
@@ -71,9 +72,12 @@ export function Proyectos() {
     setFiltroEtapa(esRevision ? EstadoEdicion.Presentado : 'todas')
   }, [esRevision])
 
+  const anios = [...new Set(ediciones.map(e => e.anioEdicion).filter((a): a is number => a != null))].sort((a, b) => b - a)
+
   const filtrados = ediciones.filter(e => {
     if (filtroEtapa !== 'todas' && e.estado !== filtroEtapa) return false
     if (filtroConv !== 'todas' && e.convocatoriaId !== filtroConv) return false
+    if (filtroAnio !== 'todas' && e.anioEdicion !== Number(filtroAnio)) return false
     if (search && !e.proyecto?.nombre?.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
@@ -125,6 +129,15 @@ export function Proyectos() {
             <SelectItem value="todas">Todas</SelectItem>
             {convocatorias.map(c => (
               <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroAnio} onValueChange={setFiltroAnio}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Edición" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas las ediciones</SelectItem>
+            {anios.map(a => (
+              <SelectItem key={a} value={String(a)}>{a}</SelectItem>
             ))}
           </SelectContent>
         </Select>

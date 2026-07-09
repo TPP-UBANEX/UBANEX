@@ -170,6 +170,7 @@ export interface Edicion {
   unidadAcademica?: UnidadAcademica
   convocatoria?: Convocatoria
   presupuesto?: Presupuesto
+  anioEdicion?: number
   datosFormulario?: Record<string, unknown>
   creadoEn: string
   actualizadoEn: string
@@ -204,12 +205,14 @@ export interface CrearProyectoDto {
   nombre: string
   convocatoriaId?: string
   codirectorId?: string
+  anioEdicion?: number
   presupuesto?: Presupuesto
 }
 
 export interface ActualizarEdicionDto {
   nombre?: string
   codirectorId?: string
+  anioEdicion?: number
   presupuesto?: Presupuesto
   datosFormulario?: Record<string, unknown>
 }

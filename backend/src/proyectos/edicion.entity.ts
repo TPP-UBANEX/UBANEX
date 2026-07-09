@@ -51,6 +51,9 @@ export class Edicion {
   @Column()
   unidadAcademicaId: string;
 
+  @Column({ nullable: true, type: 'int' })
+  anioEdicion: number | null;
+
   @Column({ type: 'json', nullable: true })
   presupuesto: object | null;
 

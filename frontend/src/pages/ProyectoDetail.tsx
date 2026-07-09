@@ -38,6 +38,7 @@ export function ProyectoDetail() {
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editCodirectorId, setEditCodirectorId] = useState('')
+  const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [directores, setDirectores] = useState<Usuario[]>([])
   const [guardando, setGuardando] = useState(false)
@@ -77,6 +78,7 @@ export function ProyectoDetail() {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
     setEditCodirectorId(edicion.codirectorId || '')
+    setEditAnioEdicion(edicion.anioEdicion ?? null)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
     setEditando(true)
   }
@@ -92,6 +94,7 @@ export function ProyectoDetail() {
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
         codirectorId: editCodirectorId || undefined,
+        anioEdicion: editAnioEdicion ?? undefined,
         presupuesto: editPresupuesto || undefined,
       })
       toast.success('Proyecto actualizado')
@@ -248,7 +251,7 @@ export function ProyectoDetail() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Director</CardTitle></CardHeader>
           <CardContent><p className="text-sm">{edicion?.director?.nombreCompleto || '-'}</p></CardContent>
@@ -260,6 +263,10 @@ export function ProyectoDetail() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Codirector</CardTitle></CardHeader>
           <CardContent><p className="text-sm">{edicion?.codirector?.nombreCompleto || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Edición</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.anioEdicion || '-'}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
@@ -297,6 +304,16 @@ export function ProyectoDetail() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Edición (año)</p>
+                  <Input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={editAnioEdicion ?? ''}
+                    onChange={e => setEditAnioEdicion(e.target.value ? Number(e.target.value) : null)}
+                  />
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -309,6 +326,7 @@ export function ProyectoDetail() {
                   <div><span className="text-muted-foreground">Codirector:</span> {edicion?.codirector?.nombreCompleto || '-'}</div>
                   <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
                   <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
+                  <div><span className="text-muted-foreground">Edición:</span> {edicion?.anioEdicion || '-'}</div>
                   <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
                   <div><span className="text-muted-foreground">Consolidado:</span> {proyecto.esConsolidado ? 'Sí' : 'No'}</div>
                 </div>

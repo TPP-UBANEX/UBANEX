@@ -1,5 +1,5 @@
 import {
-  IsString, IsNotEmpty, IsUUID, IsOptional, IsObject,
+  IsString, IsNotEmpty, IsUUID, IsOptional, IsObject, IsInt,
 } from 'class-validator';
 
 export class CrearProyectoDto {
@@ -14,6 +14,10 @@ export class CrearProyectoDto {
   @IsOptional()
   @IsUUID()
   codirectorId?: string;
+
+  @IsOptional()
+  @IsInt()
+  anioEdicion?: number;
 
   @IsOptional()
   @IsObject()

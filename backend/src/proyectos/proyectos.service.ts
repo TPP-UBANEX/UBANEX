@@ -52,6 +52,7 @@ export class ProyectosService {
         directorId: usuario.id,
         codirectorId: dto.codirectorId || null,
         unidadAcademicaId: usuario.unidadAcademicaId,
+        anioEdicion: dto.anioEdicion || new Date().getFullYear(),
         presupuesto: dto.presupuesto || null,
       }),
     );
@@ -122,6 +123,10 @@ export class ProyectosService {
         await this.validarCodirector(dto.codirectorId, edicion.convocatoriaId, edicion.directorId);
       }
       edicion.codirectorId = dto.codirectorId || null;
+    }
+
+    if (dto.anioEdicion !== undefined) {
+      edicion.anioEdicion = dto.anioEdicion;
     }
 
     if (dto.presupuesto !== undefined) {
