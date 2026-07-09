@@ -26,11 +26,15 @@ export class ProyectosService {
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
     this.validarDirectorHabilitado(usuario);
 
-    await this.validarConvocatoriaPresentacion(dto.convocatoriaId);
-    await this.validarLimiteParticipaciones(usuario.id, dto.convocatoriaId);
+    const convocatoriaId = dto.convocatoriaId || null;
+
+    if (dto.convocatoriaId) {
+      await this.validarConvocatoriaPresentacion(dto.convocatoriaId);
+      await this.validarLimiteParticipaciones(usuario.id, dto.convocatoriaId);
+    }
 
     if (dto.codirectorId) {
-      await this.validarCodirector(dto.codirectorId, dto.convocatoriaId, usuario.id);
+      await this.validarCodirector(dto.codirectorId, convocatoriaId, usuario.id);
     }
 
     const proyecto = await this.proyectoRepo.save(
@@ -43,7 +47,7 @@ export class ProyectosService {
     await this.edicionRepo.save(
       this.edicionRepo.create({
         proyectoId: proyecto.id,
-        convocatoriaId: dto.convocatoriaId,
+        convocatoriaId,
         estado: EstadoEdicion.Borrador,
         directorId: usuario.id,
         codirectorId: dto.codirectorId || null,
@@ -206,7 +210,7 @@ export class ProyectosService {
   }
 
   private async validarCodirector(
-    codirectorId: string, convocatoriaId: string, directorId: string,
+    codirectorId: string, convocatoriaId: string | null, directorId: string,
   ) {
     if (codirectorId === directorId) {
       throw new BadRequestException('El codirector no puede ser el mismo que el director');
@@ -223,14 +227,16 @@ export class ProyectosService {
       throw new BadRequestException('El codirector debe estar validado');
     }
 
-    const participaciones = await this.edicionRepo.count({
-      where: [
-        { directorId: codirectorId, convocatoriaId },
-        { codirectorId: codirectorId, convocatoriaId },
-      ],
-    });
-    if (participaciones >= 2) {
-      throw new BadRequestException('El codirector ya alcanzó el límite de 2 participaciones en esta convocatoria');
+    if (convocatoriaId) {
+      const participaciones = await this.edicionRepo.count({
+        where: [
+          { directorId: codirectorId, convocatoriaId },
+          { codirectorId: codirectorId, convocatoriaId },
+        ],
+      });
+      if (participaciones >= 2) {
+        throw new BadRequestException('El codirector ya alcanzó el límite de 2 participaciones en esta convocatoria');
+      }
     }
   }
 

@@ -72,8 +72,8 @@ export function NuevoProyectoDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!nombre || !convocatoriaId) {
-      setError('Completá nombre y convocatoria')
+    if (!nombre) {
+      setError('Completá el nombre del proyecto')
       return
     }
     setError('')
@@ -81,7 +81,7 @@ export function NuevoProyectoDialog({
     try {
       await api.proyectos.crear({
         nombre,
-        convocatoriaId,
+        convocatoriaId: convocatoriaId || undefined,
         codirectorId: codirectorId || undefined,
         presupuesto: presupuesto.rubros.some(r => r.partidas.length > 0) ? presupuesto : undefined,
       })

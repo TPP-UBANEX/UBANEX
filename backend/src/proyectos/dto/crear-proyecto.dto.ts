@@ -7,9 +7,9 @@ export class CrearProyectoDto {
   @IsNotEmpty()
   nombre: string;
 
+  @IsOptional()
   @IsUUID()
-  @IsNotEmpty()
-  convocatoriaId: string;
+  convocatoriaId?: string;
 
   @IsOptional()
   @IsUUID()

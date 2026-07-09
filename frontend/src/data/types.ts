@@ -160,7 +160,7 @@ export interface Edicion {
   id: string
   proyectoId: string
   proyecto?: Proyecto
-  convocatoriaId: string
+  convocatoriaId?: string
   estado: EstadoEdicion
   directorId: string
   director?: Usuario
@@ -202,7 +202,7 @@ export interface BienPresupuesto {
 
 export interface CrearProyectoDto {
   nombre: string
-  convocatoriaId: string
+  convocatoriaId?: string
   codirectorId?: string
   presupuesto?: Presupuesto
 }
