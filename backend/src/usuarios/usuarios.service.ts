@@ -110,8 +110,17 @@ export class UsuariosService {
     const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
       usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria);
 
+    const esEjecucion = usuarioLogueado.roles.includes(RolUsuario.DirectorDeProyecto) ||
+      usuarioLogueado.roles.includes(RolUsuario.Evaluador);
+
     if (esSecretaria) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
+    } else if (esEjecucion) {
+      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
+      query.andWhere('(usuario.roles LIKE :rolDir OR usuario.roles LIKE :rolEval)', {
+        rolDir: '%DirectorDeProyecto%',
+        rolEval: '%Evaluador%',
+      });
     } else if (unidadAcademicaId) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId });
     }
