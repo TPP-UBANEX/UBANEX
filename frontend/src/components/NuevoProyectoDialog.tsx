@@ -66,7 +66,7 @@ export function NuevoProyectoDialog({
         : Promise.resolve({ data: [] }),
     ]).then(([convs, usersResp]) => {
       setConvocatorias(convs.filter(c => c.estado === EstadoConvocatoria.Presentacion))
-      setDirectores(usersResp.data.filter(u => u.id !== user?.id))
+      setDirectores(usersResp.data)
     })
   }, [open, user?.id, user?.unidadAcademicaId])
 

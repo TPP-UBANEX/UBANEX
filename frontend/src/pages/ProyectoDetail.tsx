@@ -60,7 +60,7 @@ export function ProyectoDetail() {
 
       if (ed && user?.unidadAcademicaId) {
         const resp = await api.usuarios.list({ rol: RolUsuario.DirectorDeProyecto, unidadAcademicaId: user.unidadAcademicaId, limit: 50 })
-        setDirectores(resp.data.filter(u => u.id !== user.id))
+        setDirectores(resp.data)
       }
     } catch {
       toast.error('Error al cargar el proyecto')

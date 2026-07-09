@@ -119,10 +119,9 @@ export class ProyectosService {
 
     if (dto.codirectorId !== undefined) {
       if (dto.codirectorId) {
-        await this.validarCodirector(dto.codirectorId, edicion.convocatoriaId, usuario.id);
+        await this.validarCodirector(dto.codirectorId, edicion.convocatoriaId, edicion.directorId);
       }
       edicion.codirectorId = dto.codirectorId || null;
-      edicion.codirector = null;
     }
 
     if (dto.presupuesto !== undefined) {
