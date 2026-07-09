@@ -14,41 +14,46 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Convocatoria, Proyecto } from '@/data/types'
-import { estadoBadge } from '@/data/types'
+import { useAuth } from '@/lib/auth-context'
+import type { Convocatoria, Edicion } from '@/data/types'
+import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
+import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { ArrowLeft, Plus } from 'lucide-react'
 
 export function ConvocatoriaDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [conv, setConv] = useState<Convocatoria | null>(null)
-  const [proyectos, setProyectos] = useState<Proyecto[]>([])
+  const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
+
+  const cargarDatos = () => {
     if (!id) return
+    setLoading(true)
     Promise.all([
       api.convocatorias.get(id),
       api.proyectos.list({ convocatoriaId: id }),
-    ]).then(([c, p]) => {
+    ]).then(([c, e]) => {
       setConv(c)
-      setProyectos(p)
+      setEdiciones(e)
     }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    cargarDatos()
   }, [id])
 
   if (loading) return <DetailSkeleton />
 
   if (!conv) return <div className="p-6"><p className="text-muted-foreground">Convocatoria no encontrada</p></div>
 
-  const conteo = {
-    presentado: proyectos.filter(p => p.estado === 'presentado').length,
-    revision: proyectos.filter(p => p.estado === 'revision').length,
-    evaluacion: proyectos.filter(p => p.estado === 'evaluacion').length,
-    adjudicado: proyectos.filter(p => p.estado === 'adjudicado').length,
-    ejecucion: proyectos.filter(p => p.estado === 'ejecucion').length,
-    rendicion: proyectos.filter(p => p.estado === 'rendicion').length,
-    cerrado: proyectos.filter(p => p.estado === 'cerrado').length,
-  }
+  const conteo: Record<string, number> = {}
+  Object.values(EstadoEdicion).forEach(estado => {
+    conteo[estado] = ediciones.filter(e => e.estado === estado).length
+  })
 
   return (
     <div className="p-6 space-y-6">
@@ -76,37 +81,44 @@ export function ConvocatoriaDetail() {
 
       <Tabs defaultValue="proyectos">
         <TabsList>
-          <TabsTrigger value="proyectos">Proyectos ({proyectos.length})</TabsTrigger>
+          <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
         </TabsList>
         <TabsContent value="proyectos" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Proyectos Presentados</CardTitle>
-              <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
+              {esDirector && (
+                <NuevoProyectoDialog
+                  onCreated={cargarDatos}
+                  trigger={
+                    <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
+                  }
+                />
+              )}
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Título</TableHead>
+                    <TableHead>Proyecto</TableHead>
                     <TableHead>Director</TableHead>
                     <TableHead>Facultad</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Puntaje</TableHead>
+                    <TableHead>Presupuesto</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {proyectos.map(p => (
-                    <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${p.id}`)}>
-                      <TableCell className="font-medium">{p.titulo}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{p.director}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{p.facultad}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[p.estado]}>{p.estado}</Badge></TableCell>
-                      <TableCell className="text-sm">{p.puntaje ?? '-'}</TableCell>
+                  {ediciones.map(e => (
+                    <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
+                      <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
+                      <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
+                      <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); navigate(`/proyectos/${p.id}`) }}>Ver</Button>
+                        <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
                       </TableCell>
                     </TableRow>
                   ))}

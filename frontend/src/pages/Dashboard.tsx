@@ -11,12 +11,12 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Proyecto, Convocatoria } from '@/data/types'
-import { estadoBadge } from '@/data/types'
+import type { Edicion, Convocatoria } from '@/data/types'
+import { estadoBadge, EstadoEdicion } from '@/data/types'
 import { FileText, Users, DollarSign, ClipboardCheck } from 'lucide-react'
 
 export function Dashboard() {
-  const [proyectos, setProyectos] = useState<Proyecto[]>([])
+  const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -24,16 +24,16 @@ export function Dashboard() {
     Promise.all([
       api.proyectos.list(),
       api.convocatorias.list(),
-    ]).then(([p, c]) => {
-      setProyectos(p)
+    ]).then(([e, c]) => {
+      setEdiciones(e)
       setConvocatorias(c)
     }).finally(() => setLoading(false))
   }, [])
 
   const stats = [
-    { label: 'Proyectos Activos', value: proyectos.filter(p => p.estado === 'ejecucion').length, icon: Users, color: 'text-blue-600' },
-    { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === 'abierta').length, icon: FileText, color: 'text-green-600' },
-    { label: 'Evaluaciones Pendientes', value: proyectos.filter(p => p.estado === 'evaluacion').length, icon: ClipboardCheck, color: 'text-amber-600' },
+    { label: 'Proyectos Activos', value: ediciones.filter(e => e.estado === EstadoEdicion.Ejecucion).length, icon: Users, color: 'text-blue-600' },
+    { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === 'Presentacion').length, icon: FileText, color: 'text-green-600' },
+    { label: 'Evaluaciones Pendientes', value: ediciones.filter(e => e.estado === EstadoEdicion.EnEvaluacion).length, icon: ClipboardCheck, color: 'text-amber-600' },
     { label: 'Rendiciones Pendientes', value: 0, icon: DollarSign, color: 'text-purple-600' },
   ]
 
@@ -104,11 +104,11 @@ export function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {proyectos.slice(0, 5).map(p => (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-sm">{p.titulo}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{p.director}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[p.estado]}>{p.estado}</Badge></TableCell>
+                  {ediciones.slice(0, 5).map(e => (
+                    <TableRow key={e.id}>
+                      <TableCell className="text-sm">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
