@@ -5,6 +5,7 @@ import * as morgan from 'morgan';
 import { UsuariosService } from './usuarios/usuarios.service';
 import { UnidadesAcademicasService } from './unidades-academicas/unidades-academicas.service';
 import { RolUsuario } from './common/enums/rol-usuario.enum';
+import { EstadoDirector } from './common/enums/estado-director.enum';
 
 async function seedUnidadAcademica(
   uas: UnidadesAcademicasService,
@@ -18,11 +19,28 @@ async function seedUnidadAcademica(
 async function seedUsuario(
   usuariosService: UsuariosService,
   data: { nombreCompleto: string; email: string; password: string; roles: RolUsuario[]; unidadAcademicaId?: string },
+  opts?: { validado?: boolean; habilitado?: boolean },
 ) {
   const existe = await usuariosService.obtenerPorEmail(data.email);
-  if (existe) return;
-  await usuariosService.crear(data);
+  if (existe) return existe;
+  const user = await usuariosService.crear(data);
+  if (opts?.habilitado === false) {
+    user.habilitado = false;
+    await usuariosService['repo'].update(user.id, { habilitado: false });
+  }
   console.log(`  ${data.email} (${data.roles.join(', ')})`);
+  return user;
+}
+
+function seedDirectores(
+  usuariosService: UsuariosService,
+  data: { nombreCompleto: string; email: string; password: string; roles: RolUsuario[]; unidadAcademicaId?: string },
+  estadoDirector: EstadoDirector,
+  opts?: { habilitado?: boolean },
+) {
+  return seedUsuario(usuariosService, data, opts).then(user => {
+    return usuariosService['repo'].update(user.id, { estadoDirector });
+  });
 }
 
 async function bootstrap() {
@@ -59,10 +77,11 @@ async function bootstrap() {
     'Ciclo Básico Común (CBC)',
   ];
 
-  const [derecho] = await Promise.all(
+  const [derecho, , , , ingenieria, medicina, , , , , , , , cbc] = await Promise.all(
     uasNombres.map((nombre) => seedUnidadAcademica(uas, nombre)),
   );
 
+  // --- Rectorado ---
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Admin Rectorado',
     email: 'admin@uba.ar',
@@ -74,7 +93,9 @@ async function bootstrap() {
     email: 'asistente-rectorado@uba.ar',
     password: '123456',
     roles: [RolUsuario.AsistenteDeRectorado],
-  });
+  }, { habilitado: false });
+
+  // --- Facultad de Derecho ---
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Autoridad de Derecho',
     email: 'autoridad-derecho@uba.ar',
@@ -89,6 +110,27 @@ async function bootstrap() {
     roles: [RolUsuario.AsistenteDeSecretaria],
     unidadAcademicaId: derecho.id,
   });
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Director Validado',
+    email: 'director-validado@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: derecho.id,
+  }, EstadoDirector.Validado);
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Director Pendiente',
+    email: 'director-pendiente@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: derecho.id,
+  }, EstadoDirector.PendienteDeValidacion);
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Director Rechazado',
+    email: 'director-rechazado@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: derecho.id,
+  }, EstadoDirector.Rechazado);
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Evaluador de Derecho',
     email: 'evaluador@uba.ar',
@@ -96,6 +138,103 @@ async function bootstrap() {
     roles: [RolUsuario.Evaluador],
     unidadAcademicaId: derecho.id,
   });
+
+  // --- Facultad de Ingeniería ---
+  await seedUsuario(usuariosService, {
+    nombreCompleto: 'Autoridad de Ingeniería',
+    email: 'autoridad-ingenieria@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.AutoridadDeSecretaria],
+    unidadAcademicaId: ingenieria.id,
+  });
+  await seedUsuario(usuariosService, {
+    nombreCompleto: 'Asistente de Ingeniería',
+    email: 'asistente-ingenieria@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.AsistenteDeSecretaria],
+    unidadAcademicaId: ingenieria.id,
+  });
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Directora López',
+    email: 'directora-lopez@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: ingenieria.id,
+  }, EstadoDirector.Validado);
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Director García',
+    email: 'director-garcia@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: ingenieria.id,
+  }, EstadoDirector.Validado);
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Director Deshabilitado',
+    email: 'director-deshabilitado@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: ingenieria.id,
+  }, EstadoDirector.Validado, { habilitado: false });
+  await seedUsuario(usuariosService, {
+    nombreCompleto: 'Evaluador de Ingeniería',
+    email: 'evaluador-ingenieria@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Evaluador],
+    unidadAcademicaId: ingenieria.id,
+  });
+
+  // --- Facultad de Medicina ---
+  await seedUsuario(usuariosService, {
+    nombreCompleto: 'Autoridad de Medicina',
+    email: 'autoridad-medicina@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.AutoridadDeSecretaria],
+    unidadAcademicaId: medicina.id,
+  });
+  await seedUsuario(usuariosService, {
+    nombreCompleto: 'Asistente de Medicina',
+    email: 'asistente-medicina@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.AsistenteDeSecretaria],
+    unidadAcademicaId: medicina.id,
+  });
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Director Fernández',
+    email: 'director-fernandez@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: medicina.id,
+  }, EstadoDirector.Validado);
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Directora Martínez',
+    email: 'directora-martinez@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: medicina.id,
+  }, EstadoDirector.PendienteDeValidacion);
+  await seedUsuario(usuariosService, {
+    nombreCompleto: 'Evaluador de Medicina',
+    email: 'evaluador-medicina@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Evaluador],
+    unidadAcademicaId: medicina.id,
+  }, { habilitado: false });
+
+  // --- CBC ---
+  await seedUsuario(usuariosService, {
+    nombreCompleto: 'Autoridad de CBC',
+    email: 'autoridad-cbc@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.AutoridadDeSecretaria],
+    unidadAcademicaId: cbc.id,
+  });
+  await seedDirectores(usuariosService, {
+    nombreCompleto: 'Director del CBC',
+    email: 'director-cbc@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.DirectorDeProyecto],
+    unidadAcademicaId: cbc.id,
+  }, EstadoDirector.Validado);
 
   console.log('Seed completado.');
 
