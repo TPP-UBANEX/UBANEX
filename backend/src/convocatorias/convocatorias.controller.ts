@@ -1,9 +1,10 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Patch, Put, Delete, Body, Param, UseGuards,
 } from '@nestjs/common';
 import { ConvocatoriasService } from './convocatorias.service';
 import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
+import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -46,5 +47,19 @@ export class ConvocatoriasController {
   @Roles(RolUsuario.AutoridadDeRectorado)
   eliminar(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
     return this.service.eliminar(id, usuario);
+  }
+
+  @Get(':id/emparejamientos')
+  obtenerEmparejamientos(@Param('id') id: string) {
+    return this.service.obtenerEmparejamientos(id);
+  }
+
+  @Put(':id/emparejamientos')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  guardarEmparejamientos(
+    @Param('id') id: string,
+    @Body() dto: GuardarEmparejamientoDto,
+  ) {
+    return this.service.guardarEmparejamientos(id, dto);
   }
 }

@@ -34,6 +34,7 @@ import type { Convocatoria, Formulario, Proyecto } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import { estadoBadge } from '@/data/types'
 import { toast } from 'sonner'
+import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 
 export function ConvocatoriaDetail() {
@@ -257,6 +258,7 @@ export function ConvocatoriaDetail() {
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({proyectos.length})</TabsTrigger>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
+          <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
         </TabsList>
         <TabsContent value="proyectos" className="mt-4">
           <Card>
@@ -293,6 +295,9 @@ export function ConvocatoriaDetail() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="emparejamiento" className="mt-4">
+          {id && <EmparejamientoTab convocatoriaId={id} />}
         </TabsContent>
         <TabsContent value="detalle" className="mt-4">
           <Card>

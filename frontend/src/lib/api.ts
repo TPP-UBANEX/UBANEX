@@ -86,6 +86,12 @@ export const api = {
     actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; formularioId?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
       patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
     eliminar: (id: string) => del(`/convocatorias/${id}`),
+    emparejamientos: {
+      list: (convocatoriaId: string) =>
+        get<import('@/data/types').Emparejamiento[]>(`/convocatorias/${convocatoriaId}/emparejamientos`),
+      guardar: (convocatoriaId: string, data: import('@/data/types').GuardarEmparejamientoDto) =>
+        request<import('@/data/types').Emparejamiento[]>('PUT', `/convocatorias/${convocatoriaId}/emparejamientos`, data),
+    },
   },
   proyectos: {
     list: (params?: Record<string, string>) => {
