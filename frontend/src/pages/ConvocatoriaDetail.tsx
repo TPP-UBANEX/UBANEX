@@ -36,6 +36,30 @@ import { estadoBadge } from '@/data/types'
 import { toast } from 'sonner'
 import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 
+function erroresFechas(f: {
+  fechaInicioPresentacion: string; fechaFinPresentacion: string;
+  fechaInicioEvaluacion: string; fechaFinEvaluacion: string;
+  fechaInicioEjecucion: string; fechaFinEjecucion: string;
+}): Record<string, string> {
+  const e: Record<string, string> = {}
+  const p = (s: string) => s ? new Date(s) : null
+  const ip = p(f.fechaInicioPresentacion), fp = p(f.fechaFinPresentacion)
+  const ie = p(f.fechaInicioEvaluacion), fe = p(f.fechaFinEvaluacion)
+  const iej = p(f.fechaInicioEjecucion), fej = p(f.fechaFinEjecucion)
+
+  if (fp && ip && fp <= ip) e.fechaFinPresentacion = 'Debe ser posterior a Inicio Presentación'
+  if (ie && fp && ie < fp) e.fechaInicioEvaluacion = 'Debe ser posterior o igual a Fin Presentación'
+  if (fe && ie && fe <= ie) e.fechaFinEvaluacion = 'Debe ser posterior a Inicio Evaluación'
+  if (iej && fe && iej < fe) e.fechaInicioEjecucion = 'Debe ser posterior o igual a Fin Evaluación'
+  if (fej && iej && fej <= iej) e.fechaFinEjecucion = 'Debe ser posterior a Inicio Ejecución'
+  return e
+}
+
+function validarFechas(f: Parameters<typeof erroresFechas>[0]): string | null {
+  const errs = erroresFechas(f)
+  return errs[Object.keys(errs)[0]] ?? null
+}
+
 export function ConvocatoriaDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -47,6 +71,8 @@ export function ConvocatoriaDetail() {
   const [formularios, setFormularios] = useState<Formulario[]>([])
   const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', formularioId: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
   const [guardando, setGuardando] = useState(false)
+
+  const errores = erroresFechas(editForm)
 
   const cargar = () => {
     if (!id) return
@@ -83,6 +109,13 @@ export function ConvocatoriaDetail() {
 
   const handleGuardar = async () => {
     if (!id || !conv) return
+
+    const errorFechas = validarFechas(editForm)
+    if (errorFechas) {
+      toast.error(errorFechas)
+      return
+    }
+
     setGuardando(true)
     try {
       const actualizada = await api.convocatorias.actualizar(id, editForm)
@@ -141,9 +174,9 @@ export function ConvocatoriaDetail() {
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={abrirEdicion}><Pencil className="h-4 w-4 mr-1" />Editar</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Editar Convocatoria</DialogTitle></DialogHeader>
-                <div className="space-y-4 pt-4">
+                <div className="space-y-4 pt-4 min-w-0">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Nombre</p>
                     <Input value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))} />
@@ -172,39 +205,44 @@ export function ConvocatoriaDetail() {
                   <div className="border rounded-lg p-3 space-y-3">
                     <p className="text-sm font-semibold">Presentación</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Inicio</p>
-                        <Input type="date" value={editForm.fechaInicioPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
+                      <div className="relative h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaInicioPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Fin</p>
-                        <Input type="date" value={editForm.fechaFinPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaFinPresentacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinPresentacion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaFinPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
                       </div>
                     </div>
                   </div>
                   <div className="border rounded-lg p-3 space-y-3">
                     <p className="text-sm font-semibold">Evaluación</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Inicio</p>
-                        <Input type="date" value={editForm.fechaInicioEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaInicioEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEvaluacion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaInicioEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Fin</p>
-                        <Input type="date" value={editForm.fechaFinEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaFinEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEvaluacion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaFinEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
                       </div>
                     </div>
                   </div>
                   <div className="border rounded-lg p-3 space-y-3">
                     <p className="text-sm font-semibold">Ejecución</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Inicio</p>
-                        <Input type="date" value={editForm.fechaInicioEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaInicioEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEjecucion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaInicioEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Fin</p>
-                        <Input type="date" value={editForm.fechaFinEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaFinEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEjecucion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaFinEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
                       </div>
                     </div>
                   </div>

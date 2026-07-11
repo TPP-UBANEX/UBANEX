@@ -178,7 +178,6 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   presentado: 'outline',
   revision: 'secondary',
   adjudicado: 'default',
-  ejecucion: 'default',
   rendicion: 'secondary',
   cerrado: 'secondary',
   pendiente: 'outline',

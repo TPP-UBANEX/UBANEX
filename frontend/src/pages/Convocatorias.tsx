@@ -37,6 +37,30 @@ import { estadoBadge } from '@/data/types'
 import { toast } from 'sonner'
 import { Plus, Search, FileText } from 'lucide-react'
 
+function erroresFechas(f: {
+  fechaInicioPresentacion: string; fechaFinPresentacion: string;
+  fechaInicioEvaluacion: string; fechaFinEvaluacion: string;
+  fechaInicioEjecucion: string; fechaFinEjecucion: string;
+}): Record<string, string> {
+  const e: Record<string, string> = {}
+  const p = (s: string) => s ? new Date(s) : null
+  const ip = p(f.fechaInicioPresentacion), fp = p(f.fechaFinPresentacion)
+  const ie = p(f.fechaInicioEvaluacion), fe = p(f.fechaFinEvaluacion)
+  const iej = p(f.fechaInicioEjecucion), fej = p(f.fechaFinEjecucion)
+
+  if (fp && ip && fp <= ip) e.fechaFinPresentacion = 'Debe ser posterior a Inicio Presentación'
+  if (ie && fp && ie < fp) e.fechaInicioEvaluacion = 'Debe ser posterior o igual a Fin Presentación'
+  if (fe && ie && fe <= ie) e.fechaFinEvaluacion = 'Debe ser posterior a Inicio Evaluación'
+  if (iej && fe && iej < fe) e.fechaInicioEjecucion = 'Debe ser posterior o igual a Fin Evaluación'
+  if (fej && iej && fej <= iej) e.fechaFinEjecucion = 'Debe ser posterior a Inicio Ejecución'
+  return e
+}
+
+function validarFechas(f: Parameters<typeof erroresFechas>[0]): string | null {
+  const errs = erroresFechas(f)
+  return errs[Object.keys(errs)[0]] ?? null
+}
+
 export function Convocatorias() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -55,6 +79,8 @@ export function Convocatorias() {
     fechaInicioEjecucion: '', fechaFinEjecucion: '',
   })
 
+  const errores = erroresFechas(form)
+
   const cargar = () => {
     Promise.all([
       api.convocatorias.list(),
@@ -72,6 +98,13 @@ export function Convocatorias() {
       toast.error('Completá los campos obligatorios')
       return
     }
+
+    const errorFechas = validarFechas(form)
+    if (errorFechas) {
+      toast.error(errorFechas)
+      return
+    }
+
     setCreando(true)
     try {
       await api.convocatorias.crear({
@@ -116,9 +149,9 @@ export function Convocatorias() {
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Nueva Convocatoria</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Nueva Convocatoria</DialogTitle></DialogHeader>
-            <div className="space-y-4 pt-4">
+            <div className="space-y-4 pt-4 min-w-0">
               <div className="space-y-1">
                 <p className="text-sm font-medium">Nombre</p>
                 <Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre de la convocatoria" />
@@ -134,39 +167,45 @@ export function Convocatorias() {
               <div className="border rounded-lg p-3 space-y-3">
                 <p className="text-sm font-semibold">Presentación</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Inicio</p>
-                    <Input type="date" value={form.fechaInicioPresentacion} onChange={e => setForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
+                  <div className="relative h-[4.5rem]">
+                    {errores.fechaInicioPresentacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioPresentacion}</p>}
+                    <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                    <Input type="date" className="mt-1" value={form.fechaInicioPresentacion} onChange={e => setForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Fin</p>
-                    <Input type="date" value={form.fechaFinPresentacion} onChange={e => setForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
+                  <div className="relative h-[4.5rem]">
+                    {errores.fechaFinPresentacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinPresentacion}</p>}
+                    <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                    <Input type="date" className="mt-1" value={form.fechaFinPresentacion} onChange={e => setForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
                   </div>
                 </div>
               </div>
               <div className="border rounded-lg p-3 space-y-3">
                 <p className="text-sm font-semibold">Evaluación</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Inicio</p>
-                    <Input type="date" value={form.fechaInicioEvaluacion} onChange={e => setForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
+                  <div className="relative h-[4.5rem]">
+                    {errores.fechaInicioEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEvaluacion}</p>}
+                    <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                    <Input type="date" className="mt-1" value={form.fechaInicioEvaluacion} onChange={e => setForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Fin</p>
-                    <Input type="date" value={form.fechaFinEvaluacion} onChange={e => setForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
+                  <div className="relative h-[4.5rem]">
+                    {errores.fechaFinEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEvaluacion}</p>}
+                    <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                    <Input type="date" className="mt-1" value={form.fechaFinEvaluacion} onChange={e => setForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
                   </div>
                 </div>
               </div>
               <div className="border rounded-lg p-3 space-y-3">
                 <p className="text-sm font-semibold">Ejecución</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Inicio</p>
-                    <Input type="date" value={form.fechaInicioEjecucion} onChange={e => setForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
+                  <div className="relative h-[4.5rem]">
+                    {errores.fechaInicioEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEjecucion}</p>}
+                    <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                    <Input type="date" className="mt-1" value={form.fechaInicioEjecucion} onChange={e => setForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Fin</p>
-                    <Input type="date" value={form.fechaFinEjecucion} onChange={e => setForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
+                  <div className="relative h-[4.5rem]">
+                    {errores.fechaFinEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEjecucion}</p>}
+                    <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                    <Input type="date" className="mt-1" value={form.fechaFinEjecucion} onChange={e => setForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
                   </div>
                 </div>
               </div>

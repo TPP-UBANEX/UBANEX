@@ -6,6 +6,7 @@ import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { Formulario } from '../formularios/formulario.entity';
 import { Usuario } from '../usuarios/usuario.entity';
+import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
 
 function hoyVersion(): string {
   const d = new Date();
@@ -33,6 +34,7 @@ export class ConvocatoriasService {
   }
 
   async crear(dto: CrearConvocatoriaDto, _usuario: Usuario) {
+    validarFechasConvocatoria(dto);
     const { formularioId, ...rest } = dto;
     const convocatoria = this.repo.create(rest);
 
@@ -52,6 +54,15 @@ export class ConvocatoriasService {
   async actualizar(id: string, dto: ActualizarConvocatoriaDto, _usuario: Usuario) {
     const convocatoria = await this.repo.findOne({ where: { id }, relations: { formulario: true } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    validarFechasConvocatoria({
+      fechaInicioPresentacion: dto.fechaInicioPresentacion ?? convocatoria.fechaInicioPresentacion,
+      fechaFinPresentacion: dto.fechaFinPresentacion ?? convocatoria.fechaFinPresentacion,
+      fechaInicioEvaluacion: dto.fechaInicioEvaluacion ?? convocatoria.fechaInicioEvaluacion,
+      fechaFinEvaluacion: dto.fechaFinEvaluacion ?? convocatoria.fechaFinEvaluacion,
+      fechaInicioEjecucion: dto.fechaInicioEjecucion ?? convocatoria.fechaInicioEjecucion,
+      fechaFinEjecucion: dto.fechaFinEjecucion ?? convocatoria.fechaFinEjecucion,
+    });
 
     const { formularioId, ...rest } = dto;
 
