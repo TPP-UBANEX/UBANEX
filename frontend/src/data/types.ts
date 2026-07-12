@@ -169,6 +169,24 @@ export interface Formulario {
   esDefault: boolean
 }
 
+export interface Emparejamiento {
+  id: string
+  convocatoriaId: string
+  unidadAId: string
+  unidadA: UnidadAcademica
+  unidadBId: string
+  unidadB: UnidadAcademica
+}
+
+export interface ParEmparejamientoDto {
+  unidadAId: string
+  unidadBId: string
+}
+
+export interface GuardarEmparejamientoDto {
+  pares: ParEmparejamientoDto[]
+}
+
 export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   configuracion: 'outline',
   presentacion: 'default',
