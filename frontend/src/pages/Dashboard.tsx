@@ -32,7 +32,7 @@ export function Dashboard() {
 
   const stats = [
     { label: 'Proyectos Activos', value: proyectos.filter(p => p.estado === 'ejecucion').length, icon: Users, color: 'text-blue-600' },
-    { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === 'abierta').length, icon: FileText, color: 'text-green-600' },
+      { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === 'presentacion').length, icon: FileText, color: 'text-green-600' },
     { label: 'Evaluaciones Pendientes', value: proyectos.filter(p => p.estado === 'evaluacion').length, icon: ClipboardCheck, color: 'text-amber-600' },
     { label: 'Rendiciones Pendientes', value: 0, icon: DollarSign, color: 'text-purple-600' },
   ]
@@ -67,22 +67,26 @@ export function Dashboard() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Apertura</TableHead>
-                    <TableHead>Cierre</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {convocatorias.filter(c => c.estado === 'abierta').map(c => (
-                    <TableRow key={c.id}>
-                      <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.fechaApertura}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.fechaCierre}</TableCell>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Año</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Presentación</TableHead>
                     </TableRow>
-                  ))}
+                  </TableHeader>
+                  <TableBody>
+                    {convocatorias.filter(c => c.estado === 'presentacion' || c.estado === 'configuracion').map(c => (
+                      <TableRow key={c.id}>
+                        <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
+                        <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {c.fechaInicioPresentacion && c.fechaFinPresentacion
+                            ? `${c.fechaInicioPresentacion} — ${c.fechaFinPresentacion}`
+                            : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             )}
