@@ -2,10 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as morgan from 'morgan';
+import { DataSource } from 'typeorm';
 import { UsuariosService } from './usuarios/usuarios.service';
 import { UnidadesAcademicasService } from './unidades-academicas/unidades-academicas.service';
 import { RolUsuario } from './common/enums/rol-usuario.enum';
 import { EstadoDirector } from './common/enums/estado-director.enum';
+import { Formulario } from './formularios/formulario.entity';
 
 async function seedUnidadAcademica(
   uas: UnidadesAcademicasService,
@@ -235,6 +237,27 @@ async function bootstrap() {
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: cbc.id,
   }, EstadoDirector.Validado);
+
+  const dataSource = app.get(DataSource);
+  const formularioRepo = dataSource.getRepository(Formulario);
+  const seedFormularios = [
+    { nombre: 'Formulario estándar UBANEX', esDefault: true },
+    { nombre: 'Formulario proyectos de investigación', esDefault: false },
+    { nombre: 'Formulario proyectos de extensión', esDefault: false },
+    { nombre: 'Formulario desarrollo tecnológico', esDefault: false },
+    { nombre: 'Formulario voluntariado universitario', esDefault: false },
+    { nombre: 'Formulario prácticas socioeducativas', esDefault: false },
+    { nombre: 'Formulario cooperación internacional', esDefault: false },
+    { nombre: 'Formulario emprendimientos universitarios', esDefault: false },
+    { nombre: 'Formulario arte y cultura', esDefault: false },
+  ];
+  for (const f of seedFormularios) {
+    const existe = await formularioRepo.findOne({ where: { nombre: f.nombre } });
+    if (!existe) {
+      await formularioRepo.save(formularioRepo.create(f));
+      console.log(`  ${f.nombre}`);
+    }
+  }
 
   console.log('Seed completado.');
 

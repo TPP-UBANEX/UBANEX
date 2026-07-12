@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -12,13 +13,53 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Edicion } from '@/data/types'
+import type { Convocatoria, Edicion, Formulario } from '@/data/types'
 import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { EmparejamientoTab } from '@/components/EmparejamientoTab'
+import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+
+function erroresFechas(f: {
+  fechaInicioPresentacion: string; fechaFinPresentacion: string;
+  fechaInicioEvaluacion: string; fechaFinEvaluacion: string;
+  fechaInicioEjecucion: string; fechaFinEjecucion: string;
+}): Record<string, string> {
+  const e: Record<string, string> = {}
+  const p = (s: string) => s ? new Date(s) : null
+  const ip = p(f.fechaInicioPresentacion), fp = p(f.fechaFinPresentacion)
+  const ie = p(f.fechaInicioEvaluacion), fe = p(f.fechaFinEvaluacion)
+  const iej = p(f.fechaInicioEjecucion), fej = p(f.fechaFinEjecucion)
+
+  if (fp && ip && fp <= ip) e.fechaFinPresentacion = 'Debe ser posterior a Inicio Presentación'
+  if (ie && fp && ie < fp) e.fechaInicioEvaluacion = 'Debe ser posterior o igual a Fin Presentación'
+  if (fe && ie && fe <= ie) e.fechaFinEvaluacion = 'Debe ser posterior a Inicio Evaluación'
+  if (iej && fe && iej < fe) e.fechaInicioEjecucion = 'Debe ser posterior o igual a Fin Evaluación'
+  if (fej && iej && fej <= iej) e.fechaFinEjecucion = 'Debe ser posterior a Inicio Ejecución'
+  return e
+}
+
+function validarFechas(f: Parameters<typeof erroresFechas>[0]): string | null {
+  const errs = erroresFechas(f)
+  return errs[Object.keys(errs)[0]] ?? null
+}
 
 export function ConvocatoriaDetail() {
   const { id } = useParams<{ id: string }>()
@@ -27,8 +68,13 @@ export function ConvocatoriaDetail() {
   const [conv, setConv] = useState<Convocatoria | null>(null)
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [loading, setLoading] = useState(true)
+  const [editOpen, setEditOpen] = useState(false)
+  const [formularios, setFormularios] = useState<Formulario[]>([])
+  const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', formularioId: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
+  const [guardando, setGuardando] = useState(false)
 
   const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
+  const errores = erroresFechas(editForm)
 
   const cargarDatos = () => {
     if (!id) return
@@ -36,15 +82,69 @@ export function ConvocatoriaDetail() {
     Promise.all([
       api.convocatorias.get(id),
       api.proyectos.list({ convocatoriaId: id }),
-    ]).then(([c, e]) => {
+      api.formularios.list(),
+    ]).then(([c, e, f]) => {
       setConv(c)
       setEdiciones(e)
+      setFormularios(f)
     }).finally(() => setLoading(false))
   }
 
   useEffect(() => {
     cargarDatos()
   }, [id])
+
+  const abrirEdicion = () => {
+    if (!conv) return
+    setEditForm({
+      nombre: conv.nombre,
+      descripcion: conv.descripcion || '',
+      anio: conv.anio,
+      estado: conv.estado,
+      formularioId: conv.formularioId || '',
+      fechaInicioPresentacion: conv.fechaInicioPresentacion || '',
+      fechaFinPresentacion: conv.fechaFinPresentacion || '',
+      fechaInicioEvaluacion: conv.fechaInicioEvaluacion || '',
+      fechaFinEvaluacion: conv.fechaFinEvaluacion || '',
+      fechaInicioEjecucion: conv.fechaInicioEjecucion || '',
+      fechaFinEjecucion: conv.fechaFinEjecucion || '',
+    })
+    setEditOpen(true)
+  }
+
+  const handleGuardar = async () => {
+    if (!id || !conv) return
+
+    const errorFechas = validarFechas(editForm)
+    if (errorFechas) {
+      toast.error(errorFechas)
+      return
+    }
+
+    setGuardando(true)
+    try {
+      const actualizada = await api.convocatorias.actualizar(id, editForm)
+      setConv(actualizada)
+      toast.success('Convocatoria actualizada correctamente')
+      setEditOpen(false)
+    } catch {
+      toast.error('Error al actualizar la convocatoria')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const handleEliminar = async () => {
+    if (!id || !conv) return
+    if (!confirm('¿Estás seguro de eliminar esta convocatoria?')) return
+    try {
+      await api.convocatorias.eliminar(id)
+      toast.success('Convocatoria eliminada correctamente')
+      navigate('/convocatorias')
+    } catch {
+      toast.error('Error al eliminar la convocatoria')
+    }
+  }
 
   if (loading) return <DetailSkeleton />
 
@@ -68,6 +168,118 @@ export function ConvocatoriaDetail() {
           </div>
           <p className="text-sm text-muted-foreground">{conv.descripcion}</p>
         </div>
+        {user?.roles.includes(RolUsuario.AutoridadDeRectorado) && (
+          <div className="flex gap-2">
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" onClick={abrirEdicion}><Pencil className="h-4 w-4 mr-1" />Editar</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>Editar Convocatoria</DialogTitle></DialogHeader>
+                <div className="space-y-4 pt-4 min-w-0">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Nombre</p>
+                    <Input value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Descripción</p>
+                    <Input value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Año</p>
+                    <Input type="number" value={editForm.anio} onChange={e => setEditForm(f => ({ ...f, anio: parseInt(e.target.value) || 0 }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Estado</p>
+                    <Select value={editForm.estado} onValueChange={v => setEditForm(f => ({ ...f, estado: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="configuracion">Configuración</SelectItem>
+                        <SelectItem value="presentacion">Presentación</SelectItem>
+                        <SelectItem value="evaluacion">Evaluación</SelectItem>
+                        <SelectItem value="ejecucion">Ejecución</SelectItem>
+                        <SelectItem value="cierre">Cierre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="border rounded-lg p-3 space-y-3">
+                    <p className="text-sm font-semibold">Presentación</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="relative h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaInicioPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
+                      </div>
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaFinPresentacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinPresentacion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaFinPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-3 space-y-3">
+                    <p className="text-sm font-semibold">Evaluación</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaInicioEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEvaluacion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaInicioEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
+                      </div>
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaFinEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEvaluacion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaFinEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-3 space-y-3">
+                    <p className="text-sm font-semibold">Ejecución</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaInicioEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEjecucion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaInicioEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
+                      </div>
+                      <div className="relative h-[4.5rem]">
+                        {errores.fechaFinEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEjecucion}</p>}
+                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                        <Input type="date" className="mt-1" value={editForm.fechaFinEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-3 space-y-2">
+                    <p className="text-sm font-semibold">Formulario</p>
+                    {formularios.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No hay formularios disponibles</p>
+                    ) : (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {formularios.map(f => (
+                          <button
+                            key={f.id}
+                            type="button"
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${
+                              editForm.formularioId === f.id
+                                ? 'bg-primary text-primary-foreground'
+                                : 'hover:bg-muted'
+                            }`}
+                            onClick={() => setEditForm(ef => ({ ...ef, formularioId: f.id }))}
+                          >
+                            <FileText className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{f.nombre}</span>
+                            {f.esDefault && <span className="text-xs opacity-70 ml-auto">Default</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button className="w-full" onClick={handleGuardar} disabled={guardando}>
+                    {guardando ? 'Guardando...' : 'Guardar cambios'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button variant="destructive" size="sm" onClick={handleEliminar}><Trash2 className="h-4 w-4 mr-1" />Eliminar</Button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -83,6 +295,7 @@ export function ConvocatoriaDetail() {
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
+          <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
         </TabsList>
         <TabsContent value="proyectos" className="mt-4">
           <Card>
@@ -127,13 +340,41 @@ export function ConvocatoriaDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="emparejamiento" className="mt-4">
+          {id && <EmparejamientoTab convocatoriaId={id} />}
+        </TabsContent>
         <TabsContent value="detalle" className="mt-4">
           <Card>
             <CardHeader><CardTitle className="text-sm font-medium">Información</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
+            <CardContent className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-4">
-                <div><span className="text-muted-foreground">Inicio Presentación:</span> {conv.fechaInicioPresentacion}</div>
-                <div><span className="text-muted-foreground">Fin Presentación:</span> {conv.fechaFinPresentacion}</div>
+                <div><span className="text-muted-foreground">Año:</span> {conv.anio}</div>
+                <div><span className="text-muted-foreground">Estado:</span> {conv.estado}</div>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-sm font-medium mb-2">Presentación</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="text-muted-foreground">Inicio:</span> {conv.fechaInicioPresentacion || '-'}</div>
+                  <div><span className="text-muted-foreground">Fin:</span> {conv.fechaFinPresentacion || '-'}</div>
+                </div>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-sm font-medium mb-2">Evaluación</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="text-muted-foreground">Inicio:</span> {conv.fechaInicioEvaluacion || '-'}</div>
+                  <div><span className="text-muted-foreground">Fin:</span> {conv.fechaFinEvaluacion || '-'}</div>
+                </div>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-sm font-medium mb-2">Ejecución</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="text-muted-foreground">Inicio:</span> {conv.fechaInicioEjecucion || '-'}</div>
+                  <div><span className="text-muted-foreground">Fin:</span> {conv.fechaFinEjecucion || '-'}</div>
+                </div>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-sm font-medium mb-2">Formulario</p>
+                <p>{conv.formulario?.nombre || 'Sin formulario asignado'}</p>
               </div>
             </CardContent>
           </Card>
