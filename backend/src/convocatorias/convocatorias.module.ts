@@ -11,5 +11,6 @@ import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity'
   imports: [TypeOrmModule.forFeature([Convocatoria, Emparejamiento, Formulario, UnidadAcademica])],
   controllers: [ConvocatoriasController],
   providers: [ConvocatoriasService],
+  exports: [ConvocatoriasService],
 })
 export class ConvocatoriasModule {}

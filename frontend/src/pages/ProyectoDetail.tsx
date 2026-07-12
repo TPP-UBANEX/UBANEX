@@ -5,48 +5,195 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Proyecto, Evaluacion, Rendicion } from '@/data/types'
-import { estadoBadge } from '@/data/types'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, Usuario } from '@/data/types'
+import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario } from '@/data/types'
+import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+
+const tipoRubroLabels: Record<TipoRubro, string> = {
+  [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
+  [TipoRubro.BienesDeConsumo]: 'Bienes de Consumo',
+  [TipoRubro.BienesDeUso]: 'Bienes de Uso',
+}
 
 export function ProyectoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
-  const [evaluaciones, setEvaluaciones] = useState<Evaluacion[]>([])
-  const [rendiciones, setRendiciones] = useState<Rendicion[]>([])
-  const [open, setOpen] = useState(false)
+  const [edicion, setEdicion] = useState<Edicion | null>(null)
   const [loading, setLoading] = useState(true)
+  const [enviando, setEnviando] = useState(false)
+
+  const [editando, setEditando] = useState(false)
+  const [editNombre, setEditNombre] = useState('')
+  const [editCodirectorId, setEditCodirectorId] = useState('')
+  const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
+  const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
+  const [directores, setDirectores] = useState<Usuario[]>([])
+  const [guardando, setGuardando] = useState(false)
+
+  const esPropietario = edicion && (edicion.directorId === user?.id || edicion.codirectorId === user?.id)
+  const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
+  const esSecretaria = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+  )
+
+  const cargarDatos = async () => {
+    if (!id) return
+    setLoading(true)
+    try {
+      const p = await api.proyectos.get(id)
+      setProyecto(p)
+      const eds = p.ediciones || []
+      const ed = eds.length > 0 ? eds[0] : null
+      setEdicion(ed)
+
+      if (ed && user?.unidadAcademicaId) {
+        const resp = await api.usuarios.list({ rol: RolUsuario.DirectorDeProyecto, unidadAcademicaId: user.unidadAcademicaId, limit: 50 })
+        setDirectores(resp.data)
+      }
+    } catch {
+      toast.error('Error al cargar el proyecto')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (!id) return
-    Promise.all([
-      api.proyectos.get(id),
-      api.evaluaciones.list(id),
-      api.rendiciones.list(id),
-    ]).then(([p, e, r]) => {
-      setProyecto(p)
-      setEvaluaciones(e)
-      setRendiciones(r)
-    }).finally(() => setLoading(false))
+    cargarDatos()
   }, [id])
+
+  const iniciarEdicion = () => {
+    if (!proyecto || !edicion) return
+    setEditNombre(proyecto.nombre)
+    setEditCodirectorId(edicion.codirectorId || '')
+    setEditAnioEdicion(edicion.anioEdicion ?? null)
+    setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
+    setEditando(true)
+  }
+
+  const cancelarEdicion = () => {
+    setEditando(false)
+  }
+
+  const handleGuardar = async () => {
+    if (!id || !edicion) return
+    setGuardando(true)
+    try {
+      await api.proyectos.actualizarEdicion(id, edicion.id, {
+        nombre: editNombre,
+        codirectorId: editCodirectorId || undefined,
+        anioEdicion: editAnioEdicion ?? undefined,
+        presupuesto: editPresupuesto || undefined,
+      })
+      toast.success('Proyecto actualizado')
+      setEditando(false)
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const handleEnviar = async () => {
+    if (!id || !edicion) return
+    setEnviando(true)
+    try {
+      await api.proyectos.enviarEdicion(id, edicion.id)
+      toast.success('Proyecto enviado para corrección')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al enviar')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const presupuestoVacio = (): Presupuesto => ({
+    montoTotal: 0,
+    rubros: [
+      { tipo: TipoRubro.ViaticosYSeguros, subtotal: 0, partidas: [] },
+      { tipo: TipoRubro.BienesDeConsumo, subtotal: 0, partidas: [] },
+      { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: [] },
+    ],
+  })
+
+  const addPartida = (rubroIdx: number, tipo: TipoRubro) => {
+    const actual = editPresupuesto || presupuestoVacio()
+    const rubros = [...actual.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    if (tipo === TipoRubro.ViaticosYSeguros) {
+      const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
+      partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodoInicio: '', periodoFin: '', monto: 0 })
+      rubro.partidas = partidas
+    } else {
+      const partidas = [...(rubro.partidas as BienPresupuesto[])]
+      partidas.push({ descripcion: '', cantidad: 1, precioUnitario: 0, monto: 0 })
+      rubro.partidas = partidas
+    }
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...actual, rubros }))
+  }
+
+  const removePartida = (rubroIdx: number, partidaIdx: number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = rubro.partidas
+    if (rubro.tipo === TipoRubro.ViaticosYSeguros) {
+      rubro.partidas = (partidas as ViaticoPresupuesto[]).filter((_, i) => i !== partidaIdx)
+    } else {
+      rubro.partidas = (partidas as BienPresupuesto[]).filter((_, i) => i !== partidaIdx)
+    }
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+  }
+
+  const updateViatico = (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
+    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
+    if (field === 'monto') {
+      rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
+    }
+    rubro.partidas = partidas
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+  }
+
+  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
+    if (!editPresupuesto) return
+    const rubros = [...editPresupuesto.rubros]
+    const rubro = { ...rubros[rubroIdx] }
+    const partidas = [...(rubro.partidas as BienPresupuesto[])]
+    partidas[pIdx] = { ...partidas[pIdx], [field]: value }
+    if (field === 'cantidad' || field === 'precioUnitario') {
+      partidas[pIdx].monto = partidas[pIdx].cantidad * partidas[pIdx].precioUnitario
+    }
+    rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
+    rubro.partidas = partidas
+    rubros[rubroIdx] = rubro
+    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+  }
+
+  const recalcularPresupuesto = (p: Presupuesto): Presupuesto => ({
+    ...p,
+    montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
+  })
 
   if (loading) return <ProyectoDetailSkeleton />
 
@@ -60,142 +207,316 @@ export function ProyectoDetail() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{proyecto.titulo}</h1>
-            <Badge variant={estadoBadge[proyecto.estado]}>{proyecto.estado}</Badge>
+            <h1 className="text-2xl font-semibold tracking-tight">{proyecto.nombre}</h1>
+            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{edicion.estado}</Badge>}
           </div>
-          <p className="text-sm text-muted-foreground">{proyecto.director} · {proyecto.facultad}</p>
+          {edicion && (
+            <p className="text-sm text-muted-foreground">
+              {edicion.director?.nombreCompleto || 'Sin director'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
+              {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {esEditable && !editando && (
+            <>
+              <Button variant="outline" size="sm" onClick={iniciarEdicion}>
+                <Pencil className="h-4 w-4 mr-2" />Editar
+              </Button>
+              <Button size="sm" onClick={handleEnviar} disabled={enviando}>
+                {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                Enviar para corrección
+              </Button>
+            </>
+          )}
+          {editando && (
+            <>
+              <Button variant="outline" size="sm" onClick={cancelarEdicion}>Cancelar</Button>
+              <Button size="sm" onClick={handleGuardar} disabled={guardando}>
+                {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Guardar
+              </Button>
+            </>
+          )}
+          {!editando && esSecretaria && edicion?.estado === EstadoEdicion.Presentado && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => toast('Solicitar cambios — funcionalidad pendiente')}>
+                Solicitar cambios
+              </Button>
+              <Button size="sm" onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
+                Iniciar evaluación
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Director</CardTitle></CardHeader><CardContent><p className="text-sm">{proyecto.director}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Facultad</CardTitle></CardHeader><CardContent><p className="text-sm">{proyecto.facultad}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Puntaje</CardTitle></CardHeader><CardContent><p className="text-sm font-bold">{proyecto.puntaje ?? '-'}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Monto</CardTitle></CardHeader><CardContent><p className="text-sm font-bold">{proyecto.montoAsignado ? `$${proyecto.montoAsignado.toLocaleString()}` : '-'}</p></CardContent></Card>
+      <div className="grid gap-4 md:grid-cols-5">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Director</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.director?.nombreCompleto || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.unidadAcademica?.nombre || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Codirector</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.codirector?.nombreCompleto || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Edición</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.anioEdicion || '-'}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
+          <CardContent><p className="text-sm font-bold">${(edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</p></CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="info">
         <TabsList>
           <TabsTrigger value="info">Información</TabsTrigger>
-          <TabsTrigger value="evaluaciones">Evaluaciones ({evaluaciones.length})</TabsTrigger>
-          <TabsTrigger value="rendiciones">Rendiciones ({rendiciones.length})</TabsTrigger>
+          <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
+          <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
+          <TabsTrigger value="rendiciones">Rendiciones</TabsTrigger>
           <TabsTrigger value="cierre">Cierre</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-4">
-          <Card><CardHeader><CardTitle className="text-sm font-medium">Resumen</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{proyecto.resumen}</p></CardContent></Card>
+          {editando ? (
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-medium">Editar proyecto</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Nombre del proyecto</p>
+                  <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Codirector</p>
+                  <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
+                    <SelectTrigger><SelectValue placeholder="Sin codirector" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin codirector</SelectItem>
+                      {directores.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.nombreCompleto}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Edición (año)</p>
+                  <Input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={editAnioEdicion ?? ''}
+                    onChange={e => setEditAnioEdicion(e.target.value ? Number(e.target.value) : null)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="text-muted-foreground">Nombre:</span> {proyecto.nombre}</div>
+                  <div><span className="text-muted-foreground">Director:</span> {edicion?.director?.nombreCompleto || '-'}</div>
+                  <div><span className="text-muted-foreground">Codirector:</span> {edicion?.codirector?.nombreCompleto || '-'}</div>
+                  <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
+                  <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
+                  <div><span className="text-muted-foreground">Edición:</span> {edicion?.anioEdicion || '-'}</div>
+                  <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
+                  <div><span className="text-muted-foreground">Consolidado:</span> {proyecto.esConsolidado ? 'Sí' : 'No'}</div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="presupuesto" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium">Presupuesto</CardTitle>
+              <span className="text-sm font-bold">
+                Total: ${(editando ? (editPresupuesto?.montoTotal ?? 0) : (edicion?.presupuesto?.montoTotal ?? 0)).toLocaleString()}
+              </span>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, {
+                addPartida, removePartida, updateViatico, updateBien,
+              })}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="evaluaciones" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Evaluaciones</CardTitle>
-              <Button size="sm"><Plus className="h-4 w-4 mr-2" />Asignar</Button>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-sm font-medium">Evaluaciones</CardTitle></CardHeader>
             <CardContent>
-              {evaluaciones.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Sin evaluaciones</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Evaluador</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Puntaje</TableHead>
-                      <TableHead>Observaciones</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {evaluaciones.map(e => (
-                      <TableRow key={e.id}>
-                        <TableCell className="text-sm">{e.evaluador}</TableCell>
-                        <TableCell><Badge variant="outline">{e.tipo}</Badge></TableCell>
-                        <TableCell className="text-sm font-medium">{e.puntaje || '-'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{e.observaciones || '-'}</TableCell>
-                        <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {edicion?.estado === EstadoEdicion.Borrador || edicion?.estado === EstadoEdicion.Presentado
+                  ? 'El proyecto aún no está en etapa de evaluación.'
+                  : 'Módulo de evaluaciones próximamente.'}
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="rendiciones" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Rendiciones</CardTitle>
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nueva</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader><DialogTitle>Nueva Rendición</DialogTitle></DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <Input placeholder="Rubro" />
-                    <Input type="number" placeholder="Monto" />
-                    <Input type="date" />
-                    <Button className="w-full" onClick={() => setOpen(false)}>Guardar</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-sm font-medium">Rendiciones</CardTitle></CardHeader>
             <CardContent>
-              {rendiciones.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Sin rendiciones</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Rubro</TableHead>
-                      <TableHead>Monto</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rendiciones.map(r => (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-sm">{r.rubro}</TableCell>
-                        <TableCell className="text-sm">${r.monto.toLocaleString()}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{r.fecha}</TableCell>
-                        <TableCell><Badge variant={estadoBadge[r.estado]}>{r.estado}</Badge></TableCell>
-                        <TableCell><Button variant="ghost" size="sm">Comprobante</Button></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {edicion?.estado !== EstadoEdicion.EnEjecucion && edicion?.estado !== EstadoEdicion.Cerrado
+                  ? 'El proyecto aún no está en etapa de ejecución.'
+                  : 'Módulo de rendiciones próximamente.'}
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="cierre" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-sm font-medium">Cierre del Proyecto</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {proyecto.estado === 'cerrado' ? 'Proyecto cerrado.' : 'Complete los pasos para cerrar.'}
+            <CardHeader><CardTitle className="text-sm font-medium">Cierre</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {edicion?.estado === EstadoEdicion.Cerrado
+                  ? 'Proyecto cerrado.'
+                  : 'El cierre estará disponible cuando corresponda.'}
               </p>
-              {proyecto.estado !== 'cerrado' && (
-                <div className="space-y-3">
-                  <Input placeholder="Informe final (PDF)" disabled />
-                  <Button variant="default">Solicitar Cierre</Button>
-                </div>
-              )}
-              {proyecto.estado === 'cerrado' && (
-                <div className="text-sm space-y-1">
-                  <p><span className="text-muted-foreground">Monto:</span> ${proyecto.montoAsignado?.toLocaleString()}</p>
-                  <p><span className="text-muted-foreground">Puntaje:</span> {proyecto.puntaje}</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function renderPresupuesto(
+  presupuesto: Presupuesto | null,
+  editando: boolean,
+  handlers?: {
+    addPartida: (rubroIdx: number, tipo: TipoRubro) => void
+    removePartida: (rubroIdx: number, partidaIdx: number) => void
+    updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
+    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
+  },
+) {
+  const rubros = presupuesto?.rubros?.length
+    ? presupuesto.rubros
+    : [
+        { tipo: TipoRubro.ViaticosYSeguros, subtotal: 0, partidas: [] as ViaticoPresupuesto[] },
+        { tipo: TipoRubro.BienesDeConsumo, subtotal: 0, partidas: [] as BienPresupuesto[] },
+        { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: [] as BienPresupuesto[] },
+      ]
+
+  return (
+    <div className="space-y-4">
+      {rubros.map((rubro, rubroIdx) => (
+        <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Subtotal: ${rubro.subtotal.toLocaleString()}</span>
+              {editando && handlers && (
+                <Button type="button" variant="outline" size="sm" onClick={() => handlers.addPartida(rubroIdx, rubro.tipo as TipoRubro)}>
+                  <Plus className="h-3 w-3 mr-1" />Agregar
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {rubro.partidas.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin partidas</p>
+          ) : rubro.tipo === TipoRubro.ViaticosYSeguros ? (
+            <div className="space-y-2">
+              {(rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => (
+                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
+                  {editando && handlers ? (
+                    <>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Tipo</span>
+                        <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Docente">Docente</SelectItem>
+                            <SelectItem value="Estudiante">Estudiante</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-[2] space-y-1">
+                        <span className="text-xs">Descripción</span>
+                        <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Inicio</span>
+                        <Input type="date" value={p.periodoInicio} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Fin</span>
+                        <Input type="date" value={p.periodoFin} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Monto</span>
+                        <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', Number(e.target.value))} />
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm flex-1">{p.tipoPersona}</span>
+                      <span className="text-sm flex-[2]">{p.descripcion}</span>
+                      <span className="text-sm flex-1">{p.periodoInicio} → {p.periodoFin}</span>
+                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(rubro.partidas as BienPresupuesto[]).map((p, pIdx) => (
+                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
+                  {editando && handlers ? (
+                    <>
+                      <div className="flex-[2] space-y-1">
+                        <span className="text-xs">Descripción</span>
+                        <Input value={p.descripcion} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Resmas de papel" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Cantidad</span>
+                        <Input type="number" min="1" step="1" value={p.cantidad || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'cantidad', Number(e.target.value))} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Precio unit.</span>
+                        <Input type="number" min="0" step="0.01" value={p.precioUnitario || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'precioUnitario', Number(e.target.value))} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Monto</span>
+                        <Input type="number" value={p.monto || ''} disabled className="bg-muted" />
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm flex-[2]">{p.descripcion}</span>
+                      <span className="text-sm flex-1">{p.cantidad}</span>
+                      <span className="text-sm flex-1">${p.precioUnitario.toLocaleString()}</span>
+                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -220,7 +541,7 @@ function ProyectoDetailSkeleton() {
       </div>
       <div className="space-y-2">
         <div className="flex gap-2">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-28 rounded-md" />)}
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-8 w-28 rounded-md" />)}
         </div>
         <Skeleton className="h-48 w-full rounded-lg" />
       </div>

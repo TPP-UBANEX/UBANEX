@@ -96,9 +96,15 @@ export const api = {
   proyectos: {
     list: (params?: Record<string, string>) => {
       const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-      return get<import('@/data/types').Proyecto[]>(`/proyectos${qs}`)
+      return get<import('@/data/types').Edicion[]>(`/proyectos${qs}`)
     },
     get: (id: string) => get<import('@/data/types').Proyecto>(`/proyectos/${id}`),
+    crear: (data: import('@/data/types').CrearProyectoDto) =>
+      post<import('@/data/types').Proyecto>('/proyectos', data),
+    actualizarEdicion: (id: string, edicionId: string, data: import('@/data/types').ActualizarEdicionDto) =>
+      patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}`, data),
+    enviarEdicion: (id: string, edicionId: string) =>
+      post<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/enviar`, {}),
   },
   evaluaciones: {
     list: (proyectoId?: string) => {

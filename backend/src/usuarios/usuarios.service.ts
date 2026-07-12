@@ -110,8 +110,17 @@ export class UsuariosService {
     const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
       usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria);
 
+    const esEjecucion = usuarioLogueado.roles.includes(RolUsuario.DirectorDeProyecto) ||
+      usuarioLogueado.roles.includes(RolUsuario.Evaluador);
+
     if (esSecretaria) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
+    } else if (esEjecucion) {
+      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
+      query.andWhere('(usuario.roles LIKE :rolDir OR usuario.roles LIKE :rolEval)', {
+        rolDir: '%DirectorDeProyecto%',
+        rolEval: '%Evaluador%',
+      });
     } else if (unidadAcademicaId) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId });
     }
@@ -206,7 +215,11 @@ export class UsuariosService {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) { entity.roles = dto.roles; huboCambioRol = true; }
-      if (dto.unidadAcademicaId !== undefined) entity.unidadAcademicaId = dto.unidadAcademicaId;
+      if (dto.unidadAcademicaId !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        entity.unidadAcademica = null as any;
+        entity.unidadAcademicaId = dto.unidadAcademicaId;
+      }
       if (dto.habilitado !== undefined) entity.habilitado = dto.habilitado;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
       const saved = await this.repo.save(entity);

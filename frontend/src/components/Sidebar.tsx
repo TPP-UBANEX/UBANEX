@@ -8,7 +8,10 @@ import {
   FolderOpen,
   Users,
   ChevronLeft,
+  ClipboardList,
 } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
+import { RolUsuario } from '@/data/types'
 
 const menuItems = [
   { id: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -26,6 +29,11 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const esSecretaria = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+  )
 
   return (
     <aside
@@ -62,6 +70,32 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             {!collapsed && <span className="text-sm">{item.label}</span>}
           </Button>
         ))}
+        {esSecretaria && (
+          <>
+            <div className="border-t my-2" />
+            {!collapsed && (
+              <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider pt-1 pb-0.5">
+                Secretaría
+              </p>
+            )}
+            <Button
+              key="/proyectos?revision=true"
+              variant={
+                location.pathname === '/proyectos' && location.search.includes('revision=true')
+                  ? 'secondary'
+                  : 'ghost'
+              }
+              className={cn(
+                'w-full justify-start gap-3',
+                collapsed && 'justify-center px-2'
+              )}
+              onClick={() => navigate('/proyectos?revision=true')}
+            >
+              <ClipboardList className="h-4 w-4 shrink-0" />
+              {!collapsed && <span className="text-sm">Revisión</span>}
+            </Button>
+          </>
+        )}
       </nav>
     </aside>
   )
