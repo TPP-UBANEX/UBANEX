@@ -190,7 +190,8 @@ export interface RubroPresupuesto {
 export interface ViaticoPresupuesto {
   tipoPersona: TipoPersona
   descripcion: string
-  periodo: string
+  periodoInicio: string
+  periodoFin: string
   monto: number
 }
 

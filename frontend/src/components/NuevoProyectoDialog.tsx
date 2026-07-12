@@ -119,7 +119,7 @@ export function NuevoProyectoDialog({
       const rubro = { ...rubros[rubroIdx] }
       if (tipo === TipoRubro.ViaticosYSeguros) {
         const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
-        partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodo: '', monto: 0 })
+        partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodoInicio: '', periodoFin: '', monto: 0 })
         rubro.partidas = partidas
       } else {
         const partidas = [...(rubro.partidas as BienPresupuesto[])]
@@ -286,8 +286,12 @@ export function NuevoProyectoDialog({
                           <Input value={partida.descripcion} onChange={e => updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
                         </div>
                         <div className="flex-1 space-y-1">
-                          <span className="text-xs">Período</span>
-                          <Input value={partida.periodo} onChange={e => updateViatico(rubroIdx, pIdx, 'periodo', e.target.value)} placeholder="Ej: Oct 2025" />
+                          <span className="text-xs">Inicio</span>
+                          <Input type="date" value={partida.periodoInicio} onChange={e => updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <span className="text-xs">Fin</span>
+                          <Input type="date" value={partida.periodoFin} onChange={e => updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
                         </div>
                         <div className="flex-1 space-y-1">
                           <span className="text-xs">Monto</span>

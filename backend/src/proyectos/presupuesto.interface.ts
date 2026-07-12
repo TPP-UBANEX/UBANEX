@@ -4,7 +4,8 @@ import { TipoPersona } from '../common/enums/tipo-persona.enum';
 export interface ViaticoPresupuesto {
   tipoPersona: TipoPersona;
   descripcion: string;
-  periodo: string;
+  periodoInicio: string;
+  periodoFin: string;
   monto: number;
 }
 

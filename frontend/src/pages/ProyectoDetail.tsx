@@ -136,7 +136,7 @@ export function ProyectoDetail() {
     const rubro = { ...rubros[rubroIdx] }
     if (tipo === TipoRubro.ViaticosYSeguros) {
       const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
-      partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodo: '', monto: 0 })
+      partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodoInicio: '', periodoFin: '', monto: 0 })
       rubro.partidas = partidas
     } else {
       const partidas = [...(rubro.partidas as BienPresupuesto[])]
@@ -451,8 +451,12 @@ function renderPresupuesto(
                         <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <span className="text-xs">Período</span>
-                        <Input value={p.periodo} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodo', e.target.value)} placeholder="Ej: Oct 2025" />
+                        <span className="text-xs">Inicio</span>
+                        <Input type="date" value={p.periodoInicio} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs">Fin</span>
+                        <Input type="date" value={p.periodoFin} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
                       </div>
                       <div className="flex-1 space-y-1">
                         <span className="text-xs">Monto</span>
@@ -466,7 +470,7 @@ function renderPresupuesto(
                     <>
                       <span className="text-sm flex-1">{p.tipoPersona}</span>
                       <span className="text-sm flex-[2]">{p.descripcion}</span>
-                      <span className="text-sm flex-1">{p.periodo}</span>
+                      <span className="text-sm flex-1">{p.periodoInicio} → {p.periodoFin}</span>
                       <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
                     </>
                   )}
