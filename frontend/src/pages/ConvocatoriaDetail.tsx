@@ -132,8 +132,8 @@ export function ConvocatoriaDetail() {
             <CardHeader><CardTitle className="text-sm font-medium">Información</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="grid grid-cols-2 gap-4">
-                <div><span className="text-muted-foreground">Apertura:</span> {conv.fechaApertura}</div>
-                <div><span className="text-muted-foreground">Cierre:</span> {conv.fechaCierre}</div>
+                <div><span className="text-muted-foreground">Inicio Presentación:</span> {conv.fechaInicioPresentacion}</div>
+                <div><span className="text-muted-foreground">Fin Presentación:</span> {conv.fechaFinPresentacion}</div>
               </div>
             </CardContent>
           </Card>

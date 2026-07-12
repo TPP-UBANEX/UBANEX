@@ -20,12 +20,12 @@ export class Edicion {
   @Column()
   proyectoId: string;
 
-  @ManyToOne(() => Convocatoria, { nullable: true })
+  @ManyToOne(() => Convocatoria)
   @JoinColumn({ name: 'convocatoriaId' })
-  convocatoria: Convocatoria | null;
+  convocatoria: Convocatoria;
 
-  @Column({ nullable: true })
-  convocatoriaId: string | null;
+  @Column()
+  convocatoriaId: string;
 
   @Column({ type: 'varchar', default: EstadoEdicion.Borrador })
   estado: EstadoEdicion;

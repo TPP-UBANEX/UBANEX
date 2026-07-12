@@ -1,17 +1,65 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Put, Delete, Body, Param, UseGuards,
+} from '@nestjs/common';
 import { ConvocatoriasService } from './convocatorias.service';
+import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
+import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
+import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { Usuario } from '../usuarios/usuario.entity';
 
 @Controller('convocatorias')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ConvocatoriasController {
   constructor(private readonly service: ConvocatoriasService) {}
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  listar() {
+    return this.service.listar();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  obtener(@Param('id') id: string) {
+    return this.service.obtener(id);
+  }
+
+  @Post()
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  crear(@Body() dto: CrearConvocatoriaDto, @CurrentUser() usuario: Usuario) {
+    return this.service.crear(dto, usuario);
+  }
+
+  @Patch(':id')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  actualizar(
+    @Param('id') id: string,
+    @Body() dto: ActualizarConvocatoriaDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.actualizar(id, dto, usuario);
+  }
+
+  @Delete(':id')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  eliminar(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
+    return this.service.eliminar(id, usuario);
+  }
+
+  @Get(':id/emparejamientos')
+  obtenerEmparejamientos(@Param('id') id: string) {
+    return this.service.obtenerEmparejamientos(id);
+  }
+
+  @Put(':id/emparejamientos')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  guardarEmparejamientos(
+    @Param('id') id: string,
+    @Body() dto: GuardarEmparejamientoDto,
+  ) {
+    return this.service.guardarEmparejamientos(id, dto);
   }
 }

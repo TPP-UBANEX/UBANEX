@@ -77,12 +77,16 @@ export function NuevoProyectoDialog({
       setError('Completá el nombre del proyecto')
       return
     }
+    if (!convocatoriaId) {
+      setError('Seleccioná una convocatoria')
+      return
+    }
     setError('')
     setSubmitting(true)
     try {
       await api.proyectos.crear({
         nombre,
-        convocatoriaId: convocatoriaId || undefined,
+        convocatoriaId,
         codirectorId: codirectorId || undefined,
         anioEdicion: anioEdicion ?? undefined,
         presupuesto: presupuesto.rubros.some(r => r.partidas.length > 0) ? presupuesto : undefined,

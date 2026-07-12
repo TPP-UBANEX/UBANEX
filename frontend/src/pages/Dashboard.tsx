@@ -12,7 +12,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, EstadoEdicion } from '@/data/types'
+import { estadoBadge, EstadoEdicion, EstadoConvocatoria } from '@/data/types'
 import { FileText, Users, DollarSign, ClipboardCheck } from 'lucide-react'
 
 export function Dashboard() {
@@ -32,7 +32,7 @@ export function Dashboard() {
 
   const stats = [
     { label: 'Proyectos Activos', value: ediciones.filter(e => e.estado === EstadoEdicion.EnEjecucion).length, icon: Users, color: 'text-blue-600' },
-    { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === 'Presentacion').length, icon: FileText, color: 'text-green-600' },
+    { label: 'Convocatorias Abiertas', value: convocatorias.filter(c => c.estado === EstadoConvocatoria.Presentacion).length, icon: FileText, color: 'text-green-600' },
     { label: 'Evaluaciones Pendientes', value: ediciones.filter(e => e.estado === EstadoEdicion.EnEvaluacion).length, icon: ClipboardCheck, color: 'text-amber-600' },
     { label: 'Rendiciones Pendientes', value: 0, icon: DollarSign, color: 'text-purple-600' },
   ]
@@ -75,12 +75,12 @@ export function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {convocatorias.filter(c => c.estado === 'abierta').map(c => (
+                  {convocatorias.filter(c => c.estado === EstadoConvocatoria.Presentacion || c.estado === EstadoConvocatoria.Configuracion).map(c => (
                     <TableRow key={c.id}>
                       <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
                       <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.fechaApertura}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.fechaCierre}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{c.fechaInicioPresentacion}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{c.fechaFinPresentacion}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
