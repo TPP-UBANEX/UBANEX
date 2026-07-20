@@ -48,11 +48,11 @@ function erroresFechas(f: {
   const ie = p(f.fechaInicioEvaluacion), fe = p(f.fechaFinEvaluacion)
   const iej = p(f.fechaInicioEjecucion), fej = p(f.fechaFinEjecucion)
 
-  if (fp && ip && fp <= ip) e.fechaFinPresentacion = 'Debe ser posterior a Inicio Presentación'
+  if (fp && ip && fp < ip) e.fechaFinPresentacion = 'Debe ser igual o posterior al inicio'
   if (ie && fp && ie < fp) e.fechaInicioEvaluacion = 'Debe ser posterior o igual a Fin Presentación'
-  if (fe && ie && fe <= ie) e.fechaFinEvaluacion = 'Debe ser posterior a Inicio Evaluación'
+  if (fe && ie && fe < ie) e.fechaFinEvaluacion = 'Debe ser igual o posterior al inicio'
   if (iej && fe && iej < fe) e.fechaInicioEjecucion = 'Debe ser posterior o igual a Fin Evaluación'
-  if (fej && iej && fej <= iej) e.fechaFinEjecucion = 'Debe ser posterior a Inicio Ejecución'
+  if (fej && iej && fej < iej) e.fechaFinEjecucion = 'Debe ser igual o posterior al inicio'
   return e
 }
 

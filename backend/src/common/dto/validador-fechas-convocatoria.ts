@@ -27,14 +27,14 @@ export function validarFechasConvocatoria(campos: {
   const iej = p(campos.fechaInicioEjecucion);
   const fej = p(campos.fechaFinEjecucion);
 
-  if (ip && fp && ip >= fp) {
-    throw new BadRequestException('Inicio Presentación debe ser anterior a Fin Presentación');
+  if (ip && fp && ip > fp) {
+    throw new BadRequestException('El fin debe ser igual o posterior al inicio');
   }
   if (ie && fe && ie > fe) {
     throw new BadRequestException('Inicio Evaluación debe ser anterior o igual a Fin Evaluación');
   }
-  if (iej && fej && iej >= fej) {
-    throw new BadRequestException('Inicio Ejecución debe ser anterior a Fin Ejecución');
+  if (iej && fej && iej > fej) {
+    throw new BadRequestException('El fin debe ser igual o posterior al inicio');
   }
   if (fp && ie && fp > ie) {
     throw new BadRequestException('Fin Presentación debe ser anterior o igual a Inicio Evaluación');
