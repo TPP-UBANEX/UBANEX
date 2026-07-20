@@ -36,8 +36,30 @@ export function validarFechasConvocatoria(campos: {
   if (iej && fej && iej > fej) {
     throw new BadRequestException('El fin debe ser igual o posterior al inicio');
   }
-  if (fp && ie && fp > ie) {
-    throw new BadRequestException('Fin Presentación debe ser anterior o igual a Inicio Evaluación');
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  if (ip && ip < hoy) {
+    throw new BadRequestException('La fecha de inicio no puede ser anterior a hoy');
+  }
+  if (fp && fp < hoy) {
+    throw new BadRequestException('La fecha de fin no puede ser anterior a hoy');
+  }
+  if (ie && ie < hoy) {
+    throw new BadRequestException('La fecha de inicio no puede ser anterior a hoy');
+  }
+  if (fe && fe < hoy) {
+    throw new BadRequestException('La fecha de fin no puede ser anterior a hoy');
+  }
+  if (iej && iej < hoy) {
+    throw new BadRequestException('La fecha de inicio no puede ser anterior a hoy');
+  }
+  if (fej && fej < hoy) {
+    throw new BadRequestException('La fecha de fin no puede ser anterior a hoy');
+  }
+
+  if (fp && ie && fp >= ie) {
+    throw new BadRequestException('Fin Presentación debe ser anterior a Inicio Evaluación');
   }
   if (fe && iej && fe >= iej) {
     throw new BadRequestException('Fin Evaluación debe ser anterior a Inicio Ejecución');
