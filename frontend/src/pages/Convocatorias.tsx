@@ -167,45 +167,45 @@ export function Convocatorias() {
               <div className="border rounded-lg p-3 space-y-3">
                 <p className="text-sm font-semibold">Presentación</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="relative h-[4.5rem]">
-                    {errores.fechaInicioPresentacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioPresentacion}</p>}
-                    <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                  <div className="relative min-h-[4.5rem]">
+                    <p className="text-xs text-muted-foreground mt-1">Inicio</p>
                     <Input type="date" className="mt-1" value={form.fechaInicioPresentacion} onChange={e => setForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
+                    {errores.fechaInicioPresentacion && <p className="text-xs text-destructive mt-2">{errores.fechaInicioPresentacion}</p>}
                   </div>
-                  <div className="relative h-[4.5rem]">
-                    {errores.fechaFinPresentacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinPresentacion}</p>}
-                    <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                  <div className="relative min-h-[4.5rem]">
+                    <p className="text-xs text-muted-foreground mt-1">Fin</p>
                     <Input type="date" className="mt-1" value={form.fechaFinPresentacion} onChange={e => setForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
+                    {errores.fechaFinPresentacion && <p className="text-xs text-destructive mt-2">{errores.fechaFinPresentacion}</p>}
                   </div>
                 </div>
               </div>
               <div className="border rounded-lg p-3 space-y-3">
                 <p className="text-sm font-semibold">Evaluación</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="relative h-[4.5rem]">
-                    {errores.fechaInicioEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEvaluacion}</p>}
-                    <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                  <div className="relative min-h-[4.5rem]">
+                    <p className="text-xs text-muted-foreground mt-1">Inicio</p>
                     <Input type="date" className="mt-1" value={form.fechaInicioEvaluacion} onChange={e => setForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
+                    {errores.fechaInicioEvaluacion && <p className="text-xs text-destructive mt-2">{errores.fechaInicioEvaluacion}</p>}
                   </div>
-                  <div className="relative h-[4.5rem]">
-                    {errores.fechaFinEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEvaluacion}</p>}
-                    <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                  <div className="relative min-h-[4.5rem]">
+                    <p className="text-xs text-muted-foreground mt-1">Fin</p>
                     <Input type="date" className="mt-1" value={form.fechaFinEvaluacion} onChange={e => setForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
+                    {errores.fechaFinEvaluacion && <p className="text-xs text-destructive mt-2">{errores.fechaFinEvaluacion}</p>}
                   </div>
                 </div>
               </div>
               <div className="border rounded-lg p-3 space-y-3">
                 <p className="text-sm font-semibold">Ejecución</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="relative h-[4.5rem]">
-                    {errores.fechaInicioEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEjecucion}</p>}
-                    <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                  <div className="relative min-h-[4.5rem]">
+                    <p className="text-xs text-muted-foreground mt-1">Inicio</p>
                     <Input type="date" className="mt-1" value={form.fechaInicioEjecucion} onChange={e => setForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
+                    {errores.fechaInicioEjecucion && <p className="text-xs text-destructive mt-2">{errores.fechaInicioEjecucion}</p>}
                   </div>
-                  <div className="relative h-[4.5rem]">
-                    {errores.fechaFinEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEjecucion}</p>}
-                    <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                  <div className="relative min-h-[4.5rem]">
+                    <p className="text-xs text-muted-foreground mt-1">Fin</p>
                     <Input type="date" className="mt-1" value={form.fechaFinEjecucion} onChange={e => setForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
+                    {errores.fechaFinEjecucion && <p className="text-xs text-destructive mt-2">{errores.fechaFinEjecucion}</p>}
                   </div>
                 </div>
               </div>
