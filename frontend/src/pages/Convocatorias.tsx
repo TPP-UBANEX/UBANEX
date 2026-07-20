@@ -48,6 +48,15 @@ function erroresFechas(f: {
   const ie = p(f.fechaInicioEvaluacion), fe = p(f.fechaFinEvaluacion)
   const iej = p(f.fechaInicioEjecucion), fej = p(f.fechaFinEjecucion)
 
+  const hoy = new Date(new Date().toISOString().split('T')[0])
+
+  if (ip && ip < hoy) e.fechaInicioPresentacion = 'La fecha de inicio no puede ser anterior a hoy'
+  if (fp && fp < hoy) e.fechaFinPresentacion = 'La fecha de fin no puede ser anterior a hoy'
+  if (ie && ie < hoy) e.fechaInicioEvaluacion = 'La fecha de inicio no puede ser anterior a hoy'
+  if (fe && fe < hoy) e.fechaFinEvaluacion = 'La fecha de fin no puede ser anterior a hoy'
+  if (iej && iej < hoy) e.fechaInicioEjecucion = 'La fecha de inicio no puede ser anterior a hoy'
+  if (fej && fej < hoy) e.fechaFinEjecucion = 'La fecha de fin no puede ser anterior a hoy'
+
   if (fp && ip && fp < ip) e.fechaFinPresentacion = 'Debe ser igual o posterior al inicio'
   if (ie && fp && ie < fp) e.fechaInicioEvaluacion = 'Debe ser posterior o igual a Fin Presentación'
   if (fe && ie && fe < ie) e.fechaFinEvaluacion = 'Debe ser igual o posterior al inicio'
@@ -121,8 +130,9 @@ export function Convocatorias() {
         fechaInicioEjecucion: '', fechaFinEjecucion: '',
       })
       cargar()
-    } catch {
-      toast.error('Error al crear la convocatoria')
+    } catch (err) {
+      const detalle = err instanceof Error ? err.message : ''
+      toast.error(detalle ? `Error al crear la convocatoria: ${detalle}` : 'Error al crear la convocatoria')
     } finally {
       setCreando(false)
     }

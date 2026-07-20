@@ -36,8 +36,7 @@ export function validarFechasConvocatoria(campos: {
   if (iej && fej && iej > fej) {
     throw new BadRequestException('El fin debe ser igual o posterior al inicio');
   }
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
+  const hoy = new Date(new Date().toISOString().split('T')[0]);
 
   if (ip && ip < hoy) {
     throw new BadRequestException('La fecha de inicio no puede ser anterior a hoy');
