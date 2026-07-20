@@ -19,6 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -72,6 +74,8 @@ export function ConvocatoriaDetail() {
   const [formularios, setFormularios] = useState<Formulario[]>([])
   const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', formularioId: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
   const [guardando, setGuardando] = useState(false)
+  const [confirmEditOpen, setConfirmEditOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
   const errores = erroresFechas(editForm)
@@ -112,7 +116,7 @@ export function ConvocatoriaDetail() {
     setEditOpen(true)
   }
 
-  const handleGuardar = async () => {
+  const handleGuardar = () => {
     if (!id || !conv) return
 
     const errorFechas = validarFechas(editForm)
@@ -121,9 +125,14 @@ export function ConvocatoriaDetail() {
       return
     }
 
+    setConfirmEditOpen(true)
+  }
+
+  const ejecutarGuardar = async () => {
+    setConfirmEditOpen(false)
     setGuardando(true)
     try {
-      const actualizada = await api.convocatorias.actualizar(id, editForm)
+      const actualizada = await api.convocatorias.actualizar(id!, editForm)
       setConv(actualizada)
       toast.success('Convocatoria actualizada correctamente')
       setEditOpen(false)
@@ -134,11 +143,15 @@ export function ConvocatoriaDetail() {
     }
   }
 
-  const handleEliminar = async () => {
+  const handleEliminar = () => {
     if (!id || !conv) return
-    if (!confirm('¿Estás seguro de eliminar esta convocatoria?')) return
+    setConfirmDeleteOpen(true)
+  }
+
+  const ejecutarEliminar = async () => {
+    setConfirmDeleteOpen(false)
     try {
-      await api.convocatorias.eliminar(id)
+      await api.convocatorias.eliminar(id!)
       toast.success('Convocatoria eliminada correctamente')
       navigate('/convocatorias')
     } catch {
@@ -279,6 +292,36 @@ export function ConvocatoriaDetail() {
               </DialogContent>
             </Dialog>
             <Button variant="destructive" size="sm" onClick={handleEliminar}><Trash2 className="h-4 w-4 mr-1" />Eliminar</Button>
+
+            <Dialog open={confirmEditOpen} onOpenChange={setConfirmEditOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Confirmar cambios</DialogTitle>
+                  <DialogDescription>
+                    ¿Estás seguro de que querés guardar los cambios en esta convocatoria?
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmEditOpen(false)}>Cancelar</Button>
+                  <Button onClick={ejecutarGuardar}>Confirmar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Eliminar convocatoria</DialogTitle>
+                  <DialogDescription>
+                    ¿Estás seguro de eliminar esta convocatoria? Esta acción no se puede deshacer.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>Cancelar</Button>
+                  <Button variant="destructive" onClick={ejecutarEliminar}>Eliminar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </div>
