@@ -19,6 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -48,11 +50,11 @@ function erroresFechas(f: {
   const ie = p(f.fechaInicioEvaluacion), fe = p(f.fechaFinEvaluacion)
   const iej = p(f.fechaInicioEjecucion), fej = p(f.fechaFinEjecucion)
 
-  if (fp && ip && fp <= ip) e.fechaFinPresentacion = 'Debe ser posterior a Inicio Presentación'
+  if (fp && ip && fp < ip) e.fechaFinPresentacion = 'Debe ser igual o posterior al inicio'
   if (ie && fp && ie < fp) e.fechaInicioEvaluacion = 'Debe ser posterior o igual a Fin Presentación'
-  if (fe && ie && fe <= ie) e.fechaFinEvaluacion = 'Debe ser posterior a Inicio Evaluación'
+  if (fe && ie && fe < ie) e.fechaFinEvaluacion = 'Debe ser igual o posterior al inicio'
   if (iej && fe && iej < fe) e.fechaInicioEjecucion = 'Debe ser posterior o igual a Fin Evaluación'
-  if (fej && iej && fej <= iej) e.fechaFinEjecucion = 'Debe ser posterior a Inicio Ejecución'
+  if (fej && iej && fej < iej) e.fechaFinEjecucion = 'Debe ser igual o posterior al inicio'
   return e
 }
 
@@ -72,6 +74,8 @@ export function ConvocatoriaDetail() {
   const [formularios, setFormularios] = useState<Formulario[]>([])
   const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', formularioId: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
   const [guardando, setGuardando] = useState(false)
+  const [confirmEditOpen, setConfirmEditOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
   const errores = erroresFechas(editForm)
@@ -112,7 +116,7 @@ export function ConvocatoriaDetail() {
     setEditOpen(true)
   }
 
-  const handleGuardar = async () => {
+  const handleGuardar = () => {
     if (!id || !conv) return
 
     const errorFechas = validarFechas(editForm)
@@ -121,9 +125,14 @@ export function ConvocatoriaDetail() {
       return
     }
 
+    setConfirmEditOpen(true)
+  }
+
+  const ejecutarGuardar = async () => {
+    setConfirmEditOpen(false)
     setGuardando(true)
     try {
-      const actualizada = await api.convocatorias.actualizar(id, editForm)
+      const actualizada = await api.convocatorias.actualizar(id!, editForm)
       setConv(actualizada)
       toast.success('Convocatoria actualizada correctamente')
       setEditOpen(false)
@@ -134,11 +143,15 @@ export function ConvocatoriaDetail() {
     }
   }
 
-  const handleEliminar = async () => {
+  const handleEliminar = () => {
     if (!id || !conv) return
-    if (!confirm('¿Estás seguro de eliminar esta convocatoria?')) return
+    setConfirmDeleteOpen(true)
+  }
+
+  const ejecutarEliminar = async () => {
+    setConfirmDeleteOpen(false)
     try {
-      await api.convocatorias.eliminar(id)
+      await api.convocatorias.eliminar(id!)
       toast.success('Convocatoria eliminada correctamente')
       navigate('/convocatorias')
     } catch {
@@ -205,44 +218,45 @@ export function ConvocatoriaDetail() {
                   <div className="border rounded-lg p-3 space-y-3">
                     <p className="text-sm font-semibold">Presentación</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="relative h-[4.5rem]">
-                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                      <div className="relative min-h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-1">Inicio</p>
                         <Input type="date" className="mt-1" value={editForm.fechaInicioPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioPresentacion: e.target.value }))} />
+                        {errores.fechaInicioPresentacion && <p className="text-xs text-destructive mt-2">{errores.fechaInicioPresentacion}</p>}
                       </div>
-                      <div className="relative h-[4.5rem]">
-                        {errores.fechaFinPresentacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinPresentacion}</p>}
-                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                      <div className="relative min-h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-1">Fin</p>
                         <Input type="date" className="mt-1" value={editForm.fechaFinPresentacion} onChange={e => setEditForm(f => ({ ...f, fechaFinPresentacion: e.target.value }))} />
+                        {errores.fechaFinPresentacion && <p className="text-xs text-destructive mt-2">{errores.fechaFinPresentacion}</p>}
                       </div>
                     </div>
                   </div>
                   <div className="border rounded-lg p-3 space-y-3">
                     <p className="text-sm font-semibold">Evaluación</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="relative h-[4.5rem]">
-                        {errores.fechaInicioEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEvaluacion}</p>}
-                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                      <div className="relative min-h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-1">Inicio</p>
                         <Input type="date" className="mt-1" value={editForm.fechaInicioEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEvaluacion: e.target.value }))} />
+                        {errores.fechaInicioEvaluacion && <p className="text-xs text-destructive mt-2">{errores.fechaInicioEvaluacion}</p>}
                       </div>
-                      <div className="relative h-[4.5rem]">
-                        {errores.fechaFinEvaluacion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEvaluacion}</p>}
-                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                      <div className="relative min-h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-1">Fin</p>
                         <Input type="date" className="mt-1" value={editForm.fechaFinEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
+                        {errores.fechaFinEvaluacion && <p className="text-xs text-destructive mt-2">{errores.fechaFinEvaluacion}</p>}
                       </div>
                     </div>
                   </div>
                   <div className="border rounded-lg p-3 space-y-3">
                     <p className="text-sm font-semibold">Ejecución</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="relative h-[4.5rem]">
-                        {errores.fechaInicioEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaInicioEjecucion}</p>}
-                        <p className="text-xs text-muted-foreground mt-4">Inicio</p>
+                      <div className="relative min-h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-1">Inicio</p>
                         <Input type="date" className="mt-1" value={editForm.fechaInicioEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaInicioEjecucion: e.target.value }))} />
+                        {errores.fechaInicioEjecucion && <p className="text-xs text-destructive mt-2">{errores.fechaInicioEjecucion}</p>}
                       </div>
-                      <div className="relative h-[4.5rem]">
-                        {errores.fechaFinEjecucion && <p className="absolute top-[-1.1rem] left-0 text-xs text-destructive">{errores.fechaFinEjecucion}</p>}
-                        <p className="text-xs text-muted-foreground mt-4">Fin</p>
+                      <div className="relative min-h-[4.5rem]">
+                        <p className="text-xs text-muted-foreground mt-1">Fin</p>
                         <Input type="date" className="mt-1" value={editForm.fechaFinEjecucion} onChange={e => setEditForm(f => ({ ...f, fechaFinEjecucion: e.target.value }))} />
+                        {errores.fechaFinEjecucion && <p className="text-xs text-destructive mt-2">{errores.fechaFinEjecucion}</p>}
                       </div>
                     </div>
                   </div>
@@ -278,6 +292,36 @@ export function ConvocatoriaDetail() {
               </DialogContent>
             </Dialog>
             <Button variant="destructive" size="sm" onClick={handleEliminar}><Trash2 className="h-4 w-4 mr-1" />Eliminar</Button>
+
+            <Dialog open={confirmEditOpen} onOpenChange={setConfirmEditOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Confirmar cambios</DialogTitle>
+                  <DialogDescription>
+                    ¿Estás seguro de que querés guardar los cambios en esta convocatoria?
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmEditOpen(false)}>Cancelar</Button>
+                  <Button onClick={ejecutarGuardar}>Confirmar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Eliminar convocatoria</DialogTitle>
+                  <DialogDescription>
+                    ¿Estás seguro de eliminar esta convocatoria? Esta acción no se puede deshacer.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>Cancelar</Button>
+                  <Button variant="destructive" onClick={ejecutarEliminar}>Eliminar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </div>
