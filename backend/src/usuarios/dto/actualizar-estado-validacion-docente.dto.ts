@@ -4,5 +4,5 @@ import { EstadoValidacionDocente } from '../../common/enums/estado-validacion-do
 export class ActualizarEstadoValidacionDocenteDto {
   @IsEnum(EstadoValidacionDocente)
   @IsNotEmpty()
-  estadoDirector: EstadoValidacionDocente;
+  estadoValidacionDocente: EstadoValidacionDocente;
 }

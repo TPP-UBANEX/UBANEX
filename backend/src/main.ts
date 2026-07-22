@@ -116,28 +116,28 @@ async function bootstrap() {
     nombreCompleto: 'Director Validado',
     email: 'director-validado@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
   }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director Pendiente',
     email: 'director-pendiente@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
   }, EstadoValidacionDocente.PendienteDeValidacion);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director Rechazado',
     email: 'director-rechazado@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
   }, EstadoValidacionDocente.Rechazado);
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Evaluador de Derecho',
     email: 'evaluador@uba.ar',
     password: '123456',
-    roles: [RolUsuario.Evaluador],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
   });
 
@@ -160,28 +160,28 @@ async function bootstrap() {
     nombreCompleto: 'Directora López',
     email: 'directora-lopez@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
   }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director García',
     email: 'director-garcia@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
   }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director Deshabilitado',
     email: 'director-deshabilitado@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
   }, EstadoValidacionDocente.Validado, { habilitado: false });
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Evaluador de Ingeniería',
     email: 'evaluador-ingenieria@uba.ar',
     password: '123456',
-    roles: [RolUsuario.Evaluador],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
   });
 
@@ -204,21 +204,21 @@ async function bootstrap() {
     nombreCompleto: 'Director Fernández',
     email: 'director-fernandez@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: medicina.id,
   }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Directora Martínez',
     email: 'directora-martinez@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: medicina.id,
   }, EstadoValidacionDocente.PendienteDeValidacion);
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Evaluador de Medicina',
     email: 'evaluador-medicina@uba.ar',
     password: '123456',
-    roles: [RolUsuario.Evaluador],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: medicina.id,
   }, { habilitado: false });
 
@@ -234,7 +234,7 @@ async function bootstrap() {
     nombreCompleto: 'Director del CBC',
     email: 'director-cbc@uba.ar',
     password: '123456',
-    roles: [RolUsuario.DirectorDeProyecto],
+    roles: [RolUsuario.Docente],
     unidadAcademicaId: cbc.id,
   }, EstadoValidacionDocente.Validado);
 

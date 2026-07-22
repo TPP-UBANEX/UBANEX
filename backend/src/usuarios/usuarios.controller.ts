@@ -30,8 +30,8 @@ export class UsuariosController {
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
-    RolUsuario.DirectorDeProyecto,
-    RolUsuario.Evaluador,
+    RolUsuario.Estudiante,
+    RolUsuario.Docente,
   )
   listar(@Query() dto: PaginationDto, @CurrentUser() usuario: Usuario) {
     return this.service.listar(dto, usuario);
@@ -51,14 +51,14 @@ export class UsuariosController {
     return this.service.actualizar(id, dto, usuario);
   }
 
-  @Patch(':id/estado-director')
+  @Patch(':id/estado-validacion-docente')
   @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AutoridadDeRectorado)
-  actualizarEstadoDirector(
+  actualizarEstadoValidacionDocente(
     @Param('id') id: string,
     @Body() dto: ActualizarEstadoValidacionDocenteDto,
     @CurrentUser() usuario: Usuario,
   ) {
-    return this.service.actualizarEstadoDirector(id, dto, usuario);
+    return this.service.actualizarEstadoValidacionDocente(id, dto, usuario);
   }
 
   @Post(':id/reset-password')

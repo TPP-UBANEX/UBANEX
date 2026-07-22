@@ -27,8 +27,8 @@ const GRUPO_GESTION: RolUsuario[] = [
 ];
 
 const GRUPO_EJECUCION: RolUsuario[] = [
-  RolUsuario.DirectorDeProyecto,
-  RolUsuario.Evaluador,
+  RolUsuario.Estudiante,
+  RolUsuario.Docente,
 ];
 
 function validarGruposRoles(roles: RolUsuario[]): void {
@@ -63,7 +63,7 @@ export class UsuariosService {
     if (creador) {
       const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria);
       if (esSecretaria) {
-        const rolesPermitidos = [RolUsuario.Evaluador, RolUsuario.AsistenteDeSecretaria, RolUsuario.DirectorDeProyecto];
+        const rolesPermitidos = [RolUsuario.Docente, RolUsuario.AsistenteDeSecretaria, RolUsuario.Estudiante];
         const todosPermitidos = dto.roles.every((r) => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
           throw new BadRequestException(
@@ -110,16 +110,16 @@ export class UsuariosService {
     const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
       usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria);
 
-    const esEjecucion = usuarioLogueado.roles.includes(RolUsuario.DirectorDeProyecto) ||
-      usuarioLogueado.roles.includes(RolUsuario.Evaluador);
+    const esEjecucion = usuarioLogueado.roles.includes(RolUsuario.Estudiante) ||
+      usuarioLogueado.roles.includes(RolUsuario.Docente);
 
     if (esSecretaria) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
     } else if (esEjecucion) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
-      query.andWhere('(usuario.roles LIKE :rolDir OR usuario.roles LIKE :rolEval)', {
-        rolDir: '%DirectorDeProyecto%',
-        rolEval: '%Evaluador%',
+      query.andWhere('(usuario.roles LIKE :rolEst OR usuario.roles LIKE :rolDoc)', {
+        rolEst: '%Estudiante%',
+        rolDoc: '%Docente%',
       });
     } else if (unidadAcademicaId) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId });
@@ -145,11 +145,11 @@ export class UsuariosService {
       secretarias: await this.repo.createQueryBuilder('u')
         .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
         .getCount(),
-      evaluadores: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Evaluador%' })
+      estudiantes: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
         .getCount(),
-      directores: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Director%' })
+      docentes: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Docente%' })
         .getCount(),
     };
 
@@ -249,10 +249,10 @@ export class UsuariosService {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
-        const rolesPermitidos = [RolUsuario.DirectorDeProyecto, RolUsuario.Evaluador];
+        const rolesPermitidos = [RolUsuario.Estudiante, RolUsuario.Docente];
         const todosPermitidos = dto.roles.every(r => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
-          throw new BadRequestException('Solo puedes asignar roles de Director de Proyecto y Evaluador');
+          throw new BadRequestException('Solo puedes asignar roles de Estudiante y Docente');
         }
         const nuevosRoles = [
           ...entity.roles.filter(r => !rolesPermitidos.includes(r)),
@@ -300,17 +300,17 @@ export class UsuariosService {
     throw new ForbiddenException('No tiene permisos para editar este usuario');
   }
 
-  async actualizarEstadoDirector(
+  async actualizarEstadoValidacionDocente(
     id: string, dto: ActualizarEstadoValidacionDocenteDto, usuarioLogueado?: Usuario,
   ): Promise<Usuario> {
     const entity = await this.obtener(id);
     const estadoAnterior = entity.estadoValidacionDocente;
-    entity.estadoValidacionDocente = dto.estadoDirector;
+    entity.estadoValidacionDocente = dto.estadoValidacionDocente;
     const saved = await this.repo.save(entity);
     if (usuarioLogueado) {
       await this.auditoria.registrar({
         usuarioId: id, accion: TipoAccionAuditoria.VALIDACION_DIRECTOR,
-        descripcion: `Estado director: ${estadoAnterior || 'PendienteDeValidacion'} → ${dto.estadoDirector}`,
+        descripcion: `Estado director: ${estadoAnterior || 'PendienteDeValidacion'} → ${dto.estadoValidacionDocente}`,
         responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
       });
     }
