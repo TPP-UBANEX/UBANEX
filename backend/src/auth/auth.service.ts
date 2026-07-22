@@ -30,11 +30,10 @@ export class AuthService {
       throw new UnauthorizedException('Usuario deshabilitado');
     }
 
-    const esDirectorRechazado = usuario.roles.includes(RolUsuario.DirectorDeProyecto) &&
-      usuario.estadoValidacionDocente === EstadoValidacionDocente.Rechazado;
-    if (esDirectorRechazado) {
+    if (usuario.roles.includes(RolUsuario.Docente) &&
+      usuario.estadoValidacionDocente === EstadoValidacionDocente.Rechazado) {
       throw new UnauthorizedException(
-        'Tu cuenta de Director ha sido rechazada. Contactate con la Secretaría de Extensión de tu facultad.',
+        'Tu cuenta de Docente ha sido rechazada. Contactate con la Secretaría de Extensión de tu facultad.',
       );
     }
 
@@ -47,9 +46,13 @@ export class AuthService {
       throw new BadRequestException('El email ya está registrado');
     }
 
+    const roles: RolUsuario[] = dto.tipo === 'docente'
+      ? [RolUsuario.Docente]
+      : [RolUsuario.Estudiante];
+
     const usuario = await this.usuariosService.crear({
       ...dto,
-      roles: [RolUsuario.DirectorDeProyecto],
+      roles,
       unidadAcademicaId: dto.unidadAcademicaId,
     });
 

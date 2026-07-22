@@ -81,7 +81,7 @@ export class UsuariosService {
       ...dto,
       password,
       creadoPorId: creador?.id,
-      estadoValidacionDocente: dto.roles.includes(RolUsuario.DirectorDeProyecto)
+      estadoValidacionDocente: dto.roles.includes(RolUsuario.Docente)
         ? EstadoValidacionDocente.PendienteDeValidacion
         : null,
     });
