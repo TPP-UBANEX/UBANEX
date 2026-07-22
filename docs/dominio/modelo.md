@@ -88,6 +88,7 @@ classDiagram
         +id: string
         +estado: EstadoEdicion
         +datosFormulario: object
+        +creadoPor: Usuario
     }
 
     class EstadoEdicion {
@@ -153,8 +154,7 @@ classDiagram
 
     Edicion --> Convocatoria : se presenta en
     Edicion --> UnidadAcademica : pertenece a
-    Edicion --> Usuario : director
-    Edicion --> Usuario : codirector
+    Edicion --> Usuario : creado por
     Proyecto --> Edicion : tiene
     Edicion --> Presupuesto : tiene
     Edicion *-- EstadoEdicion : estado
@@ -173,7 +173,7 @@ classDiagram
 - El estado `NoAdjudicado` es terminal (no hay suplencia).
 - El `Presupuesto` se compone de exactamente 3 rubros fijos: `ViaticosYSeguros`, `BienesDeConsumo` y `BienesDeUso`.
 - `Viatico` tiene un `tipoPersona` (Docente o Estudiante). Ambos tipos suman al subtotal del rubro `ViaticosYSeguros`.
-- `Edicion` tiene un `director` (obligatorio) y un `codirector` (opcional), ambos de tipo `Usuario` con rol `DirectorDeProyecto`.
+- `Edicion` tiene un `creadoPor` (usuario que creó la edición). Los directores se asignan mediante `ParticipacionConvocatoria` con rol `DirectorDeProyecto`.
 
 ---
 
@@ -285,8 +285,14 @@ classDiagram
         +email: string
         +nombreCompleto: string
         +roles: RolUsuario[]
-        +estadoDirector: EstadoDirector
+        +estadoValidacionDocente: EstadoValidacionDocente
         +habilitado: boolean
+    }
+
+    class ParticipacionConvocatoria {
+        +id: string
+        +rol: RolEjecucion
+        +esDirectorPrincipal: boolean
     }
 
     class RolUsuario {
@@ -295,11 +301,17 @@ classDiagram
         AsistenteDeRectorado
         AutoridadDeSecretaria
         AsistenteDeSecretaria
+        Estudiante
+        Docente
+    }
+
+    class RolEjecucion {
+        <<enumeration>>
         DirectorDeProyecto
         Evaluador
     }
 
-    class EstadoDirector {
+    class EstadoValidacionDocente {
         <<enumeration>>
         PendienteDeValidacion
         Validado
@@ -307,23 +319,30 @@ classDiagram
     }
 
     Usuario *-- RolUsuario : roles
-    Usuario *-- EstadoDirector : estadoDirector (si tiene DirectorDeProyecto en roles)
+    Usuario *-- EstadoValidacionDocente : estadoValidacionDocente (si tiene Docente en roles)
     Usuario --> UnidadAcademica : pertenece a (nullable)
     Usuario --> Usuario : creado por
+    Usuario --> ParticipacionConvocatoria : tiene
+    ParticipacionConvocatoria --> Convocatoria : en
+    ParticipacionConvocatoria *-- RolEjecucion : rol
+    ParticipacionConvocatoria --> Edicion : opcional
 ```
 
 ### Notas
 
 - **Rectorado**: 1 a 3 Autoridades, 0 a N Asistentes. No pertenecen a ninguna UA.
 - **Secretaría de Extensión**: 1 a 3 Autoridades, 0 a N Asistentes por UA. Cada usuario de Secretaría pertenece a una UA específica.
-- **Director de Proyecto**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Puede estar asignado a una `Edicion` como director o codirector. Máximo 2 proyectos por convocatoria (1 como director + 1 como codirector).
-- **Evaluador**: 0 a N por UA. Creado por Autoridad de Secretaría de dicha UA.
-- Un usuario puede acumular múltiples roles a lo largo del tiempo (ej: fue DirectorDeProyecto en una convocatoria y luego Evaluador en otra), pero todos deben pertenecer al mismo **grupo**:
+- **Estudiante**: 0 a N. Se registra solo. Puede crear proyectos.
+- **Docente**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Puede ser asignado como Director o Evaluador en una convocatoria mediante `ParticipacionConvocatoria`.
+- **Director de Proyecto**: rol de ejecución asignado por convocatoria. Máximo 2 participaciones como director por convocatoria.
+- **Evaluador**: rol de ejecución asignado por convocatoria. Asignado por Autoridad de Secretaría.
+- Los roles se dividen en dos **grupos** excluyentes:
   - **Gestión**: AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria
-  - **Ejecución**: DirectorDeProyecto, Evaluador
+  - **Ejecución**: Estudiante, Docente (roles globales en `RolUsuario`), DirectorDeProyecto, Evaluador (roles por convocatoria en `RolEjecucion` vía `ParticipacionConvocatoria`)
   - Es **regla de negocio** excluyente: no se pueden mezclar roles de gestión con roles de ejecución.
-- `estadoDirector` solo aplica cuando el usuario tiene `DirectorDeProyecto` en sus roles (PendienteDeValidacion → Validado | Rechazado).
-- `creadoPor` referencia al Usuario que creó la cuenta (aplica para Evaluadores y Asistentes).
+- `estadoValidacionDocente` solo aplica cuando el usuario tiene `Docente` en sus roles (PendienteDeValidacion → Validado | Rechazado). Si es Rechazado, no puede iniciar sesión.
+- `ParticipacionConvocatoria` asigna un `RolEjecucion` (DirectorDeProyecto o Evaluador) a un usuario dentro de una convocatoria específica. Un usuario puede tener múltiples participaciones en distintas convocatorias, pero solo un rol por convocatoria.
+- `creadoPor` referencia al Usuario que creó la cuenta (aplica para todo tipo de usuarios).
 
 ---
 
