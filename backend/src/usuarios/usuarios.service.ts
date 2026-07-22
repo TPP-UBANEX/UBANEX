@@ -309,7 +309,7 @@ export class UsuariosService {
     const saved = await this.repo.save(entity);
     if (usuarioLogueado) {
       await this.auditoria.registrar({
-        usuarioId: id, accion: TipoAccionAuditoria.VALIDACION_DIRECTOR,
+        usuarioId: id, accion: TipoAccionAuditoria.VALIDACION_DOCENTE,
         descripcion: `Estado director: ${estadoAnterior || 'PendienteDeValidacion'} → ${dto.estadoValidacionDocente}`,
         responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
       });
