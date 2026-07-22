@@ -17,8 +17,8 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import { UsuarioHistorial } from '@/components/UsuarioHistorial'
-import type { Usuario, UnidadAcademica } from '@/data/types'
-import { RolUsuario, EstadoValidacionDocente } from '@/data/types'
+import type { Usuario, UnidadAcademica, ParticipacionConvocatoria } from '@/data/types'
+import { RolUsuario, RolEjecucion, EstadoValidacionDocente } from '@/data/types'
 import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -61,6 +61,7 @@ export function UsuarioDetail() {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [uaList, setUaList] = useState<UnidadAcademica[]>([])
   const [loading, setLoading] = useState(true)
+  const [participaciones, setParticipaciones] = useState<ParticipacionConvocatoria[]>([])
   const [resetOpen, setResetOpen] = useState(false)
   const [resetSubmitting, setResetSubmitting] = useState(false)
   const [resetExito, setResetExito] = useState(false)
@@ -80,11 +81,14 @@ export function UsuarioDetail() {
       ])
       setUsuario(u)
       setUaList(uas)
+      if (user?.id === id) {
+        api.participaciones.listarMias().then(setParticipaciones).catch(() => {})
+      }
       setLoading(false)
     } catch {
       navigate('/usuarios')
     }
-  }, [id, navigate])
+  }, [id, navigate, user?.id])
 
   useEffect(() => {
     let cancel = false
@@ -369,6 +373,16 @@ export function UsuarioDetail() {
               <span className="text-muted-foreground">Creado por:</span>
               <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
             </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Tipo:</span>
+              <span>
+                {usuario.roles.includes(RolUsuario.Docente)
+                  ? 'Docente'
+                  : usuario.roles.includes(RolUsuario.Estudiante)
+                    ? 'Estudiante'
+                    : 'Gestión'}
+              </span>
+            </div>
             <Separator />
             <div>
               <p className="text-sm text-muted-foreground mb-2">Roles</p>
@@ -432,6 +446,31 @@ export function UsuarioDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {esMiPerfil && participaciones.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              Mis Participaciones
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {participaciones.map(p => (
+                <div key={p.id} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+                  <div>
+                    <span className="font-medium">{p.convocatoria?.nombre || '—'}</span>
+                    <span className="text-muted-foreground ml-2">
+                      {p.rol === RolEjecucion.DirectorDeProyecto ? 'Director' : 'Evaluador'}
+                      {p.esDirectorPrincipal ? ' (Principal)' : ''}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="pt-6">
