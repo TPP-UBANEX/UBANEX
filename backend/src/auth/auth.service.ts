@@ -31,7 +31,7 @@ export class AuthService {
     }
 
     const esDirectorRechazado = usuario.roles.includes(RolUsuario.DirectorDeProyecto) &&
-      usuario.estadoDirector === EstadoValidacionDocente.Rechazado;
+      usuario.estadoValidacionDocente === EstadoValidacionDocente.Rechazado;
     if (esDirectorRechazado) {
       throw new UnauthorizedException(
         'Tu cuenta de Director ha sido rechazada. Contactate con la Secretaría de Extensión de tu facultad.',

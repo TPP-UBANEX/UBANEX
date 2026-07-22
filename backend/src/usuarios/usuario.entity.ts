@@ -30,7 +30,7 @@ export class Usuario {
   unidadAcademicaId: string;
 
   @Column({ nullable: true, type: 'varchar' })
-  estadoDirector: EstadoValidacionDocente | null;
+  estadoValidacionDocente: EstadoValidacionDocente | null;
 
   @Column({ default: true })
   habilitado: boolean;

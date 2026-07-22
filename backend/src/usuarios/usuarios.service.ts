@@ -81,7 +81,7 @@ export class UsuariosService {
       ...dto,
       password,
       creadoPorId: creador?.id,
-      estadoDirector: dto.roles.includes(RolUsuario.DirectorDeProyecto)
+      estadoValidacionDocente: dto.roles.includes(RolUsuario.DirectorDeProyecto)
         ? EstadoValidacionDocente.PendienteDeValidacion
         : null,
     });
@@ -304,8 +304,8 @@ export class UsuariosService {
     id: string, dto: ActualizarEstadoValidacionDocenteDto, usuarioLogueado?: Usuario,
   ): Promise<Usuario> {
     const entity = await this.obtener(id);
-    const estadoAnterior = entity.estadoDirector;
-    entity.estadoDirector = dto.estadoDirector;
+    const estadoAnterior = entity.estadoValidacionDocente;
+    entity.estadoValidacionDocente = dto.estadoDirector;
     const saved = await this.repo.save(entity);
     if (usuarioLogueado) {
       await this.auditoria.registrar({

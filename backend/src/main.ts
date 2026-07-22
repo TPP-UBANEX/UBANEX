@@ -37,11 +37,11 @@ async function seedUsuario(
 function seedDirectores(
   usuariosService: UsuariosService,
   data: { nombreCompleto: string; email: string; password: string; roles: RolUsuario[]; unidadAcademicaId?: string },
-  estadoDirector: EstadoValidacionDocente,
+  estadoValidacionDocente: EstadoValidacionDocente,
   opts?: { habilitado?: boolean },
 ) {
   return seedUsuario(usuariosService, data, opts).then(user => {
-    return usuariosService['repo'].update(user.id, { estadoDirector });
+    return usuariosService['repo'].update(user.id, { estadoValidacionDocente });
   });
 }
 

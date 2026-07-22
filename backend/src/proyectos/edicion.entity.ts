@@ -31,18 +31,11 @@ export class Edicion {
   estado: EstadoEdicion;
 
   @ManyToOne(() => Usuario)
-  @JoinColumn({ name: 'directorId' })
-  director: Usuario;
+  @JoinColumn({ name: 'creadoPorId' })
+  creadoPor: Usuario;
 
   @Column()
-  directorId: string;
-
-  @ManyToOne(() => Usuario, { nullable: true })
-  @JoinColumn({ name: 'codirectorId' })
-  codirector: Usuario | null;
-
-  @Column({ nullable: true })
-  codirectorId: string | null;
+  creadoPorId: string;
 
   @ManyToOne(() => UnidadAcademica)
   @JoinColumn({ name: 'unidadAcademicaId' })
