@@ -13,5 +13,6 @@ import { Edicion } from '../proyectos/edicion.entity';
   ],
   providers: [ParticipacionConvocatoriaService],
   controllers: [ParticipacionConvocatoriaController],
+  exports: [TypeOrmModule],
 })
 export class ParticipacionesConvocatoriaModule {}
