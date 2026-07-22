@@ -10,7 +10,7 @@ import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
-import { EstadoDirector } from '../common/enums/estado-director.enum';
+import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 
@@ -170,7 +170,7 @@ export class ProyectosService {
     if (!usuario.roles.includes(RolUsuario.DirectorDeProyecto)) {
       throw new ForbiddenException('El usuario no tiene rol DirectorDeProyecto');
     }
-    if (usuario.estadoDirector !== EstadoDirector.Validado) {
+    if (usuario.estadoDirector !== EstadoValidacionDocente.Validado) {
       throw new ForbiddenException(
         'El director debe estar validado por la Secretaría de su UA para crear proyectos',
       );
@@ -224,7 +224,7 @@ export class ProyectosService {
     if (!codirector.roles.includes(RolUsuario.DirectorDeProyecto)) {
       throw new BadRequestException('El codirector debe tener rol DirectorDeProyecto');
     }
-    if (codirector.estadoDirector !== EstadoDirector.Validado) {
+    if (codirector.estadoDirector !== EstadoValidacionDocente.Validado) {
       throw new BadRequestException('El codirector debe estar validado');
     }
 

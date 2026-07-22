@@ -5,4 +5,6 @@ export enum RolUsuario {
   AsistenteDeSecretaria = 'AsistenteDeSecretaria',
   DirectorDeProyecto = 'DirectorDeProyecto',
   Evaluador = 'Evaluador',
+  Estudiante = 'Estudiante',
+  Docente = 'Docente',
 }

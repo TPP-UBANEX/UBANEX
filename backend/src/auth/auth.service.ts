@@ -5,7 +5,7 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
-import { EstadoDirector } from '../common/enums/estado-director.enum';
+import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { JwtPayload } from './strategies/jwt.strategy';
 
 @Injectable()
@@ -31,7 +31,7 @@ export class AuthService {
     }
 
     const esDirectorRechazado = usuario.roles.includes(RolUsuario.DirectorDeProyecto) &&
-      usuario.estadoDirector === EstadoDirector.Rechazado;
+      usuario.estadoDirector === EstadoValidacionDocente.Rechazado;
     if (esDirectorRechazado) {
       throw new UnauthorizedException(
         'Tu cuenta de Director ha sido rechazada. Contactate con la Secretaría de Extensión de tu facultad.',

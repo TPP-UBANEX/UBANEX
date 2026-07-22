@@ -8,11 +8,9 @@ import * as crypto from 'crypto';
 import { Usuario } from './usuario.entity';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
-import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
-import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import { ActualizarEstadoValidacionDocenteDto } from './dto/actualizar-estado-validacion-docente.dto';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
-import { EstadoDirector } from '../common/enums/estado-director.enum';
+import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
@@ -82,7 +80,7 @@ export class UsuariosService {
       password,
       creadoPorId: creador?.id,
       estadoDirector: dto.roles.includes(RolUsuario.DirectorDeProyecto)
-        ? EstadoDirector.PendienteDeValidacion
+        ? EstadoValidacionDocente.PendienteDeValidacion
         : null,
     });
     const saved = await this.repo.save(entity);
@@ -301,7 +299,7 @@ export class UsuariosService {
   }
 
   async actualizarEstadoDirector(
-    id: string, dto: ActualizarEstadoDirectorDto, usuarioLogueado?: Usuario,
+    id: string, dto: ActualizarEstadoValidacionDocenteDto, usuarioLogueado?: Usuario,
   ): Promise<Usuario> {
     const entity = await this.obtener(id);
     const estadoAnterior = entity.estadoDirector;

@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 import { UsuariosService } from './usuarios/usuarios.service';
 import { UnidadesAcademicasService } from './unidades-academicas/unidades-academicas.service';
 import { RolUsuario } from './common/enums/rol-usuario.enum';
-import { EstadoDirector } from './common/enums/estado-director.enum';
+import { EstadoValidacionDocente } from './common/enums/estado-validacion-docente.enum';
 import { Formulario } from './formularios/formulario.entity';
 
 async function seedUnidadAcademica(
@@ -37,7 +37,7 @@ async function seedUsuario(
 function seedDirectores(
   usuariosService: UsuariosService,
   data: { nombreCompleto: string; email: string; password: string; roles: RolUsuario[]; unidadAcademicaId?: string },
-  estadoDirector: EstadoDirector,
+  estadoDirector: EstadoValidacionDocente,
   opts?: { habilitado?: boolean },
 ) {
   return seedUsuario(usuariosService, data, opts).then(user => {
@@ -118,21 +118,21 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: derecho.id,
-  }, EstadoDirector.Validado);
+  }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director Pendiente',
     email: 'director-pendiente@uba.ar',
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: derecho.id,
-  }, EstadoDirector.PendienteDeValidacion);
+  }, EstadoValidacionDocente.PendienteDeValidacion);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director Rechazado',
     email: 'director-rechazado@uba.ar',
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: derecho.id,
-  }, EstadoDirector.Rechazado);
+  }, EstadoValidacionDocente.Rechazado);
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Evaluador de Derecho',
     email: 'evaluador@uba.ar',
@@ -162,21 +162,21 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: ingenieria.id,
-  }, EstadoDirector.Validado);
+  }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director García',
     email: 'director-garcia@uba.ar',
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: ingenieria.id,
-  }, EstadoDirector.Validado);
+  }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Director Deshabilitado',
     email: 'director-deshabilitado@uba.ar',
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: ingenieria.id,
-  }, EstadoDirector.Validado, { habilitado: false });
+  }, EstadoValidacionDocente.Validado, { habilitado: false });
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Evaluador de Ingeniería',
     email: 'evaluador-ingenieria@uba.ar',
@@ -206,14 +206,14 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: medicina.id,
-  }, EstadoDirector.Validado);
+  }, EstadoValidacionDocente.Validado);
   await seedDirectores(usuariosService, {
     nombreCompleto: 'Directora Martínez',
     email: 'directora-martinez@uba.ar',
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: medicina.id,
-  }, EstadoDirector.PendienteDeValidacion);
+  }, EstadoValidacionDocente.PendienteDeValidacion);
   await seedUsuario(usuariosService, {
     nombreCompleto: 'Evaluador de Medicina',
     email: 'evaluador-medicina@uba.ar',
@@ -236,7 +236,7 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.DirectorDeProyecto],
     unidadAcademicaId: cbc.id,
-  }, EstadoDirector.Validado);
+  }, EstadoValidacionDocente.Validado);
 
   const dataSource = app.get(DataSource);
   const formularioRepo = dataSource.getRepository(Formulario);

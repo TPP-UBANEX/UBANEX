@@ -3,7 +3,7 @@ import {
 } from 'typeorm';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
-import { EstadoDirector } from '../common/enums/estado-director.enum';
+import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 
 @Entity()
 export class Usuario {
@@ -30,7 +30,7 @@ export class Usuario {
   unidadAcademicaId: string;
 
   @Column({ nullable: true, type: 'varchar' })
-  estadoDirector: EstadoDirector | null;
+  estadoDirector: EstadoValidacionDocente | null;
 
   @Column({ default: true })
   habilitado: boolean;

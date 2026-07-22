@@ -4,7 +4,7 @@ import {
 import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
-import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dto';
+import { ActualizarEstadoValidacionDocenteDto } from './dto/actualizar-estado-validacion-docente.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -55,7 +55,7 @@ export class UsuariosController {
   @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AutoridadDeRectorado)
   actualizarEstadoDirector(
     @Param('id') id: string,
-    @Body() dto: ActualizarEstadoDirectorDto,
+    @Body() dto: ActualizarEstadoValidacionDocenteDto,
     @CurrentUser() usuario: Usuario,
   ) {
     return this.service.actualizarEstadoDirector(id, dto, usuario);
