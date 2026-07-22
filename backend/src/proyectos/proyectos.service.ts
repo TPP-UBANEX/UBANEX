@@ -11,7 +11,6 @@ import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
-import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';

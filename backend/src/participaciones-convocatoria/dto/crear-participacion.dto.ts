@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsUUID, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsBoolean, IsUUID, IsEnum } from 'class-validator';
 import { RolEjecucion } from '../../common/enums/rol-ejecucion.enum';
 
 export class CrearParticipacionDto {
