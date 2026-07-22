@@ -36,6 +36,7 @@ import type { Convocatoria, Edicion, Formulario } from '@/data/types'
 import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
+import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -340,6 +341,7 @@ export function ConvocatoriaDetail() {
       <Tabs defaultValue="proyectos">
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
+          <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
         </TabsList>
@@ -388,6 +390,14 @@ export function ConvocatoriaDetail() {
         </TabsContent>
         <TabsContent value="emparejamiento" className="mt-4">
           {id && <EmparejamientoTab convocatoriaId={id} />}
+        </TabsContent>
+        <TabsContent value="evaluadores" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-sm font-medium">Asignación de Evaluadores</CardTitle></CardHeader>
+            <CardContent>
+              {id && <AsignacionEvaluadores convocatoriaId={id} />}
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="detalle" className="mt-4">
           <Card>
