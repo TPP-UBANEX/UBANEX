@@ -3,11 +3,16 @@ export enum RolUsuario {
   AsistenteDeRectorado = 'AsistenteDeRectorado',
   AutoridadDeSecretaria = 'AutoridadDeSecretaria',
   AsistenteDeSecretaria = 'AsistenteDeSecretaria',
+  Estudiante = 'Estudiante',
+  Docente = 'Docente',
+}
+
+export enum RolEjecucion {
   DirectorDeProyecto = 'DirectorDeProyecto',
   Evaluador = 'Evaluador',
 }
 
-export enum EstadoDirector {
+export enum EstadoValidacionDocente {
   PendienteDeValidacion = 'PendienteDeValidacion',
   Validado = 'Validado',
   Rechazado = 'Rechazado',
@@ -25,7 +30,7 @@ export interface Usuario {
   roles: RolUsuario[]
   unidadAcademica?: UnidadAcademica
   unidadAcademicaId?: string
-  estadoDirector?: EstadoDirector
+  estadoValidacionDocente?: EstadoValidacionDocente
   habilitado: boolean
   ultimaActividad?: string
   creadoPor?: Usuario
@@ -45,6 +50,7 @@ export interface RegisterDto {
   nombreCompleto: string
   email: string
   password: string
+  tipo: 'estudiante' | 'docente'
   unidadAcademicaId?: string
 }
 
@@ -69,8 +75,8 @@ export interface PaginatedResponse<T> {
   stats?: {
     rectorado: number
     secretarias: number
-    evaluadores: number
-    directores: number
+    estudiantes: number
+    docentes: number
   }
 }
 
@@ -82,6 +88,27 @@ export interface UsuariosQueryParams {
   unidadAcademicaId?: string
 }
 
+export interface ParticipacionConvocatoria {
+  id: string
+  usuarioId: string
+  usuario?: Usuario
+  convocatoriaId: string
+  convocatoria?: Convocatoria
+  rol: RolEjecucion
+  edicionId?: string
+  esDirectorPrincipal?: boolean
+  asignadoPorId: string
+  creadoEn: string
+}
+
+export interface CrearParticipacionDto {
+  usuarioId: string
+  convocatoriaId: string
+  rol: RolEjecucion
+  edicionId?: string
+  esDirectorPrincipal?: boolean
+}
+
 export enum TipoAccionAuditoria {
   CREACION = 'CREACION',
   EDICION = 'EDICION',
@@ -89,7 +116,7 @@ export enum TipoAccionAuditoria {
   INACTIVACION = 'INACTIVACION',
   REACTIVACION = 'REACTIVACION',
   RESET_PASSWORD = 'RESET_PASSWORD',
-  VALIDACION_DIRECTOR = 'VALIDACION_DIRECTOR',
+  VALIDACION_DOCENTE = 'VALIDACION_DOCENTE',
 }
 
 export interface Auditoria {
@@ -169,10 +196,8 @@ export interface Edicion {
   proyecto?: Proyecto
   convocatoriaId: string
   estado: EstadoEdicion
-  directorId: string
-  director?: Usuario
-  codirectorId?: string
-  codirector?: Usuario
+  creadoPorId: string
+  creadoPor?: Usuario
   unidadAcademicaId: string
   unidadAcademica?: UnidadAcademica
   convocatoria?: Convocatoria
@@ -212,14 +237,12 @@ export interface BienPresupuesto {
 export interface CrearProyectoDto {
   nombre: string
   convocatoriaId: string
-  codirectorId?: string
   anioEdicion?: number
   presupuesto?: Presupuesto
 }
 
 export interface ActualizarEdicionDto {
   nombre?: string
-  codirectorId?: string
   anioEdicion?: number
   presupuesto?: Presupuesto
   datosFormulario?: Record<string, unknown>

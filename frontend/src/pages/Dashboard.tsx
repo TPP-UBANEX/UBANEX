@@ -99,7 +99,7 @@ export function Dashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Título</TableHead>
-                    <TableHead>Director</TableHead>
+                    <TableHead>Creado por</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -107,7 +107,7 @@ export function Dashboard() {
                   {ediciones.slice(0, 5).map(e => (
                     <TableRow key={e.id}>
                       <TableCell className="text-sm">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
                     </TableRow>
                   ))}

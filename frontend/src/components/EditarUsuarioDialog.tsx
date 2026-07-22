@@ -27,8 +27,8 @@ const rolLabels: Record<string, string> = {
   [RolUsuario.AsistenteDeRectorado]: 'Asistente Rectorado',
   [RolUsuario.AutoridadDeSecretaria]: 'Autoridad Secretaría',
   [RolUsuario.AsistenteDeSecretaria]: 'Asistente Secretaría',
-  [RolUsuario.DirectorDeProyecto]: 'Director',
-  [RolUsuario.Evaluador]: 'Evaluador',
+  [RolUsuario.Estudiante]: 'Estudiante',
+  [RolUsuario.Docente]: 'Docente',
 }
 
 export function EditarUsuarioDialog({
@@ -61,7 +61,7 @@ export function EditarUsuarioDialog({
   const puedeEditarUA = esRectorado
   const rolesDisponibles: RolUsuario[] = esRectorado
     ? Object.keys(rolLabels) as RolUsuario[]
-    : [RolUsuario.DirectorDeProyecto, RolUsuario.Evaluador]
+    : [RolUsuario.Docente, RolUsuario.Estudiante]
   const puedeEditar = esAutoEdicion || esRectorado || esSecretariaMismaUA
 
   useEffect(() => {

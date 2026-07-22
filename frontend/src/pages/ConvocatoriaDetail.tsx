@@ -77,7 +77,9 @@ export function ConvocatoriaDetail() {
   const [confirmEditOpen, setConfirmEditOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
-  const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
+  const esUsuarioEjecucion = user?.roles.some(
+    r => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
+  )
   const errores = erroresFechas(editForm)
 
   const cargarDatos = () => {
@@ -345,7 +347,7 @@ export function ConvocatoriaDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Proyectos Presentados</CardTitle>
-              {esDirector && (
+              {esUsuarioEjecucion && (
                 <NuevoProyectoDialog
                   onCreated={cargarDatos}
                   trigger={
@@ -359,7 +361,7 @@ export function ConvocatoriaDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Proyecto</TableHead>
-                    <TableHead>Director</TableHead>
+                    <TableHead>Creado por</TableHead>
                     <TableHead>Facultad</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Presupuesto</TableHead>
@@ -370,7 +372,7 @@ export function ConvocatoriaDetail() {
                   {ediciones.map(e => (
                     <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
                       <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>

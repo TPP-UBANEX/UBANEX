@@ -21,6 +21,7 @@ export function Register() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [tipo, setTipo] = useState<'estudiante' | 'docente'>('estudiante')
   const [unidadAcademicaId, setUnidadAcademicaId] = useState('')
   const [uaList, setUaList] = useState<UnidadAcademica[]>([])
   const [error, setError] = useState('')
@@ -38,14 +39,10 @@ export function Register() {
       setError('Las contraseñas no coinciden')
       return
     }
-    if (!unidadAcademicaId) {
-      setError('Debés seleccionar una unidad académica')
-      return
-    }
 
     setLoading(true)
     try {
-      await register(nombreCompleto, email, password, unidadAcademicaId)
+      await register(nombreCompleto, email, password, tipo, unidadAcademicaId || undefined)
       navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrarse')
@@ -59,7 +56,7 @@ export function Register() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">UBANEX</CardTitle>
-          <CardDescription>Crear cuenta de Director de Proyecto</CardDescription>
+          <CardDescription>Crear cuenta</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -68,6 +65,18 @@ export function Register() {
                 {error}
               </div>
             )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo de usuario</label>
+              <Select value={tipo} onValueChange={v => setTipo(v as 'estudiante' | 'docente')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="estudiante">Estudiante</SelectItem>
+                  <SelectItem value="docente">Docente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Nombre completo</label>
               <Input
@@ -110,7 +119,7 @@ export function Register() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Unidad Académica</label>
-              <Select value={unidadAcademicaId} onValueChange={setUnidadAcademicaId} required>
+              <Select value={unidadAcademicaId} onValueChange={setUnidadAcademicaId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccioná tu facultad" />
                 </SelectTrigger>

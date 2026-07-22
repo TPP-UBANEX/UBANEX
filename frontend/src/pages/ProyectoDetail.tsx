@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, Usuario } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto } from '@/data/types'
 import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario } from '@/data/types'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,13 +37,11 @@ export function ProyectoDetail() {
 
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
-  const [editCodirectorId, setEditCodirectorId] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
-  const [directores, setDirectores] = useState<Usuario[]>([])
   const [guardando, setGuardando] = useState(false)
 
-  const esPropietario = edicion && (edicion.directorId === user?.id || edicion.codirectorId === user?.id)
+  const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
   const esSecretaria = user?.roles.some(
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
@@ -59,9 +57,8 @@ export function ProyectoDetail() {
       const ed = eds.length > 0 ? eds[0] : null
       setEdicion(ed)
 
-      if (ed && user?.unidadAcademicaId) {
-        const resp = await api.usuarios.list({ rol: RolUsuario.DirectorDeProyecto, unidadAcademicaId: user.unidadAcademicaId, limit: 50 })
-        setDirectores(resp.data)
+      if (ed) {
+        setEdicion(ed)
       }
     } catch {
       toast.error('Error al cargar el proyecto')
@@ -77,7 +74,6 @@ export function ProyectoDetail() {
   const iniciarEdicion = () => {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
-    setEditCodirectorId(edicion.codirectorId || '')
     setEditAnioEdicion(edicion.anioEdicion ?? null)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
     setEditando(true)
@@ -93,7 +89,6 @@ export function ProyectoDetail() {
     try {
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
-        codirectorId: editCodirectorId || undefined,
         anioEdicion: editAnioEdicion ?? undefined,
         presupuesto: editPresupuesto || undefined,
       })
@@ -212,7 +207,7 @@ export function ProyectoDetail() {
           </div>
           {edicion && (
             <p className="text-sm text-muted-foreground">
-              {edicion.director?.nombreCompleto || 'Sin director'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
+              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
               {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
             </p>
           )}
@@ -253,8 +248,8 @@ export function ProyectoDetail() {
 
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Director</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.director?.nombreCompleto || '-'}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Creado por</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.creadoPor?.nombreCompleto || '-'}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
@@ -262,7 +257,7 @@ export function ProyectoDetail() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Codirector</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.codirector?.nombreCompleto || '-'}</p></CardContent>
+          <CardContent><p className="text-sm">-</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Edición</CardTitle></CardHeader>
@@ -288,24 +283,12 @@ export function ProyectoDetail() {
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium">Editar proyecto</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Nombre del proyecto</p>
-                  <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Codirector</p>
-                  <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
-                    <SelectTrigger><SelectValue placeholder="Sin codirector" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Sin codirector</SelectItem>
-                      {directores.map(d => (
-                        <SelectItem key={d.id} value={d.id}>{d.nombreCompleto}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Edición (año)</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Nombre del proyecto</p>
+                    <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Edición (año)</p>
                   <Input
                     type="number"
                     min={2000}
@@ -322,8 +305,7 @@ export function ProyectoDetail() {
               <CardContent className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div><span className="text-muted-foreground">Nombre:</span> {proyecto.nombre}</div>
-                  <div><span className="text-muted-foreground">Director:</span> {edicion?.director?.nombreCompleto || '-'}</div>
-                  <div><span className="text-muted-foreground">Codirector:</span> {edicion?.codirector?.nombreCompleto || '-'}</div>
+                  <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
                   <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
                   <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
                   <div><span className="text-muted-foreground">Edición:</span> {edicion?.anioEdicion || '-'}</div>

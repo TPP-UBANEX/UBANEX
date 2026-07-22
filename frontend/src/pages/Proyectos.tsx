@@ -51,7 +51,9 @@ export function Proyectos() {
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
   const [loading, setLoading] = useState(true)
 
-  const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
+  const esUsuarioEjecucion = user?.roles.some(
+    r => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
+  )
 
   const cargarDatos = () => {
     setLoading(true)
@@ -98,7 +100,7 @@ export function Proyectos() {
         <div className="flex items-center gap-2">
           <Button variant={vista === 'tabla' ? 'default' : 'outline'} size="sm" onClick={() => setVista('tabla')}>Tabla</Button>
           <Button variant={vista === 'kanban' ? 'default' : 'outline'} size="sm" onClick={() => setVista('kanban')}>Kanban</Button>
-          {esDirector && (
+          {esUsuarioEjecucion && (
             <NuevoProyectoDialog
               onCreated={cargarDatos}
               trigger={
@@ -162,7 +164,7 @@ export function Proyectos() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Proyecto</TableHead>
-                    <TableHead>Director</TableHead>
+                    <TableHead>Creado por</TableHead>
                     <TableHead>Facultad</TableHead>
                     <TableHead>Etapa</TableHead>
                     <TableHead>Presupuesto</TableHead>
@@ -173,7 +175,7 @@ export function Proyectos() {
                   {filtrados.map(e => (
                     <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
                       <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
@@ -209,7 +211,7 @@ export function Proyectos() {
                     <Card key={e.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
-                        <p className="text-xs text-muted-foreground">{e.director?.nombreCompleto || '-'}</p>
+                        <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
                         {e.presupuesto && <Badge variant="outline" className="text-xs">${e.presupuesto.montoTotal.toLocaleString()}</Badge>}
                       </CardContent>
                     </Card>
