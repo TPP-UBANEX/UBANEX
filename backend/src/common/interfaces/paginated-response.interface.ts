@@ -11,7 +11,7 @@ export interface PaginatedResponse<T> {
   stats?: {
     rectorado: number;
     secretarias: number;
-    evaluadores: number;
-    directores: number;
+    estudiantes: number;
+    docentes: number;
   };
 }

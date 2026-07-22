@@ -12,10 +12,6 @@ export class CrearProyectoDto {
   convocatoriaId: string;
 
   @IsOptional()
-  @IsUUID()
-  codirectorId?: string;
-
-  @IsOptional()
   @IsInt()
   anioEdicion?: number;
 

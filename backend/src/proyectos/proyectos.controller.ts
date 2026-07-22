@@ -18,7 +18,7 @@ export class ProyectosController {
   constructor(private readonly service: ProyectosService) {}
 
   @Post()
-  @Roles(RolUsuario.DirectorDeProyecto)
+  @Roles(RolUsuario.Estudiante, RolUsuario.Docente)
   crear(@Body() dto: CrearProyectoDto, @CurrentUser() usuario: Usuario) {
     return this.service.crearProyecto(dto, usuario);
   }

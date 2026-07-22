@@ -9,10 +9,12 @@ import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
+import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
+import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 
 @Injectable()
 export class ProyectosService {
@@ -21,18 +23,12 @@ export class ProyectosService {
     private readonly proyectoRepo: Repository<Proyecto>,
     @InjectRepository(Edicion)
     private readonly edicionRepo: Repository<Edicion>,
+    @InjectRepository(ParticipacionConvocatoria)
+    private readonly participacionRepo: Repository<ParticipacionConvocatoria>,
   ) {}
 
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
-    this.validarDirectorHabilitado(usuario);
-
-    const convocatoriaId = dto.convocatoriaId;
-    await this.validarConvocatoriaPresentacion(convocatoriaId);
-    await this.validarLimiteParticipaciones(usuario.id, convocatoriaId);
-
-    if (dto.codirectorId) {
-      await this.validarCodirector(dto.codirectorId, convocatoriaId, usuario.id);
-    }
+    await this.validarConvocatoriaPresentacion(dto.convocatoriaId);
 
     const proyecto = await this.proyectoRepo.save(
       this.proyectoRepo.create({
@@ -44,10 +40,9 @@ export class ProyectosService {
     await this.edicionRepo.save(
       this.edicionRepo.create({
         proyectoId: proyecto.id,
-        convocatoriaId,
+        convocatoriaId: dto.convocatoriaId,
         estado: EstadoEdicion.Borrador,
-        directorId: usuario.id,
-        codirectorId: dto.codirectorId || null,
+        creadoPorId: usuario.id,
         unidadAcademicaId: usuario.unidadAcademicaId,
         anioEdicion: dto.anioEdicion || new Date().getFullYear(),
         presupuesto: dto.presupuesto || null,
@@ -58,18 +53,31 @@ export class ProyectosService {
   }
 
   async listar(usuario: Usuario, convocatoriaId?: string) {
-    const esDirector = usuario.roles.includes(RolUsuario.DirectorDeProyecto);
+    const esGestion = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado,
+       RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+    );
 
     const query = this.edicionRepo.createQueryBuilder('edicion')
       .leftJoinAndSelect('edicion.proyecto', 'proyecto')
-      .leftJoinAndSelect('edicion.director', 'director')
-      .leftJoinAndSelect('edicion.codirector', 'codirector')
+      .leftJoinAndSelect('edicion.creadoPor', 'creadoPor')
       .leftJoinAndSelect('edicion.unidadAcademica', 'unidadAcademica')
       .leftJoinAndSelect('edicion.convocatoria', 'convocatoria')
       .orderBy('edicion.actualizadoEn', 'DESC');
 
-    if (esDirector) {
-      query.andWhere('(edicion.directorId = :userId OR edicion.codirectorId = :userId)', { userId: usuario.id });
+    if (!esGestion) {
+      const participaciones = await this.participacionRepo.find({
+        where: { usuarioId: usuario.id },
+        select: { edicionId: true },
+      });
+      const edicionIds = participaciones
+        .map(p => p.edicionId)
+        .filter(Boolean) as string[];
+
+      query.andWhere(
+        '(edicion.creadoPorId = :userId OR edicion.id IN (:...edicionIds))',
+        { userId: usuario.id, edicionIds: edicionIds.length > 0 ? edicionIds : [''] },
+      );
     }
 
     if (convocatoriaId) {
@@ -89,8 +97,7 @@ export class ProyectosService {
     const ediciones = await this.edicionRepo.find({
       where: { proyectoId: id },
       relations: {
-        director: true,
-        codirector: true,
+        creadoPor: true,
         unidadAcademica: true,
         convocatoria: true,
       },
@@ -108,18 +115,11 @@ export class ProyectosService {
   ) {
     const edicion = await this.obtenerEdicion(proyectoId, edicionId);
 
-    this.validarPropietarioEdicion(edicion, usuario.id);
+    await this.validarAccesoEdicion(edicion, usuario);
     this.validarEstadoEditable(edicion);
 
     if (dto.nombre !== undefined) {
       await this.proyectoRepo.update(proyectoId, { nombre: dto.nombre });
-    }
-
-    if (dto.codirectorId !== undefined) {
-      if (dto.codirectorId) {
-        await this.validarCodirector(dto.codirectorId, edicion.convocatoriaId, edicion.directorId);
-      }
-      edicion.codirectorId = dto.codirectorId || null;
     }
 
     if (dto.anioEdicion !== undefined) {
@@ -142,7 +142,7 @@ export class ProyectosService {
   async enviarEdicion(proyectoId: string, edicionId: string, usuario: Usuario) {
     const edicion = await this.obtenerEdicion(proyectoId, edicionId);
 
-    this.validarPropietarioEdicion(edicion, usuario.id);
+    await this.validarAccesoEdicion(edicion, usuario);
     this.validarEstadoEditable(edicion);
 
     edicion.estado = EstadoEdicion.Presentado;
@@ -155,8 +155,7 @@ export class ProyectosService {
     const edicion = await this.edicionRepo.findOne({
       where: { id: edicionId, proyectoId },
       relations: {
-        director: true,
-        codirector: true,
+        creadoPor: true,
         unidadAcademica: true,
         convocatoria: true,
         proyecto: true,
@@ -166,17 +165,18 @@ export class ProyectosService {
     return edicion;
   }
 
-  private validarDirectorHabilitado(usuario: Usuario) {
-    if (!usuario.roles.includes(RolUsuario.DirectorDeProyecto)) {
-      throw new ForbiddenException('El usuario no tiene rol DirectorDeProyecto');
-    }
-    if (usuario.estadoValidacionDocente !== EstadoValidacionDocente.Validado) {
-      throw new ForbiddenException(
-        'El director debe estar validado por la Secretaría de su UA para crear proyectos',
-      );
-    }
-    if (!usuario.unidadAcademicaId) {
-      throw new BadRequestException('El director debe pertenecer a una Unidad Académica');
+  private async validarAccesoEdicion(edicion: Edicion, usuario: Usuario) {
+    if (edicion.creadoPorId === usuario.id) return;
+
+    const participacion = await this.participacionRepo.findOne({
+      where: {
+        usuarioId: usuario.id,
+        edicionId: edicion.id,
+        rol: RolEjecucion.DirectorDeProyecto,
+      },
+    });
+    if (!participacion) {
+      throw new ForbiddenException('No tenés permisos sobre esta edición');
     }
   }
 
@@ -187,61 +187,6 @@ export class ProyectosService {
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
     if (convocatoria.estado !== EstadoConvocatoria.Presentacion) {
       throw new BadRequestException('La convocatoria no está en etapa de presentación');
-    }
-  }
-
-  private async validarLimiteParticipaciones(usuarioId: string, convocatoriaId: string) {
-    const comoDirector = await this.edicionRepo.count({
-      where: { directorId: usuarioId, convocatoriaId },
-    });
-    const comoCodirector = await this.edicionRepo.count({
-      where: { codirectorId: usuarioId, convocatoriaId },
-    });
-
-    if (comoDirector >= 1) {
-      throw new BadRequestException(
-        'Ya sos director de un proyecto en esta convocatoria. Máximo 1 proyecto como director.',
-      );
-    }
-    if (comoDirector + comoCodirector >= 2) {
-      throw new BadRequestException(
-        'Alcanzaste el límite de 2 participaciones por convocatoria (1 como director + 1 como codirector)',
-      );
-    }
-  }
-
-  private async validarCodirector(
-    codirectorId: string, convocatoriaId: string, directorId: string,
-  ) {
-    if (codirectorId === directorId) {
-      throw new BadRequestException('El codirector no puede ser el mismo que el director');
-    }
-
-    const codirector = await this.edicionRepo.manager.findOne(Usuario, {
-      where: { id: codirectorId },
-    });
-    if (!codirector) throw new NotFoundException('Codirector no encontrado');
-    if (!codirector.roles.includes(RolUsuario.DirectorDeProyecto)) {
-      throw new BadRequestException('El codirector debe tener rol DirectorDeProyecto');
-    }
-    if (codirector.estadoValidacionDocente !== EstadoValidacionDocente.Validado) {
-      throw new BadRequestException('El codirector debe estar validado');
-    }
-
-    const participaciones = await this.edicionRepo.count({
-      where: [
-        { directorId: codirectorId, convocatoriaId },
-        { codirectorId: codirectorId, convocatoriaId },
-      ],
-    });
-    if (participaciones >= 2) {
-      throw new BadRequestException('El codirector ya alcanzó el límite de 2 participaciones en esta convocatoria');
-    }
-  }
-
-  private validarPropietarioEdicion(edicion: Edicion, usuarioId: string) {
-    if (edicion.directorId !== usuarioId && edicion.codirectorId !== usuarioId) {
-      throw new ForbiddenException('No tenés permisos sobre esta edición');
     }
   }
 
