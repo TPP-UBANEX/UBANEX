@@ -32,10 +32,12 @@ export function NuevoProyectoDialog({
   onCreated,
   trigger,
   convocatoriaId: convocatoriaFija,
+  convocatoriaNombre,
 }: {
   onCreated: () => void
   trigger: React.ReactNode
   convocatoriaId?: string
+  convocatoriaNombre?: string
 }) {
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -206,7 +208,7 @@ export function NuevoProyectoDialog({
             <div className="space-y-2">
               <p className="text-sm font-medium">Convocatoria</p>
               {convocatoriaFija ? (
-                <Input value="UBANEX 2026" disabled className="bg-muted" />
+                <Input value={convocatoriaNombre ?? ''} disabled className="bg-muted" />
               ) : (
                 <Select value={convocatoriaId} onValueChange={setConvocatoriaId}>
                   <SelectTrigger><SelectValue placeholder="Seleccioná una convocatoria" /></SelectTrigger>
