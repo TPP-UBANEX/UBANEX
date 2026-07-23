@@ -72,7 +72,7 @@ export function ProyectoDetail() {
         setEdicion(ed)
         if (ed.convocatoriaId) {
           const participaciones = await api.participaciones.listar(ed.convocatoriaId)
-          setDirectores(participaciones.filter(p => p.rol === RolEjecucion.DirectorDeProyecto))
+          setDirectores(participaciones.filter(p => p.rol === RolEjecucion.DirectorDeProyecto && p.edicionId === ed.id))
         }
       }
     } catch {
