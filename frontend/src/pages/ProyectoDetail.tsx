@@ -410,7 +410,6 @@ export function ProyectoDetail() {
           onOpenChange={setShowAsignarDirector}
           convocatoriaId={edicion.convocatoriaId}
           edicionId={edicion.id}
-          existingDirectores={directores}
           onSuccess={cargarDatos}
         />
       )}
@@ -423,14 +422,12 @@ function AsignarDirectorModal({
   onOpenChange,
   convocatoriaId,
   edicionId,
-  existingDirectores,
   onSuccess,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   convocatoriaId: string
   edicionId: string
-  existingDirectores: ParticipacionConvocatoria[]
   onSuccess: () => void
 }) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -444,9 +441,16 @@ function AsignarDirectorModal({
     const fetchUsuarios = async () => {
       setLoadingUsuarios(true)
       try {
-        const res = await api.usuarios.list({ rol: 'Docente', limit: 100 })
-        const existingIds = new Set(existingDirectores.map(d => d.usuarioId))
-        setUsuarios(res.data.filter(u => !existingIds.has(u.id)))
+        const [res, resParticipaciones] = await Promise.all([
+          api.usuarios.list({ rol: 'Docente', limit: 100 }),
+          api.participaciones.listar(convocatoriaId),
+        ])
+        const idsConRol = new Set(resParticipaciones.map(p => p.usuarioId))
+        setUsuarios(res.data.filter(u =>
+          !idsConRol.has(u.id) &&
+          u.estadoValidacionDocente === 'Validado' &&
+          u.habilitado !== false
+        ))
       } catch {
         toast.error('Error al cargar docentes')
       } finally {
@@ -454,7 +458,7 @@ function AsignarDirectorModal({
       }
     }
     fetchUsuarios()
-  }, [open, existingDirectores])
+  }, [open, convocatoriaId])
 
   const handleSubmit = async () => {
     if (!selectedUsuarioId) return
