@@ -31,9 +31,11 @@ const tipoRubroLabels: Record<TipoRubro, string> = {
 export function NuevoProyectoDialog({
   onCreated,
   trigger,
+  convocatoriaId: convocatoriaFija,
 }: {
   onCreated: () => void
   trigger: React.ReactNode
+  convocatoriaId?: string
 }) {
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -56,10 +58,15 @@ export function NuevoProyectoDialog({
 
   useEffect(() => {
     if (!open) return
+    if (convocatoriaFija) {
+      setConvocatoriaId(convocatoriaFija)
+      setConvocatorias([])
+      return
+    }
     api.convocatorias.list().then(convs => {
       setConvocatorias(convs.filter(c => c.estado === EstadoConvocatoria.Presentacion))
     })
-  }, [open])
+  }, [open, convocatoriaFija])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,7 +100,7 @@ export function NuevoProyectoDialog({
 
   const resetForm = () => {
     setNombre('')
-    setConvocatoriaId('')
+    if (!convocatoriaFija) setConvocatoriaId('')
     setAnioEdicion(new Date().getFullYear())
     setPresupuesto({
       montoTotal: 0,
@@ -198,14 +205,18 @@ export function NuevoProyectoDialog({
 
             <div className="space-y-2">
               <p className="text-sm font-medium">Convocatoria</p>
-              <Select value={convocatoriaId} onValueChange={setConvocatoriaId}>
-                <SelectTrigger><SelectValue placeholder="Seleccioná una convocatoria" /></SelectTrigger>
-                <SelectContent>
-                  {convocatorias.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {convocatoriaFija ? (
+                <Input value="UBANEX 2026" disabled className="bg-muted" />
+              ) : (
+                <Select value={convocatoriaId} onValueChange={setConvocatoriaId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccioná una convocatoria" /></SelectTrigger>
+                  <SelectContent>
+                    {convocatorias.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -352,6 +352,7 @@ export function ConvocatoriaDetail() {
               {esUsuarioEjecucion && (
                 <NuevoProyectoDialog
                   onCreated={cargarDatos}
+                  convocatoriaId={conv?.id}
                   trigger={
                     <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
                   }
