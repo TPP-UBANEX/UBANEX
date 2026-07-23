@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn,
-  CreateDateColumn, UpdateDateColumn,
+  CreateDateColumn, UpdateDateColumn, DeleteDateColumn,
 } from 'typeorm';
 import { Proyecto } from './proyecto.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
@@ -58,4 +58,7 @@ export class Edicion {
 
   @UpdateDateColumn()
   actualizadoEn: Date;
+
+  @DeleteDateColumn()
+  eliminadoEn: Date | null;
 }

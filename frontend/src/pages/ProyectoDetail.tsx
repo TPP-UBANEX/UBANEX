@@ -43,6 +43,8 @@ export function ProyectoDetail() {
   const [edicion, setEdicion] = useState<Edicion | null>(null)
   const [loading, setLoading] = useState(true)
   const [enviando, setEnviando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false)
 
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
@@ -146,6 +148,21 @@ export function ProyectoDetail() {
       toast.error(err instanceof Error ? err.message : 'Error al enviar')
     } finally {
       setEnviando(false)
+    }
+  }
+
+  const handleEliminar = async () => {
+    if (!id || !edicion) return
+    setEliminando(true)
+    try {
+      await api.proyectos.eliminarEdicion(id, edicion.id)
+      toast.success('Proyecto eliminado')
+      navigate('/proyectos')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar')
+    } finally {
+      setEliminando(false)
+      setConfirmarEliminar(false)
     }
   }
 
@@ -270,6 +287,10 @@ export function ProyectoDetail() {
                   </Tooltip>
                 </TooltipProvider>
               )}
+              <Button variant="destructive" size="sm" onClick={() => setConfirmarEliminar(true)} disabled={eliminando}>
+                {eliminando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Eliminar
+              </Button>
             </>
           )}
           {editando && (
@@ -443,6 +464,24 @@ export function ProyectoDetail() {
           onSuccess={cargarDatos}
         />
       )}
+
+      <Dialog open={confirmarEliminar} onOpenChange={setConfirmarEliminar}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar proyecto?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. El proyecto se eliminará permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarEliminar(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleEliminar} disabled={eliminando}>
+              {eliminando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -62,6 +62,7 @@ export class ProyectosService {
       .leftJoinAndSelect('edicion.creadoPor', 'creadoPor')
       .leftJoinAndSelect('edicion.unidadAcademica', 'unidadAcademica')
       .leftJoinAndSelect('edicion.convocatoria', 'convocatoria')
+      .where('edicion.eliminadoEn IS NULL')
       .orderBy('edicion.actualizadoEn', 'DESC');
 
     if (!esGestion) {
@@ -199,5 +200,13 @@ export class ProyectosService {
         `No se puede modificar una edición en estado ${edicion.estado}`,
       );
     }
+  }
+
+  async eliminarEdicion(proyectoId: string, edicionId: string, usuario: Usuario) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+    this.validarAccesoEdicion(edicion, usuario);
+    this.validarEstadoEditable(edicion);
+    await this.edicionRepo.softDelete(edicionId);
+    return { message: 'Edición eliminada' };
   }
 }
