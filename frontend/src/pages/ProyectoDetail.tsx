@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario } from '@/data/types'
@@ -60,6 +61,20 @@ export function ProyectoDetail() {
   const puedeAsignarDirector = user?.roles.some(r =>
     [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado].includes(r),
   )
+  const esDocenteValidado = user?.roles.includes(RolUsuario.Docente) &&
+    user?.estadoValidacionDocente === 'Validado'
+  const tieneDirectorPrincipal = directores.some(d => d.esDirectorPrincipal)
+  const tieneSegundoDirector = directores.filter(
+    d => d.rol === RolEjecucion.DirectorDeProyecto,
+  ).length >= 2
+  const directoresCompletos = tieneDirectorPrincipal && tieneSegundoDirector
+  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
+  const esDocente = user?.roles.includes(RolUsuario.Docente)
+  const motivoEnvio = !esDocenteValidado
+    ? 'Tu usuario no esta validado'
+    : !directoresCompletos
+      ? 'El proyecto debe tener un director principal y un codirector asignados antes de ser enviado'
+      : ''
 
   const cargarDatos = async () => {
     if (!id) return
@@ -236,10 +251,25 @@ export function ProyectoDetail() {
               <Button variant="outline" size="sm" onClick={iniciarEdicion}>
                 <Pencil className="h-4 w-4 mr-2" />Editar
               </Button>
-              <Button size="sm" onClick={handleEnviar} disabled={enviando}>
-                {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                Enviar para corrección
-              </Button>
+              {esDocente && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>
+                        <Button size="sm" onClick={handleEnviar} disabled={!puedeEnviar || enviando}>
+                          {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                          Enviar para corrección
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {motivoEnvio && (
+                      <TooltipContent>
+                        <p>{motivoEnvio}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </>
           )}
           {editando && (

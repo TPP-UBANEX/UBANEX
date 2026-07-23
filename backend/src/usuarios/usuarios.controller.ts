@@ -52,7 +52,7 @@ export class UsuariosController {
   }
 
   @Patch(':id/estado-validacion-docente')
-  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AutoridadDeRectorado)
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado)
   actualizarEstadoValidacionDocente(
     @Param('id') id: string,
     @Body() dto: ActualizarEstadoValidacionDocenteDto,
