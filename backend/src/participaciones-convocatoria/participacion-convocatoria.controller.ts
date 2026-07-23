@@ -16,13 +16,13 @@ export class ParticipacionConvocatoriaController {
   constructor(private readonly service: ParticipacionConvocatoriaService) {}
 
   @Post()
-  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AutoridadDeRectorado)
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado)
   asignar(@Body() dto: CrearParticipacionDto, @CurrentUser() usuario: Usuario) {
     return this.service.asignar(dto, usuario);
   }
 
   @Delete(':id')
-  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AutoridadDeRectorado)
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado)
   desasignar(@Param('id') id: string) {
     return this.service.desasignar(id);
   }

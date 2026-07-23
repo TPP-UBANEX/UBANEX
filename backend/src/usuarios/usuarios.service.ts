@@ -61,7 +61,8 @@ export class UsuariosService {
 
     // Validaciones según el rol del creador
     if (creador) {
-      const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria);
+      const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
+        creador.roles.includes(RolUsuario.AsistenteDeSecretaria);
       if (esSecretaria) {
         const rolesPermitidos = [RolUsuario.Docente, RolUsuario.AsistenteDeSecretaria, RolUsuario.Estudiante];
         const todosPermitidos = dto.roles.every((r) => rolesPermitidos.includes(r));
@@ -188,7 +189,8 @@ export class UsuariosService {
 
     const esAutoEdicion = usuarioLogueado && usuarioLogueado.id === id;
     const esRectorado = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeRectorado);
-    const esSecretaria = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeSecretaria);
+    const esSecretaria = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
+      usuarioLogueado?.roles.includes(RolUsuario.AsistenteDeSecretaria);
     const mismaUA = esSecretaria && usuarioLogueado?.unidadAcademicaId === entity.unidadAcademicaId;
 
     const rolesAnteriores = [...entity.roles];
@@ -322,7 +324,8 @@ export class UsuariosService {
 
     const esRectorado = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeRectorado) ||
       usuarioLogueado.roles.includes(RolUsuario.AsistenteDeRectorado);
-    const esSecretariaMismaUA = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
+    const esSecretariaMismaUA = (usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
+      usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria)) &&
       usuarioLogueado.unidadAcademicaId === entity.unidadAcademicaId;
 
     if (!esRectorado && !esSecretariaMismaUA) {

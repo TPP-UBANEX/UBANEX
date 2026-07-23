@@ -19,7 +19,7 @@ export class UsuariosController {
   constructor(private readonly service: UsuariosService) {}
 
   @Post()
-  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria)
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
   crear(@Body() dto: CrearUsuarioDto, @CurrentUser() usuario: Usuario) {
     return this.service.crear(dto, usuario);
   }
@@ -66,6 +66,7 @@ export class UsuariosController {
     RolUsuario.AutoridadDeRectorado,
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
+    RolUsuario.AsistenteDeSecretaria,
   )
   resetPassword(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
     return this.service.resetPassword(id, usuario);
