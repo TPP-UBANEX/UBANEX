@@ -37,7 +37,7 @@ export class ParticipacionConvocatoria {
   @Column({ nullable: true })
   edicionId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'boolean', nullable: true })
   esDirectorPrincipal: boolean | null;
 
   @ManyToOne(() => Usuario)
