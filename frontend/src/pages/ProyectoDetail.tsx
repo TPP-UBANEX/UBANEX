@@ -57,6 +57,9 @@ export function ProyectoDetail() {
   const esSecretaria = user?.roles.some(
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
   )
+  const puedeAsignarDirector = user?.roles.some(r =>
+    [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado].includes(r),
+  )
 
   const cargarDatos = async () => {
     if (!id) return
@@ -288,7 +291,7 @@ export function ProyectoDetail() {
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
           <CardContent><p className="text-sm font-bold">${(edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</p></CardContent>
         </Card>
-        {esPropietario && (
+        {puedeAsignarDirector && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
             <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar Director</CardTitle></CardHeader>
             <CardContent><p className="text-sm text-muted-foreground">+ Agregar director</p></CardContent>
