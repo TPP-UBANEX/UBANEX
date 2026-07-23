@@ -73,10 +73,14 @@ export class ProyectosService {
         .map(p => p.edicionId)
         .filter(Boolean) as string[];
 
-      query.andWhere(
-        '(edicion.creadoPorId = :userId OR edicion.id IN (:...edicionIds))',
-        { userId: usuario.id, edicionIds: edicionIds.length > 0 ? edicionIds : [''] },
-      );
+      if (edicionIds.length > 0) {
+        query.andWhere(
+          '(edicion.creadoPorId = :userId OR edicion.id IN (:...edicionIds))',
+          { userId: usuario.id, edicionIds },
+        );
+      } else {
+        query.andWhere('edicion.creadoPorId = :userId', { userId: usuario.id });
+      }
     }
 
     if (convocatoriaId) {
