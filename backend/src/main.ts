@@ -37,7 +37,20 @@ async function seedUsuario(
   opts?: { habilitado?: boolean },
 ) {
   const existe = await usuariosService.obtenerPorEmail(data.email);
-  if (existe) return existe;
+  if (existe) {
+    // Reconcilia roles de bases creadas antes de un cambio de enum (ej: DirectorDeProyecto
+    // y Evaluador pasaron a ser RolEjecucion y dejaron de existir en RolUsuario).
+    const rolesValidos = Object.values(RolUsuario) as string[];
+    const desactualizado =
+      existe.roles.some((r) => !rolesValidos.includes(r)) ||
+      existe.roles.join(',') !== data.roles.join(',');
+    if (desactualizado) {
+      await usuariosService['repo'].update(existe.id, { roles: data.roles });
+      console.log(`  ${data.email} — roles actualizados: ${existe.roles.join(', ')} → ${data.roles.join(', ')}`);
+      existe.roles = data.roles;
+    }
+    return existe;
+  }
   const user = await usuariosService.crear(data);
   if (opts?.habilitado === false) {
     await usuariosService['repo'].update(user.id, { habilitado: false });
@@ -369,14 +382,25 @@ async function bootstrap() {
     return saved;
   }
 
-  async function clonarFormulario(original: Formulario): Promise<Formulario> {
-    const copia = formularioRepo.create({ nombre: `${original.nombre} (copia seed)`, esDefault: false });
-    return formularioRepo.save(copia);
+  // Devuelve el formulario de la convocatoria si ya existe; si no, clona el default una sola vez
+  // por año. Idempotente: sin esto cada reinicio del backend insertaba 3 formularios huérfanos.
+  async function formularioParaConvocatoria(nombreConvocatoria: string, anio: number): Promise<string> {
+    const conv = await convocatoriaRepo.findOne({ where: { nombre: nombreConvocatoria } });
+    if (conv?.formularioId) return conv.formularioId;
+
+    const nombreCopia = `${formularioDefault.nombre} (copia ${anio})`;
+    const existente = await formularioRepo.findOne({ where: { nombre: nombreCopia } });
+    if (existente) return existente.id;
+
+    const copia = await formularioRepo.save(
+      formularioRepo.create({ nombre: nombreCopia, esDefault: false }),
+    );
+    return copia.id;
   }
 
-  const f2025 = await clonarFormulario(formularioDefault);
-  const f2026 = await clonarFormulario(formularioDefault);
-  const f2027 = await clonarFormulario(formularioDefault);
+  const f2025 = await formularioParaConvocatoria('UBANEX 2025', 2025);
+  const f2026 = await formularioParaConvocatoria('UBANEX 2026', 2026);
+  const f2027 = await formularioParaConvocatoria('UBANEX 2027', 2027);
 
   const conv2025 = await seedConvocatoria({
     nombre: 'UBANEX 2025',
@@ -389,7 +413,7 @@ async function bootstrap() {
     fechaFinEvaluacion: crearFecha(2025, 7, 15),
     fechaInicioEjecucion: crearFecha(2025, 8, 1),
     fechaFinEjecucion: crearFecha(2026, 2, 28),
-    formularioId: f2025.id,
+    formularioId: f2025,
   });
 
   const conv2026 = await seedConvocatoria({
@@ -403,7 +427,7 @@ async function bootstrap() {
     fechaFinEvaluacion: crearFecha(2026, 10, 15),
     fechaInicioEjecucion: crearFecha(2026, 11, 1),
     fechaFinEjecucion: crearFecha(2027, 2, 28),
-    formularioId: f2026.id,
+    formularioId: f2026,
   });
 
   const conv2027 = await seedConvocatoria({
@@ -417,7 +441,7 @@ async function bootstrap() {
     fechaFinEvaluacion: crearFecha(2027, 8, 15),
     fechaInicioEjecucion: crearFecha(2027, 9, 1),
     fechaFinEjecucion: crearFecha(2028, 2, 28),
-    formularioId: f2027.id,
+    formularioId: f2027,
   });
 
   // ─────────────── PROYECTOS Y EDICIONES ───────────────
