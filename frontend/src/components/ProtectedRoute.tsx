@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RolUsuario } from '@/data/types'
@@ -6,11 +6,14 @@ import { RolUsuario } from '@/data/types'
 export function ProtectedRoute({
   children,
   roles,
+  allowOwnId,
 }: {
   children: React.ReactNode
   roles?: RolUsuario[]
+  allowOwnId?: boolean
 }) {
   const { isAuthenticated, isLoading, user } = useAuth()
+  const params = useParams()
 
   if (isLoading) {
     return (
@@ -28,7 +31,10 @@ export function ProtectedRoute({
   }
 
   if (roles && !user?.roles.some(r => roles.includes(r))) {
-    return <Navigate to="/" replace />
+    const esPropio = allowOwnId && params.id === user?.id
+    if (!esPropio) {
+      return <Navigate to="/" replace />
+    }
   }
 
   return <>{children}</>

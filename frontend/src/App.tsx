@@ -63,7 +63,7 @@ function App() {
                   <Route path="/proyectos/:id" element={<ProyectoDetail />} />
                   <Route path="/evaluacion" element={<Evaluacion />} />
                   <Route path="/usuarios" element={<ProtectedRoute roles={ROLES_GESTION}><Usuarios /></ProtectedRoute>} />
-                  <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION}><UsuarioDetail /></ProtectedRoute>} />
+                  <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION} allowOwnId><UsuarioDetail /></ProtectedRoute>} />
                   <Route path="/validacion-docente" element={<ValidacionDocente />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
