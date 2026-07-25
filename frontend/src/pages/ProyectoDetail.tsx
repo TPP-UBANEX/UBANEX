@@ -73,9 +73,9 @@ export function ProyectoDetail() {
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const motivoEnvio = !esDocenteValidado
-    ? 'Tu usuario no esta validado'
+    ? 'Tu usuario no está validado'
     : !directoresCompletos
-      ? 'El proyecto debe tener un director principal y un codirector asignados antes de ser enviado'
+      ? 'El proyecto no tiene asignados director y codirector aún'
       : ''
 
   const cargarDatos = async () => {
