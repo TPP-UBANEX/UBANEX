@@ -119,15 +119,21 @@ export function Usuarios() {
   const rolesCreables = user ? rolesDisponibles[user.roles.find(r => r in rolesDisponibles) ?? ''] ?? [] : []
   const esRectorado = user?.roles.includes(RolUsuario.AutoridadDeRectorado)
   const esSecretaria = user?.roles.includes(RolUsuario.AutoridadDeSecretaria)
+  const esRolSecretaria = user?.roles.some(r =>
+    r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+  )
+  const secretariasLabel = esRolSecretaria ? 'De esta secretaría' : 'De las secretarías'
 
   const stats = response?.stats ? [
-    { label: 'Rectorado', value: response.stats.rectorado, color: 'text-blue-600' },
-    { label: 'Secretarías', value: response.stats.secretarias, color: 'text-green-600' },
+    ...(response.stats.rectorado !== undefined
+      ? [{ label: 'De rectorado', value: response.stats.rectorado, color: 'text-blue-600' }]
+      : []),
+    { label: secretariasLabel, value: response.stats.secretarias, color: 'text-green-600' },
     { label: 'Estudiantes', value: response.stats.estudiantes, color: 'text-amber-600' },
     { label: 'Docentes', value: response.stats.docentes, color: 'text-purple-600' },
   ] : [
-    { label: 'Rectorado', value: '\u2014', color: 'text-muted-foreground' },
-    { label: 'Secretarías', value: '\u2014', color: 'text-muted-foreground' },
+    ...(esRectorado ? [{ label: 'De rectorado', value: '\u2014', color: 'text-muted-foreground' }] : []),
+    { label: secretariasLabel, value: '\u2014', color: 'text-muted-foreground' },
     { label: 'Estudiantes', value: '\u2014', color: 'text-muted-foreground' },
     { label: 'Docentes', value: '\u2014', color: 'text-muted-foreground' },
   ]

@@ -139,20 +139,35 @@ export class UsuariosService {
 
     const [data, total] = await query.getManyAndCount();
 
-    const stats = {
-      rectorado: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Rectorado%' })
-        .getCount(),
-      secretarias: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
-        .getCount(),
-      estudiantes: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
-        .getCount(),
-      docentes: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Docente%' })
-        .getCount(),
-    };
+    const stats = esSecretaria
+      ? {
+          secretarias: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
+            .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId })
+            .getCount(),
+          estudiantes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
+            .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId })
+            .getCount(),
+          docentes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Docente%' })
+            .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId })
+            .getCount(),
+        }
+      : {
+          rectorado: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Rectorado%' })
+            .getCount(),
+          secretarias: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
+            .getCount(),
+          estudiantes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
+            .getCount(),
+          docentes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Docente%' })
+            .getCount(),
+        };
 
     return {
       data,

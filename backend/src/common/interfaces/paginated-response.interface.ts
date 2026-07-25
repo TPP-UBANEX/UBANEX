@@ -9,7 +9,7 @@ export interface PaginatedResponse<T> {
   data: T[];
   meta: PaginationMeta;
   stats?: {
-    rectorado: number;
+    rectorado?: number;
     secretarias: number;
     estudiantes: number;
     docentes: number;
