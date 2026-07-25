@@ -30,8 +30,6 @@ export class UsuariosController {
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
-    RolUsuario.Estudiante,
-    RolUsuario.Docente,
   )
   listar(@Query() dto: PaginationDto, @CurrentUser() usuario: Usuario) {
     return this.service.listar(dto, usuario);

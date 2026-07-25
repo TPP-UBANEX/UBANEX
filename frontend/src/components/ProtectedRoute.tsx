@@ -1,9 +1,16 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { Skeleton } from '@/components/ui/skeleton'
+import { RolUsuario } from '@/data/types'
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth()
+export function ProtectedRoute({
+  children,
+  roles,
+}: {
+  children: React.ReactNode
+  roles?: RolUsuario[]
+}) {
+  const { isAuthenticated, isLoading, user } = useAuth()
 
   if (isLoading) {
     return (
@@ -18,6 +25,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (roles && !user?.roles.some(r => roles.includes(r))) {
+    return <Navigate to="/" replace />
   }
 
   return <>{children}</>

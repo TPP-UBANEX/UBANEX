@@ -16,6 +16,14 @@ import { Evaluacion } from '@/pages/Evaluacion'
 import { Usuarios } from '@/pages/Usuarios'
 import { UsuarioDetail } from '@/pages/UsuarioDetail'
 import { ValidacionDocente } from '@/pages/ValidacionDocente'
+import { RolUsuario } from '@/data/types'
+
+const ROLES_GESTION = [
+  RolUsuario.AutoridadDeRectorado,
+  RolUsuario.AsistenteDeRectorado,
+  RolUsuario.AutoridadDeSecretaria,
+  RolUsuario.AsistenteDeSecretaria,
+]
 
 function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -54,8 +62,8 @@ function App() {
                   <Route path="/proyectos" element={<Proyectos />} />
                   <Route path="/proyectos/:id" element={<ProyectoDetail />} />
                   <Route path="/evaluacion" element={<Evaluacion />} />
-                  <Route path="/usuarios" element={<Usuarios />} />
-                  <Route path="/usuarios/:id" element={<UsuarioDetail />} />
+                  <Route path="/usuarios" element={<ProtectedRoute roles={ROLES_GESTION}><Usuarios /></ProtectedRoute>} />
+                  <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION}><UsuarioDetail /></ProtectedRoute>} />
                   <Route path="/validacion-docente" element={<ValidacionDocente />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
