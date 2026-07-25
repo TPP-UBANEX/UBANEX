@@ -139,20 +139,35 @@ export class UsuariosService {
 
     const [data, total] = await query.getManyAndCount();
 
-    const stats = {
-      rectorado: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Rectorado%' })
-        .getCount(),
-      secretarias: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
-        .getCount(),
-      estudiantes: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
-        .getCount(),
-      docentes: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Docente%' })
-        .getCount(),
-    };
+    const stats = esSecretaria
+      ? {
+          secretarias: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
+            .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId })
+            .getCount(),
+          estudiantes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
+            .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId })
+            .getCount(),
+          docentes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Docente%' })
+            .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId })
+            .getCount(),
+        }
+      : {
+          rectorado: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Rectorado%' })
+            .getCount(),
+          secretarias: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
+            .getCount(),
+          estudiantes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
+            .getCount(),
+          docentes: await this.repo.createQueryBuilder('u')
+            .where('u.roles LIKE :rol', { rol: '%Docente%' })
+            .getCount(),
+        };
 
     return {
       data,
@@ -216,7 +231,17 @@ export class UsuariosService {
       if (dto.roles) validarGruposRoles(dto.roles);
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
-      if (dto.roles !== undefined) { entity.roles = dto.roles; huboCambioRol = true; }
+      if (dto.roles !== undefined) {
+        entity.roles = dto.roles;
+        huboCambioRol = true;
+        if (
+          dto.roles.includes(RolUsuario.Docente) &&
+          !rolesAnteriores.includes(RolUsuario.Docente) &&
+          !entity.estadoValidacionDocente
+        ) {
+          entity.estadoValidacionDocente = EstadoValidacionDocente.PendienteDeValidacion;
+        }
+      }
       if (dto.unidadAcademicaId !== undefined) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         entity.unidadAcademica = null as any;
@@ -263,6 +288,13 @@ export class UsuariosService {
         validarGruposRoles(nuevosRoles);
         entity.roles = nuevosRoles;
         huboCambioRol = true;
+        if (
+          nuevosRoles.includes(RolUsuario.Docente) &&
+          !rolesAnteriores.includes(RolUsuario.Docente) &&
+          !entity.estadoValidacionDocente
+        ) {
+          entity.estadoValidacionDocente = EstadoValidacionDocente.PendienteDeValidacion;
+        }
       }
       if (dto.habilitado !== undefined) {
         const gestionRoles = [
@@ -309,6 +341,13 @@ export class UsuariosService {
     const estadoAnterior = entity.estadoValidacionDocente;
     entity.estadoValidacionDocente = dto.estadoValidacionDocente;
     const saved = await this.repo.save(entity);
+    if (
+      estadoAnterior !== dto.estadoValidacionDocente &&
+      (dto.estadoValidacionDocente === EstadoValidacionDocente.Validado ||
+        dto.estadoValidacionDocente === EstadoValidacionDocente.Rechazado)
+    ) {
+      await this.mail.enviarEstadoValidacionDocente(entity.email, entity.nombreCompleto, dto.estadoValidacionDocente);
+    }
     if (usuarioLogueado) {
       await this.auditoria.registrar({
         usuarioId: id, accion: TipoAccionAuditoria.VALIDACION_DOCENTE,

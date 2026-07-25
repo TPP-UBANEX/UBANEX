@@ -65,7 +65,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </Button>
       </div>
       <nav className="flex-1 p-2 space-y-1">
-        {menuItems.map((item) => (
+        {menuItems
+          .filter(item => item.id !== '/usuarios' || esGestion)
+          .map((item) => (
           <Button
             key={item.id}
             variant={location.pathname === item.id || location.pathname.startsWith(item.id + '/') ? 'secondary' : 'ghost'}

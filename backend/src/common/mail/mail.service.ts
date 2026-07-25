@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as sgMail from '@sendgrid/mail';
+import { EstadoValidacionDocente } from '../enums/estado-validacion-docente.enum';
 
 @Injectable()
 export class MailService {
@@ -25,6 +26,32 @@ export class MailService {
             ${password}
           </div>
           <p style="color: #666; font-size: 13px;">Te recomendamos cambiarla luego de iniciar sesión.</p>
+          <hr style="border: none; border-top: 1px solid #e4e4e7;" />
+          <p style="color: #999; font-size: 12px;">Sistema de Gestión UBANEX</p>
+        </div>
+      `,
+    });
+  }
+
+  async enviarEstadoValidacionDocente(destino: string, nombre: string, estado: EstadoValidacionDocente): Promise<void> {
+    const from = this.config.get<string>('SMTP_FROM') || 'UBANEX <noreplyubanex@gmail.com>';
+    const aprobado = estado === EstadoValidacionDocente.Validado;
+    const subject = aprobado
+      ? 'UBANEX — Tu cuenta de docente fue validada'
+      : 'UBANEX — Tu cuenta de docente fue rechazada';
+    const mensaje = aprobado
+      ? 'Tu cuenta como docente fue validada. Ya podés iniciar sesión y utilizar el sistema.'
+      : 'Tu cuenta como docente fue rechazada. Si creés que se trata de un error, comunicate con la secretaría de tu unidad académica.';
+
+    await sgMail.send({
+      from,
+      to: destino,
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #1a1a2e;">UBANEX</h2>
+          <p>Hola <strong>${nombre}</strong>,</p>
+          <p>${mensaje}</p>
           <hr style="border: none; border-top: 1px solid #e4e4e7;" />
           <p style="color: #999; font-size: 12px;">Sistema de Gestión UBANEX</p>
         </div>

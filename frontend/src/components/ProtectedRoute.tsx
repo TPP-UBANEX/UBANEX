@@ -1,9 +1,19 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { Skeleton } from '@/components/ui/skeleton'
+import { RolUsuario } from '@/data/types'
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth()
+export function ProtectedRoute({
+  children,
+  roles,
+  allowOwnId,
+}: {
+  children: React.ReactNode
+  roles?: RolUsuario[]
+  allowOwnId?: boolean
+}) {
+  const { isAuthenticated, isLoading, user } = useAuth()
+  const params = useParams()
 
   if (isLoading) {
     return (
@@ -18,6 +28,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (roles && !user?.roles.some(r => roles.includes(r))) {
+    const esPropio = allowOwnId && params.id === user?.id
+    if (!esPropio) {
+      return <Navigate to="/" replace />
+    }
   }
 
   return <>{children}</>
