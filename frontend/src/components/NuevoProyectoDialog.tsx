@@ -17,9 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
-import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Usuario, Presupuesto, ViaticoPresupuesto, BienPresupuesto } from '@/data/types'
-import { EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario } from '@/data/types'
+import type { Convocatoria, Presupuesto, ViaticoPresupuesto, BienPresupuesto } from '@/data/types'
+import { EstadoConvocatoria, TipoRubro, TipoPersona } from '@/data/types'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -32,22 +31,23 @@ const tipoRubroLabels: Record<TipoRubro, string> = {
 export function NuevoProyectoDialog({
   onCreated,
   trigger,
+  convocatoriaId: convocatoriaFija,
+  convocatoriaNombre,
 }: {
   onCreated: () => void
   trigger: React.ReactNode
+  convocatoriaId?: string
+  convocatoriaNombre?: string
 }) {
-  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const [nombre, setNombre] = useState('')
   const [convocatoriaId, setConvocatoriaId] = useState('')
-  const [codirectorId, setCodirectorId] = useState('')
   const [anioEdicion, setAnioEdicion] = useState<number | null>(new Date().getFullYear())
 
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
-  const [directores, setDirectores] = useState<Usuario[]>([])
 
   const [presupuesto, setPresupuesto] = useState<Presupuesto>({
     montoTotal: 0,
@@ -60,16 +60,15 @@ export function NuevoProyectoDialog({
 
   useEffect(() => {
     if (!open) return
-    Promise.all([
-      api.convocatorias.list(),
-      user?.unidadAcademicaId
-        ? api.usuarios.list({ rol: RolUsuario.DirectorDeProyecto, unidadAcademicaId: user.unidadAcademicaId, limit: 50 })
-        : Promise.resolve({ data: [] }),
-    ]).then(([convs, usersResp]) => {
+    if (convocatoriaFija) {
+      setConvocatoriaId(convocatoriaFija)
+      setConvocatorias([])
+      return
+    }
+    api.convocatorias.list().then(convs => {
       setConvocatorias(convs.filter(c => c.estado === EstadoConvocatoria.Presentacion))
-      setDirectores(usersResp.data)
     })
-  }, [open, user?.id, user?.unidadAcademicaId])
+  }, [open, convocatoriaFija])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,7 +86,6 @@ export function NuevoProyectoDialog({
       await api.proyectos.crear({
         nombre,
         convocatoriaId,
-        codirectorId: codirectorId || undefined,
         anioEdicion: anioEdicion ?? undefined,
         presupuesto: presupuesto.rubros.some(r => r.partidas.length > 0) ? presupuesto : undefined,
       })
@@ -104,8 +102,7 @@ export function NuevoProyectoDialog({
 
   const resetForm = () => {
     setNombre('')
-    setConvocatoriaId('')
-    setCodirectorId('')
+    if (!convocatoriaFija) setConvocatoriaId('')
     setAnioEdicion(new Date().getFullYear())
     setPresupuesto({
       montoTotal: 0,
@@ -210,27 +207,18 @@ export function NuevoProyectoDialog({
 
             <div className="space-y-2">
               <p className="text-sm font-medium">Convocatoria</p>
-              <Select value={convocatoriaId} onValueChange={setConvocatoriaId}>
-                <SelectTrigger><SelectValue placeholder="Seleccioná una convocatoria" /></SelectTrigger>
-                <SelectContent>
-                  {convocatorias.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Codirector (opcional)</p>
-              <Select value={codirectorId} onValueChange={setCodirectorId}>
-                <SelectTrigger><SelectValue placeholder="Seleccioná un codirector" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin codirector</SelectItem>
-                  {directores.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.nombreCompleto}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {convocatoriaFija ? (
+                <Input value={convocatoriaNombre ?? ''} disabled className="bg-muted" />
+              ) : (
+                <Select value={convocatoriaId} onValueChange={setConvocatoriaId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccioná una convocatoria" /></SelectTrigger>
+                  <SelectContent>
+                    {convocatorias.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">

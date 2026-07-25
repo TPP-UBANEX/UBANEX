@@ -4,7 +4,7 @@ import {
 import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
-import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dto';
+import { ActualizarEstadoValidacionDocenteDto } from './dto/actualizar-estado-validacion-docente.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -19,7 +19,7 @@ export class UsuariosController {
   constructor(private readonly service: UsuariosService) {}
 
   @Post()
-  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria)
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
   crear(@Body() dto: CrearUsuarioDto, @CurrentUser() usuario: Usuario) {
     return this.service.crear(dto, usuario);
   }
@@ -30,8 +30,8 @@ export class UsuariosController {
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
-    RolUsuario.DirectorDeProyecto,
-    RolUsuario.Evaluador,
+    RolUsuario.Estudiante,
+    RolUsuario.Docente,
   )
   listar(@Query() dto: PaginationDto, @CurrentUser() usuario: Usuario) {
     return this.service.listar(dto, usuario);
@@ -51,14 +51,14 @@ export class UsuariosController {
     return this.service.actualizar(id, dto, usuario);
   }
 
-  @Patch(':id/estado-director')
-  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AutoridadDeRectorado)
-  actualizarEstadoDirector(
+  @Patch(':id/estado-validacion-docente')
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado)
+  actualizarEstadoValidacionDocente(
     @Param('id') id: string,
-    @Body() dto: ActualizarEstadoDirectorDto,
+    @Body() dto: ActualizarEstadoValidacionDocenteDto,
     @CurrentUser() usuario: Usuario,
   ) {
-    return this.service.actualizarEstadoDirector(id, dto, usuario);
+    return this.service.actualizarEstadoValidacionDocente(id, dto, usuario);
   }
 
   @Post(':id/reset-password')
@@ -66,6 +66,7 @@ export class UsuariosController {
     RolUsuario.AutoridadDeRectorado,
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
+    RolUsuario.AsistenteDeSecretaria,
   )
   resetPassword(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
     return this.service.resetPassword(id, usuario);

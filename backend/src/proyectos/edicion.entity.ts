@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn,
-  CreateDateColumn, UpdateDateColumn,
+  CreateDateColumn, UpdateDateColumn, DeleteDateColumn,
 } from 'typeorm';
 import { Proyecto } from './proyecto.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
@@ -31,18 +31,11 @@ export class Edicion {
   estado: EstadoEdicion;
 
   @ManyToOne(() => Usuario)
-  @JoinColumn({ name: 'directorId' })
-  director: Usuario;
+  @JoinColumn({ name: 'creadoPorId' })
+  creadoPor: Usuario;
 
   @Column()
-  directorId: string;
-
-  @ManyToOne(() => Usuario, { nullable: true })
-  @JoinColumn({ name: 'codirectorId' })
-  codirector: Usuario | null;
-
-  @Column({ nullable: true })
-  codirectorId: string | null;
+  creadoPorId: string;
 
   @ManyToOne(() => UnidadAcademica)
   @JoinColumn({ name: 'unidadAcademicaId' })
@@ -65,4 +58,7 @@ export class Edicion {
 
   @UpdateDateColumn()
   actualizadoEn: Date;
+
+  @DeleteDateColumn()
+  eliminadoEn: Date | null;
 }

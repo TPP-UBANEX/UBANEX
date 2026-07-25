@@ -28,7 +28,7 @@ const accionLabels: Record<string, string> = {
   [TipoAccionAuditoria.INACTIVACION]: 'Inactivación',
   [TipoAccionAuditoria.REACTIVACION]: 'Reactivación',
   [TipoAccionAuditoria.RESET_PASSWORD]: 'Reset contraseña',
-  [TipoAccionAuditoria.VALIDACION_DIRECTOR]: 'Validación director',
+  [TipoAccionAuditoria.VALIDACION_DOCENTE]: 'Validación docente',
 }
 
 function accionColor(accion: string): string {
@@ -37,7 +37,7 @@ function accionColor(accion: string): string {
     case TipoAccionAuditoria.EDICION: return 'text-blue-600 bg-blue-50 dark:bg-blue-950'
     case TipoAccionAuditoria.CAMBIO_ROL: return 'text-amber-600 bg-amber-50 dark:bg-amber-950'
     case TipoAccionAuditoria.INACTIVACION: return 'text-destructive bg-destructive/10'
-    case TipoAccionAuditoria.VALIDACION_DIRECTOR: return 'text-purple-600 bg-purple-50 dark:bg-purple-950'
+    case TipoAccionAuditoria.VALIDACION_DOCENTE: return 'text-purple-600 bg-purple-50 dark:bg-purple-950'
     default: return ''
   }
 }

@@ -11,7 +11,7 @@ interface AuthState {
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>
-  register: (nombreCompleto: string, email: string, password: string, unidadAcademicaId?: string) => Promise<void>
+  register: (nombreCompleto: string, email: string, password: string, tipo: 'estudiante' | 'docente', unidadAcademicaId?: string) => Promise<void>
   logout: () => void
 }
 
@@ -54,9 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(async (
-    nombreCompleto: string, email: string, password: string, unidadAcademicaId?: string,
+    nombreCompleto: string, email: string, password: string, tipo: 'estudiante' | 'docente', unidadAcademicaId?: string,
   ) => {
-    const { accessToken } = await api.auth.register({ nombreCompleto, email, password, unidadAcademicaId })
+    const { accessToken } = await api.auth.register({ nombreCompleto, email, password, tipo, unidadAcademicaId })
     localStorage.setItem('token', accessToken)
     const payload = JSON.parse(atob(accessToken.split('.')[1]))
     const user = await api.usuarios.get(payload.sub)

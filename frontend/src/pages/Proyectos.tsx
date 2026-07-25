@@ -21,11 +21,9 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
-import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
-import { Search, Plus } from 'lucide-react'
+import { estadoBadge, EstadoEdicion } from '@/data/types'
+import { Search } from 'lucide-react'
 
 const pipelineColumns = [
   { key: EstadoEdicion.Borrador, label: 'Borrador' },
@@ -39,7 +37,6 @@ const pipelineColumns = [
 
 export function Proyectos() {
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const esRevision = searchParams.get('revision') === 'true'
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
@@ -50,8 +47,6 @@ export function Proyectos() {
   const [filtroAnio, setFiltroAnio] = useState('todas')
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
   const [loading, setLoading] = useState(true)
-
-  const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
 
   const cargarDatos = () => {
     setLoading(true)
@@ -98,14 +93,6 @@ export function Proyectos() {
         <div className="flex items-center gap-2">
           <Button variant={vista === 'tabla' ? 'default' : 'outline'} size="sm" onClick={() => setVista('tabla')}>Tabla</Button>
           <Button variant={vista === 'kanban' ? 'default' : 'outline'} size="sm" onClick={() => setVista('kanban')}>Kanban</Button>
-          {esDirector && (
-            <NuevoProyectoDialog
-              onCreated={cargarDatos}
-              trigger={
-                <Button><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
-              }
-            />
-          )}
         </div>
       </div>
 
@@ -162,7 +149,7 @@ export function Proyectos() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Proyecto</TableHead>
-                    <TableHead>Director</TableHead>
+                    <TableHead>Creado por</TableHead>
                     <TableHead>Facultad</TableHead>
                     <TableHead>Etapa</TableHead>
                     <TableHead>Presupuesto</TableHead>
@@ -173,7 +160,7 @@ export function Proyectos() {
                   {filtrados.map(e => (
                     <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
                       <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
@@ -209,7 +196,7 @@ export function Proyectos() {
                     <Card key={e.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
-                        <p className="text-xs text-muted-foreground">{e.director?.nombreCompleto || '-'}</p>
+                        <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
                         {e.presupuesto && <Badge variant="outline" className="text-xs">${e.presupuesto.montoTotal.toLocaleString()}</Badge>}
                       </CardContent>
                     </Card>

@@ -11,11 +11,17 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, EstadoEdicion, EstadoConvocatoria } from '@/data/types'
+import { estadoBadge, EstadoEdicion, EstadoConvocatoria, RolUsuario } from '@/data/types'
 import { FileText, Users, DollarSign, ClipboardCheck } from 'lucide-react'
 
 export function Dashboard() {
+  const { user } = useAuth()
+  const esGestion = user?.roles.some(r =>
+    [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado,
+     RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+  )
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +81,7 @@ export function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {convocatorias.filter(c => c.estado === EstadoConvocatoria.Presentacion || c.estado === EstadoConvocatoria.Configuracion).map(c => (
+                  {convocatorias.filter(c => c.estado === EstadoConvocatoria.Presentacion || (c.estado === EstadoConvocatoria.Configuracion && esGestion)).map(c => (
                     <TableRow key={c.id}>
                       <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
                       <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
@@ -99,7 +105,7 @@ export function Dashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Título</TableHead>
-                    <TableHead>Director</TableHead>
+                    <TableHead>Creado por</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -107,7 +113,7 @@ export function Dashboard() {
                   {ediciones.slice(0, 5).map(e => (
                     <TableRow key={e.id}>
                       <TableCell className="text-sm">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
                     </TableRow>
                   ))}

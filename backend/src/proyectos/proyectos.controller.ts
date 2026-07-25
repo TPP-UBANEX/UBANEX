@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Param, Query, Body,
+  Controller, Get, Post, Patch, Delete, Param, Query, Body,
   UseGuards,
 } from '@nestjs/common';
 import { ProyectosService } from './proyectos.service';
@@ -18,7 +18,7 @@ export class ProyectosController {
   constructor(private readonly service: ProyectosService) {}
 
   @Post()
-  @Roles(RolUsuario.DirectorDeProyecto)
+  @Roles(RolUsuario.Estudiante, RolUsuario.Docente)
   crear(@Body() dto: CrearProyectoDto, @CurrentUser() usuario: Usuario) {
     return this.service.crearProyecto(dto, usuario);
   }
@@ -53,5 +53,14 @@ export class ProyectosController {
     @CurrentUser() usuario: Usuario,
   ) {
     return this.service.enviarEdicion(id, edicionId, usuario);
+  }
+
+  @Delete(':id/ediciones/:edicionId')
+  eliminarEdicion(
+    @Param('id') id: string,
+    @Param('edicionId') edicionId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.eliminarEdicion(id, edicionId, usuario);
   }
 }

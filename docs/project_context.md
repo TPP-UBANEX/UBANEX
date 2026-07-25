@@ -180,8 +180,8 @@ Gestionar el ciclo completo de las convocatorias y la presentación de proyectos
 - Cada edición pertenece a una **Unidad Académica** (la facultad de su director).
 - Estados de una edición: `Borrador → Presentado → PendienteDeCambios → EnEvaluación → Adjudicado | NoAdjudicado → EnEjecución → Cerrado`.
 - `NoAdjudicado` es terminal.
-- Cada edición tiene un **director** (obligatorio) y un **codirector** (opcional), ambos con rol DirectorDeProyecto.
-- Un director puede participar en máximo **2 proyectos por convocatoria** (1 como director + 1 como codirector).
+- Cada edición tiene **directores** asignados a través de `ParticipacionConvocatoria` con rol `DirectorDeProyecto`. Un director principal (`esDirectorPrincipal = true`) es obligatorio; un segundo director es opcional.
+- Un usuario puede participar como director en máximo **2 proyectos por convocatoria**.
 
 ---
 
@@ -356,7 +356,7 @@ Los roles se dividen en dos **grupos excluyentes** — un usuario no puede mezcl
 | Grupo | Roles |
 |---|---|
 | **Gestión** | AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria |
-| **Ejecución** | DirectorDeProyecto, Evaluador |
+| **Ejecución** | Estudiante, Docente |
 
 Un usuario puede acumular múltiples roles a lo largo del tiempo (ej: fue Director en una convocatoria y luego Evaluador en otra), pero todos deben pertenecer al mismo grupo.
 
@@ -385,43 +385,72 @@ Puede realizar muchas de las funciones de las Autoridades, pero **no puede dar c
 Funciones:
 * Validar proyectos de su UA.
 * Realizar y **confirmar** evaluaciones institucionales.
-* Crear Evaluadores de su UA.
+* Asignar Evaluadores a una convocatoria (sobre usuarios existentes con rol Docente).
 * Crear Asistentes de Secretaría de su UA.
-* Validar la habilitación de Directores de Proyecto de su UA.
+* Validar Docentes de su UA.
 
 #### Asistente de Secretaría (0 a N por UA)
 
-Puede realizar muchas de las funciones de las Autoridades de Secretaría (incluyendo completar evaluaciones institucionales), pero **no puede confirmar** evaluaciones, validar directores ni crear usuarios.
+Puede realizar muchas de las funciones de las Autoridades de Secretaría (incluyendo completar evaluaciones institucionales), pero **no puede confirmar** evaluaciones, validar docentes ni crear usuarios.
 
 ---
 
-### Director de Proyecto (0 a N)
+### Docente (0 a N)
 
 Funciones:
 * Crear proyectos y ediciones.
 * Editarlos y adjuntar documentación.
 * Responder observaciones.
 * Gestionar rendiciones.
+* Puede ser asignado como `DirectorDeProyecto` o `Evaluador` en una convocatoria específica.
 
 Registro y validación:
-* Se registra por sí mismo en la aplicación.
+* Se registra por sí mismo en la aplicación indicando su Unidad Académica.
 * Requiere **validación** por una Autoridad de Secretaría de su UA.
 * Estados: `PendienteDeValidación → Validado | Rechazado`.
 
 Restricción:
-* Máximo 2 participaciones por convocatoria (1 como director + 1 como codirector).
+* Máximo 2 participaciones como director por convocatoria.
 
 ---
 
-### Evaluador (0 a N por UA)
+### Estudiante (0 a N)
 
 Funciones:
-* Evaluar proyectos (propios y ajenos de la UA emparejada).
-* Asignar puntajes.
-* Emitir observaciones.
+* Visualizar proyectos en los que participa.
 
 Registro:
-* Es creado por una **Autoridad de Secretaría** de su UA (no se registra solo).
+* Se registra por sí mismo en la aplicación.
+* No requiere validación.
+* No puede ser asignado a roles de ejecución (`DirectorDeProyecto` o `Evaluador`).
+
+---
+
+### Director de Proyecto (rol de ejecución por convocatoria)
+
+El usuario debe tener rol `Docente` y estar validado. Una Autoridad de Secretaría lo asigna como `DirectorDeProyecto` en una convocatoria específica mediante `ParticipacionConvocatoria`.
+
+Funciones:
+* Crear proyectos y ediciones (heredado de Docente).
+* Editar proyectos y adjuntar documentación.
+* Responder observaciones.
+* Gestionar rendiciones.
+* Registrar hitos de ejecución.
+* Completar autoevaluación de impacto e informe final.
+
+Restricción:
+* Máximo 2 participaciones como director por convocatoria.
+
+---
+
+### Evaluador (rol de ejecución por convocatoria)
+
+El usuario debe tener rol `Docente` y estar validado. Una **Autoridad de Secretaría** lo asigna como `Evaluador` en una convocatoria específica mediante `ParticipacionConvocatoria`.
+
+Funciones:
+* Evaluar proyectos de su UA y de la UA emparejada.
+* Asignar puntajes.
+* Emitir observaciones.
 
 Restricciones:
 * No puede tener conflicto de interés.
@@ -618,6 +647,8 @@ Características:
 * Completar evaluaciones institucionales (sin confirmar).
 
 ---
+
+> Los roles de **Director de Proyecto** y **Evaluador** son roles de ejecución asignados por convocatoria sobre usuarios con rol `Docente` validado. Ver §5 para detalle.
 
 ## Director de Proyecto
 
@@ -825,13 +856,25 @@ Duración:
 Proyecto definido.
 Relevamiento avanzado.
 Documento de propuesta prácticamente terminado.
-Modelo de dominio completo en `docs/dominio/modelo.md` (diagramas Mermaid: Convocatoria, Proyecto y Edición, Evaluación, Usuarios y Roles).
-Próximos artefactos:
+Modelo de dominio implementado en código.
 
-* Product Vision.
-* User Story Mapping (borrador inicial en esta sección).
-* WBS.
-* Wireframes.
-* Backlog.
-* Implementación de entidades del modelo de dominio.
-* Presentación de defensa.
+## Implementado
+
+* Sistema de autenticación (registro como Estudiante/Docente, login JWT).
+* Roles del sistema: 6 roles (Autoridad/Asistente de Rectorado, Autoridad/Asistente de Secretaría, Estudiante, Docente).
+* Roles de ejecución por convocatoria: DirectorDeProyecto y Evaluador mediante `ParticipacionConvocatoria`.
+* CRUD de usuarios con paginación, filtros y validación de docentes.
+* CRUD de convocatorias con fechas por etapa y formularios dinámicos.
+* CRUD de proyectos y ediciones con presupuesto (3 rubros).
+* Evaluaciones con puntajes y observaciones.
+* Rendiciones con comprobantes.
+* Emparejamiento de unidades académicas por convocatoria.
+* Auditoría de acciones de usuario.
+
+## Próximos artefactos
+
+* Hitos de ejecución.
+* Autoevaluación de impacto.
+* Informe final.
+* Orden de mérito y adjudicación.
+* Wireframes y presentación de defensa.

@@ -19,6 +19,10 @@ services:
   backend:
     build:
       context: ./backend
+    # Sincroniza node_modules con package.json en cada arranque: evita errores de
+    # dependencias faltantes despues de un git pull (el volumen anonimo de
+    # node_modules sobrevive a los rebuilds de la imagen).
+    command: sh -c "npm install && npm run start:dev"
     ports:
       - "3000:3000"
     environment:
@@ -34,6 +38,8 @@ services:
   frontend:
     build:
       context: ./frontend
+    # Ver comentario en backend: npm install en runtime, no solo en build time.
+    command: sh -c "npm install && npm run dev -- --host"
     ports:
       - "5173:5173"
     environment:

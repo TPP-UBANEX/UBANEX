@@ -40,15 +40,15 @@ const rolLabels: Record<string, string> = {
   [RolUsuario.AsistenteDeRectorado]: 'Asistente Rectorado',
   [RolUsuario.AutoridadDeSecretaria]: 'Autoridad Secretaría',
   [RolUsuario.AsistenteDeSecretaria]: 'Asistente Secretaría',
-  [RolUsuario.DirectorDeProyecto]: 'Director',
-  [RolUsuario.Evaluador]: 'Evaluador',
+  [RolUsuario.Estudiante]: 'Estudiante',
+  [RolUsuario.Docente]: 'Docente',
 }
 
 function rolColor(rol: string): string {
   if (rol.includes('Rectorado')) return 'text-blue-600'
   if (rol.includes('Secretaria')) return 'text-green-600'
-  if (rol === RolUsuario.Evaluador) return 'text-amber-600'
-  return 'text-purple-600'
+  if (rol === RolUsuario.Docente) return 'text-purple-600'
+  return 'text-amber-600'
 }
 
 const rolesDisponibles: Record<string, RolUsuario[]> = {
@@ -56,11 +56,13 @@ const rolesDisponibles: Record<string, RolUsuario[]> = {
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
+    RolUsuario.Docente,
+    RolUsuario.Estudiante,
   ],
   [RolUsuario.AutoridadDeSecretaria]: [
     RolUsuario.AsistenteDeSecretaria,
-    RolUsuario.DirectorDeProyecto,
-    RolUsuario.Evaluador,
+    RolUsuario.Docente,
+    RolUsuario.Estudiante,
   ],
 }
 
@@ -121,13 +123,13 @@ export function Usuarios() {
   const stats = response?.stats ? [
     { label: 'Rectorado', value: response.stats.rectorado, color: 'text-blue-600' },
     { label: 'Secretarías', value: response.stats.secretarias, color: 'text-green-600' },
-    { label: 'Evaluadores', value: response.stats.evaluadores, color: 'text-amber-600' },
-    { label: 'Directores', value: response.stats.directores, color: 'text-purple-600' },
+    { label: 'Estudiantes', value: response.stats.estudiantes, color: 'text-amber-600' },
+    { label: 'Docentes', value: response.stats.docentes, color: 'text-purple-600' },
   ] : [
     { label: 'Rectorado', value: '\u2014', color: 'text-muted-foreground' },
     { label: 'Secretarías', value: '\u2014', color: 'text-muted-foreground' },
-    { label: 'Evaluadores', value: '\u2014', color: 'text-muted-foreground' },
-    { label: 'Directores', value: '\u2014', color: 'text-muted-foreground' },
+    { label: 'Estudiantes', value: '\u2014', color: 'text-muted-foreground' },
+    { label: 'Docentes', value: '\u2014', color: 'text-muted-foreground' },
   ]
 
   const usuarios = (response?.data ?? []).filter(u => u.id !== user?.id)
@@ -184,8 +186,8 @@ export function Usuarios() {
             <SelectItem value={RolUsuario.AsistenteDeRectorado}>Asistente Rectorado</SelectItem>
             <SelectItem value={RolUsuario.AutoridadDeSecretaria}>Autoridad Secretaría</SelectItem>
             <SelectItem value={RolUsuario.AsistenteDeSecretaria}>Asistente Secretaría</SelectItem>
-            <SelectItem value={RolUsuario.Evaluador}>Evaluador</SelectItem>
-            <SelectItem value={RolUsuario.DirectorDeProyecto}>Director</SelectItem>
+            <SelectItem value={RolUsuario.Estudiante}>Estudiante</SelectItem>
+            <SelectItem value={RolUsuario.Docente}>Docente</SelectItem>
           </SelectContent>
         </Select>
         {esRectorado && (

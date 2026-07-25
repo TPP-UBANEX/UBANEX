@@ -17,8 +17,8 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import { UsuarioHistorial } from '@/components/UsuarioHistorial'
-import type { Usuario, UnidadAcademica } from '@/data/types'
-import { RolUsuario, EstadoDirector } from '@/data/types'
+import type { Usuario, UnidadAcademica, ParticipacionConvocatoria } from '@/data/types'
+import { RolUsuario, RolEjecucion, EstadoValidacionDocente } from '@/data/types'
 import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -27,29 +27,29 @@ const rolLabels: Record<string, string> = {
   [RolUsuario.AsistenteDeRectorado]: 'Asistente Rectorado',
   [RolUsuario.AutoridadDeSecretaria]: 'Autoridad Secretaría',
   [RolUsuario.AsistenteDeSecretaria]: 'Asistente Secretaría',
-  [RolUsuario.DirectorDeProyecto]: 'Director',
-  [RolUsuario.Evaluador]: 'Evaluador',
+  [RolUsuario.Estudiante]: 'Estudiante',
+  [RolUsuario.Docente]: 'Docente',
 }
 
 function rolColor(rol: string): string {
   if (rol.includes('Rectorado')) return 'text-blue-600 bg-blue-50 dark:bg-blue-950'
   if (rol.includes('Secretaria')) return 'text-green-600 bg-green-50 dark:bg-green-950'
-  if (rol === RolUsuario.Evaluador) return 'text-amber-600 bg-amber-50 dark:bg-amber-950'
-  return 'text-purple-600 bg-purple-50 dark:bg-purple-950'
+  if (rol === RolUsuario.Docente) return 'text-purple-600 bg-purple-50 dark:bg-purple-950'
+  return 'text-amber-600 bg-amber-50 dark:bg-amber-950'
 }
 
-function estadoDirectorColor(estado: EstadoDirector | null | undefined): string {
+function estadoValidacionDocenteColor(estado: EstadoValidacionDocente | null | undefined): string {
   switch (estado) {
-    case EstadoDirector.Validado: return 'text-green-600 bg-green-50 dark:bg-green-950'
-    case EstadoDirector.Rechazado: return 'text-destructive bg-destructive/10'
+    case EstadoValidacionDocente.Validado: return 'text-green-600 bg-green-50 dark:bg-green-950'
+    case EstadoValidacionDocente.Rechazado: return 'text-destructive bg-destructive/10'
     default: return 'text-amber-600 bg-amber-50 dark:bg-amber-950'
   }
 }
 
-function estadoDirectorLabel(estado: EstadoDirector | null | undefined): string {
+function estadoValidacionDocenteLabel(estado: EstadoValidacionDocente | null | undefined): string {
   switch (estado) {
-    case EstadoDirector.Validado: return 'Validado'
-    case EstadoDirector.Rechazado: return 'Rechazado'
+    case EstadoValidacionDocente.Validado: return 'Validado'
+    case EstadoValidacionDocente.Rechazado: return 'Rechazado'
     default: return 'Pendiente de validación'
   }
 }
@@ -61,6 +61,7 @@ export function UsuarioDetail() {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [uaList, setUaList] = useState<UnidadAcademica[]>([])
   const [loading, setLoading] = useState(true)
+  const [participaciones, setParticipaciones] = useState<ParticipacionConvocatoria[]>([])
   const [resetOpen, setResetOpen] = useState(false)
   const [resetSubmitting, setResetSubmitting] = useState(false)
   const [resetExito, setResetExito] = useState(false)
@@ -68,7 +69,7 @@ export function UsuarioDetail() {
   const [disableSubmitting, setDisableSubmitting] = useState(false)
   const [validarOpen, setValidarOpen] = useState(false)
   const [validarSubmitting, setValidarSubmitting] = useState(false)
-  const [validarAccion, setValidarAccion] = useState<EstadoDirector | null>(null)
+  const [validarAccion, setValidarAccion] = useState<EstadoValidacionDocente | null>(null)
 
   const cargarDatos = useCallback(async () => {
     if (!id) return
@@ -80,11 +81,14 @@ export function UsuarioDetail() {
       ])
       setUsuario(u)
       setUaList(uas)
+      if (user?.id === id) {
+        api.participaciones.listarMias().then(setParticipaciones).catch(() => {})
+      }
       setLoading(false)
     } catch {
       navigate('/usuarios')
     }
-  }, [id, navigate])
+  }, [id, navigate, user?.id])
 
   useEffect(() => {
     let cancel = false
@@ -125,8 +129,8 @@ export function UsuarioDetail() {
      user?.unidadAcademicaId === usuario.unidadAcademicaId &&
      !tieneRolGestion)
   )
-  const puedeValidarDirector = !esMiPerfil &&
-    usuario.roles.includes(RolUsuario.DirectorDeProyecto) &&
+  const puedeValidarDocente = !esMiPerfil &&
+    usuario.roles.includes(RolUsuario.Docente) &&
     (
       user?.roles.includes(RolUsuario.AutoridadDeRectorado) ||
       (user?.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
@@ -159,18 +163,18 @@ export function UsuarioDetail() {
     }
   }
 
-  const handleValidarDirector = async () => {
+  const handleValidarDocente = async () => {
     if (!validarAccion) return
     setValidarSubmitting(true)
     try {
-      await api.usuarios.actualizarEstadoDirector(usuario.id, validarAccion)
-      toast.success(validarAccion === EstadoDirector.Validado
-        ? 'Director validado correctamente'
-        : 'Director rechazado')
+      await api.usuarios.actualizarEstadoValidacionDocente(usuario.id, validarAccion)
+      toast.success(validarAccion === EstadoValidacionDocente.Validado
+        ? 'Docente validado correctamente'
+        : 'Docente rechazado')
       setValidarOpen(false)
       cargarDatos()
     } catch {
-      toast.error('Error al actualizar estado del director')
+      toast.error('Error al actualizar estado del docente')
     } finally {
       setValidarSubmitting(false)
     }
@@ -316,16 +320,16 @@ export function UsuarioDetail() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {validarAccion === EstadoDirector.Validado
+              {validarAccion === EstadoValidacionDocente.Validado
                 ? <CheckCircle2 className="h-5 w-5 text-green-600" />
                 : <AlertTriangle className="h-5 w-5 text-destructive" />
               }
-              {validarAccion === EstadoDirector.Validado ? 'Validar director' : 'Rechazar director'}
+              {validarAccion === EstadoValidacionDocente.Validado ? 'Validar docente' : 'Rechazar docente'}
             </DialogTitle>
             <DialogDescription>
-              {validarAccion === EstadoDirector.Validado
-                ? <>¿Estás seguro de validar a <strong>{usuario.nombreCompleto}</strong> como Director de Proyecto? Podrá participar en convocatorias.</>
-                : <>¿Estás seguro de rechazar a <strong>{usuario.nombreCompleto}</strong> como Director de Proyecto? No podrá participar hasta que sea validado.</>
+              {validarAccion === EstadoValidacionDocente.Validado
+                ? <>¿Estás seguro de validar a <strong>{usuario.nombreCompleto}</strong> como Docente? Podrá participar en convocatorias.</>
+                : <>¿Estás seguro de rechazar a <strong>{usuario.nombreCompleto}</strong> como Docente? No podrá participar hasta que sea validado.</>
               }
             </DialogDescription>
           </DialogHeader>
@@ -334,8 +338,8 @@ export function UsuarioDetail() {
               Cancelar
             </Button>
             <Button
-              variant={validarAccion === EstadoDirector.Validado ? 'default' : 'destructive'}
-              onClick={handleValidarDirector}
+              variant={validarAccion === EstadoValidacionDocente.Validado ? 'default' : 'destructive'}
+              onClick={handleValidarDocente}
               disabled={validarSubmitting}
             >
               {validarSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -369,6 +373,16 @@ export function UsuarioDetail() {
               <span className="text-muted-foreground">Creado por:</span>
               <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
             </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Tipo:</span>
+              <span>
+                {usuario.roles.includes(RolUsuario.Docente)
+                  ? 'Docente'
+                  : usuario.roles.includes(RolUsuario.Estudiante)
+                    ? 'Estudiante'
+                    : 'Gestión'}
+              </span>
+            </div>
             <Separator />
             <div>
               <p className="text-sm text-muted-foreground mb-2">Roles</p>
@@ -397,26 +411,26 @@ export function UsuarioDetail() {
                 {usuario.habilitado ? 'Habilitado' : 'Inhabilitado'}
               </Badge>
             </div>
-            {usuario.roles.includes(RolUsuario.DirectorDeProyecto) && (
+            {usuario.roles.includes(RolUsuario.Docente) && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Director:</span>
-                <Badge variant="outline" className={estadoDirectorColor(usuario.estadoDirector)}>
-                  {estadoDirectorLabel(usuario.estadoDirector)}
+                <span className="text-muted-foreground">Docente:</span>
+                <Badge variant="outline" className={estadoValidacionDocenteColor(usuario.estadoValidacionDocente)}>
+                  {estadoValidacionDocenteLabel(usuario.estadoValidacionDocente)}
                 </Badge>
-                {puedeValidarDirector && usuario.estadoDirector !== EstadoDirector.Validado && (
+                {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Validado && (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { setValidarAccion(EstadoDirector.Validado); setValidarOpen(true) }}
+                    onClick={() => { setValidarAccion(EstadoValidacionDocente.Validado); setValidarOpen(true) }}
                   >
                     Validar
                   </Button>
                 )}
-                {puedeValidarDirector && usuario.estadoDirector !== EstadoDirector.Rechazado && (
+                {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Rechazado && (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { setValidarAccion(EstadoDirector.Rechazado); setValidarOpen(true) }}
+                    onClick={() => { setValidarAccion(EstadoValidacionDocente.Rechazado); setValidarOpen(true) }}
                   >
                     Rechazar
                   </Button>
@@ -432,6 +446,31 @@ export function UsuarioDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {esMiPerfil && participaciones.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              Mis Participaciones
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {participaciones.map(p => (
+                <div key={p.id} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+                  <div>
+                    <span className="font-medium">{p.convocatoria?.nombre || '—'}</span>
+                    <span className="text-muted-foreground ml-2">
+                      {p.rol === RolEjecucion.DirectorDeProyecto ? 'Director' : 'Evaluador'}
+                      {p.esDirectorPrincipal ? ' (Principal)' : ''}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="pt-6">

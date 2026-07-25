@@ -11,12 +11,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, Usuario } from '@/data/types'
-import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario } from '@/data/types'
+import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -34,20 +43,40 @@ export function ProyectoDetail() {
   const [edicion, setEdicion] = useState<Edicion | null>(null)
   const [loading, setLoading] = useState(true)
   const [enviando, setEnviando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false)
 
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
-  const [editCodirectorId, setEditCodirectorId] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
-  const [directores, setDirectores] = useState<Usuario[]>([])
   const [guardando, setGuardando] = useState(false)
 
-  const esPropietario = edicion && (edicion.directorId === user?.id || edicion.codirectorId === user?.id)
+  const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
+  const [showAsignarDirector, setShowAsignarDirector] = useState(false)
+
+  const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
   const esSecretaria = user?.roles.some(
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
   )
+  const puedeAsignarDirector = user?.roles.some(r =>
+    [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado].includes(r),
+  )
+  const esDocenteValidado = user?.roles.includes(RolUsuario.Docente) &&
+    user?.estadoValidacionDocente === 'Validado'
+  const tieneDirectorPrincipal = directores.some(d => d.esDirectorPrincipal)
+  const tieneSegundoDirector = directores.filter(
+    d => d.rol === RolEjecucion.DirectorDeProyecto,
+  ).length >= 2
+  const directoresCompletos = tieneDirectorPrincipal && tieneSegundoDirector
+  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
+  const esDocente = user?.roles.includes(RolUsuario.Docente)
+  const motivoEnvio = !esDocenteValidado
+    ? 'Tu usuario no está validado'
+    : !directoresCompletos
+      ? 'El proyecto no tiene asignados director y codirector aún'
+      : ''
 
   const cargarDatos = async () => {
     if (!id) return
@@ -59,9 +88,12 @@ export function ProyectoDetail() {
       const ed = eds.length > 0 ? eds[0] : null
       setEdicion(ed)
 
-      if (ed && user?.unidadAcademicaId) {
-        const resp = await api.usuarios.list({ rol: RolUsuario.DirectorDeProyecto, unidadAcademicaId: user.unidadAcademicaId, limit: 50 })
-        setDirectores(resp.data)
+      if (ed) {
+        setEdicion(ed)
+        if (ed.convocatoriaId) {
+          const participaciones = await api.participaciones.listar(ed.convocatoriaId)
+          setDirectores(participaciones.filter(p => p.rol === RolEjecucion.DirectorDeProyecto && p.edicionId === ed.id))
+        }
       }
     } catch {
       toast.error('Error al cargar el proyecto')
@@ -77,7 +109,6 @@ export function ProyectoDetail() {
   const iniciarEdicion = () => {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
-    setEditCodirectorId(edicion.codirectorId || '')
     setEditAnioEdicion(edicion.anioEdicion ?? null)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
     setEditando(true)
@@ -93,7 +124,6 @@ export function ProyectoDetail() {
     try {
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
-        codirectorId: editCodirectorId || undefined,
         anioEdicion: editAnioEdicion ?? undefined,
         presupuesto: editPresupuesto || undefined,
       })
@@ -118,6 +148,21 @@ export function ProyectoDetail() {
       toast.error(err instanceof Error ? err.message : 'Error al enviar')
     } finally {
       setEnviando(false)
+    }
+  }
+
+  const handleEliminar = async () => {
+    if (!id || !edicion) return
+    setEliminando(true)
+    try {
+      await api.proyectos.eliminarEdicion(id, edicion.id)
+      toast.success('Proyecto eliminado')
+      navigate('/proyectos')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar')
+    } finally {
+      setEliminando(false)
+      setConfirmarEliminar(false)
     }
   }
 
@@ -212,7 +257,7 @@ export function ProyectoDetail() {
           </div>
           {edicion && (
             <p className="text-sm text-muted-foreground">
-              {edicion.director?.nombreCompleto || 'Sin director'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
+              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
               {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
             </p>
           )}
@@ -223,9 +268,28 @@ export function ProyectoDetail() {
               <Button variant="outline" size="sm" onClick={iniciarEdicion}>
                 <Pencil className="h-4 w-4 mr-2" />Editar
               </Button>
-              <Button size="sm" onClick={handleEnviar} disabled={enviando}>
-                {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                Enviar para corrección
+              {esDocente && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>
+                        <Button size="sm" onClick={handleEnviar} disabled={!puedeEnviar || enviando}>
+                          {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                          Enviar para corrección
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {motivoEnvio && (
+                      <TooltipContent>
+                        <p>{motivoEnvio}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <Button variant="destructive" size="sm" onClick={() => setConfirmarEliminar(true)} disabled={eliminando}>
+                {eliminando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Eliminar
               </Button>
             </>
           )}
@@ -253,16 +317,22 @@ export function ProyectoDetail() {
 
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Director</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.director?.nombreCompleto || '-'}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Creado por</CardTitle></CardHeader>
+          <CardContent><p className="text-sm">{edicion?.creadoPor?.nombreCompleto || '-'}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
           <CardContent><p className="text-sm">{edicion?.unidadAcademica?.nombre || '-'}</p></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Codirector</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.codirector?.nombreCompleto || '-'}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Directores</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-sm">
+              {directores.length > 0
+                ? directores.map(d => `${d.usuario?.nombreCompleto || '?'}${d.esDirectorPrincipal ? ' (Principal)' : ''}`).join(', ')
+                : '-'}
+            </p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Edición</CardTitle></CardHeader>
@@ -272,6 +342,12 @@ export function ProyectoDetail() {
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
           <CardContent><p className="text-sm font-bold">${(edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</p></CardContent>
         </Card>
+        {puedeAsignarDirector && (
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar Director</CardTitle></CardHeader>
+            <CardContent><p className="text-sm text-muted-foreground">+ Agregar director</p></CardContent>
+          </Card>
+        )}
       </div>
 
       <Tabs defaultValue="info">
@@ -288,24 +364,12 @@ export function ProyectoDetail() {
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium">Editar proyecto</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Nombre del proyecto</p>
-                  <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Codirector</p>
-                  <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
-                    <SelectTrigger><SelectValue placeholder="Sin codirector" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Sin codirector</SelectItem>
-                      {directores.map(d => (
-                        <SelectItem key={d.id} value={d.id}>{d.nombreCompleto}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Edición (año)</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Nombre del proyecto</p>
+                    <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Edición (año)</p>
                   <Input
                     type="number"
                     min={2000}
@@ -322,10 +386,10 @@ export function ProyectoDetail() {
               <CardContent className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div><span className="text-muted-foreground">Nombre:</span> {proyecto.nombre}</div>
-                  <div><span className="text-muted-foreground">Director:</span> {edicion?.director?.nombreCompleto || '-'}</div>
-                  <div><span className="text-muted-foreground">Codirector:</span> {edicion?.codirector?.nombreCompleto || '-'}</div>
+                  <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
                   <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
                   <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
+                  <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Principal)' : ''}`).join(', ') : '-'}</div>
                   <div><span className="text-muted-foreground">Edición:</span> {edicion?.anioEdicion || '-'}</div>
                   <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
                   <div><span className="text-muted-foreground">Consolidado:</span> {proyecto.esConsolidado ? 'Sí' : 'No'}</div>
@@ -390,7 +454,143 @@ export function ProyectoDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {edicion && (
+        <AsignarDirectorModal
+          open={showAsignarDirector}
+          onOpenChange={setShowAsignarDirector}
+          convocatoriaId={edicion.convocatoriaId}
+          edicionId={edicion.id}
+          onSuccess={cargarDatos}
+        />
+      )}
+
+      <Dialog open={confirmarEliminar} onOpenChange={setConfirmarEliminar}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar proyecto?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. El proyecto se eliminará permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarEliminar(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleEliminar} disabled={eliminando}>
+              {eliminando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  )
+}
+
+function AsignarDirectorModal({
+  open,
+  onOpenChange,
+  convocatoriaId,
+  edicionId,
+  onSuccess,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  convocatoriaId: string
+  edicionId: string
+  onSuccess: () => void
+}) {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
+  const [esDirectorPrincipal, setEsDirectorPrincipal] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const fetchUsuarios = async () => {
+      setLoadingUsuarios(true)
+      try {
+        const [res, resParticipaciones] = await Promise.all([
+          api.usuarios.list({ rol: 'Docente', limit: 100 }),
+          api.participaciones.listar(convocatoriaId),
+        ])
+        const idsConRol = new Set(resParticipaciones.map(p => p.usuarioId))
+        setUsuarios(res.data.filter(u =>
+          !idsConRol.has(u.id) &&
+          u.estadoValidacionDocente === 'Validado' &&
+          u.habilitado !== false
+        ))
+      } catch {
+        toast.error('Error al cargar docentes')
+      } finally {
+        setLoadingUsuarios(false)
+      }
+    }
+    fetchUsuarios()
+  }, [open, convocatoriaId])
+
+  const handleSubmit = async () => {
+    if (!selectedUsuarioId) return
+    setSubmitting(true)
+    try {
+      await api.participaciones.asignar({
+        usuarioId: selectedUsuarioId,
+        convocatoriaId,
+        rol: RolEjecucion.DirectorDeProyecto,
+        edicionId,
+        esDirectorPrincipal,
+      })
+      toast.success('Director asignado correctamente')
+      onOpenChange(false)
+      onSuccess()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al asignar director')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Asignar Director</DialogTitle>
+          <DialogDescription>Seleccione un docente para asignar como director del proyecto.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Docente</p>
+            <Select value={selectedUsuarioId} onValueChange={setSelectedUsuarioId}>
+              <SelectTrigger>
+                <SelectValue placeholder={loadingUsuarios ? 'Cargando...' : 'Seleccionar docente'} />
+              </SelectTrigger>
+              <SelectContent>
+                {usuarios.map(u => (
+                  <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="esDirectorPrincipal"
+              checked={esDirectorPrincipal}
+              onChange={e => setEsDirectorPrincipal(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="esDirectorPrincipal" className="text-sm">Director principal</label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={!selectedUsuarioId || submitting}>
+            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Asignar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

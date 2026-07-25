@@ -36,6 +36,7 @@ import type { Convocatoria, Edicion, Formulario } from '@/data/types'
 import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
+import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -77,7 +78,9 @@ export function ConvocatoriaDetail() {
   const [confirmEditOpen, setConfirmEditOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
-  const esDirector = user?.roles.includes(RolUsuario.DirectorDeProyecto)
+  const esUsuarioEjecucion = user?.roles.some(
+    r => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
+  )
   const errores = erroresFechas(editForm)
 
   const cargarDatos = () => {
@@ -338,6 +341,7 @@ export function ConvocatoriaDetail() {
       <Tabs defaultValue="proyectos">
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
+          <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
         </TabsList>
@@ -345,9 +349,11 @@ export function ConvocatoriaDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Proyectos Presentados</CardTitle>
-              {esDirector && (
+              {esUsuarioEjecucion && (
                 <NuevoProyectoDialog
                   onCreated={cargarDatos}
+                  convocatoriaId={conv?.id}
+                  convocatoriaNombre={conv?.nombre}
                   trigger={
                     <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
                   }
@@ -359,7 +365,7 @@ export function ConvocatoriaDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Proyecto</TableHead>
-                    <TableHead>Director</TableHead>
+                    <TableHead>Creado por</TableHead>
                     <TableHead>Facultad</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Presupuesto</TableHead>
@@ -370,7 +376,7 @@ export function ConvocatoriaDetail() {
                   {ediciones.map(e => (
                     <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.director?.nombreCompleto || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
                       <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
@@ -386,6 +392,14 @@ export function ConvocatoriaDetail() {
         </TabsContent>
         <TabsContent value="emparejamiento" className="mt-4">
           {id && <EmparejamientoTab convocatoriaId={id} />}
+        </TabsContent>
+        <TabsContent value="evaluadores" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-sm font-medium">Asignación de Evaluadores</CardTitle></CardHeader>
+            <CardContent>
+              {id && <AsignacionEvaluadores convocatoriaId={id} />}
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="detalle" className="mt-4">
           <Card>

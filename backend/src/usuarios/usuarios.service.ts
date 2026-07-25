@@ -8,11 +8,11 @@ import * as crypto from 'crypto';
 import { Usuario } from './usuario.entity';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
-import { ActualizarEstadoDirectorDto } from './dto/actualizar-estado-director.dto';
+import { ActualizarEstadoValidacionDocenteDto } from './dto/actualizar-estado-validacion-docente.dto';
+import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
-import { RolUsuario } from '../common/enums/rol-usuario.enum';
-import { EstadoDirector } from '../common/enums/estado-director.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
@@ -27,8 +27,8 @@ const GRUPO_GESTION: RolUsuario[] = [
 ];
 
 const GRUPO_EJECUCION: RolUsuario[] = [
-  RolUsuario.DirectorDeProyecto,
-  RolUsuario.Evaluador,
+  RolUsuario.Estudiante,
+  RolUsuario.Docente,
 ];
 
 function validarGruposRoles(roles: RolUsuario[]): void {
@@ -61,9 +61,10 @@ export class UsuariosService {
 
     // Validaciones según el rol del creador
     if (creador) {
-      const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria);
+      const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
+        creador.roles.includes(RolUsuario.AsistenteDeSecretaria);
       if (esSecretaria) {
-        const rolesPermitidos = [RolUsuario.Evaluador, RolUsuario.AsistenteDeSecretaria, RolUsuario.DirectorDeProyecto];
+        const rolesPermitidos = [RolUsuario.Docente, RolUsuario.AsistenteDeSecretaria, RolUsuario.Estudiante];
         const todosPermitidos = dto.roles.every((r) => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
           throw new BadRequestException(
@@ -81,8 +82,8 @@ export class UsuariosService {
       ...dto,
       password,
       creadoPorId: creador?.id,
-      estadoDirector: dto.roles.includes(RolUsuario.DirectorDeProyecto)
-        ? EstadoDirector.PendienteDeValidacion
+      estadoValidacionDocente: dto.roles.includes(RolUsuario.Docente)
+        ? EstadoValidacionDocente.PendienteDeValidacion
         : null,
     });
     const saved = await this.repo.save(entity);
@@ -110,16 +111,16 @@ export class UsuariosService {
     const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
       usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria);
 
-    const esEjecucion = usuarioLogueado.roles.includes(RolUsuario.DirectorDeProyecto) ||
-      usuarioLogueado.roles.includes(RolUsuario.Evaluador);
+    const esEjecucion = usuarioLogueado.roles.includes(RolUsuario.Estudiante) ||
+      usuarioLogueado.roles.includes(RolUsuario.Docente);
 
     if (esSecretaria) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
     } else if (esEjecucion) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
-      query.andWhere('(usuario.roles LIKE :rolDir OR usuario.roles LIKE :rolEval)', {
-        rolDir: '%DirectorDeProyecto%',
-        rolEval: '%Evaluador%',
+      query.andWhere('(usuario.roles LIKE :rolEst OR usuario.roles LIKE :rolDoc)', {
+        rolEst: '%Estudiante%',
+        rolDoc: '%Docente%',
       });
     } else if (unidadAcademicaId) {
       query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId });
@@ -145,11 +146,11 @@ export class UsuariosService {
       secretarias: await this.repo.createQueryBuilder('u')
         .where('u.roles LIKE :rol', { rol: '%Secretaria%' })
         .getCount(),
-      evaluadores: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Evaluador%' })
+      estudiantes: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Estudiante%' })
         .getCount(),
-      directores: await this.repo.createQueryBuilder('u')
-        .where('u.roles LIKE :rol', { rol: '%Director%' })
+      docentes: await this.repo.createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: '%Docente%' })
         .getCount(),
     };
 
@@ -188,7 +189,8 @@ export class UsuariosService {
 
     const esAutoEdicion = usuarioLogueado && usuarioLogueado.id === id;
     const esRectorado = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeRectorado);
-    const esSecretaria = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeSecretaria);
+    const esSecretaria = usuarioLogueado?.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
+      usuarioLogueado?.roles.includes(RolUsuario.AsistenteDeSecretaria);
     const mismaUA = esSecretaria && usuarioLogueado?.unidadAcademicaId === entity.unidadAcademicaId;
 
     const rolesAnteriores = [...entity.roles];
@@ -249,10 +251,10 @@ export class UsuariosService {
       if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
-        const rolesPermitidos = [RolUsuario.DirectorDeProyecto, RolUsuario.Evaluador];
+        const rolesPermitidos = [RolUsuario.Estudiante, RolUsuario.Docente];
         const todosPermitidos = dto.roles.every(r => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
-          throw new BadRequestException('Solo puedes asignar roles de Director de Proyecto y Evaluador');
+          throw new BadRequestException('Solo puedes asignar roles de Estudiante y Docente');
         }
         const nuevosRoles = [
           ...entity.roles.filter(r => !rolesPermitidos.includes(r)),
@@ -300,17 +302,17 @@ export class UsuariosService {
     throw new ForbiddenException('No tiene permisos para editar este usuario');
   }
 
-  async actualizarEstadoDirector(
-    id: string, dto: ActualizarEstadoDirectorDto, usuarioLogueado?: Usuario,
+  async actualizarEstadoValidacionDocente(
+    id: string, dto: ActualizarEstadoValidacionDocenteDto, usuarioLogueado?: Usuario,
   ): Promise<Usuario> {
     const entity = await this.obtener(id);
-    const estadoAnterior = entity.estadoDirector;
-    entity.estadoDirector = dto.estadoDirector;
+    const estadoAnterior = entity.estadoValidacionDocente;
+    entity.estadoValidacionDocente = dto.estadoValidacionDocente;
     const saved = await this.repo.save(entity);
     if (usuarioLogueado) {
       await this.auditoria.registrar({
-        usuarioId: id, accion: TipoAccionAuditoria.VALIDACION_DIRECTOR,
-        descripcion: `Estado director: ${estadoAnterior || 'PendienteDeValidacion'} → ${dto.estadoDirector}`,
+        usuarioId: id, accion: TipoAccionAuditoria.VALIDACION_DOCENTE,
+        descripcion: `Estado director: ${estadoAnterior || 'PendienteDeValidacion'} → ${dto.estadoValidacionDocente}`,
         responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
       });
     }
@@ -322,7 +324,8 @@ export class UsuariosService {
 
     const esRectorado = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeRectorado) ||
       usuarioLogueado.roles.includes(RolUsuario.AsistenteDeRectorado);
-    const esSecretariaMismaUA = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
+    const esSecretariaMismaUA = (usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
+      usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria)) &&
       usuarioLogueado.unidadAcademicaId === entity.unidadAcademicaId;
 
     if (!esRectorado && !esSecretariaMismaUA) {

@@ -1,5 +1,5 @@
 import {
-  IsString, IsNotEmpty, IsEmail, IsOptional, IsUUID,
+  IsString, IsNotEmpty, IsEmail, IsOptional, IsUUID, IsIn,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -13,6 +13,9 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @IsIn(['estudiante', 'docente'])
+  tipo: 'estudiante' | 'docente';
 
   @IsOptional()
   @IsUUID()

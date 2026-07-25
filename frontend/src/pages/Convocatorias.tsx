@@ -73,6 +73,10 @@ function validarFechas(f: Parameters<typeof erroresFechas>[0]): string | null {
 export function Convocatorias() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const esGestion = user?.roles.some(r =>
+    [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado,
+     RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+  )
   const [data, setData] = useState<Convocatoria[]>([])
   const [formularios, setFormularios] = useState<Formulario[]>([])
   const [search, setSearch] = useState('')
@@ -138,14 +142,16 @@ export function Convocatorias() {
     }
   }
 
-  const filtradas = data.filter(c => {
+  const convocatoriasVisibles = esGestion ? data : data.filter(c => c.estado !== 'configuracion')
+
+  const filtradas = convocatoriasVisibles.filter(c => {
     const matchNombre = c.nombre.toLowerCase().includes(search.toLowerCase())
     const matchEstado = filtroEstado === 'todas' || c.estado === filtroEstado
     return matchNombre && matchEstado
   })
 
-  const activas = data.filter(c => c.estado === 'presentacion' || c.estado === 'evaluacion')
-  const pasadas = data.filter(c => c.estado === 'ejecucion' || c.estado === 'cierre')
+  const activas = convocatoriasVisibles.filter(c => c.estado === 'presentacion' || c.estado === 'evaluacion')
+  const pasadas = convocatoriasVisibles.filter(c => c.estado === 'ejecucion' || c.estado === 'cierre')
 
   return (
     <div className="p-6 space-y-6">
@@ -289,7 +295,7 @@ export function Convocatorias() {
 
       <Tabs defaultValue="todas">
         <TabsList>
-          <TabsTrigger value="todas">Todas ({data.length})</TabsTrigger>
+          <TabsTrigger value="todas">Todas ({convocatoriasVisibles.length})</TabsTrigger>
           <TabsTrigger value="activas">Activas ({activas.length})</TabsTrigger>
           <TabsTrigger value="pasadas">Pasadas ({pasadas.length})</TabsTrigger>
         </TabsList>

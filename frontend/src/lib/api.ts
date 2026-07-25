@@ -47,7 +47,7 @@ export const api = {
   auth: {
     login: (data: { email: string; password: string }) =>
       post<{ accessToken: string }>('/auth/login', data),
-    register: (data: { nombreCompleto: string; email: string; password: string; unidadAcademicaId?: string }) =>
+    register: (data: { nombreCompleto: string; email: string; password: string; tipo: 'estudiante' | 'docente'; unidadAcademicaId?: string }) =>
       post<{ accessToken: string }>('/auth/register', data),
   },
   usuarios: {
@@ -66,8 +66,8 @@ export const api = {
       post<import('@/data/types').Usuario>('/usuarios', data),
     actualizar: (id: string, data: Partial<import('@/data/types').CrearUsuarioDto> & { habilitado?: boolean }) =>
       patch<import('@/data/types').Usuario>(`/usuarios/${id}`, data),
-    actualizarEstadoDirector: (id: string, estadoDirector: string) =>
-      patch<import('@/data/types').Usuario>(`/usuarios/${id}/estado-director`, { estadoDirector }),
+    actualizarEstadoValidacionDocente: (id: string, estadoValidacionDocente: string) =>
+      patch<import('@/data/types').Usuario>(`/usuarios/${id}/estado-validacion-docente`, { estadoValidacionDocente }),
     eliminar: (id: string) => del(`/usuarios/${id}`),
     resetPassword: (id: string) => post<{ message: string }>(`/usuarios/${id}/reset-password`, {}),
     auditoria: (id: string) => get<import('@/data/types').Auditoria[]>(`/usuarios/${id}/auditoria`),
@@ -77,6 +77,15 @@ export const api = {
     get: (id: string) => get<import('@/data/types').UnidadAcademica>(`/unidades-academicas/${id}`),
     crear: (data: { nombre: string }) =>
       post<import('@/data/types').UnidadAcademica>('/unidades-academicas', data),
+  },
+  participaciones: {
+    asignar: (data: import('@/data/types').CrearParticipacionDto) =>
+      post<import('@/data/types').ParticipacionConvocatoria>('/participaciones-convocatoria', data),
+    desasignar: (id: string) => del(`/participaciones-convocatoria/${id}`),
+    listar: (convocatoriaId: string) =>
+      get<import('@/data/types').ParticipacionConvocatoria[]>(`/participaciones-convocatoria?convocatoriaId=${convocatoriaId}`),
+    listarMias: () =>
+      get<import('@/data/types').ParticipacionConvocatoria[]>('/participaciones-convocatoria/mias'),
   },
   convocatorias: {
     list: () => get<import('@/data/types').Convocatoria[]>('/convocatorias'),
@@ -105,6 +114,8 @@ export const api = {
       patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}`, data),
     enviarEdicion: (id: string, edicionId: string) =>
       post<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/enviar`, {}),
+    eliminarEdicion: (id: string, edicionId: string) =>
+      del(`/proyectos/${id}/ediciones/${edicionId}`),
   },
   evaluaciones: {
     list: (proyectoId?: string) => {
