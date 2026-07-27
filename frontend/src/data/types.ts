@@ -298,6 +298,56 @@ export interface GuardarEmparejamientoDto {
   pares: ParEmparejamientoDto[]
 }
 
+// --- Sugerencias de cambio ---
+
+export enum EstadoSugerencia {
+  Pendiente = 'Pendiente',
+  Aceptada = 'Aceptada',
+  Rechazada = 'Rechazada',
+  MasInformacion = 'MasInformacion',
+}
+
+export enum TipoNotificacion {
+  NUEVA_SUGERENCIA = 'NUEVA_SUGERENCIA',
+  RESPUESTA_SUGERENCIA = 'RESPUESTA_SUGERENCIA',
+}
+
+export interface SugerenciaCambio {
+  id: string
+  edicionId: string
+  sugeridoPor: Usuario
+  campo: string
+  valorActual: string | null
+  valorSugerido: string | null
+  comentario: string
+  estado: EstadoSugerencia
+  respuestaDirector: string | null
+  creadoEn: string
+  respondidoEn: string | null
+}
+
+export interface CrearSugerenciaDto {
+  campo: string
+  valorSugerido: string
+  comentario: string
+}
+
+export interface ResponderSugerenciaDto {
+  estado: EstadoSugerencia
+  respuestaDirector?: string
+}
+
+export interface Notificacion {
+  id: string
+  usuarioId: string
+  tipo: TipoNotificacion
+  sugerenciaId: string
+  sugerencia?: SugerenciaCambio & { edicion: Edicion }
+  mensaje: string
+  leida: boolean
+  creadoEn: string
+}
+
 export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   configuracion: 'outline',
   presentacion: 'default',
@@ -331,4 +381,8 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Evaluacion: 'outline',
   Ejecucion: 'default',
   Cierre: 'secondary',
+  Pendiente: 'secondary',
+  Aceptada: 'default',
+  Rechazada: 'destructive',
+  MasInformacion: 'outline',
 }
