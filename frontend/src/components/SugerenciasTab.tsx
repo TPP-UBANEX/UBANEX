@@ -135,7 +135,7 @@ export function SugerenciasTab({ edicionId, creadoPorId }: SugerenciasTabProps) 
               <div className="mt-3 space-y-3 border-t pt-3">
                 {s.respuestaDirector && (
                   <div className="text-sm bg-muted/30 rounded-md p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Respuesta de la dirección:</p>
+                    <p className="text-xs text-muted-foreground mb-1">Respuesta del usuario de dirección:</p>
                     <p>{s.respuestaDirector}</p>
                   </div>
                 )}

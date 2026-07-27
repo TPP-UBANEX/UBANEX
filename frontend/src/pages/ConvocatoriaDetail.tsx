@@ -341,7 +341,7 @@ export function ConvocatoriaDetail() {
       <Tabs defaultValue="proyectos">
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
-          <TabsTrigger value="evaluadores">Usuarios evaluadores</TabsTrigger>
+          <TabsTrigger value="evaluadores">Usuarios de evaluación</TabsTrigger>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
         </TabsList>
@@ -395,8 +395,7 @@ export function ConvocatoriaDetail() {
         </TabsContent>
         <TabsContent value="evaluadores" className="mt-4">
           <Card>
-            <CardHeader>            <CardTitle className="text-sm font-medium">Asignación de Usuarios evaluadores</CardTitle></CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {id && <AsignacionEvaluadores convocatoriaId={id} />}
             </CardContent>
           </Card>

@@ -87,7 +87,7 @@ export function ProyectoDetail() {
   const motivoEnvio = !esDocenteValidado
     ? 'Tu usuario no está validado'
     : !directoresCompletos
-      ? 'El proyecto no tiene asignados usuario dirección y codirección aún'
+      ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
       : ''
 
   const cargarDatos = async () => {
@@ -371,8 +371,8 @@ export function ProyectoDetail() {
         </Card>
         {puedeAsignarDirector && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
-            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar Dirección</CardTitle></CardHeader>
-            <CardContent><p className="text-sm text-muted-foreground">+ Agregar dirección</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar usuario de dirección</CardTitle></CardHeader>
+            <CardContent><p className="text-sm text-muted-foreground">+ Agregar usuario de dirección</p></CardContent>
           </Card>
         )}
       </div>
@@ -620,11 +620,11 @@ function AsignarDirectorModal({
         edicionId,
         esDirectorPrincipal,
       })
-      toast.success('Dirección asignada correctamente')
+      toast.success('Usuario de dirección asignado correctamente')
       onOpenChange(false)
       onSuccess()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al asignar dirección')
+      toast.error(err instanceof Error ? err.message : 'Error al asignar usuario de dirección')
     } finally {
       setSubmitting(false)
     }
@@ -634,7 +634,7 @@ function AsignarDirectorModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Asignar Dirección</DialogTitle>
+          <DialogTitle>Asignar usuario de dirección</DialogTitle>
           <DialogDescription>Seleccione un usuario docente para asignar como dirección del proyecto.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
