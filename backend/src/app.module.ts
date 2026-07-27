@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { FormulariosModule } from './formularios/formularios.module';
 import { ParticipacionesConvocatoriaModule } from './participaciones-convocatoria/participaciones-convocatoria.module';
+import { SugerenciasModule } from './sugerencias/sugerencias.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ParticipacionesConvocatoriaModule } from './participaciones-convocatori
     AuditoriaModule,
     FormulariosModule,
     ParticipacionesConvocatoriaModule,
+    SugerenciasModule,
   ],
   controllers: [AppController],
   providers: [AppService],
