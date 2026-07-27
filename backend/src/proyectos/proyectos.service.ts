@@ -32,6 +32,8 @@ export class ProyectosService {
     const proyecto = await this.proyectoRepo.save(
       this.proyectoRepo.create({
         nombre: dto.nombre,
+        esConsolidado: dto.esConsolidado ?? false,
+        esInterfacultad: dto.esInterfacultad ?? false,
         creadoPorId: usuario.id,
       }),
     );
@@ -44,7 +46,6 @@ export class ProyectosService {
         creadoPorId: usuario.id,
         unidadAcademicaId: usuario.unidadAcademicaId,
         anioEdicion: dto.anioEdicion || new Date().getFullYear(),
-        presupuesto: dto.presupuesto || null,
       }),
     );
 
@@ -124,6 +125,13 @@ export class ProyectosService {
 
     if (dto.nombre !== undefined) {
       await this.proyectoRepo.update(proyectoId, { nombre: dto.nombre });
+    }
+
+    if (dto.esConsolidado !== undefined || dto.esInterfacultad !== undefined) {
+      const updateData: Partial<Proyecto> = {};
+      if (dto.esConsolidado !== undefined) updateData.esConsolidado = dto.esConsolidado;
+      if (dto.esInterfacultad !== undefined) updateData.esInterfacultad = dto.esInterfacultad;
+      await this.proyectoRepo.update(proyectoId, updateData);
     }
 
     if (dto.anioEdicion !== undefined) {

@@ -184,6 +184,7 @@ export interface Proyecto {
   id: string
   nombre: string
   esConsolidado: boolean
+  esInterfacultad: boolean
   creadoPor: Usuario
   creadoPorId: string
   creadoEn: string
@@ -238,12 +239,15 @@ export interface CrearProyectoDto {
   nombre: string
   convocatoriaId: string
   anioEdicion?: number
-  presupuesto?: Presupuesto
+  esConsolidado?: boolean
+  esInterfacultad?: boolean
 }
 
 export interface ActualizarEdicionDto {
   nombre?: string
   anioEdicion?: number
+  esConsolidado?: boolean
+  esInterfacultad?: boolean
   presupuesto?: Presupuesto
   datosFormulario?: Record<string, unknown>
 }

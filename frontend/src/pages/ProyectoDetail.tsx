@@ -49,6 +49,8 @@ export function ProyectoDetail() {
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
+  const [editEsConsolidado, setEditEsConsolidado] = useState(false)
+  const [editEsInterfacultad, setEditEsInterfacultad] = useState(false)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [guardando, setGuardando] = useState(false)
 
@@ -110,6 +112,8 @@ export function ProyectoDetail() {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
     setEditAnioEdicion(edicion.anioEdicion ?? null)
+    setEditEsConsolidado(proyecto.esConsolidado)
+    setEditEsInterfacultad(proyecto.esInterfacultad)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
     setEditando(true)
   }
@@ -125,6 +129,8 @@ export function ProyectoDetail() {
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
         anioEdicion: editAnioEdicion ?? undefined,
+        esConsolidado: editEsConsolidado,
+        esInterfacultad: editEsInterfacultad,
         presupuesto: editPresupuesto || undefined,
       })
       toast.success('Proyecto actualizado')
@@ -378,6 +384,20 @@ export function ProyectoDetail() {
                     onChange={e => setEditAnioEdicion(e.target.value ? Number(e.target.value) : null)}
                   />
                 </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">¿Es consolidado?</p>
+                    <div className="flex gap-2">
+                      <Button type="button" variant={editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(true)}>Sí</Button>
+                      <Button type="button" variant={!editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(false)}>No</Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">¿Es interfacultad?</p>
+                    <div className="flex gap-2">
+                      <Button type="button" variant={editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => setEditEsInterfacultad(true)}>Sí</Button>
+                      <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => setEditEsInterfacultad(false)}>No</Button>
+                    </div>
+                  </div>
               </CardContent>
             </Card>
           ) : (
@@ -393,6 +413,7 @@ export function ProyectoDetail() {
                   <div><span className="text-muted-foreground">Edición:</span> {edicion?.anioEdicion || '-'}</div>
                   <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
                   <div><span className="text-muted-foreground">Consolidado:</span> {proyecto.esConsolidado ? 'Sí' : 'No'}</div>
+                  <div><span className="text-muted-foreground">Interfacultad:</span> {proyecto.esInterfacultad ? 'Sí' : 'No'}</div>
                 </div>
               </CardContent>
             </Card>

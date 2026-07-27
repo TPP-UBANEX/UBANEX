@@ -1,5 +1,5 @@
 import {
-  IsString, IsNotEmpty, IsUUID, IsOptional, IsObject, IsInt,
+  IsString, IsNotEmpty, IsUUID, IsOptional, IsInt, IsBoolean,
 } from 'class-validator';
 
 export class CrearProyectoDto {
@@ -16,6 +16,10 @@ export class CrearProyectoDto {
   anioEdicion?: number;
 
   @IsOptional()
-  @IsObject()
-  presupuesto?: object;
+  @IsBoolean()
+  esConsolidado?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  esInterfacultad?: boolean;
 }

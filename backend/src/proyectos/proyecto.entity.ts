@@ -15,6 +15,9 @@ export class Proyecto {
   @Column({ default: false })
   esConsolidado: boolean;
 
+  @Column({ default: false })
+  esInterfacultad: boolean;
+
   @ManyToOne(() => Usuario)
   @JoinColumn({ name: 'creadoPorId' })
   creadoPor: Usuario;
