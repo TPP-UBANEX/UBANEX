@@ -28,6 +28,7 @@ import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuest
 import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
+import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -504,9 +505,11 @@ export function ProyectoDetail() {
         </TabsContent>
 
         <TabsContent value="sugerencias" className="mt-4">
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Módulo de sugerencias próximamente.
-          </p>
+          {edicion ? (
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
+          )}
         </TabsContent>
 
         <TabsContent value="cierre" className="mt-4">
