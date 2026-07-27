@@ -87,7 +87,7 @@ export function ProyectoDetail() {
   const motivoEnvio = !esDocenteValidado
     ? 'Tu usuario no está validado'
     : !directoresCompletos
-      ? 'El proyecto no tiene asignados director y codirector aún'
+      ? 'El proyecto no tiene asignados usuario dirección y codirección aún'
       : ''
 
   const cargarDatos = async () => {
@@ -356,7 +356,7 @@ export function ProyectoDetail() {
           <CardContent>
             <p className="text-sm">
               {directores.length > 0
-                ? directores.map(d => `${d.usuario?.nombreCompleto || '?'}${d.esDirectorPrincipal ? ' (Principal)' : ''}`).join(', ')
+                ? directores.map(d => `${d.usuario?.nombreCompleto || '?'}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ')
                 : '-'}
             </p>
           </CardContent>
@@ -371,8 +371,8 @@ export function ProyectoDetail() {
         </Card>
         {puedeAsignarDirector && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
-            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar Director</CardTitle></CardHeader>
-            <CardContent><p className="text-sm text-muted-foreground">+ Agregar director</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar Dirección</CardTitle></CardHeader>
+            <CardContent><p className="text-sm text-muted-foreground">+ Agregar dirección</p></CardContent>
           </Card>
         )}
       </div>
@@ -436,7 +436,7 @@ export function ProyectoDetail() {
                   <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
                   <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
                   <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
-                  <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Principal)' : ''}`).join(', ') : '-'}</div>
+                  <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ') : '-'}</div>
                   <div>
                     <span className="text-muted-foreground">Edición:</span>{' '}
                     <CampoSugerible campo="anioEdicion" valorActual={String(edicion?.anioEdicion ?? '')} label="Año de edición" activo={modoSugerencia} onClick={handleSugerirClick}>
@@ -620,11 +620,11 @@ function AsignarDirectorModal({
         edicionId,
         esDirectorPrincipal,
       })
-      toast.success('Director asignado correctamente')
+      toast.success('Dirección asignada correctamente')
       onOpenChange(false)
       onSuccess()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al asignar director')
+      toast.error(err instanceof Error ? err.message : 'Error al asignar dirección')
     } finally {
       setSubmitting(false)
     }
@@ -634,15 +634,15 @@ function AsignarDirectorModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Asignar Director</DialogTitle>
-          <DialogDescription>Seleccione un docente para asignar como director del proyecto.</DialogDescription>
+          <DialogTitle>Asignar Dirección</DialogTitle>
+          <DialogDescription>Seleccione un usuario docente para asignar como dirección del proyecto.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <p className="text-sm font-medium">Docente</p>
             <Select value={selectedUsuarioId} onValueChange={setSelectedUsuarioId}>
               <SelectTrigger>
-                <SelectValue placeholder={loadingUsuarios ? 'Cargando...' : 'Seleccionar docente'} />
+                <SelectValue placeholder={loadingUsuarios ? 'Cargando...' : 'Seleccionar usuario docente'} />
               </SelectTrigger>
               <SelectContent>
                 {usuarios.map(u => (
@@ -659,7 +659,7 @@ function AsignarDirectorModal({
               onChange={e => setEsDirectorPrincipal(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            <label htmlFor="esDirectorPrincipal" className="text-sm">Director principal</label>
+            <label htmlFor="esDirectorPrincipal" className="text-sm">Dirección principal</label>
           </div>
         </div>
         <DialogFooter>

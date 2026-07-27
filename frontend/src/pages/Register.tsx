@@ -114,7 +114,7 @@ export function Register() {
           {tipo === 'docente' && (
             <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md mb-4">
               Los docentes deben ser validados por la Secretaría de Extensión de su facultad
-              antes de poder participar como directores o evaluadores.
+               antes de poder participar como dirección o usuario evaluador.
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
