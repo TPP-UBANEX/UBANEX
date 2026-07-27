@@ -53,9 +53,11 @@ export class ProyectosService {
   }
 
   async listar(usuario: Usuario, convocatoriaId?: string) {
-    const esGestion = usuario.roles.some(r =>
-      [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado,
-       RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+    const esRectorado = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado].includes(r),
+    );
+    const esSecretaria = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
     );
 
     const query = this.edicionRepo.createQueryBuilder('edicion')
@@ -66,7 +68,11 @@ export class ProyectosService {
       .where('edicion.eliminadoEn IS NULL')
       .orderBy('edicion.actualizadoEn', 'DESC');
 
-    if (!esGestion) {
+    if (esRectorado) {
+      // Rectorado ve todos los proyectos
+    } else if (esSecretaria) {
+      query.andWhere('edicion.unidadAcademicaId = :uaId', { uaId: usuario.unidadAcademicaId });
+    } else {
       const participaciones = await this.participacionRepo.find({
         where: { usuarioId: usuario.id },
         select: { edicionId: true },
