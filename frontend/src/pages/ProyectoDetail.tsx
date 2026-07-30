@@ -322,7 +322,7 @@ export function ProyectoDetail() {
               </Button>
             </>
           )}
-          {!editando && esSecretariaMismaUA && !modoSugerencia && (
+          {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
             <Button variant="outline" size="sm" onClick={() => setModoSugerencia(true)}>
               <MessageSquare className="h-4 w-4 mr-2" />Sugerir cambios
             </Button>

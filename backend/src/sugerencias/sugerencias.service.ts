@@ -12,6 +12,7 @@ import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
 import { ResponderSugerenciaDto } from './dto/responder-sugerencia.dto';
 import { EstadoSugerencia } from '../common/enums/estado-sugerencia.enum';
+import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
@@ -34,6 +35,12 @@ export class SugerenciasService {
   async crear(edicionId: string, dto: CrearSugerenciaDto, usuario: Usuario) {
     const edicion = await this.obtenerEdicion(edicionId);
     await this.validarSecretariaMismaUA(edicion, usuario);
+
+    if (edicion.estado !== EstadoEdicion.Presentado) {
+      throw new BadRequestException(
+        `Solo se pueden sugerir cambios cuando la edición está en estado ${EstadoEdicion.Presentado}`,
+      );
+    }
 
     const proyecto = await this.proyectoRepo.findOneBy({ id: edicion.proyectoId });
     if (!proyecto) throw new NotFoundException('Proyecto no encontrado');
