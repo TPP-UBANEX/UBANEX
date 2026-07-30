@@ -48,7 +48,7 @@ export function SugerirCambioModal({
     try {
       await api.sugerencias.crear(edicionId, {
         campo,
-        valorSugerido,
+        valorSugerido: valorSugerido.trim() || undefined,
         comentario: comentario.trim(),
       })
       toast.success('Sugerencia enviada correctamente')
@@ -83,7 +83,9 @@ export function SugerirCambioModal({
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium">Valor sugerido</p>
+            <p className="text-sm font-medium">
+              Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+            </p>
             <Input
               value={valorSugerido}
               onChange={e => setValorSugerido(e.target.value)}

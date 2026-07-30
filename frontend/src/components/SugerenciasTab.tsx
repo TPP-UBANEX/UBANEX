@@ -82,7 +82,7 @@ export function SugerenciasTab({ edicionId, creadoPorId }: SugerenciasTabProps) 
   }
 
   const ValorDiff = ({ actual, sugerido }: { actual: string | null; sugerido: string | null }) => (
-    <div className="flex items-center gap-3 text-sm">
+    <div className="flex items-center gap-3 text-sm mb-2">
       <span className="text-muted-foreground line-through">{actual ?? '(sin valor)'}</span>
       <span className="text-muted-foreground">→</span>
       <span className="font-medium text-foreground">{sugerido ?? '(sin valor)'}</span>
@@ -125,8 +125,10 @@ export function SugerenciasTab({ edicionId, creadoPorId }: SugerenciasTabProps) 
             </div>
           </CardHeader>
           <CardContent className="pb-3">
-            <ValorDiff actual={s.valorActual} sugerido={s.valorSugerido} />
-            <div className="mt-2 text-sm bg-muted/30 rounded-md p-3">
+            {s.valorSugerido != null && (
+              <ValorDiff actual={s.valorActual} sugerido={s.valorSugerido} />
+            )}
+            <div className="text-sm bg-muted/50 rounded-md p-3">
               <p className="text-xs text-muted-foreground mb-1">Comentario:</p>
               <p>{s.comentario}</p>
             </div>
@@ -134,7 +136,7 @@ export function SugerenciasTab({ edicionId, creadoPorId }: SugerenciasTabProps) 
             {expandedId === s.id && (
               <div className="mt-3 space-y-3 border-t pt-3">
                 {s.respuestaDirector && (
-                  <div className="text-sm bg-muted/30 rounded-md p-3">
+                  <div className="text-sm bg-muted/50 rounded-md p-3">
                     <p className="text-xs text-muted-foreground mb-1">Respuesta del usuario de dirección:</p>
                     <p>{s.respuestaDirector}</p>
                   </div>
