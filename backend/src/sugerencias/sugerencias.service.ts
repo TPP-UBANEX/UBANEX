@@ -46,7 +46,7 @@ export class SugerenciasService {
         sugeridoPorId: usuario.id,
         campo: dto.campo,
         valorActual,
-        valorSugerido: dto.valorSugerido,
+        valorSugerido: dto.valorSugerido?.trim() ? dto.valorSugerido.trim() : null,
         comentario: dto.comentario,
         estado: EstadoSugerencia.Pendiente,
       }),

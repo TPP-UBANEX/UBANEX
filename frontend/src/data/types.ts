@@ -328,7 +328,7 @@ export interface SugerenciaCambio {
 
 export interface CrearSugerenciaDto {
   campo: string
-  valorSugerido: string
+  valorSugerido?: string
   comentario: string
 }
 

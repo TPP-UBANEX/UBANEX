@@ -1,13 +1,13 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class CrearSugerenciaDto {
   @IsString()
   @IsNotEmpty()
   campo: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  valorSugerido: string;
+  valorSugerido?: string;
 
   @IsString()
   @IsNotEmpty()
