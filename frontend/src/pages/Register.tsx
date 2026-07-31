@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
 import { api } from '@/lib/api'
-import type { UnidadAcademica } from '@/data/types'
+import type { UnidadAcademica, Carrera, RegisterDto } from '@/data/types'
 import { GraduationCap, ArrowLeft, BookOpen } from 'lucide-react'
 
 export function Register() {
@@ -20,18 +20,29 @@ export function Register() {
   const { register } = useAuth()
   const [step, setStep] = useState<'tipo' | 'form'>('tipo')
   const [tipo, setTipo] = useState<'estudiante' | 'docente'>('estudiante')
-  const [nombreCompleto, setNombreCompleto] = useState('')
+  const [nombre, setNombre] = useState('')
+  const [apellido, setApellido] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [telefono, setTelefono] = useState('')
   const [unidadAcademicaId, setUnidadAcademicaId] = useState('')
+  const [carreraId, setCarreraId] = useState('')
   const [uaList, setUaList] = useState<UnidadAcademica[]>([])
+  const [carreras, setCarreras] = useState<Carrera[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     api.unidadesAcademicas.list().then(setUaList).catch(() => {})
+    api.carreras.list().then(setCarreras).catch(() => {})
   }, [])
+
+  const carrerasDisponibles = useMemo(() => {
+    if (!unidadAcademicaId) return []
+    const deLaUa = carreras.filter(c => c.unidadAcademicaId === unidadAcademicaId)
+    return deLaUa.length > 0 ? deLaUa : carreras
+  }, [unidadAcademicaId, carreras])
 
   const seleccionarTipo = (t: 'estudiante' | 'docente') => {
     setTipo(t)
@@ -46,10 +57,25 @@ export function Register() {
       setError('Las contraseñas no coinciden')
       return
     }
+    if (tipo === 'docente' && !telefono.trim()) {
+      setError('El teléfono es obligatorio para docentes')
+      return
+    }
+
+    const payload: RegisterDto = {
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      email,
+      password,
+      tipo,
+      unidadAcademicaId: unidadAcademicaId || undefined,
+    }
+    if (tipo === 'docente' && telefono.trim()) payload.telefono = telefono.trim()
+    if (carreraId) payload.carreraId = carreraId
 
     setLoading(true)
     try {
-      await register(nombreCompleto, email, password, tipo, unidadAcademicaId || undefined)
+      await register(payload)
       navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrarse')
@@ -123,15 +149,49 @@ export function Register() {
                 {error}
               </div>
             )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre completo</label>
-              <Input
-                placeholder="Juan Pérez"
-                value={nombreCompleto}
-                onChange={e => setNombreCompleto(e.target.value)}
-                required
-              />
-            </div>
+            {tipo === 'docente' ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nombre</label>
+                  <Input
+                    placeholder="Juan"
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Apellido</label>
+                  <Input
+                    placeholder="Pérez"
+                    value={apellido}
+                    onChange={e => setApellido(e.target.value)}
+                    required
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Apellido</label>
+                  <Input
+                    placeholder="Pérez"
+                    value={apellido}
+                    onChange={e => setApellido(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nombre</label>
+                  <Input
+                    placeholder="Juan"
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                    required
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
               <Input
@@ -142,6 +202,18 @@ export function Register() {
                 required
               />
             </div>
+            {tipo === 'docente' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Teléfono</label>
+                <Input
+                  type="tel"
+                  placeholder="11 1234 5678"
+                  value={telefono}
+                  onChange={e => setTelefono(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Contraseña</label>
               <Input
@@ -165,7 +237,10 @@ export function Register() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Unidad Académica</label>
-              <Select value={unidadAcademicaId} onValueChange={setUnidadAcademicaId}>
+              <Select value={unidadAcademicaId} onValueChange={id => {
+                setUnidadAcademicaId(id)
+                setCarreraId('')
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccioná tu facultad" />
                 </SelectTrigger>
@@ -176,6 +251,21 @@ export function Register() {
                 </SelectContent>
               </Select>
             </div>
+            {tipo === 'estudiante' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Carrera</label>
+                <Select value={carreraId} onValueChange={setCarreraId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccioná tu carrera (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {carrerasDisponibles.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </Button>
