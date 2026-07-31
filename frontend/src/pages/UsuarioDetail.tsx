@@ -25,7 +25,7 @@ import {
   tipoDesignacionDocenteLabel,
   personaConDiscapacidadLabel,
 } from '@/data/perfil'
-import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound } from 'lucide-react'
+import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
@@ -384,91 +384,9 @@ export function UsuarioDetail() {
               <span className="text-muted-foreground">Teléfono:</span>
               <span>{usuario.telefono || '—'}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Building className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Unidad Académica:</span>
-              <span>{usuario.unidadAcademica?.nombre || 'Sin asignar'}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Creado por:</span>
-              <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Tipo:</span>
-              <span>
-                {usuario.roles.includes(RolUsuario.Docente)
-                  ? 'Docente'
-                  : usuario.roles.includes(RolUsuario.Estudiante)
-                    ? 'Estudiante'
-                    : 'Gestión'}
-              </span>
-            </div>
-            <Separator />
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Roles</p>
-              <div className="flex gap-2 flex-wrap">
-                {usuario.roles.map(r => (
-                  <Badge key={r} variant="outline" className={rolColor(r)}>
-                    {rolLabels[r] || r}
-                  </Badge>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Estado y Actividad
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Estado:</span>
-              <Badge variant={usuario.habilitado ? 'default' : 'secondary'}>
-                {usuario.habilitado ? 'Habilitado' : 'Inhabilitado'}
-              </Badge>
-            </div>
-            {usuario.roles.includes(RolUsuario.Docente) && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Docente:</span>
-                <Badge variant="outline" className={estadoValidacionDocenteColor(usuario.estadoValidacionDocente)}>
-                  {estadoValidacionDocenteLabel(usuario.estadoValidacionDocente)}
-                </Badge>
-                {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Validado && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setValidarAccion(EstadoValidacionDocente.Validado); setValidarOpen(true) }}
-                  >
-                    Validar
-                  </Button>
-                )}
-                {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Rechazado && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setValidarAccion(EstadoValidacionDocente.Rechazado); setValidarOpen(true) }}
-                  >
-                    Rechazar
-                  </Button>
-                )}
-              </div>
-            )}
-            <Separator />
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Última actividad:</span>
-              <span>{formatearFecha(usuario.ultimaActividad)}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {(usuario.roles.includes(RolUsuario.Docente) || usuario.roles.includes(RolUsuario.Estudiante)) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -478,6 +396,24 @@ export function UsuarioDetail() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Unidad Académica:</span>{' '}
+                <span>{usuario.unidadAcademica?.nombre || 'Sin asignar'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Creado por:</span>{' '}
+                <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Tipo:</span>{' '}
+                <span>
+                  {usuario.roles.includes(RolUsuario.Docente)
+                    ? 'Docente'
+                    : usuario.roles.includes(RolUsuario.Estudiante)
+                      ? 'Estudiante'
+                      : 'Gestión'}
+                </span>
+              </div>
               {usuario.roles.includes(RolUsuario.Docente) && (
                 <>
                   <div>
@@ -523,9 +459,69 @@ export function UsuarioDetail() {
                 <span>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</span>
               </div>
             </div>
+            <Separator />
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Roles</p>
+              <div className="flex gap-2 flex-wrap">
+                {usuario.roles.map(r => (
+                  <Badge key={r} variant="outline" className={rolColor(r)}>
+                    {rolLabels[r] || r}
+                  </Badge>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
-      )}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <UserCheck className="h-4 w-4" />
+            Estado y Actividad
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Estado:</span>
+            <Badge variant={usuario.habilitado ? 'default' : 'secondary'}>
+              {usuario.habilitado ? 'Habilitado' : 'Inhabilitado'}
+            </Badge>
+          </div>
+          {usuario.roles.includes(RolUsuario.Docente) && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Docente:</span>
+              <Badge variant="outline" className={estadoValidacionDocenteColor(usuario.estadoValidacionDocente)}>
+                {estadoValidacionDocenteLabel(usuario.estadoValidacionDocente)}
+              </Badge>
+              {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Validado && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setValidarAccion(EstadoValidacionDocente.Validado); setValidarOpen(true) }}
+                >
+                  Validar
+                </Button>
+              )}
+              {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Rechazado && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setValidarAccion(EstadoValidacionDocente.Rechazado); setValidarOpen(true) }}
+                >
+                  Rechazar
+                </Button>
+              )}
+            </div>
+          )}
+          <Separator />
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Última actividad:</span>
+            <span>{formatearFecha(usuario.ultimaActividad)}</span>
+          </div>
+        </CardContent>
+      </Card>
 
       {esMiPerfil && participaciones.length > 0 && (
         <Card>
