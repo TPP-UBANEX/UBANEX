@@ -11,6 +11,9 @@ import { EstadoValidacionDocente } from './common/enums/estado-validacion-docent
 import { EstadoEdicion } from './common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from './common/enums/estado-convocatoria.enum';
 import { RolEjecucion } from './common/enums/rol-ejecucion.enum';
+import { Genero } from './common/enums/genero.enum';
+import { CargoDocente } from './common/enums/cargo-docente.enum';
+import { TipoDesignacionDocente } from './common/enums/tipo-designacion-docente.enum';
 import { Usuario } from './usuarios/usuario.entity';
 import { Formulario } from './formularios/formulario.entity';
 import { Convocatoria } from './convocatorias/convocatoria.entity';
@@ -42,9 +45,24 @@ async function seedCarrera(
   await carrerasService.crear({ nombre, unidadAcademicaId });
 }
 
+type DatosSeedUsuario = {
+  nombreCompleto: string;
+  email: string;
+  password: string;
+  roles: RolUsuario[];
+  unidadAcademicaId?: string;
+  telefono?: string;
+  genero?: Genero;
+  personaConDiscapacidad?: boolean;
+  cargoDocente?: CargoDocente;
+  tipoDesignacionDocente?: TipoDesignacionDocente;
+  areaDocente?: string;
+  direccionLocalidad?: string;
+};
+
 async function seedUsuario(
   usuariosService: UsuariosService,
-  data: { nombreCompleto: string; email: string; password: string; roles: RolUsuario[]; unidadAcademicaId?: string },
+  data: DatosSeedUsuario,
   opts?: { habilitado?: boolean },
 ) {
   const existe = await usuariosService.obtenerPorEmail(data.email);
@@ -70,14 +88,36 @@ async function seedUsuario(
   return user;
 }
 
+const CAMPOS_PERFIL_DOCENTE = [
+  'telefono',
+  'genero',
+  'personaConDiscapacidad',
+  'cargoDocente',
+  'tipoDesignacionDocente',
+  'areaDocente',
+  'direccionLocalidad',
+] as const;
+
 async function seedDocente(
   usuariosService: UsuariosService,
-  data: { nombreCompleto: string; email: string; password: string; roles: RolUsuario[]; unidadAcademicaId?: string },
+  data: DatosSeedUsuario,
   estadoValidacion: EstadoValidacionDocente,
   opts?: { habilitado?: boolean },
 ) {
   const user = await seedUsuario(usuariosService, data, opts);
   await usuariosService['repo'].update(user.id, { estadoValidacionDocente: estadoValidacion });
+
+  // Rellena solo campos de perfil faltantes (no pisa datos cargados por la UI).
+  const cambiosPerfil: Record<string, unknown> = {};
+  for (const campo of CAMPOS_PERFIL_DOCENTE) {
+    const valor = data[campo];
+    if (valor !== undefined && user[campo] == null) {
+      cambiosPerfil[campo] = valor;
+    }
+  }
+  if (Object.keys(cambiosPerfil).length > 0) {
+    await usuariosService['repo'].update(user.id, cambiosPerfil as Partial<Usuario>);
+  }
   return user;
 }
 
@@ -270,6 +310,10 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
+    telefono: '11 1111 1111',
+    genero: Genero.Masculino,
+    cargoDocente: CargoDocente.ProfesorTitular,
+    areaDocente: 'Derecho Constitucional',
   }, EstadoValidacionDocente.Validado);
 
   const perez = await seedDocente(usuariosService, {
@@ -278,6 +322,11 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
+    telefono: '11 2222 2222',
+    genero: Genero.Femenino,
+    personaConDiscapacidad: false,
+    tipoDesignacionDocente: TipoDesignacionDocente.Regular,
+    direccionLocalidad: 'Caballito, CABA',
   }, EstadoValidacionDocente.Validado);
 
   await seedDocente(usuariosService, {
@@ -294,6 +343,7 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
+    genero: Genero.Masculino,
   }, EstadoValidacionDocente.Rechazado);
 
   await seedUsuario(usuariosService, {
@@ -318,6 +368,9 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: derecho.id,
+    telefono: '11 3333 3333',
+    genero: Genero.PrefieroNoResponder,
+    direccionLocalidad: 'Av. de Mayo 900, CABA',
   }, EstadoValidacionDocente.Validado);
 
   // --- Ingeniería ---
@@ -343,6 +396,10 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
+    genero: Genero.Masculino,
+    cargoDocente: CargoDocente.ProfesorAsociado,
+    tipoDesignacionDocente: TipoDesignacionDocente.Concursado,
+    areaDocente: 'Ingeniería Civil',
   }, EstadoValidacionDocente.Validado);
 
   const diaz = await seedDocente(usuariosService, {
@@ -351,6 +408,10 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
+    telefono: '11 4444 4444',
+    genero: Genero.Femenino,
+    personaConDiscapacidad: false,
+    direccionLocalidad: 'Av. Paseo Colón 850, CABA',
   }, EstadoValidacionDocente.Validado);
 
   const moreno = await seedDocente(usuariosService, {
@@ -359,6 +420,9 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
+    genero: Genero.Masculino,
+    cargoDocente: CargoDocente.ProfesorAdjunto,
+    tipoDesignacionDocente: TipoDesignacionDocente.Regular,
   }, EstadoValidacionDocente.Validado);
 
   await seedDocente(usuariosService, {
@@ -367,6 +431,7 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
+    telefono: '11 5555 5555',
   }, EstadoValidacionDocente.PendienteDeValidacion);
 
   await seedUsuario(usuariosService, {
@@ -383,6 +448,9 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: ingenieria.id,
+    genero: Genero.Otro,
+    personaConDiscapacidad: false,
+    areaDocente: 'Ingeniería Industrial',
   }, EstadoValidacionDocente.Validado);
 
   await seedDocente(usuariosService, {
@@ -416,6 +484,10 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: medicina.id,
+    telefono: '11 6666 6666',
+    genero: Genero.Masculino,
+    cargoDocente: CargoDocente.ProfesorTitular,
+    tipoDesignacionDocente: TipoDesignacionDocente.Regular,
   }, EstadoValidacionDocente.Validado);
 
   await seedDocente(usuariosService, {
@@ -424,6 +496,8 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: medicina.id,
+    genero: Genero.Femenino,
+    areaDocente: 'Cardiología',
   }, EstadoValidacionDocente.PendienteDeValidacion);
 
   const romero = await seedDocente(usuariosService, {
@@ -432,6 +506,10 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: medicina.id,
+    telefono: '11 7777 7777',
+    genero: Genero.Masculino,
+    personaConDiscapacidad: false,
+    direccionLocalidad: 'Belgrano, CABA',
   }, EstadoValidacionDocente.Validado);
 
   // --- CBC ---
@@ -449,7 +527,201 @@ async function bootstrap() {
     password: '123456',
     roles: [RolUsuario.Docente],
     unidadAcademicaId: cbc.id,
+    telefono: '11 8888 8888',
+    cargoDocente: CargoDocente.ProfesorAdjunto,
+    tipoDesignacionDocente: TipoDesignacionDocente.Interino,
+    areaDocente: 'Matemática CBC',
   }, EstadoValidacionDocente.Validado);
+
+  // ─────────────── DOCENTES ADICIONALES (PERFILES VARIADOS) ───────────────
+
+  console.log('\n=== SEED: Docentes adicionales (perfiles variados) ===');
+
+  // Facultad de Derecho
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Dr. Sosa',
+    email: 'sosa@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: derecho.id,
+    genero: Genero.Masculino,
+    cargoDocente: CargoDocente.ProfesorAdjunto,
+    tipoDesignacionDocente: TipoDesignacionDocente.Regular,
+    areaDocente: 'Derecho Penal',
+    direccionLocalidad: 'Av. Figueroa Alcorta 2263, CABA',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Dra. Ferreyra',
+    email: 'ferreyra@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: derecho.id,
+    telefono: '11 4567 8901',
+    genero: Genero.Femenino,
+    personaConDiscapacidad: false,
+    direccionLocalidad: 'Palermo, CABA',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Lic. Aguirre',
+    email: 'aguirre@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: derecho.id,
+    telefono: '11 5678 9012',
+    genero: Genero.Masculino,
+  }, EstadoValidacionDocente.PendienteDeValidacion);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Prof. Roldán',
+    email: 'roldan@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: derecho.id,
+    direccionLocalidad: 'La Plata, Buenos Aires',
+  }, EstadoValidacionDocente.Rechazado);
+
+  // Facultad de Ingeniería
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Ing. Benítez',
+    email: 'benitez@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: ingenieria.id,
+    telefono: '11 2345 6789',
+    cargoDocente: CargoDocente.ProfesorAsociado,
+    tipoDesignacionDocente: TipoDesignacionDocente.Concursado,
+    areaDocente: 'Ingeniería Electrónica',
+    direccionLocalidad: 'Av. Paseo Colón 850, CABA',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Ing. Villalba',
+    email: 'villalba@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: ingenieria.id,
+    genero: Genero.Masculino,
+    personaConDiscapacidad: false,
+    cargoDocente: CargoDocente.AyudanteDePrimera,
+    tipoDesignacionDocente: TipoDesignacionDocente.Interino,
+    areaDocente: 'Ingeniería en Informática',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Lic. Cabrera',
+    email: 'cabrera@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: ingenieria.id,
+    telefono: '11 3456 7890',
+    genero: Genero.Otro,
+    personaConDiscapacidad: true,
+  }, EstadoValidacionDocente.PendienteDeValidacion);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Dra. Giménez',
+    email: 'gimenez@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: ingenieria.id,
+    telefono: '11 4567 8901',
+  }, EstadoValidacionDocente.Validado);
+
+  // Facultad de Medicina
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Dr. Acosta',
+    email: 'acosta@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: medicina.id,
+    genero: Genero.Masculino,
+    personaConDiscapacidad: false,
+    cargoDocente: CargoDocente.ProfesorTitular,
+    tipoDesignacionDocente: TipoDesignacionDocente.Regular,
+    areaDocente: 'Clínica Médica',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Dra. Navarro',
+    email: 'navarro@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: medicina.id,
+    telefono: '11 5678 9012',
+    genero: Genero.Femenino,
+    personaConDiscapacidad: false,
+    direccionLocalidad: 'Av. Córdoba 2100, CABA',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Lic. Paredes',
+    email: 'paredes@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: medicina.id,
+    genero: Genero.PrefieroNoResponder,
+    areaDocente: 'Enfermería Comunitaria',
+  }, EstadoValidacionDocente.PendienteDeValidacion);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Prof. Corvalán',
+    email: 'corvalan@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: medicina.id,
+    telefono: '11 6789 0123',
+  }, EstadoValidacionDocente.Rechazado);
+
+  // Facultad de Ciencias Exactas y Naturales
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Dr. Vega',
+    email: 'vega@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: exactas.id,
+    telefono: '11 7890 1234',
+    genero: Genero.Masculino,
+    personaConDiscapacidad: false,
+    cargoDocente: CargoDocente.ProfesorAdjunto,
+    tipoDesignacionDocente: TipoDesignacionDocente.Concursado,
+    direccionLocalidad: 'Ciudad Universitaria, CABA',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Dra. Ledesma',
+    email: 'ledesma@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: exactas.id,
+    genero: Genero.Femenino,
+    personaConDiscapacidad: false,
+    cargoDocente: CargoDocente.JefeDeTrabajosPracticos,
+    tipoDesignacionDocente: TipoDesignacionDocente.Suplente,
+    areaDocente: 'Matemática',
+    direccionLocalidad: 'Ciudad Universitaria, CABA',
+  }, EstadoValidacionDocente.Validado);
+
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Lic. Funes',
+    email: 'funes@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: exactas.id,
+    telefono: '11 8901 2345',
+  }, EstadoValidacionDocente.PendienteDeValidacion);
+
+  // Facultad de Ciencias Sociales
+  await seedDocente(usuariosService, {
+    nombreCompleto: 'Lic. Montero',
+    email: 'montero@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: sociales.id,
+    genero: Genero.Femenino,
+    areaDocente: 'Comunicación',
+  }, EstadoValidacionDocente.Rechazado);
 
   // ─────────────── BACKFILL NOMBRE/APELLIDO ───────────────
 
