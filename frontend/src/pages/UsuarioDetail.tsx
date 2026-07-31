@@ -25,7 +25,7 @@ import {
   tipoDesignacionDocenteLabel,
   personaConDiscapacidadLabel,
 } from '@/data/perfil'
-import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound, VenusAndMars, Accessibility } from 'lucide-react'
+import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound, VenusAndMars, Accessibility, Building, Percent, Briefcase, Stamp, BookOpen, MapPin, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
@@ -405,53 +405,22 @@ export function UsuarioDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-y-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">Unidad Académica:</span>{' '}
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Unidad Académica:</span>
                 <span>{usuario.unidadAcademica?.nombre || 'Sin asignar'}</span>
               </div>
-              <div>
-                <span className="text-muted-foreground">Creado por:</span>{' '}
-                <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Tipo:</span>{' '}
-                <span>
-                  {usuario.roles.includes(RolUsuario.Docente)
-                    ? 'Docente'
-                    : usuario.roles.includes(RolUsuario.Estudiante)
-                      ? 'Estudiante'
-                      : 'Gestión'}
-                </span>
-              </div>
-              {usuario.roles.includes(RolUsuario.Docente) && (
-                <>
-                  <div>
-                    <span className="text-muted-foreground">Cargo:</span>{' '}
-                    <span>{cargoDocenteLabel(usuario.cargoDocente)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Tipo de designación:</span>{' '}
-                    <span>{tipoDesignacionDocenteLabel(usuario.tipoDesignacionDocente)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Materia / Área / Departamento:</span>{' '}
-                    <span>{usuario.areaDocente || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Dirección o localidad:</span>{' '}
-                    <span>{usuario.direccionLocalidad || '—'}</span>
-                  </div>
-                </>
-              )}
               {usuario.roles.includes(RolUsuario.Estudiante) && (
                 <>
-                  <div>
-                    <span className="text-muted-foreground">Carrera:</span>{' '}
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Carrera:</span>
                     <span>{usuario.carrera?.nombre || '—'}</span>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Porcentaje de la carrera:</span>{' '}
+                  <div className="flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Porcentaje de la carrera:</span>
                     <span>
                       {usuario.porcentajeCarrera === undefined || usuario.porcentajeCarrera === null
                         ? '—'
@@ -460,10 +429,50 @@ export function UsuarioDetail() {
                   </div>
                 </>
               )}
+              {usuario.roles.includes(RolUsuario.Docente) && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Cargo:</span>
+                    <span>{cargoDocenteLabel(usuario.cargoDocente)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Stamp className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Tipo de designación:</span>
+                    <span>{tipoDesignacionDocenteLabel(usuario.tipoDesignacionDocente)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Materia / Área / Departamento:</span>
+                    <span>{usuario.areaDocente || '—'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Dirección o localidad:</span>
+                    <span>{usuario.direccionLocalidad || '—'}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center gap-2">
+                <UserRound className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Tipo:</span>
+                <span>
+                  {usuario.roles.includes(RolUsuario.Docente)
+                    ? 'Docente'
+                    : usuario.roles.includes(RolUsuario.Estudiante)
+                      ? 'Estudiante'
+                      : 'Gestión'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Creado por:</span>
+                <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
+              </div>
             </div>
             <Separator />
             <div>
-              <p className="text-sm text-muted-foreground mb-2">Roles</p>
+              <p className="text-sm text-muted-foreground mb-2">Roles:</p>
               <div className="flex gap-2 flex-wrap">
                 {usuario.roles.map(r => (
                   <Badge key={r} variant="outline" className={rolColor(r)}>
