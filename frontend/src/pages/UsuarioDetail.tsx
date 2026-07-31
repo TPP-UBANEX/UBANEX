@@ -405,7 +405,7 @@ export function UsuarioDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 text-sm pb-3">
+            <div className="space-y-3 text-sm">
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Unidad Académica:</span>
@@ -470,17 +470,6 @@ export function UsuarioDetail() {
                 <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
               </div>
             </div>
-            <Separator />
-            <div className="pt-3">
-              <p className="text-sm text-muted-foreground mb-2">Roles:</p>
-              <div className="flex gap-2 flex-wrap">
-                {usuario.roles.map(r => (
-                  <Badge key={r} variant="outline" className={rolColor(r)}>
-                    {rolLabels[r] || r}
-                  </Badge>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -493,6 +482,14 @@ export function UsuarioDetail() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            <span className="text-muted-foreground">Roles:</span>
+            {usuario.roles.map(r => (
+              <Badge key={r} variant="outline" className={rolColor(r)}>
+                {rolLabels[r] || r}
+              </Badge>
+            ))}
+          </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Estado:</span>
             <Badge variant={usuario.habilitado ? 'default' : 'secondary'}>
