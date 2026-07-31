@@ -5,7 +5,11 @@ import {
 export class RegisterDto {
   @IsString()
   @IsNotEmpty()
-  nombreCompleto: string;
+  nombre: string;
+
+  @IsString()
+  @IsNotEmpty()
+  apellido: string;
 
   @IsEmail()
   email: string;
@@ -20,4 +24,12 @@ export class RegisterDto {
   @IsOptional()
   @IsUUID()
   unidadAcademicaId?: string;
+
+  @IsOptional()
+  @IsString()
+  telefono?: string;
+
+  @IsOptional()
+  @IsUUID()
+  carreraId?: string;
 }
