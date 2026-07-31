@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
 import { api } from '@/lib/api'
+import { esTelefonoValido } from '@/lib/utils'
 import type { UnidadAcademica, Carrera, RegisterDto } from '@/data/types'
 import { GraduationCap, ArrowLeft, BookOpen } from 'lucide-react'
 
@@ -59,6 +60,10 @@ export function Register() {
     }
     if (tipo === 'docente' && !telefono.trim()) {
       setError('El teléfono es obligatorio para docentes')
+      return
+    }
+    if (tipo === 'docente' && telefono.trim() && !esTelefonoValido(telefono.trim())) {
+      setError('El teléfono no tiene un formato válido')
       return
     }
 

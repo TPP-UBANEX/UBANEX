@@ -1,5 +1,5 @@
 import {
-  IsString, IsNotEmpty, IsEmail, IsOptional, IsUUID, IsIn,
+  IsString, IsNotEmpty, IsEmail, IsOptional, IsUUID, IsIn, Matches,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -27,6 +27,7 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\+?[0-9()\-\s]{6,20}$/, { message: 'El teléfono no tiene un formato válido' })
   telefono?: string;
 
   @IsOptional()

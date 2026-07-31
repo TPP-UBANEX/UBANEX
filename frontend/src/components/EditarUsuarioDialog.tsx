@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { esTelefonoValido } from '@/lib/utils'
 import type { Usuario, UnidadAcademica, Carrera } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import {
@@ -148,6 +149,11 @@ export function EditarUsuarioDialog({
     setError('')
     setSubmitting(true)
     try {
+      if (esAutoEdicion && telefono.trim() && !esTelefonoValido(telefono.trim())) {
+        setError('El teléfono no tiene un formato válido')
+        setSubmitting(false)
+        return
+      }
       const data: Record<string, unknown> = { email }
       if (esAutoEdicion) {
         data.nombre = nombre.trim()

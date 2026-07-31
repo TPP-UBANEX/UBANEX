@@ -1,6 +1,6 @@
 import {
   IsString, IsNotEmpty, IsEmail, IsArray, IsOptional, IsUUID, IsEnum,
-  IsBoolean, IsInt, Min, Max,
+  IsBoolean, IsInt, Min, Max, Matches,
 } from 'class-validator';
 import { RolUsuario } from '../../common/enums/rol-usuario.enum';
 import { Genero } from '../../common/enums/genero.enum';
@@ -39,6 +39,7 @@ export class CrearUsuarioDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\+?[0-9()\-\s]{6,20}$/, { message: 'El teléfono no tiene un formato válido' })
   telefono?: string;
 
   @IsOptional()
