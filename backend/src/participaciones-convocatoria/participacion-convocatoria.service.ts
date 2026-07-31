@@ -35,6 +35,16 @@ export class ParticipacionConvocatoriaService {
       throw new BadRequestException('El docente debe estar validado para ser asignado');
     }
 
+    if (
+      (dto.rol === RolEjecucion.DirectorDeProyecto || dto.rol === RolEjecucion.Evaluador) &&
+      !this.perfilDocenteCompleto(usuario)
+    ) {
+      const faltantes = this.camposPerfilFaltantes(usuario);
+      throw new BadRequestException(
+        `El docente tiene el perfil incompleto. Completar en Mi Perfil: ${faltantes.join(', ')}`,
+      );
+    }
+
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: dto.convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
@@ -82,6 +92,32 @@ export class ParticipacionConvocatoriaService {
     });
 
     return this.repo.save(entity);
+  }
+
+  private camposPerfilFaltantes(usuario: Usuario): string[] {
+    const campos: Array<[keyof Usuario, string]> = [
+      ['nombre', 'nombre'],
+      ['apellido', 'apellido'],
+      ['telefono', 'teléfono'],
+      ['cargoDocente', 'cargo'],
+      ['tipoDesignacionDocente', 'tipo de designación'],
+      ['genero', 'identidad de género'],
+      ['areaDocente', 'materia/área'],
+      ['personaConDiscapacidad', 'persona con discapacidad'],
+      ['direccionLocalidad', 'dirección o localidad'],
+    ];
+    const faltantes: string[] = [];
+    for (const [campo, etiqueta] of campos) {
+      const valor = usuario[campo];
+      if (valor === null || valor === undefined || valor === '') {
+        faltantes.push(etiqueta);
+      }
+    }
+    return faltantes;
+  }
+
+  private perfilDocenteCompleto(usuario: Usuario): boolean {
+    return this.camposPerfilFaltantes(usuario).length === 0;
   }
 
   async desasignar(id: string): Promise<void> {
