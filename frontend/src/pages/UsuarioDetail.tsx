@@ -25,7 +25,7 @@ import {
   tipoDesignacionDocenteLabel,
   personaConDiscapacidadLabel,
 } from '@/data/perfil'
-import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound } from 'lucide-react'
+import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound, VenusAndMars, Accessibility } from 'lucide-react'
 import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
@@ -384,6 +384,16 @@ export function UsuarioDetail() {
               <span className="text-muted-foreground">Teléfono:</span>
               <span>{usuario.telefono || '—'}</span>
             </div>
+            <div className="flex items-center gap-2 text-sm">
+              <VenusAndMars className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Identidad de género:</span>
+              <span>{generoLabel(usuario.genero)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Accessibility className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Persona con discapacidad:</span>
+              <span>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</span>
+            </div>
           </CardContent>
         </Card>
 
@@ -395,7 +405,7 @@ export function UsuarioDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2 text-sm">
+            <div className="grid gap-y-3 text-sm">
               <div>
                 <span className="text-muted-foreground">Unidad Académica:</span>{' '}
                 <span>{usuario.unidadAcademica?.nombre || 'Sin asignar'}</span>
@@ -450,14 +460,6 @@ export function UsuarioDetail() {
                   </div>
                 </>
               )}
-              <div>
-                <span className="text-muted-foreground">Identidad de género:</span>{' '}
-                <span>{generoLabel(usuario.genero)}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Persona con discapacidad:</span>{' '}
-                <span>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</span>
-              </div>
             </div>
             <Separator />
             <div>
