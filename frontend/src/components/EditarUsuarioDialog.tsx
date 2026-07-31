@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -126,14 +126,20 @@ export function EditarUsuarioDialog({
   }, [open, usuario])
 
   useEffect(() => {
-    if (!open || !esAutoEdicion || !esEstudiante || !usuario.unidadAcademicaId) return
-    api.carreras.porUnidadAcademica(usuario.unidadAcademicaId)
-      .then(list => {
-        if (list.length > 0) setCarreras(list)
-        else api.carreras.list().then(setCarreras).catch(() => {})
-      })
-      .catch(() => {})
+    if (!open || !esAutoEdicion || !esEstudiante) return
+    const cargar = usuario.unidadAcademicaId
+      ? api.carreras.porUnidadAcademica(usuario.unidadAcademicaId)
+          .then(list => list.length > 0 ? list : api.carreras.list())
+      : api.carreras.list()
+    cargar.then(setCarreras).catch(() => {})
   }, [open, esAutoEdicion, esEstudiante, usuario.unidadAcademicaId])
+
+  const carrerasOptions = useMemo(() => {
+    if (!usuario.carrera) return carreras
+    return carreras.some(c => c.id === usuario.carrera?.id)
+      ? carreras
+      : [usuario.carrera, ...carreras]
+  }, [carreras, usuario.carrera])
 
   if (!puedeEditar) return null
 
@@ -321,7 +327,7 @@ export function EditarUsuarioDialog({
                     <Select value={carreraId} onValueChange={setCarreraId}>
                       <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                       <SelectContent>
-                        {carreras.map(c => (
+                        {carrerasOptions.map(c => (
                           <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
                         ))}
                       </SelectContent>
