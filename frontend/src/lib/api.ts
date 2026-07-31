@@ -47,7 +47,7 @@ export const api = {
   auth: {
     login: (data: { email: string; password: string }) =>
       post<{ accessToken: string }>('/auth/login', data),
-    register: (data: { nombreCompleto: string; email: string; password: string; tipo: 'estudiante' | 'docente'; unidadAcademicaId?: string }) =>
+    register: (data: import('@/data/types').RegisterDto) =>
       post<{ accessToken: string }>('/auth/register', data),
   },
   usuarios: {
@@ -77,6 +77,14 @@ export const api = {
     get: (id: string) => get<import('@/data/types').UnidadAcademica>(`/unidades-academicas/${id}`),
     crear: (data: { nombre: string }) =>
       post<import('@/data/types').UnidadAcademica>('/unidades-academicas', data),
+  },
+  carreras: {
+    list: () => get<import('@/data/types').Carrera[]>('/carreras'),
+    get: (id: string) => get<import('@/data/types').Carrera>(`/carreras/${id}`),
+    porUnidadAcademica: (unidadAcademicaId: string) =>
+      get<import('@/data/types').Carrera[]>(`/carreras/unidad-academica/${unidadAcademicaId}`),
+    crear: (data: { nombre: string; unidadAcademicaId: string }) =>
+      post<import('@/data/types').Carrera>('/carreras', data),
   },
   participaciones: {
     asignar: (data: import('@/data/types').CrearParticipacionDto) =>

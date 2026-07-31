@@ -18,9 +18,41 @@ export enum EstadoValidacionDocente {
   Rechazado = 'Rechazado',
 }
 
+export enum Genero {
+  Femenino = 'Femenino',
+  Masculino = 'Masculino',
+  Otro = 'Otro',
+  PrefieroNoResponder = 'PrefieroNoResponder',
+}
+
+export enum CargoDocente {
+  ProfesorTitular = 'ProfesorTitular',
+  ProfesorAsociado = 'ProfesorAsociado',
+  ProfesorAdjunto = 'ProfesorAdjunto',
+  JefeDeTrabajosPracticos = 'JefeDeTrabajosPracticos',
+  AyudanteDePrimera = 'AyudanteDePrimera',
+  AyudanteDeSegunda = 'AyudanteDeSegunda',
+  Otro = 'Otro',
+}
+
+export enum TipoDesignacionDocente {
+  Concursado = 'Concursado',
+  Regular = 'Regular',
+  Ordinario = 'Ordinario',
+  Interino = 'Interino',
+  Suplente = 'Suplente',
+}
+
 export interface UnidadAcademica {
   id: string
   nombre: string
+}
+
+export interface Carrera {
+  id: string
+  nombre: string
+  unidadAcademicaId: string
+  unidadAcademica?: UnidadAcademica
 }
 
 export interface Usuario {
@@ -35,6 +67,18 @@ export interface Usuario {
   ultimaActividad?: string
   creadoPor?: Usuario
   creadoPorId?: string
+  nombre?: string
+  apellido?: string
+  telefono?: string
+  genero?: Genero
+  personaConDiscapacidad?: boolean
+  cargoDocente?: CargoDocente
+  tipoDesignacionDocente?: TipoDesignacionDocente
+  areaDocente?: string
+  direccionLocalidad?: string
+  porcentajeCarrera?: number
+  carrera?: Carrera
+  carreraId?: string
 }
 
 export interface AuthResponse {
@@ -47,11 +91,14 @@ export interface LoginDto {
 }
 
 export interface RegisterDto {
-  nombreCompleto: string
+  nombre: string
+  apellido: string
   email: string
   password: string
   tipo: 'estudiante' | 'docente'
   unidadAcademicaId?: string
+  telefono?: string
+  carreraId?: string
 }
 
 export interface CrearUsuarioDto {
@@ -60,6 +107,17 @@ export interface CrearUsuarioDto {
   password: string
   roles: RolUsuario[]
   unidadAcademicaId?: string
+  nombre?: string
+  apellido?: string
+  telefono?: string
+  genero?: Genero
+  personaConDiscapacidad?: boolean
+  cargoDocente?: CargoDocente
+  tipoDesignacionDocente?: TipoDesignacionDocente
+  areaDocente?: string
+  direccionLocalidad?: string
+  porcentajeCarrera?: number
+  carreraId?: string
 }
 
 export interface PaginationMeta {

@@ -56,7 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (
     nombreCompleto: string, email: string, password: string, tipo: 'estudiante' | 'docente', unidadAcademicaId?: string,
   ) => {
-    const { accessToken } = await api.auth.register({ nombreCompleto, email, password, tipo, unidadAcademicaId })
+    const partes = nombreCompleto.trim().split(/\s+/)
+    const { accessToken } = await api.auth.register({
+      nombre: partes[0] || '',
+      apellido: partes.slice(1).join(' ') || '',
+      email,
+      password,
+      tipo,
+      unidadAcademicaId,
+    })
     localStorage.setItem('token', accessToken)
     const payload = JSON.parse(atob(accessToken.split('.')[1]))
     const user = await api.usuarios.get(payload.sub)
