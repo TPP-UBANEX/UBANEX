@@ -454,17 +454,6 @@ export function UsuarioDetail() {
                 </>
               )}
               <div className="flex items-center gap-2">
-                <UserRound className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Tipo:</span>
-                <span>
-                  {usuario.roles.includes(RolUsuario.Docente)
-                    ? 'Docente'
-                    : usuario.roles.includes(RolUsuario.Estudiante)
-                      ? 'Estudiante'
-                      : 'Gestión'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
                 <UserPlus className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Creado por:</span>
                 <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
@@ -483,7 +472,9 @@ export function UsuarioDetail() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2 text-sm flex-wrap">
-            <span className="text-muted-foreground">Roles:</span>
+            <span className="text-muted-foreground">
+              {usuario.roles.length === 1 ? 'Rol:' : 'Roles:'}
+            </span>
             {usuario.roles.map(r => (
               <Badge key={r} variant="outline" className={rolColor(r)}>
                 {rolLabels[r] || r}
