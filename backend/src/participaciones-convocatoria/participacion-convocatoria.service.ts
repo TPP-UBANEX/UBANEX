@@ -8,9 +8,32 @@ import { CrearParticipacionDto } from './dto/crear-participacion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Edicion } from '../proyectos/edicion.entity';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
+
+type CampoPerfil = {
+  campo:
+    | 'nombre' | 'apellido' | 'telefono' | 'cargoDocente'
+    | 'tipoDesignacionDocente' | 'genero' | 'areaDocente'
+    | 'personaConDiscapacidad' | 'direccionLocalidad';
+  etiqueta: string;
+  esBooleano?: boolean;
+};
+
+const CAMPOS_PERFIL: CampoPerfil[] = [
+  { campo: 'nombre', etiqueta: 'nombre' },
+  { campo: 'apellido', etiqueta: 'apellido' },
+  { campo: 'telefono', etiqueta: 'teléfono' },
+  { campo: 'cargoDocente', etiqueta: 'cargo' },
+  { campo: 'tipoDesignacionDocente', etiqueta: 'tipo de designación' },
+  { campo: 'genero', etiqueta: 'identidad de género' },
+  { campo: 'areaDocente', etiqueta: 'materia/área' },
+  { campo: 'personaConDiscapacidad', etiqueta: 'persona con discapacidad', esBooleano: true },
+  { campo: 'direccionLocalidad', etiqueta: 'dirección o localidad' },
+];
 
 @Injectable()
 export class ParticipacionConvocatoriaService {
@@ -23,6 +46,7 @@ export class ParticipacionConvocatoriaService {
     private readonly convocatoriaRepo: Repository<Convocatoria>,
     @InjectRepository(Edicion)
     private readonly edicionRepo: Repository<Edicion>,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async asignar(dto: CrearParticipacionDto, asignadoPor: Usuario): Promise<ParticipacionConvocatoria> {
@@ -39,10 +63,7 @@ export class ParticipacionConvocatoriaService {
       (dto.rol === RolEjecucion.DirectorDeProyecto || dto.rol === RolEjecucion.Evaluador) &&
       !this.perfilDocenteCompleto(usuario)
     ) {
-      const faltantes = this.camposPerfilFaltantes(usuario);
-      throw new BadRequestException(
-        `El docente tiene el perfil incompleto. Completar en Mi Perfil: ${faltantes.join(', ')}`,
-      );
+      await this.completarPerfil(usuario, dto, asignadoPor);
     }
 
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: dto.convocatoriaId } });
@@ -94,30 +115,70 @@ export class ParticipacionConvocatoriaService {
     return this.repo.save(entity);
   }
 
-  private camposPerfilFaltantes(usuario: Usuario): string[] {
-    const campos: Array<[keyof Usuario, string]> = [
-      ['nombre', 'nombre'],
-      ['apellido', 'apellido'],
-      ['telefono', 'teléfono'],
-      ['cargoDocente', 'cargo'],
-      ['tipoDesignacionDocente', 'tipo de designación'],
-      ['genero', 'identidad de género'],
-      ['areaDocente', 'materia/área'],
-      ['personaConDiscapacidad', 'persona con discapacidad'],
-      ['direccionLocalidad', 'dirección o localidad'],
-    ];
-    const faltantes: string[] = [];
-    for (const [campo, etiqueta] of campos) {
+  private camposPerfilFaltantes(usuario: Usuario): CampoPerfil[] {
+    return CAMPOS_PERFIL.filter(({ campo }) => {
       const valor = usuario[campo];
-      if (valor === null || valor === undefined || valor === '') {
-        faltantes.push(etiqueta);
-      }
-    }
-    return faltantes;
+      return valor === null || valor === undefined || valor === '';
+    });
   }
 
   private perfilDocenteCompleto(usuario: Usuario): boolean {
     return this.camposPerfilFaltantes(usuario).length === 0;
+  }
+
+  private async completarPerfil(
+    usuario: Usuario,
+    dto: CrearParticipacionDto,
+    asignadoPor: Usuario,
+  ): Promise<void> {
+    const faltantes = this.camposPerfilFaltantes(usuario);
+    const sinCompletar = faltantes.filter(({ campo }) => {
+      const valor = dto[campo];
+      if (campo === 'personaConDiscapacidad') {
+        return typeof valor !== 'boolean';
+      }
+      return typeof valor !== 'string' || valor.trim() === '';
+    });
+
+    if (sinCompletar.length > 0) {
+      const etiquetas = sinCompletar.map(({ etiqueta }) => etiqueta).join(', ');
+      throw new BadRequestException(
+        `Faltan completar los datos del perfil del docente: ${etiquetas}`,
+      );
+    }
+
+    if (dto.nombre !== undefined) usuario.nombre = dto.nombre;
+    if (dto.apellido !== undefined) usuario.apellido = dto.apellido;
+    if (dto.telefono !== undefined) usuario.telefono = dto.telefono;
+    if (dto.genero !== undefined) usuario.genero = dto.genero;
+    if (dto.personaConDiscapacidad !== undefined) {
+      usuario.personaConDiscapacidad = dto.personaConDiscapacidad;
+    }
+    if (dto.cargoDocente !== undefined) usuario.cargoDocente = dto.cargoDocente;
+    if (dto.tipoDesignacionDocente !== undefined) {
+      usuario.tipoDesignacionDocente = dto.tipoDesignacionDocente;
+    }
+    if (dto.areaDocente !== undefined) usuario.areaDocente = dto.areaDocente;
+    if (dto.direccionLocalidad !== undefined) {
+      usuario.direccionLocalidad = dto.direccionLocalidad;
+    }
+
+    if (dto.nombre !== undefined || dto.apellido !== undefined) {
+      usuario.nombreCompleto = `${usuario.nombre || ''} ${usuario.apellido || ''}`.trim();
+    }
+
+    await this.usuarioRepo.save(usuario);
+
+    const rolLabel = dto.rol === RolEjecucion.DirectorDeProyecto
+      ? 'Director de Proyecto'
+      : 'Evaluador';
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EDICION,
+      descripcion: `Perfil completado al asignar como ${rolLabel}`,
+      responsableId: asignadoPor.id,
+      responsableNombre: asignadoPor.nombreCompleto,
+    });
   }
 
   async desasignar(id: string): Promise<void> {

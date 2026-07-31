@@ -6,10 +6,12 @@ import { ParticipacionConvocatoriaController } from './participacion-convocatori
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Edicion } from '../proyectos/edicion.entity';
+import { AuditoriaModule } from '../auditoria/auditoria.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ParticipacionConvocatoria, Usuario, Convocatoria, Edicion]),
+    AuditoriaModule,
   ],
   providers: [ParticipacionConvocatoriaService],
   controllers: [ParticipacionConvocatoriaController],
