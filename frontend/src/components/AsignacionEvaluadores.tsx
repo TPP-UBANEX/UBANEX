@@ -66,11 +66,11 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
         convocatoriaId,
         rol: RolEjecucion.Evaluador,
       })
-      toast.success('Evaluador asignado correctamente')
+      toast.success('Usuario de evaluación asignado correctamente')
       setSelectedUserId('')
       cargarDatos()
     } catch {
-      toast.error('Error al asignar evaluador')
+      toast.error('Error al asignar usuario de evaluación')
     } finally {
       setSubmitting(false)
     }
@@ -79,10 +79,10 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const handleDesasignar = async (id: string) => {
     try {
       await api.participaciones.desasignar(id)
-      toast.success('Evaluador desasignado')
+      toast.success('Usuario de evaluación quitado correctamente')
       cargarDatos()
     } catch {
-      toast.error('Error al desasignar evaluador')
+      toast.error('Error al quitar usuario de evaluación')
     }
   }
 
@@ -90,10 +90,10 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     <div className="space-y-6">
       <div className="flex items-end gap-3">
         <div className="flex-1 space-y-2">
-          <p className="text-sm font-medium">Asignar evaluador</p>
+          <p className="text-sm font-medium">Asignar usuario de evaluación</p>
           <Select value={selectedUserId} onValueChange={setSelectedUserId}>
             <SelectTrigger>
-              <SelectValue placeholder="Seleccioná un docente validado" />
+              <SelectValue placeholder="Seleccioná un usuario docente validado" />
             </SelectTrigger>
             <SelectContent>
               {docentes.map(d => (
@@ -112,7 +112,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
 
       <div>
         <p className="text-sm font-medium mb-2">
-          Evaluadores asignados ({evaluadores.length})
+          Usuarios de evaluación asignados ({evaluadores.length})
         </p>
         {loading ? (
           <div className="space-y-2">
@@ -122,7 +122,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
           </div>
         ) : evaluadores.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No hay evaluadores asignados a esta convocatoria
+            No hay usuarios de evaluación asignados a esta convocatoria
           </p>
         ) : (
           <Table>

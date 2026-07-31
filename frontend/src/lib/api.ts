@@ -130,6 +130,19 @@ export const api = {
       post<import('@/data/types').Formulario>('/formularios', data),
     eliminar: (id: string) => del(`/formularios/${id}`),
   },
+  sugerencias: {
+    listar: (edicionId: string) =>
+      get<import('@/data/types').SugerenciaCambio[]>(`/ediciones/${edicionId}/sugerencias`),
+    crear: (edicionId: string, data: import('@/data/types').CrearSugerenciaDto) =>
+      post<import('@/data/types').SugerenciaCambio>(`/ediciones/${edicionId}/sugerencias`, data),
+    responder: (id: string, data: import('@/data/types').ResponderSugerenciaDto) =>
+      patch<import('@/data/types').SugerenciaCambio>(`/sugerencias/${id}/responder`, data),
+  },
+  notificaciones: {
+    listar: () => get<import('@/data/types').Notificacion[]>('/notificaciones'),
+    leer: (id: string) => patch<{ message: string }>(`/notificaciones/${id}/leer`, {}),
+    leerTodas: () => patch<{ message: string }>('/notificaciones/leer-todas', {}),
+  },
   rendiciones: {
     list: (proyectoId?: string) => {
       const qs = proyectoId ? `?proyectoId=${proyectoId}` : ''

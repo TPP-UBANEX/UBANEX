@@ -26,7 +26,10 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario } from '@/data/types'
 import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
-import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2 } from 'lucide-react'
+import { CampoSugerible } from '@/components/CampoSugerible'
+import { SugerirCambioModal } from '@/components/SugerirCambioModal'
+import { SugerenciasTab } from '@/components/SugerenciasTab'
+import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 const tipoRubroLabels: Record<TipoRubro, string> = {
@@ -49,11 +52,18 @@ export function ProyectoDetail() {
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
+  const [editEsConsolidado, setEditEsConsolidado] = useState(false)
+  const [editEsInterfacultad, setEditEsInterfacultad] = useState(false)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [guardando, setGuardando] = useState(false)
 
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showAsignarDirector, setShowAsignarDirector] = useState(false)
+
+  const [modoSugerencia, setModoSugerencia] = useState(false)
+  const [sugerenciaModal, setSugerenciaModal] = useState<{ open: boolean; campo: string; valorActual: string; label: string }>({
+    open: false, campo: '', valorActual: '', label: '',
+  })
 
   const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
@@ -72,10 +82,12 @@ export function ProyectoDetail() {
   const directoresCompletos = tieneDirectorPrincipal && tieneSegundoDirector
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
   const esDocente = user?.roles.includes(RolUsuario.Docente)
+  const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
+  const esSecretariaMismaUA = esSecretaria && esMismaUA
   const motivoEnvio = !esDocenteValidado
     ? 'Tu usuario no está validado'
     : !directoresCompletos
-      ? 'El proyecto no tiene asignados director y codirector aún'
+      ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
       : ''
 
   const cargarDatos = async () => {
@@ -110,6 +122,8 @@ export function ProyectoDetail() {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
     setEditAnioEdicion(edicion.anioEdicion ?? null)
+    setEditEsConsolidado(proyecto.esConsolidado)
+    setEditEsInterfacultad(proyecto.esInterfacultad)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
     setEditando(true)
   }
@@ -125,6 +139,8 @@ export function ProyectoDetail() {
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
         anioEdicion: editAnioEdicion ?? undefined,
+        esConsolidado: editEsConsolidado,
+        esInterfacultad: editEsInterfacultad,
         presupuesto: editPresupuesto || undefined,
       })
       toast.success('Proyecto actualizado')
@@ -164,6 +180,10 @@ export function ProyectoDetail() {
       setEliminando(false)
       setConfirmarEliminar(false)
     }
+  }
+
+  const handleSugerirClick = (campo: string, valorActual: string, label: string) => {
+    setSugerenciaModal({ open: true, campo, valorActual, label })
   }
 
   const presupuestoVacio = (): Presupuesto => ({
@@ -302,11 +322,18 @@ export function ProyectoDetail() {
               </Button>
             </>
           )}
+          {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
+            <Button variant="outline" size="sm" onClick={() => setModoSugerencia(true)}>
+              <MessageSquare className="h-4 w-4 mr-2" />Sugerir cambios
+            </Button>
+          )}
+          {modoSugerencia && (
+            <Button variant="ghost" size="sm" onClick={() => setModoSugerencia(false)}>
+              <X className="h-4 w-4 mr-2" />Cancelar sugerencia
+            </Button>
+          )}
           {!editando && esSecretaria && edicion?.estado === EstadoEdicion.Presentado && (
             <>
-              <Button variant="outline" size="sm" onClick={() => toast('Solicitar cambios — funcionalidad pendiente')}>
-                Solicitar cambios
-              </Button>
               <Button size="sm" onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
                 Iniciar evaluación
               </Button>
@@ -329,7 +356,7 @@ export function ProyectoDetail() {
           <CardContent>
             <p className="text-sm">
               {directores.length > 0
-                ? directores.map(d => `${d.usuario?.nombreCompleto || '?'}${d.esDirectorPrincipal ? ' (Principal)' : ''}`).join(', ')
+                ? directores.map(d => `${d.usuario?.nombreCompleto || '?'}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ')
                 : '-'}
             </p>
           </CardContent>
@@ -344,8 +371,8 @@ export function ProyectoDetail() {
         </Card>
         {puedeAsignarDirector && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
-            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar Director</CardTitle></CardHeader>
-            <CardContent><p className="text-sm text-muted-foreground">+ Agregar director</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar usuario de dirección</CardTitle></CardHeader>
+            <CardContent><p className="text-sm text-muted-foreground">+ Agregar usuario de dirección</p></CardContent>
           </Card>
         )}
       </div>
@@ -357,6 +384,7 @@ export function ProyectoDetail() {
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="rendiciones">Rendiciones</TabsTrigger>
           <TabsTrigger value="cierre">Cierre</TabsTrigger>
+          <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-4">
@@ -378,6 +406,20 @@ export function ProyectoDetail() {
                     onChange={e => setEditAnioEdicion(e.target.value ? Number(e.target.value) : null)}
                   />
                 </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">¿Es consolidado?</p>
+                    <div className="flex gap-2">
+                      <Button type="button" variant={editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(true)}>Sí</Button>
+                      <Button type="button" variant={!editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(false)}>No</Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">¿Es interfacultad?</p>
+                    <div className="flex gap-2">
+                      <Button type="button" variant={editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => setEditEsInterfacultad(true)}>Sí</Button>
+                      <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => setEditEsInterfacultad(false)}>No</Button>
+                    </div>
+                  </div>
               </CardContent>
             </Card>
           ) : (
@@ -385,14 +427,35 @@ export function ProyectoDetail() {
               <CardHeader><CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-4">
-                  <div><span className="text-muted-foreground">Nombre:</span> {proyecto.nombre}</div>
+                  <div>
+                    <span className="text-muted-foreground">Nombre:</span>{' '}
+                    <CampoSugerible campo="nombre" valorActual={proyecto.nombre} label="Nombre" activo={modoSugerencia} onClick={handleSugerirClick}>
+                      {proyecto.nombre}
+                    </CampoSugerible>
+                  </div>
                   <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
                   <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
                   <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
-                  <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Principal)' : ''}`).join(', ') : '-'}</div>
-                  <div><span className="text-muted-foreground">Edición:</span> {edicion?.anioEdicion || '-'}</div>
+                  <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ') : '-'}</div>
+                  <div>
+                    <span className="text-muted-foreground">Edición:</span>{' '}
+                    <CampoSugerible campo="anioEdicion" valorActual={String(edicion?.anioEdicion ?? '')} label="Año de edición" activo={modoSugerencia} onClick={handleSugerirClick}>
+                      {edicion?.anioEdicion || '-'}
+                    </CampoSugerible>
+                  </div>
                   <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
-                  <div><span className="text-muted-foreground">Consolidado:</span> {proyecto.esConsolidado ? 'Sí' : 'No'}</div>
+                  <div>
+                    <span className="text-muted-foreground">Consolidado:</span>{' '}
+                    <CampoSugerible campo="esConsolidado" valorActual={String(proyecto.esConsolidado)} label="Es consolidado" activo={modoSugerencia} onClick={handleSugerirClick}>
+                      {proyecto.esConsolidado ? 'Sí' : 'No'}
+                    </CampoSugerible>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Interfacultad:</span>{' '}
+                    <CampoSugerible campo="esInterfacultad" valorActual={String(proyecto.esInterfacultad)} label="Es interfacultad" activo={modoSugerencia} onClick={handleSugerirClick}>
+                      {proyecto.esInterfacultad ? 'Sí' : 'No'}
+                    </CampoSugerible>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -441,6 +504,14 @@ export function ProyectoDetail() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="sugerencias" className="mt-4">
+          {edicion ? (
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
+          )}
+        </TabsContent>
+
         <TabsContent value="cierre" className="mt-4">
           <Card>
             <CardHeader><CardTitle className="text-sm font-medium">Cierre</CardTitle></CardHeader>
@@ -454,6 +525,15 @@ export function ProyectoDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <SugerirCambioModal
+        open={sugerenciaModal.open}
+        onOpenChange={open => setSugerenciaModal(prev => ({ ...prev, open }))}
+        campo={sugerenciaModal.campo}
+        label={sugerenciaModal.label}
+        valorActual={sugerenciaModal.valorActual}
+        edicionId={edicion?.id ?? ''}
+      />
 
       {edicion && (
         <AsignarDirectorModal
@@ -540,11 +620,11 @@ function AsignarDirectorModal({
         edicionId,
         esDirectorPrincipal,
       })
-      toast.success('Director asignado correctamente')
+      toast.success('Usuario de dirección asignado correctamente')
       onOpenChange(false)
       onSuccess()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al asignar director')
+      toast.error(err instanceof Error ? err.message : 'Error al asignar usuario de dirección')
     } finally {
       setSubmitting(false)
     }
@@ -554,15 +634,15 @@ function AsignarDirectorModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Asignar Director</DialogTitle>
-          <DialogDescription>Seleccione un docente para asignar como director del proyecto.</DialogDescription>
+          <DialogTitle>Asignar usuario de dirección</DialogTitle>
+          <DialogDescription>Seleccione un usuario docente para asignar como dirección del proyecto.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <p className="text-sm font-medium">Docente</p>
             <Select value={selectedUsuarioId} onValueChange={setSelectedUsuarioId}>
               <SelectTrigger>
-                <SelectValue placeholder={loadingUsuarios ? 'Cargando...' : 'Seleccionar docente'} />
+                <SelectValue placeholder={loadingUsuarios ? 'Cargando...' : 'Seleccionar usuario docente'} />
               </SelectTrigger>
               <SelectContent>
                 {usuarios.map(u => (
@@ -579,7 +659,7 @@ function AsignarDirectorModal({
               onChange={e => setEsDirectorPrincipal(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            <label htmlFor="esDirectorPrincipal" className="text-sm">Director principal</label>
+            <label htmlFor="esDirectorPrincipal" className="text-sm">Dirección principal</label>
           </div>
         </div>
         <DialogFooter>

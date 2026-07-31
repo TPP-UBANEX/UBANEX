@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { ThemeToggle } from './ThemeToggle'
+import { NotificacionesDropdown } from './NotificacionesDropdown'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, Bell, User } from 'lucide-react'
+import { LogOut, User } from 'lucide-react'
 
 export function Header() {
   const navigate = useNavigate()
@@ -35,10 +36,7 @@ export function Header() {
 
       <div className="flex items-center gap-4">
         <ThemeToggle />
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500" />
-        </Button>
+        <NotificacionesDropdown />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

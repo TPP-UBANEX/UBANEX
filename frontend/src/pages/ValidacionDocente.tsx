@@ -183,7 +183,7 @@ export function ValidacionDocente() {
             </DialogTitle>
             <DialogDescription>
               {confirmAction === EstadoValidacionDocente.Validado
-                ? `¿Estás seguro de validar a ${selectedUser?.nombreCompleto}? Podrá participar como director o evaluador en convocatorias.`
+                ? `¿Estás seguro de validar a ${selectedUser?.nombreCompleto}? Podrá participar en la dirección y/o evaluación de proyectos de extensión.`
                 : `¿Estás seguro de rechazar a ${selectedUser?.nombreCompleto}? No podrá participar hasta que sea validado.`}
             </DialogDescription>
           </DialogHeader>

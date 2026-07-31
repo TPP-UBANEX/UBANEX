@@ -77,7 +77,7 @@ export function Evaluacion() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Proyecto</TableHead>
-                      <TableHead>Evaluador</TableHead>
+                      <TableHead>Usuario de evaluación</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
@@ -98,7 +98,7 @@ export function Evaluacion() {
                             <DialogContent>
                               <DialogHeader><DialogTitle>Evaluar: {e.proyectoTitulo || e.proyectoId}</DialogTitle></DialogHeader>
                               <div className="space-y-4 pt-4">
-                                <div className="text-sm"><span className="text-muted-foreground">Tipo:</span> {e.tipo} · <span className="text-muted-foreground">Evaluador:</span> {e.evaluador}</div>
+                                <div className="text-sm"><span className="text-muted-foreground">Tipo:</span> {e.tipo} · <span className="text-muted-foreground">Usuario de evaluación:</span> {e.evaluador}</div>
                                 <div className="space-y-2">
                                   <label className="text-sm font-medium">Puntaje (0-100)</label>
                                   <input type="number" min={0} max={100} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
@@ -132,7 +132,7 @@ export function Evaluacion() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Proyecto</TableHead>
-                      <TableHead>Evaluador</TableHead>
+                      <TableHead>Usuario de evaluación</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Puntaje</TableHead>
                       <TableHead>Observaciones</TableHead>
