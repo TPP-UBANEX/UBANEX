@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
 import { api } from '@/lib/api'
-import { esTelefonoValido } from '@/lib/utils'
+import { cn, esTelefonoValido } from '@/lib/utils'
 import type { UnidadAcademica, Carrera, RegisterDto } from '@/data/types'
 import { GraduationCap, ArrowLeft, BookOpen } from 'lucide-react'
 
@@ -129,7 +129,7 @@ export function Register() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-muted/20">
-      <Card className="w-full max-w-md mx-4">
+      <Card className="w-full max-w-lg mx-4">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
             <Button variant="ghost" size="icon" className="h-8 w-8 absolute left-4" onClick={() => setStep('tipo')}>
@@ -154,123 +154,100 @@ export function Register() {
                 {error}
               </div>
             )}
-            {tipo === 'docente' ? (
-              <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Nombre</label>
-                  <Input
-                    placeholder="Juan"
-                    value={nombre}
-                    onChange={e => setNombre(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Apellido</label>
-                  <Input
-                    placeholder="Pérez"
-                    value={apellido}
-                    onChange={e => setApellido(e.target.value)}
-                    required
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Apellido</label>
-                  <Input
-                    placeholder="Pérez"
-                    value={apellido}
-                    onChange={e => setApellido(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Nombre</label>
-                  <Input
-                    placeholder="Juan"
-                    value={nombre}
-                    onChange={e => setNombre(e.target.value)}
-                    required
-                  />
-                </div>
-              </>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                type="email"
-                placeholder="email@ejemplo.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            {tipo === 'docente' && (
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Teléfono</label>
+                <label className="text-sm font-medium">Apellido</label>
                 <Input
-                  type="tel"
-                  placeholder="11 1234 5678"
-                  value={telefono}
-                  onChange={e => setTelefono(e.target.value)}
+                  placeholder="Pérez"
+                  value={apellido}
+                  onChange={e => setApellido(e.target.value)}
                   required
                 />
               </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Contraseña</label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Confirmar contraseña</label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Unidad Académica</label>
-              <Select value={unidadAcademicaId} onValueChange={id => {
-                setUnidadAcademicaId(id)
-                setCarreraId('')
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccioná tu facultad" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uaList.map(ua => (
-                    <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {tipo === 'estudiante' && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Carrera</label>
-                <Select value={carreraId} onValueChange={setCarreraId}>
+                <label className="text-sm font-medium">Nombre</label>
+                <Input
+                  placeholder="Juan"
+                  value={nombre}
+                  onChange={e => setNombre(e.target.value)}
+                  required
+                />
+              </div>
+              <div className={cn('space-y-2', tipo === 'estudiante' && 'sm:col-span-2')}>
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  type="email"
+                  placeholder="email@ejemplo.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              {tipo === 'docente' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Teléfono</label>
+                  <Input
+                    type="tel"
+                    placeholder="11 1234 5678"
+                    value={telefono}
+                    onChange={e => setTelefono(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Contraseña</label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Confirmar contraseña</label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className={cn('space-y-2', tipo === 'docente' && 'sm:col-span-2')}>
+                <label className="text-sm font-medium">Unidad Académica</label>
+                <Select value={unidadAcademicaId} onValueChange={id => {
+                  setUnidadAcademicaId(id)
+                  setCarreraId('')
+                }}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccioná tu carrera (opcional)" />
+                    <SelectValue placeholder="Seleccioná tu facultad" />
                   </SelectTrigger>
                   <SelectContent>
-                    {carrerasDisponibles.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                    {uaList.map(ua => (
+                      <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
+              {tipo === 'estudiante' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Carrera</label>
+                  <Select value={carreraId} onValueChange={setCarreraId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccioná tu carrera (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {carrerasDisponibles.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </Button>
