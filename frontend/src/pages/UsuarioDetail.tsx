@@ -19,7 +19,13 @@ import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import { UsuarioHistorial } from '@/components/UsuarioHistorial'
 import type { Usuario, UnidadAcademica, ParticipacionConvocatoria } from '@/data/types'
 import { RolUsuario, RolEjecucion, EstadoValidacionDocente } from '@/data/types'
-import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import {
+  generoLabel,
+  cargoDocenteLabel,
+  tipoDesignacionDocenteLabel,
+  personaConDiscapacidadLabel,
+} from '@/data/perfil'
+import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
@@ -359,9 +365,24 @@ export function UsuarioDetail() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
+              <UserRound className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Nombre:</span>
+              <span>{usuario.nombre || '—'}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <UserRound className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Apellido:</span>
+              <span>{usuario.apellido || '—'}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Email:</span>
               <span>{usuario.email}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Teléfono:</span>
+              <span>{usuario.telefono || '—'}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Building className="h-4 w-4 text-muted-foreground" />
@@ -446,6 +467,65 @@ export function UsuarioDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {(usuario.roles.includes(RolUsuario.Docente) || usuario.roles.includes(RolUsuario.Estudiante)) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <GraduationCap className="h-4 w-4" />
+              Datos de Perfil
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2 text-sm">
+              {usuario.roles.includes(RolUsuario.Docente) && (
+                <>
+                  <div>
+                    <span className="text-muted-foreground">Cargo:</span>{' '}
+                    <span>{cargoDocenteLabel(usuario.cargoDocente)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Tipo de designación:</span>{' '}
+                    <span>{tipoDesignacionDocenteLabel(usuario.tipoDesignacionDocente)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Materia / Área / Departamento:</span>{' '}
+                    <span>{usuario.areaDocente || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Dirección o localidad:</span>{' '}
+                    <span>{usuario.direccionLocalidad || '—'}</span>
+                  </div>
+                </>
+              )}
+              {usuario.roles.includes(RolUsuario.Estudiante) && (
+                <>
+                  <div>
+                    <span className="text-muted-foreground">Carrera:</span>{' '}
+                    <span>{usuario.carrera?.nombre || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Porcentaje de la carrera:</span>{' '}
+                    <span>
+                      {usuario.porcentajeCarrera === undefined || usuario.porcentajeCarrera === null
+                        ? '—'
+                        : `${usuario.porcentajeCarrera}%`}
+                    </span>
+                  </div>
+                </>
+              )}
+              <div>
+                <span className="text-muted-foreground">Identidad de género:</span>{' '}
+                <span>{generoLabel(usuario.genero)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Persona con discapacidad:</span>{' '}
+                <span>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {esMiPerfil && participaciones.length > 0 && (
         <Card>
