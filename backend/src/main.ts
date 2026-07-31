@@ -451,6 +451,23 @@ async function bootstrap() {
     unidadAcademicaId: cbc.id,
   }, EstadoValidacionDocente.Validado);
 
+  // ─────────────── BACKFILL NOMBRE/APELLIDO ───────────────
+
+  console.log('\n=== SEED: Backfill nombre/apellido ===');
+  const todosLosUsuarios = await dataSource.getRepository(Usuario).find();
+  let usuariosBackfilled = 0;
+  for (const usuario of todosLosUsuarios) {
+    if (usuario.nombre || usuario.apellido) continue;
+    const partes = (usuario.nombreCompleto || '').trim().split(/\s+/);
+    const nombre = partes[0] || '';
+    const apellido = partes.slice(1).join(' ') || '';
+    await usuariosService['repo'].update(usuario.id, { nombre, apellido });
+    usuariosBackfilled++;
+  }
+  if (usuariosBackfilled > 0) {
+    console.log(`  ${usuariosBackfilled} usuarios con nombre/apellido derivados de nombreCompleto`);
+  }
+
   // ─────────────── FORMULARIOS ───────────────
 
   console.log('\n=== SEED: Formularios ===');
