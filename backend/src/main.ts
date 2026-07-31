@@ -5,6 +5,7 @@ import * as morgan from 'morgan';
 import { DataSource } from 'typeorm';
 import { UsuariosService } from './usuarios/usuarios.service';
 import { UnidadesAcademicasService } from './unidades-academicas/unidades-academicas.service';
+import { CarrerasService } from './carreras/carreras.service';
 import { RolUsuario } from './common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from './common/enums/estado-validacion-docente.enum';
 import { EstadoEdicion } from './common/enums/estado-edicion.enum';
@@ -29,6 +30,16 @@ async function seedUnidadAcademica(
   const existente = await uas.obtenerPorNombre(nombre);
   if (existente) return existente;
   return uas.crear({ nombre });
+}
+
+async function seedCarrera(
+  carrerasService: CarrerasService,
+  nombre: string,
+  unidadAcademicaId: string,
+) {
+  const existente = await carrerasService.listarPorUnidadAcademica(unidadAcademicaId);
+  if (existente.some((c) => c.nombre === nombre)) return;
+  await carrerasService.crear({ nombre, unidadAcademicaId });
 }
 
 async function seedUsuario(
@@ -84,6 +95,7 @@ async function bootstrap() {
 
   const usuariosService = app.get(UsuariosService);
   const uas = app.get(UnidadesAcademicasService);
+  const carrerasService = app.get(CarrerasService);
   const dataSource = app.get(DataSource);
 
   console.log('\n=== SEED: Unidades Académicas ===');
@@ -112,6 +124,110 @@ async function bootstrap() {
   for (const ua of [derecho, econ, sociales, filo, ingenieria, medicina, exactas, arquitetc, agronomia, farmacia, odonto, psicologia, veterinaria, cbc]) {
     uaMap.set(ua.nombre, ua);
   }
+
+  // ─────────────── CARRERAS ───────────────
+
+  console.log('\n=== SEED: Carreras ===');
+  const carrerasPorUa: Record<string, string[]> = {
+    'Facultad de Derecho': ['Abogacía', 'Traductorado Público', 'Calígrafo Público'],
+    'Facultad de Ciencias Económicas': [
+      'Contador Público',
+      'Licenciatura en Administración',
+      'Licenciatura en Economía',
+      'Actuario',
+      'Licenciatura en Sistemas de Información de las Organizaciones',
+    ],
+    'Facultad de Ciencias Sociales': [
+      'Licenciatura en Sociología',
+      'Licenciatura en Trabajo Social',
+      'Licenciatura en Relaciones del Trabajo',
+      'Licenciatura en Ciencias de la Comunicación',
+      'Licenciatura en Ciencia Política',
+    ],
+    'Facultad de Filosofía y Letras': [
+      'Licenciatura en Artes',
+      'Licenciatura en Ciencias Antropológicas',
+      'Licenciatura en Ciencias de la Educación',
+      'Licenciatura en Filosofía',
+      'Licenciatura en Geografía',
+      'Licenciatura en Historia',
+      'Licenciatura en Letras',
+      'Licenciatura en Bibliotecología y Ciencia de la Información',
+      'Edición',
+    ],
+    'Facultad de Ingeniería': [
+      'Ingeniería Civil',
+      'Ingeniería en Alimentos',
+      'Ingeniería en Energía Eléctrica',
+      'Ingeniería Electrónica',
+      'Ingeniería en Agrimensura',
+      'Ingeniería en Informática',
+      'Ingeniería en Petróleo',
+      'Ingeniería Industrial',
+      'Ingeniería Mecánica',
+      'Ingeniería Naval',
+      'Ingeniería Química',
+      'Licenciatura en Análisis de Sistemas',
+      'Bioingeniería',
+    ],
+    'Facultad de Medicina': [
+      'Medicina',
+      'Licenciatura en Enfermería',
+      'Licenciatura en Fonoaudiología',
+      'Licenciatura en Kinesiología y Fisiatría',
+      'Licenciatura en Nutrición',
+      'Licenciatura en Obstetricia',
+    ],
+    'Facultad de Ciencias Exactas y Naturales': [
+      'Licenciatura en Ciencias Biológicas',
+      'Licenciatura en Ciencias de Datos',
+      'Licenciatura en Ciencias de la Atmósfera',
+      'Licenciatura en Ciencias de la Computación',
+      'Licenciatura en Ciencias Físicas',
+      'Licenciatura en Ciencias Geológicas',
+      'Licenciatura en Ciencias Matemáticas',
+      'Licenciatura en Ciencias Químicas',
+      'Licenciatura en Oceanografía',
+      'Licenciatura en Paleontología',
+      'Licenciatura en Ciencia y Tecnología de los Alimentos',
+      'Licenciatura en Biotecnología',
+    ],
+    'Facultad de Arquitectura, Diseño y Urbanismo': [
+      'Arquitectura',
+      'Diseño Gráfico',
+      'Diseño Industrial',
+      'Diseño de Imagen y Sonido',
+      'Diseño de Indumentaria',
+      'Diseño Textil',
+    ],
+    'Facultad de Agronomía': [
+      'Agronomía',
+      'Licenciatura en Ciencias Ambientales',
+      'Licenciatura en Economía y Administración Agrarias',
+      'Licenciatura en Gestión de Agroalimentos',
+    ],
+    'Facultad de Farmacia y Bioquímica': [
+      'Bioquímica',
+      'Farmacia',
+      'Licenciatura en Ciencia y Tecnología de los Alimentos',
+      'Licenciatura en Biotecnología',
+    ],
+    'Facultad de Odontología': ['Odontología'],
+    'Facultad de Psicología': ['Licenciatura en Psicología', 'Musicoterapia', 'Terapia Ocupacional'],
+    'Facultad de Ciencias Veterinarias': ['Veterinaria', 'Licenciatura en Gestión de Agroalimentos'],
+  };
+
+  for (const [nombreUa, carreras] of Object.entries(carrerasPorUa)) {
+    const ua = uaMap.get(nombreUa);
+    if (!ua) {
+      console.warn(`  Carreras no seedeadas: unidad académica no encontrada: ${nombreUa}`);
+      continue;
+    }
+    for (const nombreCarrera of carreras) {
+      await seedCarrera(carrerasService, nombreCarrera, ua.id);
+    }
+  }
+  console.log(`  ${Object.values(carrerasPorUa).reduce((acc, arr) => acc + arr.length, 0)} carreras`);
 
   // ─────────────── USUARIOS ───────────────
 
