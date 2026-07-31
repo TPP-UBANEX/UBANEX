@@ -471,7 +471,7 @@ export function UsuarioDetail() {
               </div>
             </div>
             <Separator />
-            <div>
+            <div className="pt-3">
               <p className="text-sm text-muted-foreground mb-2">Roles:</p>
               <div className="flex gap-2 flex-wrap">
                 {usuario.roles.map(r => (
