@@ -17,13 +17,13 @@ export class Usuario {
   @Column()
   nombreCompleto: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'varchar' })
   nombre: string | null;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'varchar' })
   apellido: string | null;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'varchar' })
   telefono: string | null;
 
   @Column({ nullable: true, type: 'varchar' })
@@ -38,10 +38,10 @@ export class Usuario {
   @Column({ nullable: true, type: 'varchar' })
   tipoDesignacionDocente: TipoDesignacionDocente | null;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'varchar' })
   areaDocente: string | null;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'varchar' })
   direccionLocalidad: string | null;
 
   @Column({ nullable: true, type: 'smallint' })
