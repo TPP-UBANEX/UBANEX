@@ -405,7 +405,7 @@ export function UsuarioDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-sm pb-3">
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Unidad Académica:</span>
@@ -471,7 +471,7 @@ export function UsuarioDetail() {
               </div>
             </div>
             <Separator />
-            <div className="pt-3">
+            <div>
               <p className="text-sm text-muted-foreground mb-2">Roles:</p>
               <div className="flex gap-2 flex-wrap">
                 {usuario.roles.map(r => (
