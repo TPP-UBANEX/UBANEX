@@ -1,4 +1,37 @@
 import { Genero, CargoDocente, TipoDesignacionDocente } from './types'
+import type { Usuario } from './types'
+
+export type CampoPerfilDocente =
+  | 'nombre'
+  | 'apellido'
+  | 'telefono'
+  | 'cargoDocente'
+  | 'tipoDesignacionDocente'
+  | 'genero'
+  | 'areaDocente'
+  | 'personaConDiscapacidad'
+  | 'direccionLocalidad'
+
+export const camposPerfilDocente: { campo: CampoPerfilDocente; etiqueta: string; tipo: 'text' | 'select' }[] = [
+  { campo: 'nombre', etiqueta: 'Nombre', tipo: 'text' },
+  { campo: 'apellido', etiqueta: 'Apellido', tipo: 'text' },
+  { campo: 'telefono', etiqueta: 'Teléfono', tipo: 'text' },
+  { campo: 'cargoDocente', etiqueta: 'Cargo', tipo: 'select' },
+  { campo: 'tipoDesignacionDocente', etiqueta: 'Tipo de designación', tipo: 'select' },
+  { campo: 'genero', etiqueta: 'Identidad de género', tipo: 'select' },
+  { campo: 'areaDocente', etiqueta: 'Materia/Área', tipo: 'text' },
+  { campo: 'personaConDiscapacidad', etiqueta: 'Persona con discapacidad', tipo: 'select' },
+  { campo: 'direccionLocalidad', etiqueta: 'Dirección o localidad', tipo: 'text' },
+]
+
+export function camposPerfilFaltantes(u: Usuario): CampoPerfilDocente[] {
+  return camposPerfilDocente
+    .filter(({ campo }) => {
+      const v = u[campo]
+      return v === null || v === undefined || v === ''
+    })
+    .map(({ campo }) => campo)
+}
 
 export const generoOptions: { value: Genero; label: string }[] = [
   { value: Genero.Femenino, label: 'Femenino' },

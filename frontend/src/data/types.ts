@@ -165,6 +165,15 @@ export interface CrearParticipacionDto {
   rol: RolEjecucion
   edicionId?: string
   esDirectorPrincipal?: boolean
+  nombre?: string
+  apellido?: string
+  telefono?: string
+  genero?: Genero
+  personaConDiscapacidad?: boolean
+  cargoDocente?: CargoDocente
+  tipoDesignacionDocente?: TipoDesignacionDocente
+  areaDocente?: string
+  direccionLocalidad?: string
 }
 
 export enum TipoAccionAuditoria {
