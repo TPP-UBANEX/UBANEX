@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { CampoFormulario } from './campo-formulario.interface';
 
 @Entity()
 export class Formulario {
@@ -10,4 +11,7 @@ export class Formulario {
 
   @Column({ default: false })
   esDefault: boolean;
+
+  @Column({ type: 'json', nullable: true })
+  campos: CampoFormulario[] | null;
 }

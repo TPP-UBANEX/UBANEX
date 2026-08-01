@@ -1,15 +1,19 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as crypto from 'crypto';
 import { Convocatoria } from './convocatoria.entity';
 import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
+import { GuardarFormularioDto } from './dto/guardar-formulario.dto';
 import { Emparejamiento } from './emparejamiento.entity';
 import { Formulario } from '../formularios/formulario.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { Usuario } from '../usuarios/usuario.entity';
+import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
+import { validarCamposFormulario } from '../common/dto/validador-campos-formulario';
 
 function hoyVersion(): string {
   const d = new Date();
@@ -46,10 +50,8 @@ export class ConvocatoriasService {
     const convocatoria = this.repo.create(rest);
 
     if (formularioId) {
-      const plantilla = await this.formularioRepo.findOne({ where: { id: formularioId } });
-      if (plantilla) {
-        const copia = this.formularioRepo.create({ nombre: `${plantilla.nombre} (${hoyVersion()})`, esDefault: false });
-        const guardado = await this.formularioRepo.save(copia);
+      const guardado = await this.clonarFormulario(formularioId);
+      if (guardado) {
         convocatoria.formularioId = guardado.id;
         convocatoria.formulario = guardado;
       }
@@ -81,10 +83,8 @@ export class ConvocatoriasService {
       if (viejo) {
         await this.formularioRepo.remove(viejo);
       }
-      const plantilla = await this.formularioRepo.findOne({ where: { id: formularioId } });
-      if (plantilla) {
-        const copia = this.formularioRepo.create({ nombre: `${plantilla.nombre} (${hoyVersion()})`, esDefault: false });
-        const guardado = await this.formularioRepo.save(copia);
+      const guardado = await this.clonarFormulario(formularioId);
+      if (guardado) {
         convocatoria.formularioId = guardado.id;
         convocatoria.formulario = guardado;
       }
@@ -92,6 +92,18 @@ export class ConvocatoriasService {
 
     Object.assign(convocatoria, rest);
     return this.repo.save(convocatoria);
+  }
+
+  private async clonarFormulario(formularioId: string): Promise<Formulario | null> {
+    const plantilla = await this.formularioRepo.findOne({ where: { id: formularioId } });
+    if (!plantilla) return null;
+
+    const copia = this.formularioRepo.create({
+      nombre: `${plantilla.nombre} (${hoyVersion()})`,
+      esDefault: false,
+      campos: plantilla.campos ? plantilla.campos.map((c) => ({ ...c })) : null,
+    });
+    return this.formularioRepo.save(copia);
   }
 
   async eliminar(id: string, _usuario: Usuario) {
@@ -148,5 +160,61 @@ export class ConvocatoriasService {
     );
 
     return this.emparejamientoRepo.save(nuevos);
+  }
+
+  async obtenerFormulario(convocatoriaId: string): Promise<Formulario> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { formulario: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.formulario) return convocatoria.formulario;
+
+    return { id: '', nombre: '', esDefault: false, campos: [] } as Formulario;
+  }
+
+  async guardarFormulario(convocatoriaId: string, dto: GuardarFormularioDto): Promise<Formulario> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { formulario: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.estado !== EstadoConvocatoria.Configuracion) {
+      throw new BadRequestException(
+        'El formulario solo puede editarse mientras la convocatoria está en etapa de configuración',
+      );
+    }
+
+    validarCamposFormulario(dto.campos);
+
+    const campos = dto.campos.map((campo, index) => ({
+      id: campo.id || crypto.randomUUID(),
+      tipo: campo.tipo,
+      nombre: campo.nombre.trim(),
+      textoAyuda: campo.textoAyuda?.trim() || undefined,
+      esObligatorio: campo.esObligatorio,
+      orden: index,
+      opciones: campo.opciones?.map((o) => o.trim()).filter(Boolean),
+    }));
+
+    let formulario = convocatoria.formulario;
+    if (!formulario) {
+      formulario = this.formularioRepo.create({
+        nombre: `Formulario ${convocatoria.nombre}`,
+        esDefault: false,
+      });
+    }
+    formulario.campos = campos;
+    const guardado = await this.formularioRepo.save(formulario);
+
+    if (convocatoria.formularioId !== guardado.id) {
+      convocatoria.formularioId = guardado.id;
+      convocatoria.formulario = guardado;
+      await this.repo.save(convocatoria);
+    }
+
+    return guardado;
   }
 }

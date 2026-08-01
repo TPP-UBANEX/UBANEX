@@ -109,6 +109,12 @@ export const api = {
       guardar: (convocatoriaId: string, data: import('@/data/types').GuardarEmparejamientoDto) =>
         request<import('@/data/types').Emparejamiento[]>('PUT', `/convocatorias/${convocatoriaId}/emparejamientos`, data),
     },
+    formulario: {
+      get: (convocatoriaId: string) =>
+        get<import('@/data/types').Formulario>(`/convocatorias/${convocatoriaId}/formulario`),
+      guardar: (convocatoriaId: string, campos: import('@/data/types').CampoFormulario[]) =>
+        request<import('@/data/types').Formulario>('PUT', `/convocatorias/${convocatoriaId}/formulario`, { campos }),
+    },
   },
   proyectos: {
     list: (params?: Record<string, string>) => {

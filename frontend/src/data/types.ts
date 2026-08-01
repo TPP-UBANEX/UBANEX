@@ -341,10 +341,37 @@ export interface Rendicion {
   comprobanteUrl?: string
 }
 
+export enum TipoCampo {
+  Texto = 'texto',
+  Booleano = 'booleano',
+  Checkbox = 'checkbox',
+  Select = 'select',
+  Archivo = 'archivo',
+}
+
+export interface CampoFormulario {
+  id: string
+  tipo: TipoCampo
+  nombre: string
+  textoAyuda?: string
+  esObligatorio: boolean
+  orden: number
+  opciones?: string[]
+}
+
 export interface Formulario {
   id: string
   nombre: string
   esDefault: boolean
+  campos?: CampoFormulario[]
+}
+
+export const tipoCampoLabels: Record<TipoCampo, string> = {
+  [TipoCampo.Texto]: 'Texto',
+  [TipoCampo.Booleano]: 'Sí / No',
+  [TipoCampo.Checkbox]: 'Casillas (múltiple)',
+  [TipoCampo.Select]: 'Selección (única)',
+  [TipoCampo.Archivo]: 'Archivo',
 }
 
 export interface Emparejamiento {

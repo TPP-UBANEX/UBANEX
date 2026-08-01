@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as morgan from 'morgan';
+import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
 import { UsuariosService } from './usuarios/usuarios.service';
 import { UnidadesAcademicasService } from './unidades-academicas/unidades-academicas.service';
@@ -11,6 +12,7 @@ import { EstadoValidacionDocente } from './common/enums/estado-validacion-docent
 import { EstadoEdicion } from './common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from './common/enums/estado-convocatoria.enum';
 import { RolEjecucion } from './common/enums/rol-ejecucion.enum';
+import { TipoCampo } from './common/enums/tipo-campo.enum';
 import { Genero } from './common/enums/genero.enum';
 import { CargoDocente } from './common/enums/cargo-docente.enum';
 import { TipoDesignacionDocente } from './common/enums/tipo-designacion-docente.enum';
@@ -744,8 +746,42 @@ async function bootstrap() {
 
   console.log('\n=== SEED: Formularios ===');
   const formularioRepo = dataSource.getRepository(Formulario);
+  const camposFormularioEstandar = [
+    {
+      id: crypto.randomUUID(),
+      tipo: TipoCampo.Texto,
+      nombre: 'Resumen del proyecto',
+      textoAyuda: 'Describí brevemente el objetivo del proyecto',
+      esObligatorio: true,
+      orden: 0,
+    },
+    {
+      id: crypto.randomUUID(),
+      tipo: TipoCampo.Booleano,
+      nombre: '¿El proyecto tiene antecedentes en convocatorias anteriores?',
+      esObligatorio: true,
+      orden: 1,
+    },
+    {
+      id: crypto.randomUUID(),
+      tipo: TipoCampo.Select,
+      nombre: 'Área temática principal',
+      esObligatorio: true,
+      orden: 2,
+      opciones: ['Salud', 'Educación', 'Ambiente', 'Tecnología', 'Cultura'],
+    },
+    {
+      id: crypto.randomUUID(),
+      tipo: TipoCampo.Checkbox,
+      nombre: 'Poblaciones destinatarias',
+      esObligatorio: false,
+      orden: 3,
+      opciones: ['Niños y adolescentes', 'Adultos mayores', 'Personas con discapacidad', 'Comunidad general'],
+    },
+  ];
+
   const seedFormularios = [
-    { nombre: 'Formulario estándar UBANEX', esDefault: true },
+    { nombre: 'Formulario estándar UBANEX', esDefault: true, campos: camposFormularioEstandar },
     { nombre: 'Formulario proyectos de investigación', esDefault: false },
     { nombre: 'Formulario proyectos de extensión', esDefault: false },
     { nombre: 'Formulario desarrollo tecnológico', esDefault: false },

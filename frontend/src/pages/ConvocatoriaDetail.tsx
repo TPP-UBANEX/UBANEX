@@ -37,6 +37,7 @@ import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
+import { FormularioBuilderTab } from '@/components/FormularioBuilderTab'
 import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -80,6 +81,9 @@ export function ConvocatoriaDetail() {
 
   const esUsuarioEjecucion = user?.roles.some(
     r => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
+  )
+  const esRectorado = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   )
   const errores = erroresFechas(editForm)
 
@@ -344,6 +348,7 @@ export function ConvocatoriaDetail() {
           <TabsTrigger value="evaluadores">Usuarios de evaluación</TabsTrigger>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
+          {esRectorado && <TabsTrigger value="formulario">Formulario</TabsTrigger>}
         </TabsList>
         <TabsContent value="proyectos" className="mt-4">
           <Card>
@@ -393,6 +398,11 @@ export function ConvocatoriaDetail() {
         <TabsContent value="emparejamiento" className="mt-4">
           {id && <EmparejamientoTab convocatoriaId={id} />}
         </TabsContent>
+        {esRectorado && (
+          <TabsContent value="formulario" className="mt-4">
+            {id && conv && <FormularioBuilderTab convocatoriaId={id} estadoConvocatoria={conv.estado} />}
+          </TabsContent>
+        )}
         <TabsContent value="evaluadores" className="mt-4">
           <Card>
             <CardContent className="pt-6">
