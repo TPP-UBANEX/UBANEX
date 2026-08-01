@@ -54,6 +54,13 @@ export class UsuariosService {
   async crear(dto: CrearUsuarioDto, creador?: Usuario): Promise<Usuario> {
     validarGruposRoles(dto.roles);
 
+    if ((dto.nombre && !dto.apellido) || (!dto.nombre && dto.apellido)) {
+      throw new BadRequestException('Deben completarse nombre y apellido');
+    }
+    if (dto.nombre && dto.apellido) {
+      dto.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
+    }
+
     const existente = await this.repo.findOne({ where: { email: dto.email } });
     if (existente) {
       throw new BadRequestException('El email ya está registrado');
@@ -106,6 +113,7 @@ export class UsuariosService {
 
     const query = this.repo.createQueryBuilder('usuario')
       .leftJoinAndSelect('usuario.unidadAcademica', 'unidadAcademica')
+      .leftJoinAndSelect('usuario.carrera', 'carrera')
       .leftJoinAndSelect('usuario.creadoPor', 'creadoPor');
 
     const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
@@ -184,7 +192,7 @@ export class UsuariosService {
   async obtener(id: string, usuarioLogueado?: Usuario): Promise<Usuario> {
     const entity = await this.repo.findOne({
       where: { id },
-      relations: { unidadAcademica: true, creadoPor: true },
+      relations: { unidadAcademica: true, carrera: true, creadoPor: true },
     });
     if (!entity) throw new NotFoundException(`Usuario ${id} no encontrado`);
 
@@ -215,8 +223,31 @@ export class UsuariosService {
       if (dto.habilitado !== undefined) {
         throw new ForbiddenException('No puedes cambiar tu propio estado');
       }
-      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      const hayNombreApellido = dto.nombre !== undefined || dto.apellido !== undefined;
+      if (hayNombreApellido) {
+        if (!dto.nombre || !dto.apellido) {
+          throw new BadRequestException('Deben completarse nombre y apellido');
+        }
+        entity.nombre = dto.nombre;
+        entity.apellido = dto.apellido;
+        entity.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
+      } else if (dto.nombreCompleto !== undefined) {
+        entity.nombreCompleto = dto.nombreCompleto;
+      }
       if (dto.email !== undefined) entity.email = dto.email;
+      if (dto.telefono !== undefined) entity.telefono = dto.telefono;
+      if (dto.genero !== undefined) entity.genero = dto.genero;
+      if (dto.personaConDiscapacidad !== undefined) entity.personaConDiscapacidad = dto.personaConDiscapacidad;
+      if (dto.cargoDocente !== undefined) entity.cargoDocente = dto.cargoDocente;
+      if (dto.tipoDesignacionDocente !== undefined) entity.tipoDesignacionDocente = dto.tipoDesignacionDocente;
+      if (dto.areaDocente !== undefined) entity.areaDocente = dto.areaDocente;
+      if (dto.direccionLocalidad !== undefined) entity.direccionLocalidad = dto.direccionLocalidad;
+      if (dto.porcentajeCarrera !== undefined) entity.porcentajeCarrera = dto.porcentajeCarrera;
+      if (dto.carreraId !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        entity.carrera = null as any;
+        entity.carreraId = dto.carreraId;
+      }
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
       const saved = await this.repo.save(entity);
       await this.auditoria.registrar({

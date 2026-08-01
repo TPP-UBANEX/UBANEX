@@ -9,6 +9,7 @@ import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
 import { RendicionesModule } from './rendiciones/rendiciones.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { UnidadesAcademicasModule } from './unidades-academicas/unidades-academicas.module';
+import { CarrerasModule } from './carreras/carreras.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { FormulariosModule } from './formularios/formularios.module';
@@ -34,6 +35,7 @@ import { SugerenciasModule } from './sugerencias/sugerencias.module';
     RendicionesModule,
     UsuariosModule,
     UnidadesAcademicasModule,
+    CarrerasModule,
     AuthModule,
     AuditoriaModule,
     FormulariosModule,

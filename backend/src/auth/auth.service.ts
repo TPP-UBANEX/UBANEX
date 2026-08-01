@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsuariosService } from '../usuarios/usuarios.service';
+import { CarrerasService } from '../carreras/carreras.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
@@ -12,6 +13,7 @@ import { JwtPayload } from './strategies/jwt.strategy';
 export class AuthService {
   constructor(
     private readonly usuariosService: UsuariosService,
+    private readonly carrerasService: CarrerasService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -46,6 +48,22 @@ export class AuthService {
       throw new BadRequestException('El email ya está registrado');
     }
 
+    if (dto.tipo === 'docente' && !dto.telefono) {
+      throw new BadRequestException('El teléfono es obligatorio para docentes');
+    }
+
+    if (dto.carreraId) {
+      const carrera = await this.carrerasService.obtener(dto.carreraId);
+      if (dto.unidadAcademicaId && carrera.unidadAcademicaId !== dto.unidadAcademicaId) {
+        const carrerasDeLaUa = await this.carrerasService.listarPorUnidadAcademica(dto.unidadAcademicaId);
+        if (carrerasDeLaUa.length > 0) {
+          throw new BadRequestException(
+            'La carrera elegida no corresponde a la unidad académica seleccionada',
+          );
+        }
+      }
+    }
+
     const roles: RolUsuario[] = dto.tipo === 'docente'
       ? [RolUsuario.Docente]
       : [RolUsuario.Estudiante];
@@ -54,6 +72,7 @@ export class AuthService {
       ...dto,
       roles,
       unidadAcademicaId: dto.unidadAcademicaId,
+      nombreCompleto: `${dto.nombre} ${dto.apellido}`.trim(),
     });
 
     return this.generarToken(usuario);

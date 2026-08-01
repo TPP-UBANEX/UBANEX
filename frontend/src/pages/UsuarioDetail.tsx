@@ -19,7 +19,13 @@ import { EditarUsuarioDialog } from '@/components/EditarUsuarioDialog'
 import { UsuarioHistorial } from '@/components/UsuarioHistorial'
 import type { Usuario, UnidadAcademica, ParticipacionConvocatoria } from '@/data/types'
 import { RolUsuario, RolEjecucion, EstadoValidacionDocente } from '@/data/types'
-import { ArrowLeft, Mail, Building, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import {
+  generoLabel,
+  cargoDocenteLabel,
+  tipoDesignacionDocenteLabel,
+  personaConDiscapacidadLabel,
+} from '@/data/perfil'
+import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound, VenusAndMars, Accessibility, Building, Percent, Briefcase, Stamp, BookOpen, MapPin, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
@@ -359,40 +365,34 @@ export function UsuarioDetail() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
+              <UserRound className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Nombre:</span>
+              <span>{usuario.nombre || '—'}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <UserRound className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Apellido:</span>
+              <span>{usuario.apellido || '—'}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Email:</span>
               <span>{usuario.email}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <Building className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Unidad Académica:</span>
-              <span>{usuario.unidadAcademica?.nombre || 'Sin asignar'}</span>
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Teléfono:</span>
+              <span>{usuario.telefono || '—'}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Creado por:</span>
-              <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
+              <VenusAndMars className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Identidad de género:</span>
+              <span>{generoLabel(usuario.genero)}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Tipo:</span>
-              <span>
-                {usuario.roles.includes(RolUsuario.Docente)
-                  ? 'Docente'
-                  : usuario.roles.includes(RolUsuario.Estudiante)
-                    ? 'Estudiante'
-                    : 'Gestión'}
-              </span>
-            </div>
-            <Separator />
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Roles</p>
-              <div className="flex gap-2 flex-wrap">
-                {usuario.roles.map(r => (
-                  <Badge key={r} variant="outline" className={rolColor(r)}>
-                    {rolLabels[r] || r}
-                  </Badge>
-                ))}
-              </div>
+              <Accessibility className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Persona con discapacidad:</span>
+              <span>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</span>
             </div>
           </CardContent>
         </Card>
@@ -400,52 +400,127 @@ export function UsuarioDetail() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Estado y Actividad
+              <GraduationCap className="h-4 w-4" />
+              Datos de Perfil
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Estado:</span>
-              <Badge variant={usuario.habilitado ? 'default' : 'secondary'}>
-                {usuario.habilitado ? 'Habilitado' : 'Inhabilitado'}
-              </Badge>
-            </div>
-            {usuario.roles.includes(RolUsuario.Docente) && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Docente:</span>
-                <Badge variant="outline" className={estadoValidacionDocenteColor(usuario.estadoValidacionDocente)}>
-                  {estadoValidacionDocenteLabel(usuario.estadoValidacionDocente)}
-                </Badge>
-                {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Validado && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setValidarAccion(EstadoValidacionDocente.Validado); setValidarOpen(true) }}
-                  >
-                    Validar
-                  </Button>
-                )}
-                {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Rechazado && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setValidarAccion(EstadoValidacionDocente.Rechazado); setValidarOpen(true) }}
-                  >
-                    Rechazar
-                  </Button>
-                )}
+          <CardContent>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Unidad Académica:</span>
+                <span>{usuario.unidadAcademica?.nombre || 'Sin asignar'}</span>
               </div>
-            )}
-            <Separator />
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Última actividad:</span>
-              <span>{formatearFecha(usuario.ultimaActividad)}</span>
+              {usuario.roles.includes(RolUsuario.Estudiante) && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Carrera:</span>
+                    <span>{usuario.carrera?.nombre || '—'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Porcentaje de la carrera:</span>
+                    <span>
+                      {usuario.porcentajeCarrera === undefined || usuario.porcentajeCarrera === null
+                        ? '—'
+                        : `${usuario.porcentajeCarrera}%`}
+                    </span>
+                  </div>
+                </>
+              )}
+              {usuario.roles.includes(RolUsuario.Docente) && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Cargo:</span>
+                    <span>{cargoDocenteLabel(usuario.cargoDocente)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Stamp className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Tipo de designación:</span>
+                    <span>{tipoDesignacionDocenteLabel(usuario.tipoDesignacionDocente)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Materia / Área / Departamento:</span>
+                    <span>{usuario.areaDocente || '—'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Dirección o localidad:</span>
+                    <span>{usuario.direccionLocalidad || '—'}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Creado por:</span>
+                <span>{usuario.creadoPor?.nombreCompleto || 'Auto-registro'}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <UserCheck className="h-4 w-4" />
+            Estado y Actividad
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            <span className="text-muted-foreground">
+              {usuario.roles.length === 1 ? 'Rol:' : 'Roles:'}
+            </span>
+            {usuario.roles.map(r => (
+              <Badge key={r} variant="outline" className={rolColor(r)}>
+                {rolLabels[r] || r}
+              </Badge>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Estado:</span>
+            <Badge variant={usuario.habilitado ? 'default' : 'secondary'}>
+              {usuario.habilitado ? 'Habilitado' : 'Inhabilitado'}
+            </Badge>
+          </div>
+          {usuario.roles.includes(RolUsuario.Docente) && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Docente:</span>
+              <Badge variant="outline" className={estadoValidacionDocenteColor(usuario.estadoValidacionDocente)}>
+                {estadoValidacionDocenteLabel(usuario.estadoValidacionDocente)}
+              </Badge>
+              {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Validado && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setValidarAccion(EstadoValidacionDocente.Validado); setValidarOpen(true) }}
+                >
+                  Validar
+                </Button>
+              )}
+              {puedeValidarDocente && usuario.estadoValidacionDocente !== EstadoValidacionDocente.Rechazado && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setValidarAccion(EstadoValidacionDocente.Rechazado); setValidarOpen(true) }}
+                >
+                  Rechazar
+                </Button>
+              )}
+            </div>
+          )}
+          <Separator />
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Última actividad:</span>
+            <span>{formatearFecha(usuario.ultimaActividad)}</span>
+          </div>
+        </CardContent>
+      </Card>
 
       {esMiPerfil && participaciones.length > 0 && (
         <Card>

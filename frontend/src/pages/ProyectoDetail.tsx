@@ -24,8 +24,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto } from '@/data/types'
 import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
+import {
+  camposPerfilDocente,
+  camposPerfilFaltantes,
+  generoOptions,
+  cargoDocenteOptions,
+  tipoDesignacionDocenteOptions,
+  personaConDiscapacidadOptions,
+} from '@/data/perfil'
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
@@ -582,6 +590,7 @@ function AsignarDirectorModal({
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
   const [esDirectorPrincipal, setEsDirectorPrincipal] = useState(false)
+  const [completar, setCompletar] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [loadingUsuarios, setLoadingUsuarios] = useState(false)
 
@@ -609,17 +618,38 @@ function AsignarDirectorModal({
     fetchUsuarios()
   }, [open, convocatoriaId])
 
+  const selectedUsuario = usuarios.find(u => u.id === selectedUsuarioId)
+  const faltantes = selectedUsuario ? camposPerfilFaltantes(selectedUsuario) : []
+
+  const seleccionarUsuario = (id: string) => {
+    setSelectedUsuarioId(id)
+    setCompletar({})
+  }
+
+  const faltantesCompletos = faltantes.every(campo => {
+    const valor = completar[campo]
+    if (campo === 'personaConDiscapacidad') return valor === 'true' || valor === 'false'
+    return valor !== undefined && valor.trim() !== ''
+  })
+  const puedeAsignar = !!selectedUsuarioId && faltantesCompletos
+
   const handleSubmit = async () => {
-    if (!selectedUsuarioId) return
+    if (!puedeAsignar) return
     setSubmitting(true)
     try {
-      await api.participaciones.asignar({
+      const payload: CrearParticipacionDto = {
         usuarioId: selectedUsuarioId,
         convocatoriaId,
         rol: RolEjecucion.DirectorDeProyecto,
         edicionId,
         esDirectorPrincipal,
-      })
+      }
+      const extra: Record<string, string | boolean> = {}
+      for (const campo of faltantes) {
+        const valor = completar[campo]
+        extra[campo] = campo === 'personaConDiscapacidad' ? valor === 'true' : valor.trim()
+      }
+      await api.participaciones.asignar({ ...payload, ...extra })
       toast.success('Usuario de dirección asignado correctamente')
       onOpenChange(false)
       onSuccess()
@@ -640,17 +670,72 @@ function AsignarDirectorModal({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <p className="text-sm font-medium">Docente</p>
-            <Select value={selectedUsuarioId} onValueChange={setSelectedUsuarioId}>
+            <Select value={selectedUsuarioId} onValueChange={seleccionarUsuario}>
               <SelectTrigger>
                 <SelectValue placeholder={loadingUsuarios ? 'Cargando...' : 'Seleccionar usuario docente'} />
               </SelectTrigger>
               <SelectContent>
-                {usuarios.map(u => (
-                  <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
-                ))}
+                {usuarios.map(u => {
+                  const incompleto = camposPerfilFaltantes(u).length > 0
+                  return (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.nombreCompleto}{incompleto ? ' — perfil incompleto' : ''}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>
+          {faltantes.length > 0 && (
+            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+              <div>
+                <p className="text-sm font-medium">Completar datos del perfil</p>
+                <p className="text-xs text-muted-foreground">
+                  El docente tiene el perfil incompleto. Completá los datos faltantes para poder asignarlo.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {faltantes.map(campo => {
+                  const def = camposPerfilDocente.find(c => c.campo === campo)!
+                  if (def.tipo === 'select') {
+                    const options = campo === 'genero'
+                      ? generoOptions
+                      : campo === 'cargoDocente'
+                        ? cargoDocenteOptions
+                        : campo === 'tipoDesignacionDocente'
+                          ? tipoDesignacionDocenteOptions
+                          : personaConDiscapacidadOptions
+                    return (
+                      <div key={campo} className="space-y-1.5">
+                        <label className="text-xs font-medium">{def.etiqueta}</label>
+                        <Select
+                          value={completar[campo] ?? ''}
+                          onValueChange={v => setCompletar({ ...completar, [campo]: v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                          <SelectContent>
+                            {options.map(o => (
+                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={campo} className="space-y-1.5">
+                      <label className="text-xs font-medium">{def.etiqueta}</label>
+                      <Input
+                        placeholder={`Completar ${def.etiqueta.toLowerCase()}`}
+                        value={completar[campo] ?? ''}
+                        onChange={e => setCompletar({ ...completar, [campo]: e.target.value })}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -664,7 +749,7 @@ function AsignarDirectorModal({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!selectedUsuarioId || submitting}>
+          <Button onClick={handleSubmit} disabled={!puedeAsignar || submitting}>
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Asignar
           </Button>
