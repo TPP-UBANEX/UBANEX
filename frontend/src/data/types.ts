@@ -363,6 +363,7 @@ export interface Formulario {
   id: string
   nombre: string
   esDefault: boolean
+  esPlantilla: boolean
   campos?: CampoFormulario[]
 }
 

@@ -32,13 +32,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Edicion, Formulario } from '@/data/types'
+import type { Convocatoria, Edicion } from '@/data/types'
 import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab'
-import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 function erroresFechas(f: {
@@ -73,8 +73,7 @@ export function ConvocatoriaDetail() {
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
-  const [formularios, setFormularios] = useState<Formulario[]>([])
-  const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', formularioId: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
+  const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
   const [guardando, setGuardando] = useState(false)
   const [confirmEditOpen, setConfirmEditOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
@@ -93,11 +92,9 @@ export function ConvocatoriaDetail() {
     Promise.all([
       api.convocatorias.get(id),
       api.proyectos.list({ convocatoriaId: id }),
-      api.formularios.list(),
-    ]).then(([c, e, f]) => {
+    ]).then(([c, e]) => {
       setConv(c)
       setEdiciones(e)
-      setFormularios(f)
     }).finally(() => setLoading(false))
   }
 
@@ -112,7 +109,6 @@ export function ConvocatoriaDetail() {
       descripcion: conv.descripcion || '',
       anio: conv.anio,
       estado: conv.estado,
-      formularioId: conv.formularioId || '',
       fechaInicioPresentacion: conv.fechaInicioPresentacion || '',
       fechaFinPresentacion: conv.fechaFinPresentacion || '',
       fechaInicioEvaluacion: conv.fechaInicioEvaluacion || '',
@@ -267,31 +263,6 @@ export function ConvocatoriaDetail() {
                       </div>
                     </div>
                   </div>
-                  <div className="border rounded-lg p-3 space-y-2">
-                    <p className="text-sm font-semibold">Formulario</p>
-                    {formularios.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No hay formularios disponibles</p>
-                    ) : (
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {formularios.map(f => (
-                          <button
-                            key={f.id}
-                            type="button"
-                            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${
-                              editForm.formularioId === f.id
-                                ? 'bg-primary text-primary-foreground'
-                                : 'hover:bg-muted'
-                            }`}
-                            onClick={() => setEditForm(ef => ({ ...ef, formularioId: f.id }))}
-                          >
-                            <FileText className="h-4 w-4 shrink-0" />
-                            <span className="truncate">{f.nombre}</span>
-                            {f.esDefault && <span className="text-xs opacity-70 ml-auto">Default</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                   <Button className="w-full" onClick={handleGuardar} disabled={guardando}>
                     {guardando ? 'Guardando...' : 'Guardar cambios'}
                   </Button>
@@ -441,7 +412,11 @@ export function ConvocatoriaDetail() {
               </div>
               <div className="border-t pt-3">
                 <p className="text-sm font-medium mb-2">Formulario</p>
-                <p>{conv.formulario?.nombre || 'Sin formulario asignado'}</p>
+                <p>
+                  {conv.formulario?.campos?.length
+                    ? `${conv.formulario.campos.length} campos definidos`
+                    : 'Sin campos definidos'}
+                </p>
               </div>
             </CardContent>
           </Card>

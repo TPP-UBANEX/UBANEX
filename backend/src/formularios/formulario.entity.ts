@@ -12,6 +12,9 @@ export class Formulario {
   @Column({ default: false })
   esDefault: boolean;
 
+  @Column({ default: false })
+  esPlantilla: boolean;
+
   @Column({ type: 'json', nullable: true })
   campos: CampoFormulario[] | null;
 }

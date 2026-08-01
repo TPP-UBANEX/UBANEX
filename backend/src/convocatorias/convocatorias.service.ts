@@ -15,14 +15,6 @@ import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
 import { validarCamposFormulario } from '../common/dto/validador-campos-formulario';
 
-function hoyVersion(): string {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `version ${dd}-${mm}-${yyyy}`;
-}
-
 @Injectable()
 export class ConvocatoriasService {
   constructor(
@@ -46,17 +38,7 @@ export class ConvocatoriasService {
 
   async crear(dto: CrearConvocatoriaDto, _usuario: Usuario) {
     validarFechasConvocatoria(dto);
-    const { formularioId, ...rest } = dto;
-    const convocatoria = this.repo.create(rest);
-
-    if (formularioId) {
-      const guardado = await this.clonarFormulario(formularioId);
-      if (guardado) {
-        convocatoria.formularioId = guardado.id;
-        convocatoria.formulario = guardado;
-      }
-    }
-
+    const convocatoria = this.repo.create(dto);
     return this.repo.save(convocatoria);
   }
 
@@ -73,37 +55,8 @@ export class ConvocatoriasService {
       fechaFinEjecucion: dto.fechaFinEjecucion ?? convocatoria.fechaFinEjecucion,
     });
 
-    const { formularioId, ...rest } = dto;
-
-    if (formularioId && formularioId !== convocatoria.formularioId) {
-      const viejo = convocatoria.formulario;
-      convocatoria.formulario = null;
-      convocatoria.formularioId = null;
-      await this.repo.save(convocatoria);
-      if (viejo) {
-        await this.formularioRepo.remove(viejo);
-      }
-      const guardado = await this.clonarFormulario(formularioId);
-      if (guardado) {
-        convocatoria.formularioId = guardado.id;
-        convocatoria.formulario = guardado;
-      }
-    }
-
-    Object.assign(convocatoria, rest);
+    Object.assign(convocatoria, dto);
     return this.repo.save(convocatoria);
-  }
-
-  private async clonarFormulario(formularioId: string): Promise<Formulario | null> {
-    const plantilla = await this.formularioRepo.findOne({ where: { id: formularioId } });
-    if (!plantilla) return null;
-
-    const copia = this.formularioRepo.create({
-      nombre: `${plantilla.nombre} (${hoyVersion()})`,
-      esDefault: false,
-      campos: plantilla.campos ? plantilla.campos.map((c) => ({ ...c })) : null,
-    });
-    return this.formularioRepo.save(copia);
   }
 
   async eliminar(id: string, _usuario: Usuario) {
@@ -171,7 +124,7 @@ export class ConvocatoriasService {
 
     if (convocatoria.formulario) return convocatoria.formulario;
 
-    return { id: '', nombre: '', esDefault: false, campos: [] } as Formulario;
+    return { id: '', nombre: '', esDefault: false, esPlantilla: false, campos: [] } as Formulario;
   }
 
   async guardarFormulario(convocatoriaId: string, dto: GuardarFormularioDto): Promise<Formulario> {

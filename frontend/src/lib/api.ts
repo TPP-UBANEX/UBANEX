@@ -98,9 +98,9 @@ export const api = {
   convocatorias: {
     list: () => get<import('@/data/types').Convocatoria[]>('/convocatorias'),
     get: (id: string) => get<import('@/data/types').Convocatoria>(`/convocatorias/${id}`),
-    crear: (data: { nombre: string; descripcion?: string; anio: number; formularioId?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
       post<import('@/data/types').Convocatoria>('/convocatorias', data),
-    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; formularioId?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
       patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
     eliminar: (id: string) => del(`/convocatorias/${id}`),
     emparejamientos: {

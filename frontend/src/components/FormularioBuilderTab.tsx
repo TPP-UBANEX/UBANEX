@@ -13,7 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { EstadoConvocatoria, TipoCampo, tipoCampoLabels } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
-import { ArrowDown, ArrowUp, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { SeleccionarPlantillaDialog } from '@/components/SeleccionarPlantillaDialog'
+import { ArrowDown, ArrowUp, FileText, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -38,6 +39,7 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
   const [campos, setCampos] = useState<CampoFormulario[]>([])
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const [plantillaDialogOpen, setPlantillaDialogOpen] = useState(false)
 
   const editable = estadoConvocatoria === EstadoConvocatoria.Configuracion
 
@@ -63,6 +65,11 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
 
   const agregarCampo = () => {
     setCampos(prev => [...prev, campoVacio()])
+  }
+
+  const importarPlantilla = (camposPlantilla: CampoFormulario[]) => {
+    setCampos(camposPlantilla)
+    toast.success('Plantilla cargada. Revisá los campos y guardá para confirmar.')
   }
 
   const eliminarCampo = (id: string) => {
@@ -148,6 +155,11 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium">Formulario de presentación</CardTitle>
+        {editable && campos.length > 0 && (
+          <Button type="button" variant="outline" size="sm" onClick={() => setPlantillaDialogOpen(true)}>
+            <FileText className="h-4 w-4 mr-2" />Reemplazar por plantilla
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {!editable && (
@@ -157,9 +169,25 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
         )}
 
         {campos.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            {editable ? 'Todavía no hay campos definidos.' : 'Este formulario no tiene campos definidos.'}
-          </p>
+          editable ? (
+            <div className="text-center py-8 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Todavía no hay campos definidos. ¿Cómo querés empezar?
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <Button type="button" variant="outline" onClick={() => setPlantillaDialogOpen(true)}>
+                  <FileText className="h-4 w-4 mr-2" />Empezar desde una plantilla
+                </Button>
+                <Button type="button" variant="outline" onClick={agregarCampo}>
+                  <Plus className="h-4 w-4 mr-2" />Empezar de cero
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Este formulario no tiene campos definidos.
+            </p>
+          )
         ) : (
           <div className="space-y-3">
             {campos.map((campo, index) => (
@@ -271,9 +299,11 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
 
         {editable && (
           <div className="flex items-center justify-between pt-2">
-            <Button type="button" variant="outline" onClick={agregarCampo}>
-              <Plus className="h-4 w-4 mr-2" />Agregar campo
-            </Button>
+            {campos.length > 0 ? (
+              <Button type="button" variant="outline" onClick={agregarCampo}>
+                <Plus className="h-4 w-4 mr-2" />Agregar campo
+              </Button>
+            ) : <span />}
             <Button onClick={handleGuardar} disabled={guardando}>
               {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {guardando ? 'Guardando...' : 'Guardar formulario'}
@@ -281,6 +311,15 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
           </div>
         )}
       </CardContent>
+
+      <SeleccionarPlantillaDialog
+        open={plantillaDialogOpen}
+        onOpenChange={setPlantillaDialogOpen}
+        onSeleccionar={importarPlantilla}
+        advertencia={campos.length > 0
+          ? 'Los campos que tenés cargados se reemplazan por los de la plantilla. El cambio no se aplica hasta que guardes.'
+          : undefined}
+      />
     </Card>
   )
 }

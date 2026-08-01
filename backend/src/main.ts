@@ -795,10 +795,16 @@ async function bootstrap() {
   for (const f of seedFormularios) {
     const existe = await formularioRepo.findOne({ where: { nombre: f.nombre } });
     if (!existe) {
-      const creado = await formularioRepo.save(formularioRepo.create(f));
+      const creado = await formularioRepo.save(formularioRepo.create({ ...f, esPlantilla: true }));
       formulariosCreados.push(creado);
       console.log(`  ${f.nombre}`);
     } else {
+      // Bases ya sembradas antes de que existiera esPlantilla quedaron con el default false.
+      if (!existe.esPlantilla) {
+        existe.esPlantilla = true;
+        await formularioRepo.save(existe);
+        console.log(`  ${f.nombre} — marcado como plantilla`);
+      }
       formulariosCreados.push(existe);
     }
   }
@@ -834,7 +840,12 @@ async function bootstrap() {
     if (existente) return existente.id;
 
     const copia = await formularioRepo.save(
-      formularioRepo.create({ nombre: nombreCopia, esDefault: false }),
+      formularioRepo.create({
+        nombre: nombreCopia,
+        esDefault: false,
+        esPlantilla: false,
+        campos: formularioDefault.campos ? formularioDefault.campos.map(c => ({ ...c })) : null,
+      }),
     );
     return copia.id;
   }
