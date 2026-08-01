@@ -30,7 +30,7 @@ classDiagram
         +fin: Date
     }
 
-    class TemplateFormulario {
+    class Formulario {
         +id: string
         +nombre: string
         +esDefault: boolean
@@ -38,8 +38,10 @@ classDiagram
 
     class CampoFormulario {
         <<value object>>
+        +id: string
         +tipo: TipoCampo
         +nombre: string
+        +textoAyuda: string
         +esObligatorio: boolean
         +orden: number
         +opciones: string[]
@@ -58,8 +60,8 @@ classDiagram
     Convocatoria *-- RangoFechas : fechasPresentacion
     Convocatoria *-- RangoFechas : fechasEvaluacion
     Convocatoria *-- RangoFechas : fechasEjecucion
-    Convocatoria --> TemplateFormulario : template
-    TemplateFormulario *-- CampoFormulario : campos
+    Convocatoria --> Formulario : formulario
+    Formulario *-- CampoFormulario : campos
     CampoFormulario *-- TipoCampo : tipo
 ```
 
@@ -68,8 +70,14 @@ classDiagram
 - Las etapas de la convocatoria son siempre las mismas 5 (`Configuracion`, `Presentacion`, `Evaluacion`, `Ejecucion`, `Cierre`) y se corresponden 1 a 1 con el estado actual.
 - Solo `Presentacion`, `Evaluacion` y `Ejecucion` tienen fechas de inicio y fin predefinidas (value object `RangoFechas`).
 - `Configuracion` y `Cierre` no tienen fechas asociadas.
-- `TemplateFormulario` define los campos dinámicos del formulario de presentación. Puede reutilizarse entre convocatorias (`esDefault`).
+- `Formulario` es la definición de los campos dinámicos del formulario de presentación (no se llama `TemplateFormulario` como el resto de los templates del dominio porque, a diferencia de ellos, no tiene una entidad hermana que guarde las respuestas — las respuestas de cada proyecto se guardan directamente en `Edicion.datosFormulario`). Puede reutilizarse entre convocatorias (`esDefault`).
+- Aunque `CampoFormulario` es un value object, lleva un `id` estable: es la clave con la que se guardan las respuestas en `Edicion.datosFormulario`, y debe sobrevivir a que se renombre la etiqueta (`nombre`) del campo más adelante.
+- `Edicion.datosFormulario` es un objeto cuyas claves son los `CampoFormulario.id` del `Formulario` de la convocatoria correspondiente.
 - Un `CampoFormulario` puede tener `opciones` solo cuando su `tipo` es `checkbox` o `select`.
+- El `tipo` `archivo` está contemplado en `TipoCampo` pero no está disponible para usarse hasta que exista un mecanismo de almacenamiento de adjuntos.
+- El `Formulario` de una convocatoria solo puede editarse (agregar, quitar o modificar `CampoFormulario`) mientras la convocatoria esté en estado `Configuracion`. Al pasar a `Presentacion` queda congelado.
+- Tanto `AutoridadDeRectorado` como `AsistenteDeRectorado` pueden configurar el `Formulario` de una convocatoria.
+- Asignar un `Formulario` reutilizable (`esDefault`) a una convocatoria no lo referencia: se crea una copia propia de esa convocatoria (con sus `CampoFormulario`), de forma que editar el `Formulario` de una convocatoria no afecta a otras convocatorias que partieron del mismo original.
 - `cuotaFederativa` define el mínimo de proyectos a adjudicar por unidad académica en esa convocatoria.
 
 ---
@@ -82,6 +90,7 @@ classDiagram
         +id: string
         +nombre: string
         +esConsolidado: boolean
+        +esInterfacultad: boolean
     }
 
     class Edicion {
@@ -167,8 +176,9 @@ classDiagram
 
 ### Notas
 
-- `Proyecto` es una entidad raíz con datos estables que persisten entre años (ej: nombre, `esConsolidado`).
+- `Proyecto` es una entidad raíz con datos estables que persisten entre años (ej: nombre, `esConsolidado`, `esInterfacultad`).
 - `esConsolidado = true` indica que el proyecto tiene el mismo equipo directivo 2 años consecutivos. Su Edición saltea la etapa `Evaluacion` en la convocatoria actual.
+- `esInterfacultad = true` indica que el proyecto involucra a más de una unidad académica. Es un dato autodeclarado al crear el proyecto; no tiene reglas de negocio asociadas todavía.
 - `Edicion` representa la instancia de un proyecto dentro de una convocatoria específica. Un proyecto puede tener múltiples ediciones a lo largo del tiempo.
 - El estado `NoAdjudicado` es terminal (no hay suplencia).
 - El `Presupuesto` se compone de exactamente 3 rubros fijos: `ViaticosYSeguros`, `BienesDeConsumo` y `BienesDeUso`.
