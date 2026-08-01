@@ -142,7 +142,6 @@ export const api = {
     get: (id: string) => get<import('@/data/types').Formulario>(`/formularios/${id}`),
     crear: (data: { nombre: string; esDefault?: boolean }) =>
       post<import('@/data/types').Formulario>('/formularios', data),
-    eliminar: (id: string) => del(`/formularios/${id}`),
   },
   sugerencias: {
     listar: (edicionId: string) =>
