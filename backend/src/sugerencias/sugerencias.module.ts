@@ -7,10 +7,11 @@ import { SugerenciasService } from './sugerencias.service';
 import { Edicion } from '../proyectos/edicion.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
+import { Convocatoria } from '../convocatorias/convocatoria.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([SugerenciaCambio, Notificacion, Edicion, Proyecto, ParticipacionConvocatoria]),
+    TypeOrmModule.forFeature([SugerenciaCambio, Notificacion, Edicion, Proyecto, ParticipacionConvocatoria, Convocatoria]),
   ],
   controllers: [SugerenciasController],
   providers: [SugerenciasService],

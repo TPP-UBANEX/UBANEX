@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { SugerenciaCambio } from '@/data/types'
+import type { SugerenciaCambio, CampoFormulario } from '@/data/types'
 import { estadoBadge, EstadoSugerencia } from '@/data/types'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
@@ -21,9 +21,10 @@ const estadoLabel: Record<string, string> = {
 interface SugerenciasTabProps {
   edicionId: string
   creadoPorId: string
+  camposFormulario?: CampoFormulario[]
 }
 
-export function SugerenciasTab({ edicionId, creadoPorId }: SugerenciasTabProps) {
+export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }: SugerenciasTabProps) {
   const { user } = useAuth()
   const [sugerencias, setSugerencias] = useState<SugerenciaCambio[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,7 +78,11 @@ export function SugerenciasTab({ edicionId, creadoPorId }: SugerenciasTabProps) 
     }
     if (mapa[campo]) return mapa[campo]
     if (campo.startsWith('presupuesto.')) return `Presupuesto > ${campo.slice(12)}`
-    if (campo.startsWith('datosFormulario.')) return `Formulario > ${campo.slice(16)}`
+    if (campo.startsWith('datosFormulario.')) {
+      const campoId = campo.slice(16)
+      const campoFormulario = camposFormulario.find(c => c.id === campoId)
+      return `Formulario > ${campoFormulario?.nombre ?? campoId}`
+    }
     return campo
   }
 

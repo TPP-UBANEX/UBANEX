@@ -11,7 +11,7 @@ export class FormulariosService {
   ) {}
 
   listar() {
-    return this.repo.find({ order: { nombre: 'ASC' } });
+    return this.repo.find({ where: { esPlantilla: true }, order: { nombre: 'ASC' } });
   }
 
   obtener(id: string) {
@@ -26,7 +26,7 @@ export class FormulariosService {
         await this.repo.save(actual);
       }
     }
-    const formulario = this.repo.create(dto);
+    const formulario = this.repo.create({ ...dto, esPlantilla: true });
     return this.repo.save(formulario);
   }
 }

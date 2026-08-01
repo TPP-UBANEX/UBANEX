@@ -5,6 +5,7 @@ import { ConvocatoriasService } from './convocatorias.service';
 import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
+import { GuardarFormularioDto } from './dto/guardar-formulario.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -61,5 +62,19 @@ export class ConvocatoriasController {
     @Body() dto: GuardarEmparejamientoDto,
   ) {
     return this.service.guardarEmparejamientos(id, dto);
+  }
+
+  @Get(':id/formulario')
+  obtenerFormulario(@Param('id') id: string) {
+    return this.service.obtenerFormulario(id);
+  }
+
+  @Put(':id/formulario')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  guardarFormulario(
+    @Param('id') id: string,
+    @Body() dto: GuardarFormularioDto,
+  ) {
+    return this.service.guardarFormulario(id, dto);
   }
 }

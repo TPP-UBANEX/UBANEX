@@ -8,6 +8,8 @@ import { Notificacion } from './notificacion.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
+import { Convocatoria } from '../convocatorias/convocatoria.entity';
+import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
 import { ResponderSugerenciaDto } from './dto/responder-sugerencia.dto';
@@ -30,6 +32,8 @@ export class SugerenciasService {
     private readonly proyectoRepo: Repository<Proyecto>,
     @InjectRepository(ParticipacionConvocatoria)
     private readonly participacionRepo: Repository<ParticipacionConvocatoria>,
+    @InjectRepository(Convocatoria)
+    private readonly convocatoriaRepo: Repository<Convocatoria>,
   ) {}
 
   async crear(edicionId: string, dto: CrearSugerenciaDto, usuario: Usuario) {
@@ -280,7 +284,8 @@ export class SugerenciasService {
     });
     directores.forEach(d => destinatarios.add(d.usuarioId));
 
-    const nombreCampo = this.nombreLegible(sugerencia.campo);
+    const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
+    const nombreCampo = this.nombreLegible(sugerencia.campo, campos);
     const mensaje = `${sugeridoPor.nombreCompleto} sugirió un cambio en "${nombreCampo}" del proyecto "${proyecto.nombre}"`;
 
     for (const usuarioId of destinatarios) {
@@ -303,7 +308,8 @@ export class SugerenciasService {
       [EstadoSugerencia.MasInformacion]: 'pidió más información sobre',
     };
     const accion = accionTexto[sugerencia.estado] || 'respondió a';
-    const nombreCampo = this.nombreLegible(sugerencia.campo);
+    const campos = await this.obtenerCamposFormulario(sugerencia.edicion.convocatoriaId);
+    const nombreCampo = this.nombreLegible(sugerencia.campo, campos);
     const mensaje = `${respondidoPor.nombreCompleto} ${accion} la sugerencia en "${nombreCampo}"`;
 
     await this.notificacionRepo.save(
@@ -316,7 +322,15 @@ export class SugerenciasService {
     );
   }
 
-  private nombreLegible(campo: string): string {
+  private async obtenerCamposFormulario(convocatoriaId: string): Promise<CampoFormulario[]> {
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+      relations: { formulario: true },
+    });
+    return convocatoria?.formulario?.campos ?? [];
+  }
+
+  private nombreLegible(campo: string, campos: CampoFormulario[] = []): string {
     const mapa: Record<string, string> = {
       nombre: 'Nombre',
       anioEdicion: 'Año de edición',
@@ -325,7 +339,11 @@ export class SugerenciasService {
     };
     if (mapa[campo]) return mapa[campo];
     if (campo.startsWith('presupuesto.')) return `Presupuesto > ${campo.replace('presupuesto.', '')}`;
-    if (campo.startsWith('datosFormulario.')) return `Formulario > ${campo.replace('datosFormulario.', '')}`;
+    if (campo.startsWith('datosFormulario.')) {
+      const campoId = campo.replace('datosFormulario.', '');
+      const campoFormulario = campos.find(c => c.id === campoId);
+      return `Formulario > ${campoFormulario?.nombre ?? campoId}`;
+    }
     return campo;
   }
 }

@@ -31,11 +31,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Formulario } from '@/data/types'
+import type { Convocatoria } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import { estadoBadge } from '@/data/types'
 import { toast } from 'sonner'
-import { Plus, Search, FileText } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 
 function erroresFechas(f: {
   fechaInicioPresentacion: string; fechaFinPresentacion: string;
@@ -78,13 +78,11 @@ export function Convocatorias() {
      RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
   )
   const [data, setData] = useState<Convocatoria[]>([])
-  const [formularios, setFormularios] = useState<Formulario[]>([])
   const [search, setSearch] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todas')
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [creando, setCreando] = useState(false)
-  const [formularioSeleccionado, setFormularioSeleccionado] = useState<Formulario | null>(null)
   const [form, setForm] = useState({
     nombre: '', descripcion: '', anio: new Date().getFullYear(),
     fechaInicioPresentacion: '', fechaFinPresentacion: '',
@@ -95,13 +93,9 @@ export function Convocatorias() {
   const errores = erroresFechas(form)
 
   const cargar = () => {
-    Promise.all([
-      api.convocatorias.list(),
-      api.formularios.list(),
-    ]).then(([c, f]) => {
-      setData(c)
-      setFormularios(f)
-    }).finally(() => setLoading(false))
+    api.convocatorias.list()
+      .then(setData)
+      .finally(() => setLoading(false))
   }
 
   useEffect(cargar, [])
@@ -120,13 +114,9 @@ export function Convocatorias() {
 
     setCreando(true)
     try {
-      await api.convocatorias.crear({
-        ...form,
-        formularioId: formularioSeleccionado?.id,
-      })
+      await api.convocatorias.crear(form)
       toast.success('Convocatoria creada correctamente')
       setOpen(false)
-      setFormularioSeleccionado(null)
       setForm({
         nombre: '', descripcion: '', anio: new Date().getFullYear(),
         fechaInicioPresentacion: '', fechaFinPresentacion: '',
@@ -225,47 +215,6 @@ export function Convocatorias() {
                   </div>
                 </div>
               </div>
-              <div className="border rounded-lg p-3 space-y-2">
-                <p className="text-sm font-semibold">Formulario</p>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300"
-                    checked={formularioSeleccionado?.id === formularios.find(f => f.esDefault)?.id}
-                    onChange={e => {
-                      if (e.target.checked) {
-                        const defaultForm = formularios.find(f => f.esDefault)
-                        if (defaultForm) setFormularioSeleccionado(defaultForm)
-                      } else {
-                        setFormularioSeleccionado(null)
-                      }
-                    }}
-                  />
-                  Usar formulario default
-                </label>
-                {formularios.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No hay formularios disponibles</p>
-                ) : (
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {formularios.map(f => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${
-                          formularioSeleccionado?.id === f.id
-                            ? 'bg-primary text-primary-foreground'
-                            : 'hover:bg-muted'
-                        }`}
-                        onClick={() => setFormularioSeleccionado(f)}
-                      >
-                        <FileText className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{f.nombre}</span>
-                        {f.esDefault && <span className="text-xs opacity-70 ml-auto">Default</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
               <Button className="w-full" onClick={handleCrear} disabled={creando}>
                 {creando ? 'Creando...' : 'Crear'}
               </Button>
@@ -341,7 +290,9 @@ function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: 
                     : '-'}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {c.formulario?.nombre || '-'}
+                  {c.formulario?.campos?.length
+                    ? `${c.formulario.campos.length} campos`
+                    : 'Sin configurar'}
                 </TableCell>
                 <TableCell>
                   <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onClick(c.id) }}>Ver</Button>

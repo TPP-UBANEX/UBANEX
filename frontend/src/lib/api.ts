@@ -98,9 +98,9 @@ export const api = {
   convocatorias: {
     list: () => get<import('@/data/types').Convocatoria[]>('/convocatorias'),
     get: (id: string) => get<import('@/data/types').Convocatoria>(`/convocatorias/${id}`),
-    crear: (data: { nombre: string; descripcion?: string; anio: number; formularioId?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
       post<import('@/data/types').Convocatoria>('/convocatorias', data),
-    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; formularioId?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
       patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
     eliminar: (id: string) => del(`/convocatorias/${id}`),
     emparejamientos: {
@@ -108,6 +108,12 @@ export const api = {
         get<import('@/data/types').Emparejamiento[]>(`/convocatorias/${convocatoriaId}/emparejamientos`),
       guardar: (convocatoriaId: string, data: import('@/data/types').GuardarEmparejamientoDto) =>
         request<import('@/data/types').Emparejamiento[]>('PUT', `/convocatorias/${convocatoriaId}/emparejamientos`, data),
+    },
+    formulario: {
+      get: (convocatoriaId: string) =>
+        get<import('@/data/types').Formulario>(`/convocatorias/${convocatoriaId}/formulario`),
+      guardar: (convocatoriaId: string, campos: import('@/data/types').CampoFormulario[]) =>
+        request<import('@/data/types').Formulario>('PUT', `/convocatorias/${convocatoriaId}/formulario`, { campos }),
     },
   },
   proyectos: {
@@ -136,7 +142,6 @@ export const api = {
     get: (id: string) => get<import('@/data/types').Formulario>(`/formularios/${id}`),
     crear: (data: { nombre: string; esDefault?: boolean }) =>
       post<import('@/data/types').Formulario>('/formularios', data),
-    eliminar: (id: string) => del(`/formularios/${id}`),
   },
   sugerencias: {
     listar: (edicionId: string) =>
