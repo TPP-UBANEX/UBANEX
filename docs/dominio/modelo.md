@@ -34,6 +34,7 @@ classDiagram
         +id: string
         +nombre: string
         +esDefault: boolean
+        +esPlantilla: boolean
     }
 
     class CampoFormulario {
@@ -70,14 +71,14 @@ classDiagram
 - Las etapas de la convocatoria son siempre las mismas 5 (`Configuracion`, `Presentacion`, `Evaluacion`, `Ejecucion`, `Cierre`) y se corresponden 1 a 1 con el estado actual.
 - Solo `Presentacion`, `Evaluacion` y `Ejecucion` tienen fechas de inicio y fin predefinidas (value object `RangoFechas`).
 - `Configuracion` y `Cierre` no tienen fechas asociadas.
-- `Formulario` es la definición de los campos dinámicos del formulario de presentación (no se llama `TemplateFormulario` como el resto de los templates del dominio porque, a diferencia de ellos, no tiene una entidad hermana que guarde las respuestas — las respuestas de cada proyecto se guardan directamente en `Edicion.datosFormulario`). Puede reutilizarse entre convocatorias (`esDefault`).
-- Aunque `CampoFormulario` es un value object, lleva un `id` estable: es la clave con la que se guardan las respuestas en `Edicion.datosFormulario`, y debe sobrevivir a que se renombre la etiqueta (`nombre`) del campo más adelante.
+- `Formulario` es la definición de los campos dinámicos del formulario de presentación (no se llama `TemplateFormulario` como el resto de los templates del dominio porque, a diferencia de ellos, no tiene una entidad hermana que guarde las respuestas — las respuestas de cada proyecto se guardan directamente en `Edicion.datosFormulario`). `esPlantilla: true` marca los formularios de biblioteca, reutilizables, que se pueden usar como punto de partida; `esPlantilla: false` es el formulario privado de una convocatoria. `esDefault` indica, entre las plantillas, cuál se sugiere primero — hay a lo sumo una.
+- Aunque `CampoFormulario` es un value object, lleva un `id` estable: es la clave con la que se guardan las respuestas en `Edicion.datosFormulario`, y debe sobrevivir a que se renombre la etiqueta (`nombre`) del campo más adelante. Por eso, al copiar los campos de una plantilla a una convocatoria, cada `CampoFormulario.id` se regenera: así las respuestas de una convocatoria nunca se confunden con las de otra que partió de la misma plantilla.
 - `Edicion.datosFormulario` es un objeto cuyas claves son los `CampoFormulario.id` del `Formulario` de la convocatoria correspondiente.
 - Un `CampoFormulario` puede tener `opciones` solo cuando su `tipo` es `checkbox` o `select`.
 - El `tipo` `archivo` está contemplado en `TipoCampo` pero no está disponible para usarse hasta que exista un mecanismo de almacenamiento de adjuntos.
 - El `Formulario` de una convocatoria solo puede editarse (agregar, quitar o modificar `CampoFormulario`) mientras la convocatoria esté en estado `Configuracion`. Al pasar a `Presentacion` queda congelado.
 - Tanto `AutoridadDeRectorado` como `AsistenteDeRectorado` pueden configurar el `Formulario` de una convocatoria.
-- Asignar un `Formulario` reutilizable (`esDefault`) a una convocatoria no lo referencia: se crea una copia propia de esa convocatoria (con sus `CampoFormulario`), de forma que editar el `Formulario` de una convocatoria no afecta a otras convocatorias que partieron del mismo original.
+- El `Formulario` de una convocatoria es siempre propio (`esPlantilla: false`) y se crea recién la primera vez que se guardan campos; hasta ese momento la convocatoria no tiene formulario asociado. Elegir una plantilla como punto de partida copia sus `CampoFormulario` (con `id` regenerados) sin referenciar ni modificar la plantilla original, y esos campos se siguen editando libremente antes de guardar.
 - `cuotaFederativa` define el mínimo de proyectos a adjudicar por unidad académica en esa convocatoria.
 
 ---
