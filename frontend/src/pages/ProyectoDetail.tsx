@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, CampoFormulario } from '@/data/types'
 import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
 import {
   camposPerfilDocente,
@@ -37,6 +37,12 @@ import {
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
+import {
+  CampoFormularioInput,
+  EtiquetaCampoFormulario,
+  campoFormularioVacio,
+  formatearValorCampoFormulario,
+} from '@/components/CampoFormularioInput'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -63,8 +69,10 @@ export function ProyectoDetail() {
   const [editEsConsolidado, setEditEsConsolidado] = useState(false)
   const [editEsInterfacultad, setEditEsInterfacultad] = useState(false)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
+  const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
 
+  const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showAsignarDirector, setShowAsignarDirector] = useState(false)
 
@@ -88,7 +96,10 @@ export function ProyectoDetail() {
     d => d.rol === RolEjecucion.DirectorDeProyecto,
   ).length >= 2
   const directoresCompletos = tieneDirectorPrincipal && tieneSegundoDirector
-  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
+  const camposObligatoriosFaltantes = camposFormulario.filter(
+    c => c.esObligatorio && campoFormularioVacio(c, edicion?.datosFormulario?.[c.id]),
+  )
+  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos && camposObligatoriosFaltantes.length === 0
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
@@ -96,7 +107,9 @@ export function ProyectoDetail() {
     ? 'Tu usuario no está validado'
     : !directoresCompletos
       ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
-      : ''
+      : camposObligatoriosFaltantes.length > 0
+        ? `Faltan completar campos obligatorios: ${camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}`
+        : ''
 
   const cargarDatos = async () => {
     if (!id) return
@@ -111,8 +124,12 @@ export function ProyectoDetail() {
       if (ed) {
         setEdicion(ed)
         if (ed.convocatoriaId) {
-          const participaciones = await api.participaciones.listar(ed.convocatoriaId)
+          const [participaciones, formulario] = await Promise.all([
+            api.participaciones.listar(ed.convocatoriaId),
+            api.convocatorias.formulario.get(ed.convocatoriaId),
+          ])
           setDirectores(participaciones.filter(p => p.rol === RolEjecucion.DirectorDeProyecto && p.edicionId === ed.id))
+          setCamposFormulario((formulario.campos ?? []).slice().sort((a, b) => a.orden - b.orden))
         }
       }
     } catch {
@@ -133,6 +150,7 @@ export function ProyectoDetail() {
     setEditEsConsolidado(proyecto.esConsolidado)
     setEditEsInterfacultad(proyecto.esInterfacultad)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
+    setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
   }
 
@@ -150,6 +168,7 @@ export function ProyectoDetail() {
         esConsolidado: editEsConsolidado,
         esInterfacultad: editEsInterfacultad,
         presupuesto: editPresupuesto || undefined,
+        datosFormulario: editDatosFormulario,
       })
       toast.success('Proyecto actualizado')
       setEditando(false)
@@ -428,45 +447,79 @@ export function ProyectoDetail() {
                       <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => setEditEsInterfacultad(false)}>No</Button>
                     </div>
                   </div>
+                  {camposFormulario.map(campo => (
+                    <CampoFormularioInput
+                      key={campo.id}
+                      campo={campo}
+                      valor={editDatosFormulario[campo.id]}
+                      onChange={v => setEditDatosFormulario(prev => ({ ...prev, [campo.id]: v }))}
+                    />
+                  ))}
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardHeader><CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-muted-foreground">Nombre:</span>{' '}
-                    <CampoSugerible campo="nombre" valorActual={proyecto.nombre} label="Nombre" activo={modoSugerencia} onClick={handleSugerirClick}>
-                      {proyecto.nombre}
-                    </CampoSugerible>
-                  </div>
-                  <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
-                  <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
-                  <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
-                  <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ') : '-'}</div>
-                  <div>
-                    <span className="text-muted-foreground">Edición:</span>{' '}
-                    <CampoSugerible campo="anioEdicion" valorActual={String(edicion?.anioEdicion ?? '')} label="Año de edición" activo={modoSugerencia} onClick={handleSugerirClick}>
-                      {edicion?.anioEdicion || '-'}
-                    </CampoSugerible>
-                  </div>
-                  <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
-                  <div>
-                    <span className="text-muted-foreground">Consolidado:</span>{' '}
-                    <CampoSugerible campo="esConsolidado" valorActual={String(proyecto.esConsolidado)} label="Es consolidado" activo={modoSugerencia} onClick={handleSugerirClick}>
-                      {proyecto.esConsolidado ? 'Sí' : 'No'}
-                    </CampoSugerible>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Interfacultad:</span>{' '}
-                    <CampoSugerible campo="esInterfacultad" valorActual={String(proyecto.esInterfacultad)} label="Es interfacultad" activo={modoSugerencia} onClick={handleSugerirClick}>
-                      {proyecto.esInterfacultad ? 'Sí' : 'No'}
-                    </CampoSugerible>
-                  </div>
+            <div className="space-y-4">
+              {esPropietario && edicion?.estado === EstadoEdicion.Borrador && camposObligatoriosFaltantes.length > 0 && (
+                <div className="text-sm text-destructive bg-destructive/10 rounded-md p-3">
+                  Faltan completar {camposObligatoriosFaltantes.length === 1 ? '1 campo obligatorio' : `${camposObligatoriosFaltantes.length} campos obligatorios`} para poder enviar: {camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}.
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              <Card>
+                <CardHeader><CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle></CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Nombre:</span>{' '}
+                      <CampoSugerible campo="nombre" valorActual={proyecto.nombre} label="Nombre" activo={modoSugerencia} onClick={handleSugerirClick}>
+                        {proyecto.nombre}
+                      </CampoSugerible>
+                    </div>
+                    <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
+                    <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
+                    <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
+                    <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ') : '-'}</div>
+                    <div>
+                      <span className="text-muted-foreground">Edición:</span>{' '}
+                      <CampoSugerible campo="anioEdicion" valorActual={String(edicion?.anioEdicion ?? '')} label="Año de edición" activo={modoSugerencia} onClick={handleSugerirClick}>
+                        {edicion?.anioEdicion || '-'}
+                      </CampoSugerible>
+                    </div>
+                    <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
+                    <div>
+                      <span className="text-muted-foreground">Consolidado:</span>{' '}
+                      <CampoSugerible campo="esConsolidado" valorActual={String(proyecto.esConsolidado)} label="Es consolidado" activo={modoSugerencia} onClick={handleSugerirClick}>
+                        {proyecto.esConsolidado ? 'Sí' : 'No'}
+                      </CampoSugerible>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Interfacultad:</span>{' '}
+                      <CampoSugerible campo="esInterfacultad" valorActual={String(proyecto.esInterfacultad)} label="Es interfacultad" activo={modoSugerencia} onClick={handleSugerirClick}>
+                        {proyecto.esInterfacultad ? 'Sí' : 'No'}
+                      </CampoSugerible>
+                    </div>
+                    {camposFormulario.map(campo => (
+                      <div key={campo.id}>
+                        <span className="text-muted-foreground">
+                          <EtiquetaCampoFormulario campo={campo} />:
+                        </span>{' '}
+                        <CampoSugerible
+                          campo={`datosFormulario.${campo.id}`}
+                          valorActual={formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])}
+                          label={campo.nombre}
+                          activo={modoSugerencia}
+                          onClick={handleSugerirClick}
+                        >
+                          {formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])}
+                        </CampoSugerible>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          {camposFormulario.some(c => c.esObligatorio) && (
+            <p className="text-xs text-muted-foreground mt-2">* Campos obligatorios para enviar la presentación</p>
           )}
         </TabsContent>
 
@@ -514,7 +567,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="sugerencias" className="mt-4">
           {edicion ? (
-            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} />
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} camposFormulario={camposFormulario} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
