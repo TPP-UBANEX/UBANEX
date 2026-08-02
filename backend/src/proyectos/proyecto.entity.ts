@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../usuarios/usuario.entity';
+import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 
 @Entity()
 export class Proyecto {
@@ -17,6 +18,13 @@ export class Proyecto {
 
   @Column({ default: false })
   esInterfacultad: boolean;
+
+  @ManyToOne(() => UnidadAcademica, { nullable: true })
+  @JoinColumn({ name: 'unidadAcademicaAdicionalId' })
+  unidadAcademicaAdicional: UnidadAcademica | null;
+
+  @Column({ nullable: true })
+  unidadAcademicaAdicionalId: string | null;
 
   @ManyToOne(() => Usuario)
   @JoinColumn({ name: 'creadoPorId' })

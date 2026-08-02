@@ -252,6 +252,8 @@ export interface Proyecto {
   nombre: string
   esConsolidado: boolean
   esInterfacultad: boolean
+  unidadAcademicaAdicional?: UnidadAcademica
+  unidadAcademicaAdicionalId?: string
   creadoPor: Usuario
   creadoPorId: string
   creadoEn: string
@@ -315,6 +317,7 @@ export interface ActualizarEdicionDto {
   anioEdicion?: number
   esConsolidado?: boolean
   esInterfacultad?: boolean
+  unidadAcademicaAdicionalId?: string
   presupuesto?: Presupuesto
   datosFormulario?: Record<string, unknown>
 }
