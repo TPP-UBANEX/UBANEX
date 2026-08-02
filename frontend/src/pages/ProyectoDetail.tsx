@@ -227,6 +227,9 @@ export function ProyectoDetail() {
       !deseado.some(des => des.usuarioId === p.usuarioId && des.esDirectorPrincipal === p.esDirectorPrincipal),
     )
 
+    for (const p of borrar) {
+      await api.participaciones.desasignar(p.id)
+    }
     for (const des of crear) {
       await api.participaciones.asignar({
         usuarioId: des.usuarioId,
@@ -235,9 +238,6 @@ export function ProyectoDetail() {
         edicionId: edicion.id,
         esDirectorPrincipal: des.esDirectorPrincipal,
       })
-    }
-    for (const p of borrar) {
-      await api.participaciones.desasignar(p.id)
     }
   }
 
