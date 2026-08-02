@@ -13,7 +13,9 @@ import { ParticipacionConvocatoria } from '../participaciones-convocatoria/parti
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
+import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { campoFormularioVacio } from '../formularios/campo-formulario.util';
 
 @Injectable()
 export class ProyectosService {
@@ -168,11 +170,50 @@ export class ProyectosService {
 
     await this.validarAccesoEdicion(edicion, usuario);
     this.validarEstadoEditable(edicion);
+    await this.validarCompletitudParaEnvio(edicion, usuario);
 
     edicion.estado = EstadoEdicion.Presentado;
     await this.edicionRepo.save(edicion);
 
     return this.obtenerProyecto(proyectoId);
+  }
+
+  private async validarCompletitudParaEnvio(edicion: Edicion, usuario: Usuario): Promise<void> {
+    const motivos: string[] = [];
+
+    const esDocenteValidado = usuario.roles.includes(RolUsuario.Docente) &&
+      usuario.estadoValidacionDocente === EstadoValidacionDocente.Validado;
+    if (!esDocenteValidado) {
+      motivos.push('Tu usuario no está validado');
+    }
+
+    const directores = await this.participacionRepo.find({
+      where: { edicionId: edicion.id, rol: RolEjecucion.DirectorDeProyecto },
+    });
+    const tieneDirectorPrincipal = directores.some(d => d.esDirectorPrincipal);
+    const tieneSegundoDirector = directores.length >= 2;
+    if (!tieneDirectorPrincipal || !tieneSegundoDirector) {
+      motivos.push('El proyecto no tiene usuarios de dirección ni codirección asignados aún');
+    }
+
+    const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
+      where: { id: edicion.convocatoriaId },
+      relations: { formulario: true },
+    });
+    const campos = convocatoria?.formulario?.campos ?? [];
+    const datosFormulario = (edicion.datosFormulario as Record<string, unknown> | null) ?? {};
+    const camposObligatoriosFaltantes = campos
+      .filter(c => c.esObligatorio)
+      .filter(c => campoFormularioVacio(c, datosFormulario[c.id]));
+    if (camposObligatoriosFaltantes.length > 0) {
+      motivos.push(
+        `Faltan completar campos obligatorios: ${camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}`,
+      );
+    }
+
+    if (motivos.length > 0) {
+      throw new BadRequestException(motivos.join('. '));
+    }
   }
 
   private async obtenerEdicion(proyectoId: string, edicionId: string): Promise<Edicion> {

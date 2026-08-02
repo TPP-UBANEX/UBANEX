@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString, IsEnum, IsInt, IsUUID, Min } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEnum, IsInt, Min } from 'class-validator';
 import { EstadoConvocatoria } from '../../common/enums/estado-convocatoria.enum';
 
 export class ActualizarConvocatoriaDto {
@@ -42,8 +42,4 @@ export class ActualizarConvocatoriaDto {
   @IsDateString()
   @IsOptional()
   fechaFinEjecucion?: string;
-
-  @IsUUID()
-  @IsOptional()
-  formularioId?: string;
 }
