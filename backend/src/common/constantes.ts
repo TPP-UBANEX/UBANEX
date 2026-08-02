@@ -1,0 +1,1 @@
+export const CANTIDAD_EVALUADORES_POR_UA = 3;

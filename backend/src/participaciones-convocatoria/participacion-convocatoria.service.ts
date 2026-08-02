@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ParticipacionConvocatoria } from './participacion-convocatoria.entity';
 import { CrearParticipacionDto } from './dto/crear-participacion.dto';
+import { ActualizarEstadoParticipacionDto } from './dto/actualizar-estado-participacion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Edicion } from '../proyectos/edicion.entity';
@@ -12,6 +13,8 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
+import { CANTIDAD_EVALUADORES_POR_UA } from '../common/constantes';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 
 type CampoPerfil = {
@@ -101,6 +104,43 @@ export class ParticipacionConvocatoriaService {
       if (dto.edicionId || dto.esDirectorPrincipal != null) {
         throw new BadRequestException('Evaluador no puede tener edicionId ni esDirectorPrincipal');
       }
+
+      const esSecretaria = asignadoPor.roles.some(
+        r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+      );
+      if (!esSecretaria) {
+        throw new BadRequestException('Solo la Secretaría de la Unidad Académica puede proponer evaluadores');
+      }
+      if (!asignadoPor.unidadAcademicaId) {
+        throw new BadRequestException('La Secretaría debe pertenecer a una Unidad Académica');
+      }
+      if (usuario.unidadAcademicaId !== asignadoPor.unidadAcademicaId) {
+        throw new BadRequestException('Solo se pueden proponer docentes de la propia Unidad Académica');
+      }
+
+      const proyectosEnConvocatoria = await this.edicionRepo.count({
+        where: { convocatoriaId: dto.convocatoriaId, creadoPorId: dto.usuarioId },
+      });
+      if (proyectosEnConvocatoria > 0) {
+        throw new BadRequestException('El docente tiene proyectos en esta convocatoria y no puede ser evaluador');
+      }
+
+      const activos = await this.repo
+        .createQueryBuilder('p')
+        .innerJoin('p.usuario', 'u')
+        .where('p.convocatoriaId = :convocatoriaId', { convocatoriaId: dto.convocatoriaId })
+        .andWhere('p.rol = :rol', { rol: RolEjecucion.Evaluador })
+        .andWhere('p.estado IN (:...estados)', {
+          estados: [EstadoPropuestaEvaluador.Propuesto, EstadoPropuestaEvaluador.Aprobado],
+        })
+        .andWhere('u.unidadAcademicaId = :uaId', { uaId: asignadoPor.unidadAcademicaId })
+        .getCount();
+
+      if (activos >= CANTIDAD_EVALUADORES_POR_UA) {
+        throw new BadRequestException(
+          `La Unidad Académica ya alcanzó el límite de ${CANTIDAD_EVALUADORES_POR_UA} evaluadores activos en esta convocatoria`,
+        );
+      }
     }
 
     const entity = this.repo.create({
@@ -110,8 +150,24 @@ export class ParticipacionConvocatoriaService {
       edicionId: dto.edicionId ?? null,
       esDirectorPrincipal: dto.esDirectorPrincipal ?? null,
       asignadoPorId: asignadoPor.id,
+      estado: dto.rol === RolEjecucion.Evaluador
+        ? EstadoPropuestaEvaluador.Propuesto
+        : null,
     });
 
+    return this.repo.save(entity);
+  }
+
+  async actualizarEstado(id: string, dto: ActualizarEstadoParticipacionDto): Promise<ParticipacionConvocatoria> {
+    const entity = await this.repo.findOne({ where: { id } });
+    if (!entity) throw new NotFoundException('Participacion no encontrada');
+    if (entity.rol !== RolEjecucion.Evaluador) {
+      throw new BadRequestException('Solo las participaciones de evaluador pueden aprobarse o rechazarse');
+    }
+    if (entity.estado !== EstadoPropuestaEvaluador.Propuesto) {
+      throw new BadRequestException('Solo las propuestas pendientes pueden aprobarse o rechazarse');
+    }
+    entity.estado = dto.estado;
     return this.repo.save(entity);
   }
 
@@ -190,7 +246,7 @@ export class ParticipacionConvocatoriaService {
   async listarPorConvocatoria(convocatoriaId: string): Promise<ParticipacionConvocatoria[]> {
     return this.repo.find({
       where: { convocatoriaId },
-      relations: { usuario: true },
+      relations: { usuario: { unidadAcademica: true } },
       order: { creadoEn: 'ASC' },
     });
   }

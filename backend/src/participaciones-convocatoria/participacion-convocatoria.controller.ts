@@ -1,8 +1,9 @@
 import {
-  Controller, Get, Post, Delete, Body, Param, Query, UseGuards,
+  Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards,
 } from '@nestjs/common';
 import { ParticipacionConvocatoriaService } from './participacion-convocatoria.service';
 import { CrearParticipacionDto } from './dto/crear-participacion.dto';
+import { ActualizarEstadoParticipacionDto } from './dto/actualizar-estado-participacion.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -25,6 +26,15 @@ export class ParticipacionConvocatoriaController {
   @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado)
   desasignar(@Param('id') id: string) {
     return this.service.desasignar(id);
+  }
+
+  @Patch(':id/estado')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  actualizarEstado(
+    @Param('id') id: string,
+    @Body() dto: ActualizarEstadoParticipacionDto,
+  ) {
+    return this.service.actualizarEstado(id, dto);
   }
 
   @Get()

@@ -316,7 +316,9 @@ export function ConvocatoriaDetail() {
       <Tabs defaultValue="proyectos">
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
-          <TabsTrigger value="evaluadores">Usuarios de evaluación</TabsTrigger>
+          {!esUsuarioEjecucion && (
+            <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>
+          )}
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
           {esRectorado && <TabsTrigger value="formulario">Formulario</TabsTrigger>}

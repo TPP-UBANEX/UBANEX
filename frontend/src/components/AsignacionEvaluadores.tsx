@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -17,40 +18,67 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { api } from '@/lib/api'
-import { RolUsuario, RolEjecucion, EstadoValidacionDocente } from '@/data/types'
-import type { ParticipacionConvocatoria, Usuario, CrearParticipacionDto } from '@/data/types'
-import {
-  camposPerfilDocente,
-  camposPerfilFaltantes,
-  generoOptions,
-  cargoDocenteOptions,
-  tipoDesignacionDocenteOptions,
-  personaConDiscapacidadOptions,
-} from '@/data/perfil'
-import { Loader2, Trash2 } from 'lucide-react'
+import { RolUsuario, RolEjecucion, EstadoValidacionDocente, EstadoPropuestaEvaluador } from '@/data/types'
+import type { ParticipacionConvocatoria, Usuario } from '@/data/types'
+import { camposPerfilFaltantes } from '@/data/perfil'
+import { useAuth } from '@/lib/auth-context'
+import { Loader2, Trash2, Check, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
+const CANTIDAD_EVALUADORES_POR_UA = 3
+
+const estadoVariant: Record<EstadoPropuestaEvaluador, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  [EstadoPropuestaEvaluador.Propuesto]: 'outline',
+  [EstadoPropuestaEvaluador.Aprobado]: 'default',
+  [EstadoPropuestaEvaluador.Rechazado]: 'destructive',
+}
+
+const estadoLabel: Record<EstadoPropuestaEvaluador, string> = {
+  [EstadoPropuestaEvaluador.Propuesto]: 'Propuesto',
+  [EstadoPropuestaEvaluador.Aprobado]: 'Aprobado',
+  [EstadoPropuestaEvaluador.Rechazado]: 'Rechazado',
+}
+
 export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: string }) {
+  const { user } = useAuth()
+  const esSecretaria = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+  )
+  const esRectorado = user?.roles.some(r => r === RolUsuario.AutoridadDeRectorado)
+
   const [participaciones, setParticipaciones] = useState<ParticipacionConvocatoria[]>([])
   const [docentes, setDocentes] = useState<Usuario[]>([])
-  const [selectedUserId, setSelectedUserId] = useState('')
-  const [completar, setCompletar] = useState<Record<string, string>>({})
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  const evaluadores = participaciones.filter(p => p.rol === RolEjecucion.Evaluador)
+  const evaluadoresPropios = evaluadores.filter(
+    p => p.usuario?.unidadAcademicaId === user?.unidadAcademicaId,
+  )
+  const activosPropios = evaluadoresPropios.filter(p =>
+    p.estado === EstadoPropuestaEvaluador.Propuesto || p.estado === EstadoPropuestaEvaluador.Aprobado,
+  )
+  const aprobados = evaluadoresPropios.filter(p => p.estado === EstadoPropuestaEvaluador.Aprobado)
+  const hayRechazados = evaluadoresPropios.some(p => p.estado === EstadoPropuestaEvaluador.Rechazado)
 
   const cargarDatos = async () => {
     setLoading(true)
     try {
-      const [parts, usersRes] = await Promise.all([
+      const [parts, usersRes, ediciones] = await Promise.all([
         api.participaciones.listar(convocatoriaId),
         api.usuarios.list({ rol: RolUsuario.Docente, limit: 100 }),
+        api.proyectos.list({ convocatoriaId }),
       ])
       setParticipaciones(parts)
-      // Solo docentes validados que no tengan ya participacion en esta convocatoria
+      const idsConProyecto = new Set(ediciones.map(e => e.creadoPorId))
       setDocentes(
         usersRes.data.filter(
           (u: Usuario) =>
             u.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
+            u.habilitado !== false &&
+            !idsConProyecto.has(u.id) &&
             !parts.some((p: ParticipacionConvocatoria) => p.usuarioId === u.id),
         ),
       )
@@ -65,44 +93,43 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     if (convocatoriaId) cargarDatos()
   }, [convocatoriaId])
 
-  const evaluadores = participaciones.filter(p => p.rol === RolEjecucion.Evaluador)
+  const cupoLleno = activosPropios.length >= CANTIDAD_EVALUADORES_POR_UA
+  const cupoDisponible = Math.max(0, CANTIDAD_EVALUADORES_POR_UA - activosPropios.length)
 
-  const selectedDocente = docentes.find(d => d.id === selectedUserId)
-  const faltantes = selectedDocente ? camposPerfilFaltantes(selectedDocente) : []
-
-  const seleccionarDocente = (id: string) => {
-    setSelectedUserId(id)
-    setCompletar({})
+  const toggleSeleccion = (id: string) => {
+    setSelectedUserIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      if (prev.length >= cupoDisponible) return prev
+      return [...prev, id]
+    })
   }
 
-  const faltantesCompletos = faltantes.every(campo => {
-    const valor = completar[campo]
-    if (campo === 'personaConDiscapacidad') return valor === 'true' || valor === 'false'
-    return valor !== undefined && valor.trim() !== ''
-  })
-  const puedeAsignar = !!selectedUserId && faltantesCompletos
-
-  const handleAsignar = async () => {
-    if (!puedeAsignar) return
+  const handleProponer = async () => {
+    if (selectedUserIds.length === 0) return
     setSubmitting(true)
     try {
-      const payload: CrearParticipacionDto = {
-        usuarioId: selectedUserId,
-        convocatoriaId,
-        rol: RolEjecucion.Evaluador,
+      const resultados = await Promise.allSettled(
+        selectedUserIds.map(usuarioId =>
+          api.participaciones.asignar({
+            usuarioId,
+            convocatoriaId,
+            rol: RolEjecucion.Evaluador,
+          }),
+        ),
+      )
+      const exitos = resultados.filter(r => r.status === 'fulfilled').length
+      const errores = resultados.filter(r => r.status === 'rejected')
+      if (errores.length > 0) {
+        const primerError = (errores[0] as PromiseRejectedResult).reason
+        toast.error(
+          `${exitos} evaluadores propuestos, ${errores.length} no se pudieron proponer: ${primerError instanceof Error ? primerError.message : 'error desconocido'}`,
+        )
+      } else {
+        toast.success(`${exitos} evaluadores propuestos correctamente`)
       }
-      const extra: Record<string, string | boolean> = {}
-      for (const campo of faltantes) {
-        const valor = completar[campo]
-        extra[campo] = campo === 'personaConDiscapacidad' ? valor === 'true' : valor.trim()
-      }
-      await api.participaciones.asignar({ ...payload, ...extra })
-      toast.success('Usuario de evaluación asignado correctamente')
-      setSelectedUserId('')
-      setCompletar({})
+      setSelectedUserIds([])
+      setDialogOpen(false)
       cargarDatos()
-    } catch {
-      toast.error('Error al asignar usuario de evaluación')
     } finally {
       setSubmitting(false)
     }
@@ -111,105 +138,205 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const handleDesasignar = async (id: string) => {
     try {
       await api.participaciones.desasignar(id)
-      toast.success('Usuario de evaluación quitado correctamente')
+      toast.success('Evaluador quitado correctamente')
       cargarDatos()
-    } catch {
-      toast.error('Error al quitar usuario de evaluación')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al quitar evaluador')
     }
   }
 
+  const handleAprobar = async (id: string) => {
+    try {
+      await api.participaciones.actualizarEstado(id, EstadoPropuestaEvaluador.Aprobado)
+      toast.success('Evaluador aprobado')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al aprobar evaluador')
+    }
+  }
+
+  const handleRechazar = async (id: string) => {
+    try {
+      await api.participaciones.actualizarEstado(id, EstadoPropuestaEvaluador.Rechazado)
+      toast.success('Evaluador rechazado')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al rechazar evaluador')
+    }
+  }
+
+  const porUA = useMemo(() => {
+    const map = new Map<string, ParticipacionConvocatoria[]>()
+    evaluadores.forEach(p => {
+      const nombre = p.usuario?.unidadAcademica?.nombre || 'Sin Unidad Académica'
+      const lista = map.get(nombre) || []
+      lista.push(p)
+      map.set(nombre, lista)
+    })
+    return Array.from(map.entries()).map(([nombre, lista]) => ({
+      nombre,
+      lista,
+      aprobados: lista.filter(p => p.estado === EstadoPropuestaEvaluador.Aprobado).length,
+    }))
+  }, [evaluadores])
+
   return (
     <div className="space-y-6">
-      <div className="flex items-end gap-3">
-        <div className="flex-1 space-y-2">
-          <p className="text-sm font-medium">Asignar usuario de evaluación</p>
-          <Select value={selectedUserId} onValueChange={seleccionarDocente}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccioná un usuario docente validado" />
-            </SelectTrigger>
-            <SelectContent>
-              {docentes.map(d => {
-                const incompleto = camposPerfilFaltantes(d).length > 0
-                return (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.nombreCompleto} - {d.unidadAcademica?.nombre || 'Sin UA'}
-                    {incompleto ? ' — perfil incompleto' : ''}
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button onClick={handleAsignar} disabled={!puedeAsignar || submitting}>
-          {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Asignar
-        </Button>
-      </div>
-
-      {faltantes.length > 0 && (
-        <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-          <div>
-            <p className="text-sm font-medium">Completar datos del perfil</p>
-            <p className="text-xs text-muted-foreground">
-              El docente tiene el perfil incompleto. Completá los datos faltantes para poder asignarlo.
+      {esSecretaria && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-medium">
+              Evaluadores de tu Unidad Académica: <span className="font-bold">{activosPropios.length}</span>/{CANTIDAD_EVALUADORES_POR_UA}
             </p>
+            <Badge variant="default">{aprobados.length} aprobados</Badge>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {faltantes.map(campo => {
-              const def = camposPerfilDocente.find(c => c.campo === campo)!
-              if (def.tipo === 'select') {
-                const options = campo === 'genero'
-                  ? generoOptions
-                  : campo === 'cargoDocente'
-                    ? cargoDocenteOptions
-                    : campo === 'tipoDesignacionDocente'
-                      ? tipoDesignacionDocenteOptions
-                      : personaConDiscapacidadOptions
-                return (
-                  <div key={campo} className="space-y-1.5">
-                    <label className="text-xs font-medium">{def.etiqueta}</label>
-                    <Select
-                      value={completar[campo] ?? ''}
-                      onValueChange={v => setCompletar({ ...completar, [campo]: v })}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                      <SelectContent>
-                        {options.map(o => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+          <Button size="sm" onClick={() => setDialogOpen(true)} disabled={cupoLleno}>
+            <Plus className="h-4 w-4 mr-2" />Proponer evaluadores
+          </Button>
+
+          {cupoLleno && (
+            <p className="text-sm text-muted-foreground">
+              Alcanzaste el límite de {CANTIDAD_EVALUADORES_POR_UA} evaluadores activos.
+            </p>
+          )}
+          {!cupoLleno && hayRechazados && (
+            <p className="text-sm text-destructive">
+              Hay evaluadores rechazados. Podés proponer un reemplazo por cada uno.
+            </p>
+          )}
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Proponer evaluadores</DialogTitle>
+                <DialogDescription>
+                  Seleccioná los docentes validados de tu Unidad Académica para proponerlos como evaluadores.
+                  Podés enviar hasta {cupoDisponible} en lote.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 pt-2">
+                <p className="text-sm font-medium">
+                  Seleccionados: <span className="font-bold">{selectedUserIds.length}</span> / {cupoDisponible}
+                </p>
+                {docentes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No hay docentes validados disponibles. Los docentes con proyectos en esta convocatoria no pueden ser evaluadores.
+                  </p>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border p-2">
+                    {docentes.map(d => {
+                      const seleccionado = selectedUserIds.includes(d.id)
+                      const perfilIncompleto = camposPerfilFaltantes(d).length > 0
+                      const deshabilitado = perfilIncompleto || (!seleccionado && selectedUserIds.length >= cupoDisponible)
+                      return (
+                        <label
+                          key={d.id}
+                          className={`flex items-center gap-3 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors ${
+                            seleccionado ? 'bg-primary/10' : 'hover:bg-muted'
+                          } ${deshabilitado ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary"
+                            checked={seleccionado}
+                            disabled={deshabilitado}
+                            onChange={() => toggleSeleccion(d.id)}
+                          />
+                          <span className="truncate">
+                            {d.nombreCompleto}
+                            {perfilIncompleto && (
+                              <span className="ml-2 text-xs text-muted-foreground">— perfil incompleto</span>
+                            )}
+                          </span>
+                        </label>
+                      )
+                    })}
                   </div>
-                )
-              }
-              return (
-                <div key={campo} className="space-y-1.5">
-                  <label className="text-xs font-medium">{def.etiqueta}</label>
-                  <Input
-                    placeholder={`Completar ${def.etiqueta.toLowerCase()}`}
-                    value={completar[campo] ?? ''}
-                    onChange={e => setCompletar({ ...completar, [campo]: e.target.value })}
-                  />
-                </div>
-              )
-            })}
-          </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={handleProponer} disabled={selectedUserIds.length === 0 || submitting}>
+                  {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Confirmar propuesta
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
-      <div>
-        <p className="text-sm font-medium mb-2">
-          Usuarios de evaluación asignados ({evaluadores.length})
+      <div className="space-y-4">
+        <p className="text-sm font-medium">
+          {esRectorado
+            ? 'Evaluadores propuestos por Unidad Académica'
+            : `Evaluadores de tu Unidad Académica (${evaluadoresPropios.length})`}
         </p>
+
         {loading ? (
           <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-10 bg-muted animate-pulse rounded-md" />
             ))}
           </div>
-        ) : evaluadores.length === 0 ? (
+        ) : esRectorado ? (
+          porUA.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No hay evaluadores en esta convocatoria
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {porUA.map(grupo => (
+                  <Fragment key={grupo.nombre}>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableCell colSpan={4} className="font-semibold">
+                        {grupo.nombre}
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                          {grupo.aprobados}/{CANTIDAD_EVALUADORES_POR_UA} aprobados
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                    {grupo.lista.map(p => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.usuario?.nombreCompleto || '—'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.usuario?.email || '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant={estadoVariant[p.estado || EstadoPropuestaEvaluador.Propuesto]}>
+                            {estadoLabel[p.estado || EstadoPropuestaEvaluador.Propuesto]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {p.estado === EstadoPropuestaEvaluador.Propuesto && (
+                            <div className="flex justify-end gap-2">
+                              <Button variant="outline" size="sm" onClick={() => handleAprobar(p.id)}>
+                                <Check className="h-4 w-4 mr-1 text-green-600" />Aprobar
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => handleRechazar(p.id)}>
+                                <X className="h-4 w-4 mr-1 text-destructive" />Rechazar
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          )
+        ) : evaluadoresPropios.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No hay usuarios de evaluación asignados a esta convocatoria
+            Tu Unidad Académica aún no propuso evaluadores
           </p>
         ) : (
           <Table>
@@ -218,16 +345,22 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                 <TableHead>Nombre</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Unidad Académica</TableHead>
+                <TableHead>Estado</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {evaluadores.map(p => (
+              {evaluadoresPropios.map(p => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.usuario?.nombreCompleto || '—'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{p.usuario?.email || '—'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {p.usuario?.unidadAcademica?.nombre || '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={estadoVariant[p.estado || EstadoPropuestaEvaluador.Propuesto]}>
+                      {estadoLabel[p.estado || EstadoPropuestaEvaluador.Propuesto]}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" onClick={() => handleDesasignar(p.id)}>

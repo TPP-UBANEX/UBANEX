@@ -90,6 +90,8 @@ export const api = {
     asignar: (data: import('@/data/types').CrearParticipacionDto) =>
       post<import('@/data/types').ParticipacionConvocatoria>('/participaciones-convocatoria', data),
     desasignar: (id: string) => del(`/participaciones-convocatoria/${id}`),
+    actualizarEstado: (id: string, estado: import('@/data/types').EstadoPropuestaEvaluador) =>
+      patch<import('@/data/types').ParticipacionConvocatoria>(`/participaciones-convocatoria/${id}/estado`, { estado }),
     listar: (convocatoriaId: string) =>
       get<import('@/data/types').ParticipacionConvocatoria[]>(`/participaciones-convocatoria?convocatoriaId=${convocatoriaId}`),
     listarMias: () =>

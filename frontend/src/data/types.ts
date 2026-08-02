@@ -12,6 +12,12 @@ export enum RolEjecucion {
   Evaluador = 'Evaluador',
 }
 
+export enum EstadoPropuestaEvaluador {
+  Propuesto = 'Propuesto',
+  Aprobado = 'Aprobado',
+  Rechazado = 'Rechazado',
+}
+
 export enum EstadoValidacionDocente {
   PendienteDeValidacion = 'PendienteDeValidacion',
   Validado = 'Validado',
@@ -155,6 +161,7 @@ export interface ParticipacionConvocatoria {
   rol: RolEjecucion
   edicionId?: string
   esDirectorPrincipal?: boolean
+  estado?: EstadoPropuestaEvaluador | null
   asignadoPorId: string
   creadoEn: string
 }
