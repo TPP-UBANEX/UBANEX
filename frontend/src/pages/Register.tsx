@@ -15,6 +15,7 @@ import { api } from '@/lib/api'
 import { cn, esTelefonoValido } from '@/lib/utils'
 import type { UnidadAcademica, Carrera, RegisterDto } from '@/data/types'
 import { GraduationCap, ArrowLeft, BookOpen } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
 import { Logo } from '@/components/Logo'
 
 export function Register() {
@@ -96,8 +97,11 @@ export function Register() {
         <Card className="w-full max-w-md mx-4">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">
-              <Logo className="h-9 w-auto mx-auto" />
+              <Logo className="h-16 w-auto mx-auto" />
             </CardTitle>
+            <div className="py-4">
+              <Separator />
+            </div>
             <CardDescription>Crear cuenta nueva</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -140,7 +144,7 @@ export function Register() {
             </Button>
           </div>
           <CardTitle className="text-2xl">
-            <Logo className="h-9 w-auto mx-auto" />
+            <Logo className="h-16 w-auto mx-auto" />
           </CardTitle>
           <CardDescription>
             {tipo === 'estudiante' ? 'Crear cuenta de Estudiante' : 'Crear cuenta de Docente'}

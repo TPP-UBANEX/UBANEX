@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth-context'
 import { Logo } from '@/components/Logo'
+import { Separator } from '@/components/ui/separator'
 
 export function Login() {
   const navigate = useNavigate()
@@ -33,9 +34,11 @@ export function Login() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            <Logo className="h-9 w-auto mx-auto" />
+            <Logo className="h-16 w-auto mx-auto" />
           </CardTitle>
-          <CardDescription>Sistema de Gestión de Convocatorias</CardDescription>
+          <div className="py-4">
+            <Separator />
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
