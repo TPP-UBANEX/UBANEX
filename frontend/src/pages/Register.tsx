@@ -15,6 +15,7 @@ import { api } from '@/lib/api'
 import { cn, esTelefonoValido } from '@/lib/utils'
 import type { UnidadAcademica, Carrera, RegisterDto } from '@/data/types'
 import { GraduationCap, ArrowLeft, BookOpen } from 'lucide-react'
+import { Logo } from '@/components/Logo'
 
 export function Register() {
   const navigate = useNavigate()
@@ -94,7 +95,9 @@ export function Register() {
       <div className="flex items-center justify-center min-h-screen bg-muted/20">
         <Card className="w-full max-w-md mx-4">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">UBANEX</CardTitle>
+            <CardTitle className="text-2xl">
+              <Logo className="h-9 w-auto mx-auto" />
+            </CardTitle>
             <CardDescription>Crear cuenta nueva</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -136,7 +139,9 @@ export function Register() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </div>
-          <CardTitle className="text-2xl">UBANEX</CardTitle>
+          <CardTitle className="text-2xl">
+            <Logo className="h-9 w-auto mx-auto" />
+          </CardTitle>
           <CardDescription>
             {tipo === 'estudiante' ? 'Crear cuenta de Estudiante' : 'Crear cuenta de Docente'}
           </CardDescription>
