@@ -103,7 +103,7 @@ export class ProyectosService {
   async obtenerProyecto(id: string) {
     const proyecto = await this.proyectoRepo.findOne({
       where: { id },
-      relations: { creadoPor: true },
+      relations: { creadoPor: true, unidadAcademicaAdicional: true },
     });
     if (!proyecto) throw new NotFoundException('Proyecto no encontrado');
 
@@ -140,6 +140,12 @@ export class ProyectosService {
       if (dto.esConsolidado !== undefined) updateData.esConsolidado = dto.esConsolidado;
       if (dto.esInterfacultad !== undefined) updateData.esInterfacultad = dto.esInterfacultad;
       await this.proyectoRepo.update(proyectoId, updateData);
+    }
+
+    if (dto.unidadAcademicaAdicionalId !== undefined) {
+      await this.proyectoRepo.update(proyectoId, {
+        unidadAcademicaAdicionalId: dto.unidadAcademicaAdicionalId || null,
+      });
     }
 
     if (dto.anioEdicion !== undefined) {
@@ -259,9 +265,10 @@ export class ProyectosService {
 
   async eliminarEdicion(proyectoId: string, edicionId: string, usuario: Usuario) {
     const edicion = await this.obtenerEdicion(proyectoId, edicionId);
-    this.validarAccesoEdicion(edicion, usuario);
+    await this.validarAccesoEdicion(edicion, usuario);
     this.validarEstadoEditable(edicion);
     await this.edicionRepo.softDelete(edicionId);
+    await this.participacionRepo.delete({ edicionId });
     return { message: 'Edición eliminada' };
   }
 }
