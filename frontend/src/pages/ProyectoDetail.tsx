@@ -299,7 +299,6 @@ export function ProyectoDetail() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{proyecto.nombre}</h1>
             {edicion && <Badge variant={estadoBadge[edicion.estado]}>{edicion.estado}</Badge>}
           </div>
           {edicion && (

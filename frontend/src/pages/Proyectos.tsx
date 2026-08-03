@@ -81,9 +81,6 @@ export function Proyectos() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {esRevision ? 'Revisión de proyectos' : 'Proyectos'}
-          </h1>
           <p className="text-sm text-muted-foreground">
             {esRevision
               ? 'Proyectos presentados pendientes de revisión'

@@ -203,23 +203,10 @@ export function UsuarioDetail() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/usuarios')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {esMiPerfil ? 'Mi Perfil' : usuario.nombreCompleto}
-              </h1>
-              <Badge variant={usuario.habilitado ? 'default' : 'secondary'}>
-                {usuario.habilitado ? 'Habilitado' : 'Inhabilitado'}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">{usuario.email}</p>
-          </div>
-        </div>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/usuarios')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver
+        </Button>
         <div className="flex items-center gap-2">
           {puedeResetearPassword && (
             <Button variant="outline" onClick={() => setResetOpen(true)}>

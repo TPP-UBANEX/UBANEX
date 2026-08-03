@@ -179,7 +179,6 @@ export function ConvocatoriaDetail() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{conv.nombre}</h1>
             <Badge variant={estadoBadge[conv.estado]}>{conv.estado}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">{conv.descripcion}</p>
