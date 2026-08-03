@@ -88,8 +88,8 @@ export function Proyectos() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant={vista === 'tabla' ? 'default' : 'outline'} size="sm" onClick={() => setVista('tabla')}>Tabla</Button>
-          <Button variant={vista === 'kanban' ? 'default' : 'outline'} size="sm" onClick={() => setVista('kanban')}>Kanban</Button>
+          <Button variant={vista === 'tabla' ? 'default' : 'outline'} onClick={() => setVista('tabla')}>Tabla</Button>
+          <Button variant={vista === 'kanban' ? 'default' : 'outline'} onClick={() => setVista('kanban')}>Kanban</Button>
         </div>
       </div>
 

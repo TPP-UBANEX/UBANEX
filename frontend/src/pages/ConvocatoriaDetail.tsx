@@ -187,7 +187,7 @@ export function ConvocatoriaDetail() {
           <div className="flex gap-2">
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" onClick={abrirEdicion}><Pencil className="h-4 w-4 mr-1" />Editar</Button>
+                <Button variant="outline" onClick={abrirEdicion}><Pencil className="h-4 w-4 mr-1" />Editar</Button>
               </DialogTrigger>
               <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Editar Convocatoria</DialogTitle></DialogHeader>
@@ -268,7 +268,7 @@ export function ConvocatoriaDetail() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Button variant="destructive" size="sm" onClick={handleEliminar}><Trash2 className="h-4 w-4 mr-1" />Eliminar</Button>
+            <Button variant="destructive" onClick={handleEliminar}><Trash2 className="h-4 w-4 mr-1" />Eliminar</Button>
 
             <Dialog open={confirmEditOpen} onOpenChange={setConfirmEditOpen}>
               <DialogContent className="sm:max-w-md">
@@ -330,7 +330,7 @@ export function ConvocatoriaDetail() {
                   convocatoriaId={conv?.id}
                   convocatoriaNombre={conv?.nombre}
                   trigger={
-                    <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
+                    <Button><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
                   }
                 />
               )}

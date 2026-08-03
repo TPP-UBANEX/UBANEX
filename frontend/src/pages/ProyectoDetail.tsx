@@ -311,7 +311,7 @@ export function ProyectoDetail() {
         <div className="flex items-center gap-2">
           {esEditable && !editando && (
             <>
-              <Button variant="outline" size="sm" onClick={iniciarEdicion}>
+              <Button variant="outline" onClick={iniciarEdicion}>
                 <Pencil className="h-4 w-4 mr-2" />Editar
               </Button>
               {esDocente && (
@@ -319,7 +319,7 @@ export function ProyectoDetail() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span tabIndex={0}>
-                        <Button size="sm" onClick={handleEnviar} disabled={!puedeEnviar || enviando}>
+                        <Button onClick={handleEnviar} disabled={!puedeEnviar || enviando}>
                           {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                           Enviar para corrección
                         </Button>
@@ -333,7 +333,7 @@ export function ProyectoDetail() {
                   </Tooltip>
                 </TooltipProvider>
               )}
-              <Button variant="destructive" size="sm" onClick={() => setConfirmarEliminar(true)} disabled={eliminando}>
+              <Button variant="destructive" onClick={() => setConfirmarEliminar(true)} disabled={eliminando}>
                 {eliminando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
                 Eliminar
               </Button>
@@ -341,26 +341,26 @@ export function ProyectoDetail() {
           )}
           {editando && (
             <>
-              <Button variant="outline" size="sm" onClick={cancelarEdicion}>Cancelar</Button>
-              <Button size="sm" onClick={handleGuardar} disabled={guardando}>
+              <Button variant="outline" onClick={cancelarEdicion}>Cancelar</Button>
+              <Button onClick={handleGuardar} disabled={guardando}>
                 {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Guardar
               </Button>
             </>
           )}
           {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
-            <Button variant="outline" size="sm" onClick={() => setModoSugerencia(true)}>
+            <Button variant="outline" onClick={() => setModoSugerencia(true)}>
               <MessageSquare className="h-4 w-4 mr-2" />Sugerir cambios
             </Button>
           )}
           {modoSugerencia && (
-            <Button variant="ghost" size="sm" onClick={() => setModoSugerencia(false)}>
+            <Button variant="ghost" onClick={() => setModoSugerencia(false)}>
               <X className="h-4 w-4 mr-2" />Cancelar sugerencia
             </Button>
           )}
           {!editando && esSecretaria && edicion?.estado === EstadoEdicion.Presentado && (
             <>
-              <Button size="sm" onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
+              <Button onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
                 Iniciar evaluación
               </Button>
             </>
