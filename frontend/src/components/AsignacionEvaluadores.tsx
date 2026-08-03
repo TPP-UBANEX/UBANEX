@@ -29,12 +29,16 @@ const CANTIDAD_EVALUADORES_POR_UA = 3
 
 const estadoVariant: Record<EstadoPropuestaEvaluador, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   [EstadoPropuestaEvaluador.Propuesto]: 'outline',
+  [EstadoPropuestaEvaluador.Aceptada]: 'secondary',
+  [EstadoPropuestaEvaluador.Declinada]: 'outline',
   [EstadoPropuestaEvaluador.Aprobado]: 'default',
   [EstadoPropuestaEvaluador.Rechazado]: 'destructive',
 }
 
 const estadoLabel: Record<EstadoPropuestaEvaluador, string> = {
   [EstadoPropuestaEvaluador.Propuesto]: 'Propuesto',
+  [EstadoPropuestaEvaluador.Aceptada]: 'Aceptada',
+  [EstadoPropuestaEvaluador.Declinada]: 'Declinada',
   [EstadoPropuestaEvaluador.Aprobado]: 'Aprobado',
   [EstadoPropuestaEvaluador.Rechazado]: 'Rechazado',
 }
@@ -52,13 +56,14 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [confirmarEliminar, setConfirmarEliminar] = useState<ParticipacionConvocatoria | null>(null)
 
   const evaluadores = participaciones.filter(p => p.rol === RolEjecucion.Evaluador)
   const evaluadoresPropios = evaluadores.filter(
     p => p.usuario?.unidadAcademicaId === user?.unidadAcademicaId,
   )
   const activosPropios = evaluadoresPropios.filter(p =>
-    p.estado === EstadoPropuestaEvaluador.Propuesto || p.estado === EstadoPropuestaEvaluador.Aprobado,
+    p.estado === EstadoPropuestaEvaluador.Aceptada || p.estado === EstadoPropuestaEvaluador.Aprobado,
   )
   const aprobados = evaluadoresPropios.filter(p => p.estado === EstadoPropuestaEvaluador.Aprobado)
   const hayRechazados = evaluadoresPropios.some(p => p.estado === EstadoPropuestaEvaluador.Rechazado)
@@ -316,7 +321,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {p.estado === EstadoPropuestaEvaluador.Propuesto && (
+                          {p.estado === EstadoPropuestaEvaluador.Aceptada && (
                             <div className="flex justify-end gap-2">
                               <Button variant="outline" size="sm" onClick={() => handleAprobar(p.id)}>
                                 <Check className="h-4 w-4 mr-1 text-green-600" />Aprobar
@@ -363,7 +368,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => handleDesasignar(p.id)}>
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmarEliminar(p)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>
@@ -373,6 +378,38 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
           </Table>
         )}
       </div>
+
+      <Dialog open={!!confirmarEliminar} onOpenChange={v => { if (!v) setConfirmarEliminar(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quitar evaluador</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de quitar a{' '}
+              <span className="font-semibold text-foreground">
+                {confirmarEliminar?.usuario?.nombreCompleto || 'este evaluador'}
+              </span>{' '}
+              de la convocatoria?
+              {confirmarEliminar?.estado === EstadoPropuestaEvaluador.Aceptada ||
+                confirmarEliminar?.estado === EstadoPropuestaEvaluador.Aprobado ? (
+                <span className="block mt-1 text-destructive">
+                  Es un evaluador activo. Esta acción no se puede deshacer.
+                </span>
+              ) : (
+                <span className="block mt-1">Esta acción no se puede deshacer.</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarEliminar(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => {
+              if (confirmarEliminar) handleDesasignar(confirmarEliminar.id)
+              setConfirmarEliminar(null)
+            }}>
+              Quitar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

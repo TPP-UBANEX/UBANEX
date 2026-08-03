@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -10,11 +11,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, EstadoEdicion, EstadoConvocatoria, RolUsuario } from '@/data/types'
-import { FileText, Users, DollarSign, ClipboardCheck } from 'lucide-react'
+import type { Edicion, Convocatoria, ParticipacionConvocatoria } from '@/data/types'
+import {
+  estadoBadge, EstadoEdicion, EstadoConvocatoria, RolUsuario,
+  RolEjecucion, EstadoPropuestaEvaluador,
+} from '@/data/types'
+import { FileText, Users, DollarSign, ClipboardCheck, UserCheck } from 'lucide-react'
 
 export function Dashboard() {
   const { user } = useAuth()
@@ -24,17 +29,34 @@ export function Dashboard() {
   )
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
+  const [invitaciones, setInvitaciones] = useState<ParticipacionConvocatoria[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       api.proyectos.list(),
       api.convocatorias.list(),
-    ]).then(([e, c]) => {
+      api.participaciones.listarMias().catch(() => []),
+    ]).then(([e, c, p]) => {
       setEdiciones(e)
       setConvocatorias(c)
+      setInvitaciones(p.filter(pc =>
+        pc.rol === RolEjecucion.Evaluador && pc.estado === EstadoPropuestaEvaluador.Propuesto,
+      ))
     }).finally(() => setLoading(false))
   }, [])
+
+  const responder = async (participacion: ParticipacionConvocatoria, aceptada: boolean) => {
+    try {
+      await (aceptada
+        ? api.participaciones.aceptar(participacion.id)
+        : api.participaciones.declinar(participacion.id))
+      toast.success(aceptada ? 'Aceptaste la propuesta como evaluador' : 'Declinaste la propuesta')
+      setInvitaciones(prev => prev.filter(p => p.id !== participacion.id))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al responder la propuesta')
+    }
+  }
 
   const stats = [
     { label: 'Proyectos Activos', value: ediciones.filter(e => e.estado === EstadoEdicion.EnEjecucion).length, icon: Users, color: 'text-blue-600' },
@@ -49,6 +71,42 @@ export function Dashboard() {
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Resumen general del sistema UBANEX</p>
       </div>
+
+      {!esGestion && invitaciones.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <UserCheck className="h-4 w-4" /> Invitaciones a ser evaluador
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-full" />
+            ) : invitaciones.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tenés invitaciones pendientes.</p>
+            ) : (
+              <div className="space-y-2">
+                {invitaciones.map(p => (
+                  <div key={p.id} className="flex items-center justify-between gap-4 border-b pb-2 last:border-0">
+                    <div className="text-sm">
+                      <span className="font-medium">{p.convocatoria?.nombre || '—'}</span>
+                      <Badge variant="outline" className="ml-2">Evaluador</Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="default" onClick={() => responder(p, true)}>
+                        Aceptar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => responder(p, false)}>
+                        Declinar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (

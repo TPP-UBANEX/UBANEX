@@ -37,6 +37,16 @@ export class ParticipacionConvocatoriaController {
     return this.service.actualizarEstado(id, dto);
   }
 
+  @Post(':id/aceptar')
+  aceptar(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
+    return this.service.responder(id, usuario, true);
+  }
+
+  @Post(':id/declinar')
+  declinar(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
+    return this.service.responder(id, usuario, false);
+  }
+
   @Get()
   listar(@Query('convocatoriaId') convocatoriaId: string) {
     return this.service.listarPorConvocatoria(convocatoriaId);

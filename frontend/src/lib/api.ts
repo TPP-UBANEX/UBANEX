@@ -92,6 +92,10 @@ export const api = {
     desasignar: (id: string) => del(`/participaciones-convocatoria/${id}`),
     actualizarEstado: (id: string, estado: import('@/data/types').EstadoPropuestaEvaluador) =>
       patch<import('@/data/types').ParticipacionConvocatoria>(`/participaciones-convocatoria/${id}/estado`, { estado }),
+    aceptar: (id: string) =>
+      post<import('@/data/types').ParticipacionConvocatoria>(`/participaciones-convocatoria/${id}/aceptar`, {}),
+    declinar: (id: string) =>
+      post<import('@/data/types').ParticipacionConvocatoria>(`/participaciones-convocatoria/${id}/declinar`, {}),
     listar: (convocatoriaId: string) =>
       get<import('@/data/types').ParticipacionConvocatoria[]>(`/participaciones-convocatoria?convocatoriaId=${convocatoriaId}`),
     listarMias: () =>

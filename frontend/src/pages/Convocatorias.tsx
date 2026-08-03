@@ -31,8 +31,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria } from '@/data/types'
-import { RolUsuario } from '@/data/types'
+import type { Convocatoria, ParticipacionConvocatoria } from '@/data/types'
+import { RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
 import { estadoBadge } from '@/data/types'
 import { toast } from 'sonner'
 import { Plus, Search } from 'lucide-react'
@@ -83,6 +83,7 @@ export function Convocatorias() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [creando, setCreando] = useState(false)
+  const [convocatoriasEvaluador, setConvocatoriasEvaluador] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({
     nombre: '', descripcion: '', anio: new Date().getFullYear(),
     fechaInicioPresentacion: '', fechaFinPresentacion: '',
@@ -99,6 +100,24 @@ export function Convocatorias() {
   }
 
   useEffect(cargar, [])
+
+  useEffect(() => {
+    if (esGestion) return
+    const estadosActivos = [
+      EstadoPropuestaEvaluador.Propuesto,
+      EstadoPropuestaEvaluador.Aceptada,
+      EstadoPropuestaEvaluador.Aprobado,
+    ]
+    api.participaciones.listarMias()
+      .then((part: ParticipacionConvocatoria[]) => {
+        setConvocatoriasEvaluador(new Set(
+          part
+            .filter(p => p.rol === RolEjecucion.Evaluador && p.estado && estadosActivos.includes(p.estado))
+            .map(p => p.convocatoriaId),
+        ))
+      })
+      .catch(() => {})
+  }, [esGestion])
 
   const handleCrear = async () => {
     if (!form.nombre || !form.anio) {
@@ -249,20 +268,20 @@ export function Convocatorias() {
           <TabsTrigger value="pasadas">Pasadas ({pasadas.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="todas" className="mt-4">
-          {loading ? <TableSkeleton /> : <TablaConvocatorias data={filtradas} onClick={id => navigate(`/convocatorias/${id}`)} />}
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={filtradas} convocatoriasEvaluador={convocatoriasEvaluador} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
         <TabsContent value="activas" className="mt-4">
-          {loading ? <TableSkeleton /> : <TablaConvocatorias data={activas} onClick={id => navigate(`/convocatorias/${id}`)} />}
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={activas} convocatoriasEvaluador={convocatoriasEvaluador} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
         <TabsContent value="pasadas" className="mt-4">
-          {loading ? <TableSkeleton /> : <TablaConvocatorias data={pasadas} onClick={id => navigate(`/convocatorias/${id}`)} />}
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={pasadas} convocatoriasEvaluador={convocatoriasEvaluador} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
       </Tabs>
     </div>
   )
 }
 
-function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: (id: string) => void }) {
+function TablaConvocatorias({ data, convocatoriasEvaluador, onClick }: { data: Convocatoria[]; convocatoriasEvaluador: Set<string>; onClick: (id: string) => void }) {
   return (
     <Card>
       <CardHeader><CardTitle className="text-sm font-medium">Listado</CardTitle></CardHeader>
@@ -281,7 +300,12 @@ function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: 
           <TableBody>
             {data.map(c => (
               <TableRow key={c.id} className="cursor-pointer" onClick={() => onClick(c.id)}>
-                <TableCell className="font-medium">{c.nombre}</TableCell>
+                <TableCell className="font-medium">
+                  {c.nombre}
+                  {convocatoriasEvaluador.has(c.id) && (
+                    <Badge variant="secondary" className="ml-2">Sos evaluador</Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
                 <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">

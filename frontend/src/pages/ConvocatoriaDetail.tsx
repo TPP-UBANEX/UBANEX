@@ -32,8 +32,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Edicion } from '@/data/types'
-import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
+import type { Convocatoria, Edicion, ParticipacionConvocatoria } from '@/data/types'
+import { estadoBadge, EstadoEdicion, RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
@@ -71,6 +71,7 @@ export function ConvocatoriaDetail() {
   const { user } = useAuth()
   const [conv, setConv] = useState<Convocatoria | null>(null)
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
+  const [soyEvaluador, setSoyEvaluador] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
@@ -92,9 +93,21 @@ export function ConvocatoriaDetail() {
     Promise.all([
       api.convocatorias.get(id),
       api.proyectos.list({ convocatoriaId: id }),
-    ]).then(([c, e]) => {
+      api.participaciones.listarMias().catch(() => []),
+    ]).then(([c, e, p]) => {
       setConv(c)
       setEdiciones(e)
+      const estadosActivos = [
+        EstadoPropuestaEvaluador.Propuesto,
+        EstadoPropuestaEvaluador.Aceptada,
+        EstadoPropuestaEvaluador.Aprobado,
+      ]
+      setSoyEvaluador((p as ParticipacionConvocatoria[]).some(pc =>
+        pc.convocatoriaId === id &&
+        pc.rol === RolEjecucion.Evaluador &&
+        pc.estado &&
+        estadosActivos.includes(pc.estado),
+      ))
     }).finally(() => setLoading(false))
   }
 
@@ -327,7 +340,7 @@ export function ConvocatoriaDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Proyectos Presentados</CardTitle>
-              {esUsuarioEjecucion && (
+              {esUsuarioEjecucion && !soyEvaluador && (
                 <NuevoProyectoDialog
                   onCreated={cargarDatos}
                   convocatoriaId={conv?.id}
@@ -338,6 +351,13 @@ export function ConvocatoriaDetail() {
                 />
               )}
             </CardHeader>
+            {esUsuarioEjecucion && soyEvaluador && (
+              <div className="px-6 pb-4">
+                <p className="text-sm bg-muted text-muted-foreground rounded-md px-3 py-2">
+                  Sos evaluador de esta convocatoria. No podés presentar proyectos.
+                </p>
+              </div>
+            )}
             <CardContent>
               <Table>
                 <TableHeader>
