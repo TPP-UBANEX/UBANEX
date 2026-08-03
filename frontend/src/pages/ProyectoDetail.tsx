@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario } from '@/data/types'
-import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -402,8 +402,7 @@ export function ProyectoDetail() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{proyecto.nombre}</h1>
-            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{edicion.estado}</Badge>}
+            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{estadoEdicionLabel[edicion.estado] || edicion.estado}</Badge>}
           </div>
           {edicion && (
             <p className="text-sm text-muted-foreground">
@@ -415,15 +414,15 @@ export function ProyectoDetail() {
         <div className="flex items-center gap-2">
           {esEditable && !editando && (
             <>
-              <Button variant="outline" size="sm" onClick={iniciarEdicion}>
-                <Pencil className="h-4 w-4 mr-2" />Editar
+              <Button variant="outline" onClick={iniciarEdicion}>
+                <Pencil className="h-4 w-4 mr-2" />Editar Proyecto
               </Button>
               {esDocente && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span tabIndex={0}>
-                        <Button size="sm" onClick={handleEnviar} disabled={!puedeEnviar || enviando}>
+                        <Button onClick={handleEnviar} disabled={!puedeEnviar || enviando}>
                           {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                           Enviar para corrección
                         </Button>
@@ -437,34 +436,34 @@ export function ProyectoDetail() {
                   </Tooltip>
                 </TooltipProvider>
               )}
-              <Button variant="destructive" size="sm" onClick={() => setConfirmarEliminar(true)} disabled={eliminando}>
+              <Button variant="destructive" onClick={() => setConfirmarEliminar(true)} disabled={eliminando}>
                 {eliminando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
-                Eliminar
+                Eliminar Proyecto
               </Button>
             </>
           )}
           {editando && (
             <>
-              <Button variant="outline" size="sm" onClick={cancelarEdicion}>Cancelar</Button>
-              <Button size="sm" onClick={handleGuardar} disabled={guardando}>
+              <Button variant="outline" onClick={cancelarEdicion}>Cancelar</Button>
+              <Button onClick={handleGuardar} disabled={guardando}>
                 {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Guardar
               </Button>
             </>
           )}
           {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
-            <Button variant="outline" size="sm" onClick={() => setModoSugerencia(true)}>
+            <Button variant="outline" onClick={() => setModoSugerencia(true)}>
               <MessageSquare className="h-4 w-4 mr-2" />Sugerir cambios
             </Button>
           )}
           {modoSugerencia && (
-            <Button variant="ghost" size="sm" onClick={() => setModoSugerencia(false)}>
+            <Button variant="ghost" onClick={() => setModoSugerencia(false)}>
               <X className="h-4 w-4 mr-2" />Cancelar sugerencia
             </Button>
           )}
           {!editando && esSecretaria && edicion?.estado === EstadoEdicion.Presentado && (
             <>
-              <Button size="sm" onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
+              <Button onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
                 Iniciar evaluación
               </Button>
             </>
@@ -587,7 +586,7 @@ export function ProyectoDetail() {
                         {edicion?.anioEdicion || '-'}
                       </CampoSugerible>
                     </div>
-                    <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
+                    <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Consolidado:</span>{' '}
                       <CampoSugerible campo="esConsolidado" valorActual={String(proyecto.esConsolidado)} label="Es consolidado" activo={modoSugerencia} onClick={handleSugerirClick}>

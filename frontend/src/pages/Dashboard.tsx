@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, EstadoEdicion, EstadoConvocatoria, RolUsuario } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario } from '@/data/types'
 import { FileText, Users, DollarSign, ClipboardCheck } from 'lucide-react'
 
 export function Dashboard() {
@@ -46,7 +46,6 @@ export function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Resumen general del sistema UBANEX</p>
       </div>
 
@@ -84,7 +83,7 @@ export function Dashboard() {
                   {convocatorias.filter(c => c.estado === EstadoConvocatoria.Presentacion || (c.estado === EstadoConvocatoria.Configuracion && esGestion)).map(c => (
                     <TableRow key={c.id}>
                       <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
+                      <TableCell><Badge variant={estadoBadge[c.estado]}>{estadoConvocatoriaLabel[c.estado] || c.estado}</Badge></TableCell>
                       <TableCell className="text-sm text-muted-foreground">{c.fechaInicioPresentacion}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{c.fechaFinPresentacion}</TableCell>
                     </TableRow>
@@ -114,7 +113,7 @@ export function Dashboard() {
                     <TableRow key={e.id}>
                       <TableCell className="text-sm">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
+                      <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
