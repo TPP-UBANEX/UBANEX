@@ -45,7 +45,7 @@ export function Header() {
   return (
     <header className="border-b bg-background px-6 h-14 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-xl font-semibold">
+        <span className="text-xl font-semibold text-heading">
           {tituloSeccion(location.pathname, location.search, user?.id)}
         </span>
       </div>
