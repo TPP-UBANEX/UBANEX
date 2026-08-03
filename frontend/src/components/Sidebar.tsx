@@ -52,7 +52,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? 'w-16' : 'w-56',
       )}
     >
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between h-16 px-4 border-b">
         {!collapsed && (
           <Logo className="h-8 w-auto" />
         )}

@@ -43,9 +43,9 @@ export function Header() {
     .slice(0, 2) ?? '??'
 
   return (
-    <header className="border-b bg-background px-6 h-14 flex items-center justify-between">
+    <header className="border-b bg-background px-6 h-16 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-xl font-semibold text-heading">
+        <span className="text-2xl font-semibold text-heading">
           {tituloSeccion(location.pathname, location.search, user?.id)}
         </span>
       </div>
