@@ -219,7 +219,7 @@ export function UsuarioDetail() {
               usuario={usuario}
               uaList={uaList}
               onUpdated={cargarDatos}
-              trigger={<Button>Editar</Button>}
+              trigger={<Button>Editar Perfil</Button>}
             />
           )}
           {puedeCambiarEstado && (

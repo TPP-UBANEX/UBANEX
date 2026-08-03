@@ -312,7 +312,7 @@ export function ProyectoDetail() {
           {esEditable && !editando && (
             <>
               <Button variant="outline" onClick={iniciarEdicion}>
-                <Pencil className="h-4 w-4 mr-2" />Editar
+                <Pencil className="h-4 w-4 mr-2" />Editar Proyecto
               </Button>
               {esDocente && (
                 <TooltipProvider>
@@ -335,7 +335,7 @@ export function ProyectoDetail() {
               )}
               <Button variant="destructive" onClick={() => setConfirmarEliminar(true)} disabled={eliminando}>
                 {eliminando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
-                Eliminar
+                Eliminar Proyecto
               </Button>
             </>
           )}
