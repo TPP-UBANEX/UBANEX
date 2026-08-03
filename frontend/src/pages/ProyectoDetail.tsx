@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, CampoFormulario } from '@/data/types'
-import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -299,7 +299,7 @@ export function ProyectoDetail() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{edicion.estado}</Badge>}
+            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{estadoEdicionLabel[edicion.estado] || edicion.estado}</Badge>}
           </div>
           {edicion && (
             <p className="text-sm text-muted-foreground">
@@ -483,7 +483,7 @@ export function ProyectoDetail() {
                         {edicion?.anioEdicion || '-'}
                       </CampoSugerible>
                     </div>
-                    <div><span className="text-muted-foreground">Estado:</span> {edicion?.estado || '-'}</div>
+                    <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Consolidado:</span>{' '}
                       <CampoSugerible campo="esConsolidado" valorActual={String(proyecto.esConsolidado)} label="Es consolidado" activo={modoSugerencia} onClick={handleSugerirClick}>

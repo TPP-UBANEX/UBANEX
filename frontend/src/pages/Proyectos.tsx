@@ -22,7 +22,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, EstadoEdicion } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion } from '@/data/types'
 import { Search } from 'lucide-react'
 
 const pipelineColumns = [
@@ -159,7 +159,7 @@ export function Proyectos() {
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
+                      <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>

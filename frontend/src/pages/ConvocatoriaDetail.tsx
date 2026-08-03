@@ -33,7 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Convocatoria, Edicion } from '@/data/types'
-import { estadoBadge, EstadoEdicion, RolUsuario } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, RolUsuario } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
@@ -179,7 +179,7 @@ export function ConvocatoriaDetail() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <Badge variant={estadoBadge[conv.estado]}>{conv.estado}</Badge>
+            <Badge variant={estadoBadge[conv.estado]}>{estadoConvocatoriaLabel[conv.estado] || conv.estado}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">{conv.descripcion}</p>
         </div>
@@ -306,7 +306,7 @@ export function ConvocatoriaDetail() {
       <div className="grid gap-4 md:grid-cols-4">
         {Object.entries(conteo).map(([etapa, count]) => (
           <Card key={etapa}>
-            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium capitalize">{etapa}</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">{estadoEdicionLabel[etapa] || etapa}</CardTitle></CardHeader>
             <CardContent><div className="text-2xl font-bold">{count}</div></CardContent>
           </Card>
         ))}
@@ -353,7 +353,7 @@ export function ConvocatoriaDetail() {
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
+                      <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
@@ -386,7 +386,7 @@ export function ConvocatoriaDetail() {
             <CardContent className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-4">
                 <div><span className="text-muted-foreground">Año:</span> {conv.anio}</div>
-                <div><span className="text-muted-foreground">Estado:</span> {conv.estado}</div>
+                <div><span className="text-muted-foreground">Estado:</span> {estadoConvocatoriaLabel[conv.estado] || conv.estado}</div>
               </div>
               <div className="border-t pt-3">
                 <p className="text-sm font-medium mb-2">Presentación</p>

@@ -33,7 +33,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Convocatoria } from '@/data/types'
 import { RolUsuario } from '@/data/types'
-import { estadoBadge } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel } from '@/data/types'
 import { toast } from 'sonner'
 import { Plus, Search } from 'lucide-react'
 
@@ -282,7 +282,7 @@ function TablaConvocatorias({ data, onClick }: { data: Convocatoria[]; onClick: 
               <TableRow key={c.id} className="cursor-pointer" onClick={() => onClick(c.id)}>
                 <TableCell className="font-medium">{c.nombre}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
-                <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
+                <TableCell><Badge variant={estadoBadge[c.estado]}>{estadoConvocatoriaLabel[c.estado] || c.estado}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {c.fechaInicioPresentacion && c.fechaFinPresentacion
                     ? `${c.fechaInicioPresentacion} — ${c.fechaFinPresentacion}`

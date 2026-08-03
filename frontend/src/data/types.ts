@@ -481,3 +481,22 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Rechazada: 'destructive',
   MasInformacion: 'outline',
 }
+
+export const estadoConvocatoriaLabel: Record<string, string> = {
+  configuracion: 'Configuración',
+  presentacion: 'Presentación',
+  evaluacion: 'Evaluación',
+  ejecucion: 'Ejecución',
+  cierre: 'Cierre',
+}
+
+export const estadoEdicionLabel: Record<string, string> = {
+  Borrador: 'Borrador',
+  Presentado: 'Presentado',
+  PendienteDeCambios: 'Pendiente de cambios',
+  EnEvaluacion: 'En evaluación',
+  Adjudicado: 'Adjudicado',
+  NoAdjudicado: 'No adjudicado',
+  EnEjecucion: 'En ejecución',
+  Cerrado: 'Cerrado',
+}
