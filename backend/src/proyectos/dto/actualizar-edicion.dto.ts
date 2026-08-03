@@ -1,5 +1,5 @@
 import {
-  IsString, IsOptional, IsObject, IsInt, IsBoolean,
+  IsString, IsOptional, IsObject, IsInt, IsBoolean, IsUUID,
 } from 'class-validator';
 
 export class ActualizarEdicionDto {
@@ -18,6 +18,10 @@ export class ActualizarEdicionDto {
   @IsOptional()
   @IsBoolean()
   esInterfacultad?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  unidadAcademicaAdicionalId?: string;
 
   @IsOptional()
   @IsObject()

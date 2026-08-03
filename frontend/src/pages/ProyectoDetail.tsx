@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, CampoFormulario } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario } from '@/data/types'
 import { estadoBadge, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
 import {
   camposPerfilDocente,
@@ -75,6 +75,13 @@ export function ProyectoDetail() {
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showAsignarDirector, setShowAsignarDirector] = useState(false)
+
+  const [uas, setUas] = useState<UnidadAcademica[]>([])
+  const [candidatosDireccion, setCandidatosDireccion] = useState<Usuario[]>([])
+  const [loadingCandidatos, setLoadingCandidatos] = useState(false)
+  const [editDirectorId, setEditDirectorId] = useState('')
+  const [editCodirectorId, setEditCodirectorId] = useState('')
+  const [editUnidadAcademicaAdicionalId, setEditUnidadAcademicaAdicionalId] = useState('')
 
   const [modoSugerencia, setModoSugerencia] = useState(false)
   const [sugerenciaModal, setSugerenciaModal] = useState<{ open: boolean; campo: string; valorActual: string; label: string }>({
@@ -143,6 +150,60 @@ export function ProyectoDetail() {
     cargarDatos()
   }, [id])
 
+  useEffect(() => {
+    api.unidadesAcademicas.list()
+      .then(setUas)
+      .catch(() => toast.error('Error al cargar unidades académicas'))
+  }, [])
+
+  const cargarCandidatos = async (uaId: string, uaAdicionalId?: string) => {
+    if (!edicion) return
+    setLoadingCandidatos(true)
+    try {
+      const res = await api.participaciones.candidatos({
+        unidadAcademicaId: uaId,
+        ...(uaAdicionalId ? { unidadAcademicaAdicionalId: uaAdicionalId } : {}),
+        convocatoriaId: edicion.convocatoriaId,
+        edicionId: edicion.id,
+      })
+      setCandidatosDireccion(res)
+    } catch {
+      toast.error('Error al cargar docentes candidatos')
+    } finally {
+      setLoadingCandidatos(false)
+    }
+  }
+
+  const directoresActuales = directores
+    .map(d => d.usuario)
+    .filter((u): u is Usuario => !!u)
+  const opcionesDireccion = [...candidatosDireccion, ...directoresActuales]
+    .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
+
+  const toggleInterfacultad = (v: boolean) => {
+    setEditEsInterfacultad(v)
+    setEditDirectorId('')
+    setEditCodirectorId('')
+    if (v) {
+      setEditUnidadAcademicaAdicionalId(proyecto?.unidadAcademicaAdicionalId ?? '')
+      const ua = proyecto?.unidadAcademicaAdicionalId
+      if (ua && edicion) cargarCandidatos(edicion.unidadAcademicaId, ua)
+      else setCandidatosDireccion([])
+    } else {
+      setEditUnidadAcademicaAdicionalId('')
+      if (edicion) cargarCandidatos(edicion.unidadAcademicaId)
+      else setCandidatosDireccion([])
+    }
+  }
+
+  const handleCambioUA = (uaId: string) => {
+    setEditUnidadAcademicaAdicionalId(uaId)
+    setEditDirectorId('')
+    setEditCodirectorId('')
+    if (uaId && edicion) cargarCandidatos(edicion.unidadAcademicaId, uaId)
+    else setCandidatosDireccion([])
+  }
+
   const iniciarEdicion = () => {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
@@ -150,12 +211,52 @@ export function ProyectoDetail() {
     setEditEsConsolidado(proyecto.esConsolidado)
     setEditEsInterfacultad(proyecto.esInterfacultad)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
+    setEditUnidadAcademicaAdicionalId(proyecto.unidadAcademicaAdicionalId ?? '')
+    setEditDirectorId(directores.find(d => d.esDirectorPrincipal)?.usuarioId ?? '')
+    setEditCodirectorId(directores.find(d => !d.esDirectorPrincipal)?.usuarioId ?? '')
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
+    if (proyecto.esInterfacultad) {
+      if (edicion) cargarCandidatos(edicion.unidadAcademicaId, proyecto.unidadAcademicaAdicionalId ?? '')
+      else setCandidatosDireccion([])
+    } else if (edicion) {
+      cargarCandidatos(edicion.unidadAcademicaId)
+    } else {
+      setCandidatosDireccion([])
+    }
   }
 
   const cancelarEdicion = () => {
     setEditando(false)
+  }
+
+  const sincronizarDirecciones = async () => {
+    if (!edicion) return
+    const deseado: { usuarioId: string; esDirectorPrincipal: boolean }[] = []
+    if (editDirectorId) deseado.push({ usuarioId: editDirectorId, esDirectorPrincipal: true })
+    if (editCodirectorId) deseado.push({ usuarioId: editCodirectorId, esDirectorPrincipal: false })
+
+    const actual = directores
+
+    const crear = deseado.filter(des =>
+      !actual.some(p => p.usuarioId === des.usuarioId && p.esDirectorPrincipal === des.esDirectorPrincipal),
+    )
+    const borrar = actual.filter(p =>
+      !deseado.some(des => des.usuarioId === p.usuarioId && des.esDirectorPrincipal === p.esDirectorPrincipal),
+    )
+
+    for (const p of borrar) {
+      await api.participaciones.desasignar(p.id)
+    }
+    for (const des of crear) {
+      await api.participaciones.asignar({
+        usuarioId: des.usuarioId,
+        convocatoriaId: edicion.convocatoriaId,
+        rol: RolEjecucion.DirectorDeProyecto,
+        edicionId: edicion.id,
+        esDirectorPrincipal: des.esDirectorPrincipal,
+      })
+    }
   }
 
   const handleGuardar = async () => {
@@ -167,9 +268,11 @@ export function ProyectoDetail() {
         anioEdicion: editAnioEdicion ?? undefined,
         esConsolidado: editEsConsolidado,
         esInterfacultad: editEsInterfacultad,
+        unidadAcademicaAdicionalId: editEsInterfacultad ? (editUnidadAcademicaAdicionalId || undefined) : undefined,
         presupuesto: editPresupuesto || undefined,
         datosFormulario: editDatosFormulario,
       })
+      await sincronizarDirecciones()
       toast.success('Proyecto actualizado')
       setEditando(false)
       cargarDatos()
@@ -379,13 +482,18 @@ export function ProyectoDetail() {
           <CardContent><p className="text-sm">{edicion?.unidadAcademica?.nombre || '-'}</p></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Directores</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Dirección</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-sm">
-              {directores.length > 0
-                ? directores.map(d => `${d.usuario?.nombreCompleto || '?'}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ')
-                : '-'}
-            </p>
+            <div className="space-y-1 text-sm">
+              <div>
+                <span className="text-muted-foreground">Dirección:</span>{' '}
+                {directores.find(d => d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Codirección:</span>{' '}
+                {directores.find(d => !d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -407,6 +515,7 @@ export function ProyectoDetail() {
       <Tabs defaultValue="info">
         <TabsList>
           <TabsTrigger value="info">Información</TabsTrigger>
+          <TabsTrigger value="direccion">Dirección</TabsTrigger>
           <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="rendiciones">Rendiciones</TabsTrigger>
@@ -416,37 +525,31 @@ export function ProyectoDetail() {
 
         <TabsContent value="info" className="mt-4">
           {editando ? (
-            <Card>
-              <CardHeader><CardTitle className="text-sm font-medium">Editar proyecto</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Nombre del proyecto</p>
-                    <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Edición (año)</p>
-                  <Input
-                    type="number"
-                    min={2000}
-                    max={2100}
-                    value={editAnioEdicion ?? ''}
-                    onChange={e => setEditAnioEdicion(e.target.value ? Number(e.target.value) : null)}
-                  />
-                </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">¿Es consolidado?</p>
-                    <div className="flex gap-2">
-                      <Button type="button" variant={editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(true)}>Sí</Button>
-                      <Button type="button" variant={!editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(false)}>No</Button>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader><CardTitle className="text-sm font-medium">Editar proyecto</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Nombre del proyecto</p>
+                      <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
                     </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Edición (año)</p>
+                    <Input
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      value={editAnioEdicion ?? ''}
+                      onChange={e => setEditAnioEdicion(e.target.value ? Number(e.target.value) : null)}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">¿Es interfacultad?</p>
-                    <div className="flex gap-2">
-                      <Button type="button" variant={editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => setEditEsInterfacultad(true)}>Sí</Button>
-                      <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => setEditEsInterfacultad(false)}>No</Button>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">¿Es consolidado?</p>
+                      <div className="flex gap-2">
+                        <Button type="button" variant={editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(true)}>Sí</Button>
+                        <Button type="button" variant={!editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(false)}>No</Button>
+                      </div>
                     </div>
-                  </div>
                   {camposFormulario.map(campo => (
                     <CampoFormularioInput
                       key={campo.id}
@@ -455,8 +558,9 @@ export function ProyectoDetail() {
                       onChange={v => setEditDatosFormulario(prev => ({ ...prev, [campo.id]: v }))}
                     />
                   ))}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           ) : (
             <div className="space-y-4">
               {esPropietario && edicion?.estado === EstadoEdicion.Borrador && camposObligatoriosFaltantes.length > 0 && (
@@ -477,7 +581,6 @@ export function ProyectoDetail() {
                     <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
                     <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
                     <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
-                    <div><span className="text-muted-foreground">Directores:</span> {directores.length > 0 ? directores.map(d => `${d.usuario?.nombreCompleto}${d.esDirectorPrincipal ? ' (Dirección principal)' : ''}`).join(', ') : '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Edición:</span>{' '}
                       <CampoSugerible campo="anioEdicion" valorActual={String(edicion?.anioEdicion ?? '')} label="Año de edición" activo={modoSugerencia} onClick={handleSugerirClick}>
@@ -521,6 +624,86 @@ export function ProyectoDetail() {
           {camposFormulario.some(c => c.esObligatorio) && (
             <p className="text-xs text-muted-foreground mt-2">* Campos obligatorios para enviar la presentación</p>
           )}
+        </TabsContent>
+
+        <TabsContent value="direccion" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-sm font-medium">Dirección y codirección</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {editando ? (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">¿Es interfacultad?</p>
+                    <div className="flex gap-2">
+                      <Button type="button" variant={editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => toggleInterfacultad(true)}>Sí</Button>
+                      <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => toggleInterfacultad(false)}>No</Button>
+                    </div>
+                  </div>
+                  {editEsInterfacultad && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Unidad académica adicional</p>
+                      <Select value={editUnidadAcademicaAdicionalId} onValueChange={handleCambioUA}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar unidad académica" /></SelectTrigger>
+                        <SelectContent>
+                          {uas.filter(u => u.id !== user?.unidadAcademicaId).map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Dirección</p>
+                    <Select value={editDirectorId} onValueChange={setEditDirectorId}>
+                      <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar director'} /></SelectTrigger>
+                      <SelectContent>
+                        {opcionesDireccion.map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Codirección</p>
+                    <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
+                      <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar codirector'} /></SelectTrigger>
+                      <SelectContent>
+                        {opcionesDireccion.filter(u => u.id !== editDirectorId).map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Interfacultad:</span>{' '}
+                    {proyecto?.esInterfacultad ? 'Sí' : 'No'}
+                  </div>
+                  {proyecto?.esInterfacultad && (
+                    <div>
+                      <span className="text-muted-foreground">Unidad académica adicional:</span>{' '}
+                      {proyecto?.unidadAcademicaAdicional?.nombre || '-'}
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-muted-foreground">Dirección principal:</span>{' '}
+                    {directores.find(d => d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Codirección:</span>{' '}
+                    {directores.find(d => !d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                  </div>
+                  {!esEditable && (
+                    <p className="text-muted-foreground text-xs col-span-2">
+                      Solo el creador de la edición puede modificar las direcciones mientras esté en borrador.
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="presupuesto" className="mt-4">
