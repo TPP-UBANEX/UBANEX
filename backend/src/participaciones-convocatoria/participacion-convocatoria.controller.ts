@@ -17,15 +17,13 @@ export class ParticipacionConvocatoriaController {
   constructor(private readonly service: ParticipacionConvocatoriaService) {}
 
   @Post()
-  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado)
   asignar(@Body() dto: CrearParticipacionDto, @CurrentUser() usuario: Usuario) {
     return this.service.asignar(dto, usuario);
   }
 
   @Delete(':id')
-  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado)
-  desasignar(@Param('id') id: string) {
-    return this.service.desasignar(id);
+  desasignar(@Param('id') id: string, @CurrentUser() usuario: Usuario) {
+    return this.service.desasignar(id, usuario);
   }
 
   @Patch(':id/estado')
@@ -50,6 +48,21 @@ export class ParticipacionConvocatoriaController {
   @Get()
   listar(@Query('convocatoriaId') convocatoriaId: string) {
     return this.service.listarPorConvocatoria(convocatoriaId);
+  }
+
+  @Get('candidatos')
+  candidatos(
+    @Query('unidadAcademicaId') unidadAcademicaId: string,
+    @Query('convocatoriaId') convocatoriaId: string,
+    @Query('edicionId') edicionId?: string,
+    @Query('unidadAcademicaAdicionalId') unidadAcademicaAdicionalId?: string,
+  ) {
+    return this.service.listarCandidatos(
+      unidadAcademicaId,
+      convocatoriaId,
+      edicionId,
+      unidadAcademicaAdicionalId,
+    );
   }
 
   @Get('mias')

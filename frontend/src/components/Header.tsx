@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { ThemeToggle } from './ThemeToggle'
 import { NotificacionesDropdown } from './NotificacionesDropdown'
@@ -14,8 +14,25 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LogOut, User } from 'lucide-react'
 
+function tituloSeccion(pathname: string, search: string, userId?: string): string {
+  if (pathname === '/') return 'Dashboard'
+  if (pathname === '/convocatorias') return 'Convocatorias'
+  if (pathname.startsWith('/convocatorias/')) return 'Convocatoria'
+  if (pathname === '/proyectos') return search.includes('revision=true') ? 'Revisión de proyectos' : 'Proyectos'
+  if (pathname.startsWith('/proyectos/')) return 'Proyecto'
+  if (pathname === '/evaluacion') return 'Evaluación'
+  if (pathname === '/usuarios') return 'Usuarios'
+  if (pathname.startsWith('/usuarios/')) {
+    const id = pathname.split('/')[2]
+    return id === userId ? 'Mi Perfil' : 'Usuario'
+  }
+  if (pathname === '/validacion-docente') return 'Validación de Docentes'
+  return 'UBANEX'
+}
+
 export function Header() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
 
   const iniciales = user?.nombreCompleto
@@ -26,12 +43,11 @@ export function Header() {
     .slice(0, 2) ?? '??'
 
   return (
-    <header className="border-b bg-background px-6 h-14 flex items-center justify-between">
+    <header className="border-b bg-background px-6 h-16 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">
-          Sistema de Gestión UBANEX
+        <span className="text-2xl font-semibold text-heading">
+          {tituloSeccion(location.pathname, location.search, user?.id)}
         </span>
-        <span className="h-2 w-2 rounded-full bg-green-500" />
       </div>
 
       <div className="flex items-center gap-4">

@@ -24,7 +24,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     const mensaje = body?.message || res.statusText
     throw new Error(mensaje)
   }
-  return res.json()
+  if (res.status === 204) return undefined as T
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 function get<T>(path: string): Promise<T> {
@@ -98,6 +100,14 @@ export const api = {
       post<import('@/data/types').ParticipacionConvocatoria>(`/participaciones-convocatoria/${id}/declinar`, {}),
     listar: (convocatoriaId: string) =>
       get<import('@/data/types').ParticipacionConvocatoria[]>(`/participaciones-convocatoria?convocatoriaId=${convocatoriaId}`),
+    candidatos: (params: { unidadAcademicaId: string; unidadAcademicaAdicionalId?: string; convocatoriaId: string; edicionId?: string }) => {
+      const qs = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([_, v]) => v !== undefined && v !== '')
+        )
+      ).toString()
+      return get<import('@/data/types').Usuario[]>(`/participaciones-convocatoria/candidatos?${qs}`)
+    },
     listarMias: () =>
       get<import('@/data/types').ParticipacionConvocatoria[]>('/participaciones-convocatoria/mias'),
   },

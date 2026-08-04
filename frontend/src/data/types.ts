@@ -261,6 +261,8 @@ export interface Proyecto {
   nombre: string
   esConsolidado: boolean
   esInterfacultad: boolean
+  unidadAcademicaAdicional?: UnidadAcademica
+  unidadAcademicaAdicionalId?: string
   creadoPor: Usuario
   creadoPorId: string
   creadoEn: string
@@ -324,6 +326,7 @@ export interface ActualizarEdicionDto {
   anioEdicion?: number
   esConsolidado?: boolean
   esInterfacultad?: boolean
+  unidadAcademicaAdicionalId?: string
   presupuesto?: Presupuesto
   datosFormulario?: Record<string, unknown>
 }
@@ -489,4 +492,23 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Aceptada: 'default',
   Rechazada: 'destructive',
   MasInformacion: 'outline',
+}
+
+export const estadoConvocatoriaLabel: Record<string, string> = {
+  configuracion: 'Configuración',
+  presentacion: 'Presentación',
+  evaluacion: 'Evaluación',
+  ejecucion: 'Ejecución',
+  cierre: 'Cierre',
+}
+
+export const estadoEdicionLabel: Record<string, string> = {
+  Borrador: 'Borrador',
+  Presentado: 'Presentado',
+  PendienteDeCambios: 'Pendiente de cambios',
+  EnEvaluacion: 'En evaluación',
+  Adjudicado: 'Adjudicado',
+  NoAdjudicado: 'No adjudicado',
+  EnEjecucion: 'En ejecución',
+  Cerrado: 'Cerrado',
 }

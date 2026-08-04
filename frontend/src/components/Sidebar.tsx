@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { RolUsuario } from '@/data/types'
+import { Logo } from '@/components/Logo'
 
 const menuItems = [
   { id: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -51,9 +52,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? 'w-16' : 'w-56',
       )}
     >
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between h-16 px-4 border-b">
         {!collapsed && (
-          <span className="font-semibold text-sm tracking-tight">UBANEX</span>
+          <Logo className="h-8 w-auto" />
         )}
         <Button
           variant="ghost"

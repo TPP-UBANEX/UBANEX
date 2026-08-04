@@ -33,7 +33,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Convocatoria, ParticipacionConvocatoria } from '@/data/types'
 import { RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
-import { estadoBadge } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel } from '@/data/types'
 import { toast } from 'sonner'
 import { Plus, Search } from 'lucide-react'
 
@@ -166,7 +166,6 @@ export function Convocatorias() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Convocatorias</h1>
           <p className="text-sm text-muted-foreground">Gestión de convocatorias UBANEX</p>
         </div>
         {user?.roles.includes(RolUsuario.AutoridadDeRectorado) && (
@@ -307,7 +306,7 @@ function TablaConvocatorias({ data, convocatoriasEvaluador, onClick }: { data: C
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
-                <TableCell><Badge variant={estadoBadge[c.estado]}>{c.estado}</Badge></TableCell>
+                <TableCell><Badge variant={estadoBadge[c.estado]}>{estadoConvocatoriaLabel[c.estado] || c.estado}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {c.fechaInicioPresentacion && c.fechaFinPresentacion
                     ? `${c.fechaInicioPresentacion} — ${c.fechaFinPresentacion}`

@@ -1,8 +1,8 @@
 import {
-  Injectable, NotFoundException, BadRequestException, Logger,
+  Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { ParticipacionConvocatoria } from './participacion-convocatoria.entity';
 import { CrearParticipacionDto } from './dto/crear-participacion.dto';
 import { ActualizarEstadoParticipacionDto } from './dto/actualizar-estado-participacion.dto';
@@ -13,6 +13,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
+import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 import { CANTIDAD_EVALUADORES_POR_UA } from '../common/constantes';
@@ -57,6 +58,10 @@ export class ParticipacionConvocatoriaService {
   ) {}
 
   async asignar(dto: CrearParticipacionDto, asignadoPor: Usuario): Promise<ParticipacionConvocatoria> {
+    if (!this.esAutoridad(asignadoPor)) {
+      await this.validarCreadorPuedeAsignar(asignadoPor, dto);
+    }
+
     const usuario = await this.usuarioRepo.findOne({ where: { id: dto.usuarioId } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
     if (!usuario.roles.includes(RolUsuario.Docente)) {
@@ -68,7 +73,8 @@ export class ParticipacionConvocatoriaService {
 
     if (
       (dto.rol === RolEjecucion.DirectorDeProyecto || dto.rol === RolEjecucion.Evaluador) &&
-      !this.perfilDocenteCompleto(usuario)
+      !this.perfilDocenteCompleto(usuario) &&
+      this.esAutoridad(asignadoPor)
     ) {
       await this.completarPerfil(usuario, dto, asignadoPor);
     }
@@ -76,10 +82,14 @@ export class ParticipacionConvocatoriaService {
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: dto.convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
-    const existente = await this.repo.findOne({
+    const existentes = await this.repo.find({
       where: { usuarioId: dto.usuarioId, convocatoriaId: dto.convocatoriaId },
     });
-    if (existente) {
+    const { activas, estancadas } = await this.separarActivasYEstancadas(existentes);
+    if (estancadas.length > 0) {
+      await this.repo.remove(estancadas);
+    }
+    if (activas.length > 0) {
       throw new BadRequestException('El usuario ya tiene un rol asignado en esta convocatoria');
     }
 
@@ -90,13 +100,9 @@ export class ParticipacionConvocatoriaService {
       const edicion = await this.edicionRepo.findOne({ where: { id: dto.edicionId } });
       if (!edicion) throw new NotFoundException('Edicion no encontrada');
 
-      const participacionesDirector = await this.repo.count({
-        where: {
-          usuarioId: dto.usuarioId,
-          convocatoriaId: dto.convocatoriaId,
-          rol: RolEjecucion.DirectorDeProyecto,
-        },
-      });
+      const participacionesDirector = activas.filter(
+        p => p.rol === RolEjecucion.DirectorDeProyecto,
+      ).length;
       if (participacionesDirector >= 2) {
         throw new BadRequestException(
           'El usuario ya alcanzó el límite de 2 participaciones como director en esta convocatoria',
@@ -313,6 +319,37 @@ export class ParticipacionConvocatoriaService {
     }
   }
 
+  private esAutoridad(usuario: Usuario): boolean {
+    return usuario.roles.some(r =>
+      [
+        RolUsuario.AutoridadDeRectorado,
+        RolUsuario.AsistenteDeRectorado,
+        RolUsuario.AutoridadDeSecretaria,
+        RolUsuario.AsistenteDeSecretaria,
+      ].includes(r),
+    );
+  }
+
+  private async validarCreadorPuedeAsignar(
+    usuario: Usuario,
+    dto: CrearParticipacionDto,
+  ): Promise<void> {
+    if (dto.rol !== RolEjecucion.DirectorDeProyecto) {
+      throw new ForbiddenException('Solo autoridades pueden asignar otros roles');
+    }
+    if (!dto.edicionId) {
+      throw new ForbiddenException('DirectorDeProyecto requiere una edicionId');
+    }
+    const edicion = await this.edicionRepo.findOne({ where: { id: dto.edicionId } });
+    if (!edicion) throw new NotFoundException('Edicion no encontrada');
+    if (edicion.creadoPorId !== usuario.id) {
+      throw new ForbiddenException('Solo el creador de la edición o autoridades pueden asignar direcciones');
+    }
+    if (edicion.estado !== EstadoEdicion.Borrador) {
+      throw new ForbiddenException('Solo se pueden asignar direcciones en estado borrador');
+    }
+  }
+
   private camposPerfilFaltantes(usuario: Usuario): CampoPerfil[] {
     return CAMPOS_PERFIL.filter(({ campo }) => {
       const valor = usuario[campo];
@@ -379,9 +416,96 @@ export class ParticipacionConvocatoriaService {
     });
   }
 
-  async desasignar(id: string): Promise<void> {
+  async listarCandidatos(
+    unidadAcademicaId: string,
+    convocatoriaId: string,
+    edicionId?: string,
+    unidadAcademicaAdicionalId?: string,
+  ): Promise<Usuario[]> {
+    if (!unidadAcademicaId) throw new BadRequestException('unidadAcademicaId es requerido');
+
+    const unidadAcademicaIds = [
+      unidadAcademicaId,
+      ...(unidadAcademicaAdicionalId ? [unidadAcademicaAdicionalId] : []),
+    ];
+
+    const usuarios = await this.usuarioRepo.find({
+      where: { unidadAcademicaId: In(unidadAcademicaIds), habilitado: true },
+      relations: { unidadAcademica: true },
+      select: {
+        id: true,
+        nombreCompleto: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        roles: true,
+        telefono: true,
+        genero: true,
+        personaConDiscapacidad: true,
+        cargoDocente: true,
+        tipoDesignacionDocente: true,
+        areaDocente: true,
+        direccionLocalidad: true,
+        estadoValidacionDocente: true,
+        unidadAcademicaId: true,
+        habilitado: true,
+        unidadAcademica: { id: true, nombre: true },
+      },
+    });
+
+    const participaciones = await this.repo.find({ where: { convocatoriaId } });
+    const edicionIds = [...new Set(
+      participaciones.map(p => p.edicionId).filter((id): id is string => !!id),
+    )];
+    const ediciones = edicionIds.length > 0
+      ? await this.edicionRepo.find({ where: { id: In(edicionIds) }, withDeleted: true })
+      : [];
+    const edicionesEliminadas = new Set(
+      ediciones.filter(e => e.eliminadoEn).map(e => e.id),
+    );
+    const usuarioIdsOcupados = new Set(
+      participaciones
+        .filter(p => {
+          if (p.edicionId === edicionId) return false;
+          if (!p.edicionId) return true;
+          return !edicionesEliminadas.has(p.edicionId);
+        })
+        .map(p => p.usuarioId),
+    );
+
+    return usuarios.filter(u =>
+      u.roles.includes(RolUsuario.Docente) &&
+      u.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
+      !usuarioIdsOcupados.has(u.id),
+    );
+  }
+
+  private async separarActivasYEstancadas(
+    participaciones: ParticipacionConvocatoria[],
+  ): Promise<{ activas: ParticipacionConvocatoria[]; estancadas: ParticipacionConvocatoria[] }> {
+    const conEdicion = participaciones.filter(p => p.edicionId);
+    const edicionIds = [...new Set(conEdicion.map(p => p.edicionId as string))];
+    const ediciones = edicionIds.length > 0
+      ? await this.edicionRepo.find({ where: { id: In(edicionIds) }, withDeleted: true })
+      : [];
+    const eliminadas = new Set(ediciones.filter(e => e.eliminadoEn).map(e => e.id));
+    return {
+      activas: participaciones.filter(p => !p.edicionId || !eliminadas.has(p.edicionId)),
+      estancadas: participaciones.filter(p => !!p.edicionId && eliminadas.has(p.edicionId)),
+    };
+  }
+
+  async desasignar(id: string, usuario: Usuario): Promise<void> {
     const entity = await this.repo.findOne({ where: { id } });
     if (!entity) throw new NotFoundException('Participacion no encontrada');
+
+    if (!this.esAutoridad(usuario)) {
+      const edicion = await this.edicionRepo.findOne({ where: { id: entity.edicionId ?? '' } });
+      if (!edicion || edicion.creadoPorId !== usuario.id || edicion.estado !== EstadoEdicion.Borrador) {
+        throw new ForbiddenException('Solo el creador de la edición o autoridades pueden desasignar');
+      }
+    }
+
     await this.repo.remove(entity);
   }
 

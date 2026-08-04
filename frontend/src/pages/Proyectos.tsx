@@ -22,7 +22,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, EstadoEdicion } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion } from '@/data/types'
 import { Search } from 'lucide-react'
 
 const pipelineColumns = [
@@ -81,9 +81,6 @@ export function Proyectos() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {esRevision ? 'Revisión de proyectos' : 'Proyectos'}
-          </h1>
           <p className="text-sm text-muted-foreground">
             {esRevision
               ? 'Proyectos presentados pendientes de revisión'
@@ -91,8 +88,8 @@ export function Proyectos() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant={vista === 'tabla' ? 'default' : 'outline'} size="sm" onClick={() => setVista('tabla')}>Tabla</Button>
-          <Button variant={vista === 'kanban' ? 'default' : 'outline'} size="sm" onClick={() => setVista('kanban')}>Kanban</Button>
+          <Button variant={vista === 'tabla' ? 'default' : 'outline'} onClick={() => setVista('tabla')}>Tabla</Button>
+          <Button variant={vista === 'kanban' ? 'default' : 'outline'} onClick={() => setVista('kanban')}>Kanban</Button>
         </div>
       </div>
 
@@ -162,7 +159,7 @@ export function Proyectos() {
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[e.estado]}>{e.estado}</Badge></TableCell>
+                      <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
