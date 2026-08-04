@@ -226,17 +226,7 @@ export class UsuariosService {
       if (dto.habilitado !== undefined) {
         throw new ForbiddenException('No puedes cambiar tu propio estado');
       }
-      const hayNombreApellido = dto.nombre !== undefined || dto.apellido !== undefined;
-      if (hayNombreApellido) {
-        if (!dto.nombre || !dto.apellido) {
-          throw new BadRequestException('Deben completarse nombre y apellido');
-        }
-        entity.nombre = dto.nombre;
-        entity.apellido = dto.apellido;
-        entity.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
-      } else if (dto.nombreCompleto !== undefined) {
-        entity.nombreCompleto = dto.nombreCompleto;
-      }
+      this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.telefono !== undefined) entity.telefono = dto.telefono;
       if (dto.genero !== undefined) entity.genero = dto.genero;
@@ -263,7 +253,7 @@ export class UsuariosService {
 
     if (esRectorado) {
       if (dto.roles) validarGruposRoles(dto.roles);
-      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
         entity.roles = dto.roles;
@@ -307,7 +297,7 @@ export class UsuariosService {
     }
 
     if (esSecretaria && mismaUA) {
-      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
         const rolesPermitidos = [RolUsuario.Estudiante, RolUsuario.Docente];
@@ -427,6 +417,20 @@ export class UsuariosService {
         descripcion: 'Usuario deshabilitado',
         responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
       });
+    }
+  }
+
+  private aplicarNombreApellido(entity: Usuario, dto: ActualizarUsuarioDto): void {
+    const hayNombreApellido = dto.nombre !== undefined || dto.apellido !== undefined;
+    if (hayNombreApellido) {
+      if (!dto.nombre || !dto.apellido) {
+        throw new BadRequestException('Deben completarse nombre y apellido');
+      }
+      entity.nombre = dto.nombre;
+      entity.apellido = dto.apellido;
+      entity.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
+    } else if (dto.nombreCompleto !== undefined) {
+      entity.nombreCompleto = dto.nombreCompleto;
     }
   }
 }
