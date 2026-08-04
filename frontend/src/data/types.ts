@@ -102,7 +102,7 @@ export interface RegisterDto {
 }
 
 export interface CrearUsuarioDto {
-  nombreCompleto: string
+  nombreCompleto?: string
   email: string
   password: string
   roles: RolUsuario[]
