@@ -338,7 +338,7 @@ function NuevoUsuarioDialog({
   const [apellido, setApellido] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [roles, setRoles] = useState<string[]>([])
+  const [rol, setRol] = useState('')
   const [unidadAcademicaId, setUnidadAcademicaId] = useState(uaId ?? '')
   const [telefono, setTelefono] = useState('')
   const [genero, setGenero] = useState('')
@@ -357,8 +357,8 @@ function NuevoUsuarioDialog({
     api.carreras.list().then(setCarreras).catch(() => {})
   }, [])
 
-  const esDocente = roles.includes(RolUsuario.Docente)
-  const esEstudiante = roles.includes(RolUsuario.Estudiante)
+  const esDocente = rol === RolUsuario.Docente
+  const esEstudiante = rol === RolUsuario.Estudiante
 
   const carrerasDisponibles = useMemo(() => {
     if (!unidadAcademicaId) return []
@@ -371,7 +371,7 @@ function NuevoUsuarioDialog({
     setApellido('')
     setEmail('')
     setPassword('')
-    setRoles([])
+    setRol('')
     setUnidadAcademicaId(uaId ?? '')
     setTelefono('')
     setGenero('')
@@ -386,7 +386,7 @@ function NuevoUsuarioDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (roles.length === 0) return
+    if (!rol) return
     if (esDocente && !telefono.trim()) {
       setError('El teléfono es obligatorio para docentes')
       return
@@ -403,7 +403,7 @@ function NuevoUsuarioDialog({
         apellido: apellido.trim(),
         email,
         password,
-        roles: roles as RolUsuario[],
+        roles: [rol as RolUsuario],
         unidadAcademicaId: unidadAcademicaId || undefined,
       }
       if (esDocente) {
@@ -483,29 +483,15 @@ function NuevoUsuarioDialog({
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <p className="text-sm font-medium">Roles</p>
-            <div className="flex flex-wrap gap-2">
-              {rolesCreables.map(r => {
-                const selected = roles.includes(r)
-                return (
-                  <Button
-                    key={r}
-                    type="button"
-                    variant={selected ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      if (selected) {
-                        setRoles(roles.filter(x => x !== r))
-                      } else {
-                        setRoles([...roles, r])
-                      }
-                    }}
-                  >
-                    {rolLabels[r]}
-                  </Button>
-                )
-              })}
-            </div>
+            <label className="text-sm font-medium">Rol</label>
+            <Select value={rol} onValueChange={setRol} required>
+              <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
+              <SelectContent>
+                {rolesCreables.map(r => (
+                  <SelectItem key={r} value={r}>{rolLabels[r]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {!esSecretaria && (
             <div className="space-y-2 sm:col-span-2">
