@@ -57,7 +57,10 @@ export class UsuariosService {
     if ((dto.nombre && !dto.apellido) || (!dto.nombre && dto.apellido)) {
       throw new BadRequestException('Deben completarse nombre y apellido');
     }
-    if (dto.nombre && dto.apellido) {
+    if (!dto.nombreCompleto) {
+      if (!dto.nombre || !dto.apellido) {
+        throw new BadRequestException('Deben completarse nombre y apellido');
+      }
       dto.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
     }
 
