@@ -57,7 +57,6 @@ export function EditarUsuarioDialog({
   const [open, setOpen] = useState(false)
   const [nombre, setNombre] = useState(usuario.nombre ?? '')
   const [apellido, setApellido] = useState(usuario.apellido ?? '')
-  const [nombreCompleto, setNombreCompleto] = useState(usuario.nombreCompleto)
   const [email, setEmail] = useState(usuario.email)
   const [password, setPassword] = useState('')
   const [telefono, setTelefono] = useState(usuario.telefono ?? '')
@@ -101,7 +100,6 @@ export function EditarUsuarioDialog({
     if (!open) return
     setNombre(usuario.nombre ?? '')
     setApellido(usuario.apellido ?? '')
-    setNombreCompleto(usuario.nombreCompleto)
     setEmail(usuario.email)
     setPassword('')
     setTelefono(usuario.telefono ?? '')
@@ -177,7 +175,8 @@ export function EditarUsuarioDialog({
         }
         if (password) data.password = password
       } else {
-        data.nombreCompleto = nombreCompleto
+        data.nombre = nombre.trim()
+        data.apellido = apellido.trim()
         if (password) data.password = password
       }
       if (puedeEditarRoles && roles.length > 0) {
@@ -353,50 +352,67 @@ export function EditarUsuarioDialog({
             </div>
           ) : (
             <>
-              <Input
-                placeholder="Nombre completo"
-                value={nombreCompleto}
-                onChange={e => setNombreCompleto(e.target.value)}
-                required
-              />
-              <Input
-                placeholder="Email"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Apellido</label>
+                  <Input
+                    placeholder="Pérez"
+                    value={apellido}
+                    onChange={e => setApellido(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nombre</label>
+                  <Input
+                    placeholder="Juan"
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="email@ejemplo.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
               {(esDocente || esEstudiante) && (
-                <div className="space-y-1.5 border rounded-md p-3 bg-muted/30 text-sm">
-                  <p className="font-medium">Datos de perfil (solo lectura)</p>
-                  <div className="grid gap-1 sm:grid-cols-2">
-                    <span className="text-muted-foreground">Teléfono:</span>
-                    <span>{usuario.telefono || '—'}</span>
-                    <span className="text-muted-foreground">Identidad de género:</span>
-                    <span>{generoLabel(usuario.genero)}</span>
-                    <span className="text-muted-foreground">Persona con discapacidad:</span>
-                    <span>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</span>
+                <div className="border rounded-md p-4 bg-muted/30 text-sm">
+                  <p className="font-medium mb-3">Datos de perfil (solo lectura)</p>
+                  <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-[auto_1fr]">
+                    <dt className="text-muted-foreground">Teléfono</dt>
+                    <dd>{usuario.telefono || '—'}</dd>
+                    <dt className="text-muted-foreground">Identidad de género</dt>
+                    <dd>{generoLabel(usuario.genero)}</dd>
+                    <dt className="text-muted-foreground">Persona con discapacidad</dt>
+                    <dd>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</dd>
                     {esDocente && (
                       <>
-                        <span className="text-muted-foreground">Cargo:</span>
-                        <span>{cargoDocenteLabel(usuario.cargoDocente)}</span>
-                        <span className="text-muted-foreground">Tipo de designación:</span>
-                        <span>{tipoDesignacionDocenteLabel(usuario.tipoDesignacionDocente)}</span>
-                        <span className="text-muted-foreground">Materia/Área:</span>
-                        <span>{usuario.areaDocente || '—'}</span>
-                        <span className="text-muted-foreground">Dirección o localidad:</span>
-                        <span>{usuario.direccionLocalidad || '—'}</span>
+                        <dt className="text-muted-foreground">Cargo</dt>
+                        <dd>{cargoDocenteLabel(usuario.cargoDocente)}</dd>
+                        <dt className="text-muted-foreground">Tipo de designación</dt>
+                        <dd>{tipoDesignacionDocenteLabel(usuario.tipoDesignacionDocente)}</dd>
+                        <dt className="text-muted-foreground">Materia/Área</dt>
+                        <dd>{usuario.areaDocente || '—'}</dd>
+                        <dt className="text-muted-foreground">Dirección o localidad</dt>
+                        <dd>{usuario.direccionLocalidad || '—'}</dd>
                       </>
                     )}
                     {esEstudiante && (
                       <>
-                        <span className="text-muted-foreground">Porcentaje de la carrera:</span>
-                        <span>{usuario.porcentajeCarrera === undefined || usuario.porcentajeCarrera === null ? '—' : `${usuario.porcentajeCarrera}%`}</span>
-                        <span className="text-muted-foreground">Carrera:</span>
-                        <span>{usuario.carrera?.nombre || '—'}</span>
+                        <dt className="text-muted-foreground">Porcentaje de la carrera</dt>
+                        <dd>{usuario.porcentajeCarrera === undefined || usuario.porcentajeCarrera === null ? '—' : `${usuario.porcentajeCarrera}%`}</dd>
+                        <dt className="text-muted-foreground">Carrera</dt>
+                        <dd>{usuario.carrera?.nombre || '—'}</dd>
                       </>
                     )}
-                  </div>
+                  </dl>
                 </div>
               )}
               {puedeEditarRoles && (
