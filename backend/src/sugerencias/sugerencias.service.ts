@@ -115,8 +115,11 @@ export class SugerenciasService {
 
   async listarNotificaciones(usuario: Usuario) {
     return this.notificacionRepo.find({
-      where: { usuarioId: usuario.id },
-      relations: { sugerencia: { edicion: { proyecto: true }, sugeridoPor: true } },
+      where: { usuarioId: usuario.id, leida: false },
+      relations: {
+        sugerencia: { edicion: { proyecto: true }, sugeridoPor: true },
+        participacion: { convocatoria: true, usuario: true },
+      },
       order: { creadoEn: 'DESC' },
       take: 50,
     });

@@ -417,6 +417,8 @@ export enum EstadoSugerencia {
 export enum TipoNotificacion {
   NUEVA_SUGERENCIA = 'NUEVA_SUGERENCIA',
   RESPUESTA_SUGERENCIA = 'RESPUESTA_SUGERENCIA',
+  PROPUESTA_EVALUADOR = 'PROPUESTA_EVALUADOR',
+  RESULTADO_EVALUADOR = 'RESULTADO_EVALUADOR',
 }
 
 export interface SugerenciaCambio {
@@ -448,8 +450,10 @@ export interface Notificacion {
   id: string
   usuarioId: string
   tipo: TipoNotificacion
-  sugerenciaId: string
-  sugerencia?: SugerenciaCambio & { edicion: Edicion }
+  sugerenciaId?: string | null
+  sugerencia?: (SugerenciaCambio & { edicion: Edicion }) | null
+  participacionId?: string | null
+  participacion?: ParticipacionConvocatoria & { convocatoria: Convocatoria }
   mensaje: string
   leida: boolean
   creadoEn: string

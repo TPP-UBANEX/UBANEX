@@ -63,7 +63,9 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     p => p.usuario?.unidadAcademicaId === user?.unidadAcademicaId,
   )
   const activosPropios = evaluadoresPropios.filter(p =>
-    p.estado === EstadoPropuestaEvaluador.Aceptada || p.estado === EstadoPropuestaEvaluador.Aprobado,
+    p.estado === EstadoPropuestaEvaluador.Propuesto ||
+    p.estado === EstadoPropuestaEvaluador.Aceptada ||
+    p.estado === EstadoPropuestaEvaluador.Aprobado,
   )
   const aprobados = evaluadoresPropios.filter(p => p.estado === EstadoPropuestaEvaluador.Aprobado)
   const hayRechazados = evaluadoresPropios.some(p => p.estado === EstadoPropuestaEvaluador.Rechazado)
