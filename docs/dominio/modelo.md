@@ -304,6 +304,7 @@ classDiagram
         +id: string
         +rol: RolEjecucion
         +esDirectorPrincipal: boolean
+        +estado: EstadoPropuestaEvaluador
     }
 
     class RolUsuario {
@@ -322,6 +323,15 @@ classDiagram
         Evaluador
     }
 
+    class EstadoPropuestaEvaluador {
+        <<enumeration>>
+        Propuesto
+        Aceptada
+        Declinada
+        Aprobado
+        Rechazado
+    }
+
     class EstadoValidacionDocente {
         <<enumeration>>
         PendienteDeValidacion
@@ -336,6 +346,7 @@ classDiagram
     Usuario --> ParticipacionConvocatoria : tiene
     ParticipacionConvocatoria --> Convocatoria : en
     ParticipacionConvocatoria *-- RolEjecucion : rol
+    ParticipacionConvocatoria *-- EstadoPropuestaEvaluador : estado (solo si rol = Evaluador)
     ParticipacionConvocatoria --> Edicion : opcional
 ```
 
@@ -346,7 +357,7 @@ classDiagram
 - **Estudiante**: 0 a N. Se registra solo. Puede crear proyectos.
 - **Docente**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Puede ser asignado como Director o Evaluador en una convocatoria mediante `ParticipacionConvocatoria`.
 - **Director de Proyecto**: rol de ejecución asignado por convocatoria. Máximo 2 participaciones como director por convocatoria.
-- **Evaluador**: rol de ejecución asignado por convocatoria. Asignado por Autoridad de Secretaría.
+- **Evaluador**: rol de ejecución por convocatoria. No se asigna de forma directa: lo **propone** una Autoridad o un Asistente de Secretaría, y la propuesta recorre el circuito descrito más abajo hasta quedar `Aprobado`.
 - Los roles se dividen en dos **grupos** excluyentes:
   - **Gestión**: AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria
   - **Ejecución**: Estudiante, Docente (roles globales en `RolUsuario`), DirectorDeProyecto, Evaluador (roles por convocatoria en `RolEjecucion` vía `ParticipacionConvocatoria`)
@@ -354,6 +365,18 @@ classDiagram
 - `estadoValidacionDocente` solo aplica cuando el usuario tiene `Docente` en sus roles (PendienteDeValidacion → Validado | Rechazado). Si es Rechazado, no puede iniciar sesión.
 - `ParticipacionConvocatoria` asigna un `RolEjecucion` (DirectorDeProyecto o Evaluador) a un usuario dentro de una convocatoria específica. Un usuario puede tener múltiples participaciones en distintas convocatorias, pero solo un rol por convocatoria.
 - `creadoPor` referencia al Usuario que creó la cuenta (aplica para todo tipo de usuarios).
+
+#### Propuesta de evaluadores
+
+- `estado` solo aplica cuando el `rol` de la participación es `Evaluador`. Para `DirectorDeProyecto` no tiene valor.
+- Al proponer un evaluador, la participación se crea en estado `Propuesto`. El ciclo de vida es:
+  - `Propuesto → Aceptada | Declinada`: responde **únicamente el docente propuesto**, nadie puede responder por él.
+  - `Aceptada → Aprobado | Rechazado`: decide una **Autoridad de Rectorado**. Solo las propuestas ya aceptadas por el docente pueden aprobarse o rechazarse.
+  - `Declinada` y `Rechazado` son terminales. Un evaluador cuenta como tal recién cuando llega a `Aprobado`.
+- Cada paso del circuito notifica a los involucrados (mail + notificación en la aplicación): al docente cuando se lo propone y cuando Rectorado resuelve, y a la Secretaría de su UA cuando el docente responde y cuando Rectorado resuelve.
+- Solo la Secretaría puede proponer, y únicamente a docentes validados **de su propia Unidad Académica**.
+- Cada Unidad Académica tiene un cupo de **3 evaluadores activos** por convocatoria. Cuentan como activos los estados `Propuesto`, `Aceptada` y `Aprobado`; `Declinada` y `Rechazado` no ocupan cupo.
+- Ser evaluador y presentar proyectos en la misma convocatoria es **incompatible en ambos sentidos**: no se puede proponer como evaluador a un docente que ya creó ediciones en esa convocatoria, ni un docente con una propuesta de evaluador activa puede crear proyectos en ella.
 
 ---
 
