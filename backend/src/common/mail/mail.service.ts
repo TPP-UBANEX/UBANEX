@@ -68,18 +68,28 @@ export class MailService {
     await sgMail.send({
       from,
       to: destino,
-      subject: 'UBANEX — Fuiste propuesto como evaluador',
+      subject: `UBANEX — Fuiste propuesto como evaluador en "${convocatoriaNombre}"`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #1a1a2e;">UBANEX</h2>
-          <p>Hola <strong>${docenteNombre}</strong>,</p>
-          <p>
-            Tu Unidad Académica te propuso como <strong>evaluador</strong> en la convocatoria
-            <strong>${convocatoriaNombre}</strong>.
-          </p>
-          <p>Ingrsa a UBANEX para Aceptar o  Rechazar la propuesta</p>
-          <hr style="border: none; border-top: 1px solid #e4e4e7;" />
-          <p style="color: #999; font-size: 12px;">Sistema de Gestión UBANEX</p>
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; border: 1px solid #e4e4e7; border-radius: 8px; overflow: hidden;">
+          <div style="background: #1a1a2e; padding: 24px 20px; text-align: center;">
+            <div style="font-size: 22px; font-weight: bold; color: #ffffff;">UBANEX</div>
+            <div style="color: #b8b8cc; font-size: 13px; margin-top: 4px;">
+              Propuesta de evaluador · <strong>${convocatoriaNombre}</strong>
+            </div>
+          </div>
+          <div style="padding: 24px 20px; background: #ffffff;">
+            <p style="margin: 0 0 12px;">Hola <strong>${docenteNombre}</strong>,</p>
+            <p style="margin: 0;">
+              Tu Unidad Académica te propuso como <strong>evaluador</strong> en la convocatoria
+              <strong>${convocatoriaNombre}</strong>.
+            </p>
+            <div style="margin-top: 16px; padding: 12px 16px; background: #f4f4f5; border-left: 4px solid #1a1a2e; border-radius: 4px; color: #444;">
+              <p style="margin: 0;">Ingresá a UBANEX para <strong>Aceptar</strong> o <strong>Rechazar</strong> la propuesta.</p>
+            </div>
+          </div>
+          <div style="padding: 12px 20px; text-align: center; border-top: 1px solid #e4e4e7; font-size: 12px; color: #999;">
+            Sistema de Gestión UBANEX
+          </div>
         </div>
       `,
     });
