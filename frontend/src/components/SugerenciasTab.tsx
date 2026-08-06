@@ -29,10 +29,11 @@ const estadoLabel: Record<string, string> = {
 interface SugerenciasTabProps {
   edicionId: string
   creadoPorId: string
+  directorIds?: string[]
   camposFormulario?: CampoFormulario[]
 }
 
-export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }: SugerenciasTabProps) {
+export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], camposFormulario = [] }: SugerenciasTabProps) {
   const { user } = useAuth()
   const [sugerencias, setSugerencias] = useState<SugerenciaCambio[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,8 +42,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }
   const [respuestaTexto, setRespuestaTexto] = useState('')
   const [confirmacion, setConfirmacion] = useState<{ id: string; estado: EstadoSugerencia; campo: string } | null>(null)
 
-  const esDirector = user?.id === creadoPorId
-  const puedeResponder = esDirector
+  const puedeResponder = user?.id === creadoPorId || directorIds.includes(user?.id ?? '')
 
   const cargar = useCallback(async () => {
     try {
