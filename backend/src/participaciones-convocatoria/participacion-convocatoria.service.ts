@@ -557,6 +557,7 @@ export class ParticipacionConvocatoriaService {
       }
     }
 
+    await this.notificacionRepo.delete({ participacionId: id });
     await this.repo.remove(entity);
   }
 
