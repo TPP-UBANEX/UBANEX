@@ -9,12 +9,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, MessageSquare, CheckCheck, Loader2, UserCheck, CheckCircle2 } from 'lucide-react'
+import { Bell, MessageSquare, CheckCheck, Loader2, UserCheck, CheckCircle2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { Notificacion } from '@/data/types'
 import { TipoNotificacion, EstadoPropuestaEvaluador } from '@/data/types'
 import { cn } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export function NotificacionesDropdown() {
   const navigate = useNavigate()
@@ -22,6 +30,7 @@ export function NotificacionesDropdown() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [respondiendoId, setRespondiendoId] = useState<string | null>(null)
+  const [confirmarBorrar, setConfirmarBorrar] = useState<Notificacion | null>(null)
 
   const cargar = useCallback(async () => {
     try {
@@ -42,10 +51,20 @@ export function NotificacionesDropdown() {
 
   const noLeidas = notificaciones.filter(n => !n.leida).length
 
+  const esEvaluador = (n: Notificacion) =>
+    n.tipo === TipoNotificacion.PROPUESTA_EVALUADOR ||
+    n.tipo === TipoNotificacion.RESULTADO_EVALUADOR
+
+  const visibles = notificaciones.filter(n => esEvaluador(n) || !n.leida)
+
   const handleClick = async (notif: Notificacion) => {
     if (!notif.leida) {
       await api.notificaciones.leer(notif.id).catch(() => {})
-      setNotificaciones(prev => prev.filter(n => n.id !== notif.id))
+      setNotificaciones(prev =>
+        esEvaluador(notif)
+          ? prev.map(n => (n.id === notif.id ? { ...n, leida: true } : n))
+          : prev.filter(n => n.id !== notif.id),
+      )
     }
     const esPropuesta = notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR
     const esResultado = notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
@@ -86,7 +105,21 @@ export function NotificacionesDropdown() {
 
   const handleLeerTodas = async () => {
     await api.notificaciones.leerTodas().catch(() => {})
-    setNotificaciones([])
+    setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })))
+  }
+
+  const borrar = async () => {
+    if (!confirmarBorrar) return
+    const id = confirmarBorrar.id
+    try {
+      await api.notificaciones.eliminar(id)
+      setNotificaciones(prev => prev.filter(n => n.id !== id))
+      toast.success('Notificación eliminada')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar la notificación')
+    } finally {
+      setConfirmarBorrar(null)
+    }
   }
 
   const tiempoRelativo = (fecha: string) => {
@@ -101,7 +134,8 @@ export function NotificacionesDropdown() {
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-4 w-4" />
@@ -126,10 +160,10 @@ export function NotificacionesDropdown() {
           <div className="flex justify-center py-4">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : notificaciones.length === 0 ? (
+        ) : visibles.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">Sin notificaciones</p>
         ) : (
-          notificaciones.slice(0, 20).map(notif => (
+          visibles.slice(0, 20).map(notif => (
             <DropdownMenuItem
               key={notif.id}
               className={cn('flex flex-col items-start gap-1 py-3 cursor-pointer', !notif.leida && 'bg-muted/50')}
@@ -179,11 +213,38 @@ export function NotificacionesDropdown() {
                   )}
                 </div>
                 {!notif.leida && <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />}
+                {esEvaluador(notif) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 -mt-0.5 text-muted-foreground hover:text-destructive"
+                    onClick={e => { e.stopPropagation(); setConfirmarBorrar(notif) }}
+                    title="Eliminar notificación"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             </DropdownMenuItem>
           ))
         )}
       </DropdownMenuContent>
-    </DropdownMenu>
+</DropdownMenu>
+
+      <Dialog open={!!confirmarBorrar} onOpenChange={o => { if (!o) setConfirmarBorrar(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar notificación</DialogTitle>
+            <DialogDescription>
+              ¿Seguro que querés eliminar esta notificación? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setConfirmarBorrar(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={borrar}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

@@ -22,7 +22,7 @@ import { RolUsuario, RolEjecucion, EstadoValidacionDocente, EstadoPropuestaEvalu
 import type { ParticipacionConvocatoria, Usuario } from '@/data/types'
 import { camposPerfilFaltantes } from '@/data/perfil'
 import { useAuth } from '@/lib/auth-context'
-import { Loader2, Trash2, Check, X, Plus } from 'lucide-react'
+import { Loader2, Trash2, Check, X, Plus, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CANTIDAD_EVALUADORES_POR_UA = 3
@@ -57,6 +57,11 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const [submitting, setSubmitting] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState<ParticipacionConvocatoria | null>(null)
+  const [accionEvaluador, setAccionEvaluador] = useState<{
+    p: ParticipacionConvocatoria
+    accion: 'aprobar' | 'rechazar'
+  } | null>(null)
+  const [confirmandoAccion, setConfirmandoAccion] = useState(false)
 
   const evaluadores = participaciones.filter(p => p.rol === RolEjecucion.Evaluador)
   const evaluadoresPropios = evaluadores.filter(
@@ -152,23 +157,22 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     }
   }
 
-  const handleAprobar = async (id: string) => {
+  const confirmarAccionEvaluador = async () => {
+    if (!accionEvaluador) return
+    const { p, accion } = accionEvaluador
+    setConfirmandoAccion(true)
     try {
-      await api.participaciones.actualizarEstado(id, EstadoPropuestaEvaluador.Aprobado)
-      toast.success('Evaluador aprobado')
+      await api.participaciones.actualizarEstado(
+        p.id,
+        accion === 'aprobar' ? EstadoPropuestaEvaluador.Aprobado : EstadoPropuestaEvaluador.Rechazado,
+      )
+      toast.success(accion === 'aprobar' ? 'Evaluador aprobado' : 'Evaluador rechazado')
+      setAccionEvaluador(null)
       cargarDatos()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al aprobar evaluador')
-    }
-  }
-
-  const handleRechazar = async (id: string) => {
-    try {
-      await api.participaciones.actualizarEstado(id, EstadoPropuestaEvaluador.Rechazado)
-      toast.success('Evaluador rechazado')
-      cargarDatos()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al rechazar evaluador')
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar evaluador')
+    } finally {
+      setConfirmandoAccion(false)
     }
   }
 
@@ -325,10 +329,10 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                         <TableCell className="text-right">
                           {p.estado === EstadoPropuestaEvaluador.Aceptada && (
                             <div className="flex justify-end gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleAprobar(p.id)}>
+                              <Button variant="outline" size="sm" onClick={() => setAccionEvaluador({ p, accion: 'aprobar' })}>
                                 <Check className="h-4 w-4 mr-1 text-green-600" />Aprobar
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleRechazar(p.id)}>
+                              <Button variant="outline" size="sm" onClick={() => setAccionEvaluador({ p, accion: 'rechazar' })}>
                                 <X className="h-4 w-4 mr-1 text-destructive" />Rechazar
                               </Button>
                             </div>
@@ -380,6 +384,35 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
           </Table>
         )}
       </div>
+
+      <Dialog open={!!accionEvaluador} onOpenChange={o => { if (!o) setAccionEvaluador(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {accionEvaluador?.accion === 'aprobar'
+                ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                : <AlertTriangle className="h-5 w-5 text-destructive" />}
+              {accionEvaluador?.accion === 'aprobar' ? 'Aprobar evaluador' : 'Rechazar evaluador'}
+            </DialogTitle>
+            <DialogDescription>
+              {accionEvaluador?.accion === 'aprobar'
+                ? <>¿Estás seguro de aprobar a <strong>{accionEvaluador.p.usuario?.nombreCompleto || 'este evaluador'}</strong> como evaluador de la convocatoria?</>
+                : <>¿Estás seguro de rechazar a <strong>{accionEvaluador?.p.usuario?.nombreCompleto || 'este evaluador'}</strong> como evaluador de la convocatoria?</>}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAccionEvaluador(null)}>Cancelar</Button>
+            <Button
+              variant={accionEvaluador?.accion === 'aprobar' ? 'default' : 'destructive'}
+              onClick={confirmarAccionEvaluador}
+              disabled={confirmandoAccion}
+            >
+              {confirmandoAccion && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {confirmandoAccion ? 'Guardando...' : 'Confirmar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!confirmarEliminar} onOpenChange={v => { if (!v) setConfirmarEliminar(null) }}>
         <DialogContent className="sm:max-w-md">

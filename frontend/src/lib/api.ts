@@ -171,6 +171,7 @@ export const api = {
     listar: () => get<import('@/data/types').Notificacion[]>('/notificaciones'),
     leer: (id: string) => patch<{ message: string }>(`/notificaciones/${id}/leer`, {}),
     leerTodas: () => patch<{ message: string }>('/notificaciones/leer-todas', {}),
+    eliminar: (id: string) => del(`/notificaciones/${id}`),
   },
   rendiciones: {
     list: (proyectoId?: string) => {
