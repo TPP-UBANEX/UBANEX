@@ -65,7 +65,7 @@ export class Usuario {
 
   @ManyToOne(() => UnidadAcademica, { nullable: true })
   @JoinColumn({ name: 'unidadAcademicaId' })
-  unidadAcademica: UnidadAcademica;
+  unidadAcademica: UnidadAcademica | null;
 
   @Column({ nullable: true })
   unidadAcademicaId: string;
