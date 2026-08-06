@@ -118,6 +118,23 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
+
+  const nombreUnidadesAcademicas = () => {
+    const principal = edicion?.unidadAcademica?.nombre
+    const adicionalId = proyecto?.esInterfacultad ? proyecto.unidadAcademicaAdicionalId : undefined
+    const adicional = adicionalId && adicionalId !== edicion?.unidadAcademicaId
+      ? proyecto?.unidadAcademicaAdicional?.nombre
+      : undefined
+    if (principal && adicional) return `${principal} y ${adicional}`
+    return principal || 'Sin UA'
+  }
+
+  const nombreConUA = (d: ParticipacionConvocatoria | undefined) => {
+    if (!d?.usuario) return '-'
+    const ua = d.usuario.unidadAcademica?.nombre
+    return ua ? `${d.usuario.nombreCompleto} (${ua})` : d.usuario.nombreCompleto
+  }
+
   const motivoEnvio = !esDocenteValidado
     ? 'Tu usuario no está validado'
     : !directoresCompletos
@@ -435,7 +452,7 @@ export function ProyectoDetail() {
           </div>
           {edicion && (
             <p className="text-sm text-muted-foreground">
-              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
+              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {nombreUnidadesAcademicas()}
               {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
             </p>
           )}
@@ -507,7 +524,7 @@ export function ProyectoDetail() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.unidadAcademica?.nombre || '-'}</p></CardContent>
+          <CardContent><p className="text-sm">{nombreUnidadesAcademicas()}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Dirección</CardTitle></CardHeader>
@@ -515,11 +532,11 @@ export function ProyectoDetail() {
             <div className="space-y-1 text-sm">
               <div>
                 <span className="text-muted-foreground">Dirección:</span>{' '}
-                {directores.find(d => d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
               </div>
               <div>
                 <span className="text-muted-foreground">Codirección:</span>{' '}
-                {directores.find(d => !d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
               </div>
             </div>
           </CardContent>
@@ -542,7 +559,7 @@ export function ProyectoDetail() {
 
       <Tabs defaultValue="info">
         <TabsList>
-          <TabsTrigger value="info">Información</TabsTrigger>
+          <TabsTrigger value="info">Resumen</TabsTrigger>
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
           <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
@@ -607,7 +624,7 @@ export function ProyectoDetail() {
                       </CampoSugerible>
                     </div>
                     <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
-                    <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
+                    <div><span className="text-muted-foreground">Unidad Académica:</span> {nombreUnidadesAcademicas()}</div>
                     <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Edición:</span>{' '}
@@ -717,11 +734,11 @@ export function ProyectoDetail() {
                   )}
                   <div>
                     <span className="text-muted-foreground">Dirección principal:</span>{' '}
-                    {directores.find(d => d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                    {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Codirección:</span>{' '}
-                    {directores.find(d => !d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                    {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
                   </div>
                   {!esEditable && (
                     <p className="text-muted-foreground text-xs col-span-2">

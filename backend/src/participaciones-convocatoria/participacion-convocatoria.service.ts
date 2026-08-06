@@ -314,7 +314,7 @@ export class ParticipacionConvocatoriaService {
   async listarPorConvocatoria(convocatoriaId: string): Promise<ParticipacionConvocatoria[]> {
     return this.repo.find({
       where: { convocatoriaId },
-      relations: { usuario: true },
+      relations: { usuario: { unidadAcademica: true } },
       order: { creadoEn: 'ASC' },
     });
   }
