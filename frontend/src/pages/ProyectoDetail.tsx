@@ -453,7 +453,7 @@ export function ProyectoDetail() {
           )}
           {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
             <Button variant="outline" onClick={() => setModoSugerencia(true)}>
-              <MessageSquare className="h-4 w-4 mr-2" />Sugerir cambios
+              <MessageSquare className="h-4 w-4 mr-2" />Sugerir
             </Button>
           )}
           {modoSugerencia && (
