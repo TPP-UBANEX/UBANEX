@@ -24,8 +24,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -84,8 +84,16 @@ export function ProyectoDetail() {
   const [editUnidadAcademicaAdicionalId, setEditUnidadAcademicaAdicionalId] = useState('')
 
   const [modoSugerencia, setModoSugerencia] = useState(false)
-  const [sugerenciaModal, setSugerenciaModal] = useState<{ open: boolean; campo: string; valorActual: string; label: string }>({
-    open: false, campo: '', valorActual: '', label: '',
+  const [sugerenciasPropias, setSugerenciasPropias] = useState<SugerenciaCambio[]>([])
+  const [sugerenciaModal, setSugerenciaModal] = useState<{
+    open: boolean
+    campo: string
+    valorActual: string
+    label: string
+    valorSugeridoInicial: string
+    comentarioInicial: string
+  }>({
+    open: false, campo: '', valorActual: '', label: '', valorSugeridoInicial: '', comentarioInicial: '',
   })
 
   const esPropietario = edicion?.creadoPorId === user?.id
@@ -155,6 +163,19 @@ export function ProyectoDetail() {
       .then(setUas)
       .catch(() => toast.error('Error al cargar unidades académicas'))
   }, [])
+
+  useEffect(() => {
+    if (!modoSugerencia || !edicion?.id || !user?.id) return
+    api.sugerencias.listar(edicion.id)
+      .then(data =>
+        setSugerenciasPropias(
+          data.filter(s =>
+            s.sugeridoPor?.id === user.id && s.estado === EstadoSugerencia.Pendiente,
+          ),
+        ),
+      )
+      .catch(() => toast.error('Error al cargar sugerencias'))
+  }, [modoSugerencia, edicion?.id, user?.id])
 
   const cargarCandidatos = async (uaId: string, uaAdicionalId?: string) => {
     if (!edicion) return
@@ -313,7 +334,15 @@ export function ProyectoDetail() {
   }
 
   const handleSugerirClick = (campo: string, valorActual: string, label: string) => {
-    setSugerenciaModal({ open: true, campo, valorActual, label })
+    const previa = sugerenciasPropias.find(s => s.campo === campo)
+    setSugerenciaModal({
+      open: true,
+      campo,
+      valorActual,
+      label,
+      valorSugeridoInicial: previa?.valorSugerido ?? '',
+      comentarioInicial: previa?.comentario ?? '',
+    })
   }
 
   const presupuestoVacio = (): Presupuesto => ({
@@ -776,6 +805,8 @@ export function ProyectoDetail() {
         label={sugerenciaModal.label}
         valorActual={sugerenciaModal.valorActual}
         edicionId={edicion?.id ?? ''}
+        valorSugeridoInicial={sugerenciaModal.valorSugeridoInicial}
+        comentarioInicial={sugerenciaModal.comentarioInicial}
       />
 
       {edicion && (

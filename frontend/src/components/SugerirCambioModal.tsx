@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,6 +20,8 @@ interface SugerirCambioModalProps {
   label: string
   valorActual: string
   edicionId: string
+  valorSugeridoInicial?: string
+  comentarioInicial?: string
   onSuccess?: () => void
 }
 
@@ -30,12 +32,22 @@ export function SugerirCambioModal({
   label,
   valorActual,
   edicionId,
+  valorSugeridoInicial = '',
+  comentarioInicial = '',
   onSuccess,
 }: SugerirCambioModalProps) {
-  const [valorSugerido, setValorSugerido] = useState('')
-  const [comentario, setComentario] = useState('')
+  const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
+  const [comentario, setComentario] = useState(comentarioInicial)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setValorSugerido(valorSugeridoInicial)
+      setComentario(comentarioInicial)
+      setError('')
+    }
+  }, [open, valorSugeridoInicial, comentarioInicial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
