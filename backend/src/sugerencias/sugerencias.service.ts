@@ -142,7 +142,10 @@ export class SugerenciasService {
   async listarNotificaciones(usuario: Usuario) {
     return this.notificacionRepo.find({
       where: { usuarioId: usuario.id },
-      relations: { sugerencia: { edicion: { proyecto: true }, sugeridoPor: true } },
+      relations: {
+        sugerencia: { edicion: { proyecto: true }, sugeridoPor: true },
+        participacion: { convocatoria: true, usuario: true },
+      },
       order: { creadoEn: 'DESC' },
       take: 50,
     });
@@ -162,6 +165,13 @@ export class SugerenciasService {
       { leida: true },
     );
     return { message: 'Todas las notificaciones marcadas como leídas' };
+  }
+
+  async eliminar(id: string, usuario: Usuario) {
+    const notif = await this.notificacionRepo.findOneBy({ id, usuarioId: usuario.id });
+    if (!notif) throw new NotFoundException('Notificación no encontrada');
+    await this.notificacionRepo.delete(id);
+    return { message: 'Notificación eliminada' };
   }
 
   private async obtenerEdicion(id: string): Promise<Edicion> {

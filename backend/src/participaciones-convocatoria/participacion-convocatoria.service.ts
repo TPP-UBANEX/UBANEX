@@ -1,18 +1,24 @@
 import {
-  Injectable, NotFoundException, BadRequestException, ForbiddenException,
+  Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { ParticipacionConvocatoria } from './participacion-convocatoria.entity';
 import { CrearParticipacionDto } from './dto/crear-participacion.dto';
+import { ActualizarEstadoParticipacionDto } from './dto/actualizar-estado-participacion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { MailService } from '../common/mail/mail.service';
+import { Notificacion } from '../sugerencias/notificacion.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
+import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
+import { CANTIDAD_EVALUADORES_POR_UA } from '../common/constantes';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 
 type CampoPerfil = {
@@ -38,6 +44,8 @@ const CAMPOS_PERFIL: CampoPerfil[] = [
 
 @Injectable()
 export class ParticipacionConvocatoriaService {
+  private readonly logger = new Logger(ParticipacionConvocatoriaService.name);
+
   constructor(
     @InjectRepository(ParticipacionConvocatoria)
     private readonly repo: Repository<ParticipacionConvocatoria>,
@@ -47,7 +55,10 @@ export class ParticipacionConvocatoriaService {
     private readonly convocatoriaRepo: Repository<Convocatoria>,
     @InjectRepository(Edicion)
     private readonly edicionRepo: Repository<Edicion>,
+    @InjectRepository(Notificacion)
+    private readonly notificacionRepo: Repository<Notificacion>,
     private readonly auditoria: AuditoriaService,
+    private readonly mail: MailService,
   ) {}
 
   async asignar(dto: CrearParticipacionDto, asignadoPor: Usuario): Promise<ParticipacionConvocatoria> {
@@ -107,6 +118,47 @@ export class ParticipacionConvocatoriaService {
       if (dto.edicionId || dto.esDirectorPrincipal != null) {
         throw new BadRequestException('Evaluador no puede tener edicionId ni esDirectorPrincipal');
       }
+
+      const esSecretaria = asignadoPor.roles.some(
+        r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+      );
+      if (!esSecretaria) {
+        throw new BadRequestException('Solo la Secretaría de la Unidad Académica puede proponer evaluadores');
+      }
+      if (!asignadoPor.unidadAcademicaId) {
+        throw new BadRequestException('La Secretaría debe pertenecer a una Unidad Académica');
+      }
+      if (usuario.unidadAcademicaId !== asignadoPor.unidadAcademicaId) {
+        throw new BadRequestException('Solo se pueden proponer docentes de la propia Unidad Académica');
+      }
+
+      const proyectosEnConvocatoria = await this.edicionRepo.count({
+        where: { convocatoriaId: dto.convocatoriaId, creadoPorId: dto.usuarioId },
+      });
+      if (proyectosEnConvocatoria > 0) {
+        throw new BadRequestException('El docente tiene proyectos en esta convocatoria y no puede ser evaluador');
+      }
+
+      const activos = await this.repo
+        .createQueryBuilder('p')
+        .innerJoin('p.usuario', 'u')
+        .where('p.convocatoriaId = :convocatoriaId', { convocatoriaId: dto.convocatoriaId })
+        .andWhere('p.rol = :rol', { rol: RolEjecucion.Evaluador })
+        .andWhere('p.estado IN (:...estados)', {
+          estados: [
+            EstadoPropuestaEvaluador.Propuesto,
+            EstadoPropuestaEvaluador.Aceptada,
+            EstadoPropuestaEvaluador.Aprobado,
+          ],
+        })
+        .andWhere('u.unidadAcademicaId = :uaId', { uaId: asignadoPor.unidadAcademicaId })
+        .getCount();
+
+      if (activos >= CANTIDAD_EVALUADORES_POR_UA) {
+        throw new BadRequestException(
+          `La Unidad Académica ya alcanzó el límite de ${CANTIDAD_EVALUADORES_POR_UA} evaluadores activos en esta convocatoria`,
+        );
+      }
     }
 
     const entity = this.repo.create({
@@ -116,9 +168,206 @@ export class ParticipacionConvocatoriaService {
       edicionId: dto.edicionId ?? null,
       esDirectorPrincipal: dto.esDirectorPrincipal ?? null,
       asignadoPorId: asignadoPor.id,
+      estado: dto.rol === RolEjecucion.Evaluador
+        ? EstadoPropuestaEvaluador.Propuesto
+        : null,
     });
 
-    return this.repo.save(entity);
+    const saved = await this.repo.save(entity);
+
+    if (dto.rol === RolEjecucion.Evaluador) {
+      await this.notificarDocentePropuesto(usuario, convocatoria, saved.id);
+    }
+
+    return saved;
+  }
+
+  private async notificarDocentePropuesto(
+    usuario: Usuario,
+    convocatoria: Convocatoria,
+    participacionId: string,
+  ): Promise<void> {
+    try {
+      await this.mail.enviarPropuestaEvaluador(
+        usuario.email,
+        usuario.nombreCompleto,
+        convocatoria.nombre,
+      );
+    } catch (err) {
+      this.logger.error(
+        `No se pudo enviar el mail de propuesta a ${usuario.email}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    try {
+      await this.notificacionRepo.save(
+        this.notificacionRepo.create({
+          usuarioId: usuario.id,
+          tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
+          participacionId,
+          mensaje: `Fuiste propuesto como evaluador en la convocatoria "${convocatoria.nombre}"`,
+        }),
+      );
+    } catch (err) {
+      this.logger.error(
+        `No se pudo crear la notificación de propuesta para ${usuario.email}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+
+  async actualizarEstado(id: string, dto: ActualizarEstadoParticipacionDto): Promise<ParticipacionConvocatoria> {
+    const entity = await this.repo.findOne({
+      where: { id },
+      relations: { usuario: true, convocatoria: true },
+    });
+    if (!entity) throw new NotFoundException('Participacion no encontrada');
+    if (entity.rol !== RolEjecucion.Evaluador) {
+      throw new BadRequestException('Solo las participaciones de evaluador pueden aprobarse o rechazarse');
+    }
+    if (entity.estado !== EstadoPropuestaEvaluador.Aceptada) {
+      throw new BadRequestException('Solo las propuestas aceptadas por el docente pueden aprobarse o rechazarse');
+    }
+    entity.estado = dto.estado;
+    const saved = await this.repo.save(entity);
+    await this.notificarAutoridadesEstadoEvaluador(saved);
+    return saved;
+  }
+
+  async responder(
+    id: string,
+    docente: Usuario,
+    aceptada: boolean,
+  ): Promise<ParticipacionConvocatoria> {
+    const entity = await this.repo.findOne({
+      where: { id },
+      relations: { usuario: true, convocatoria: true },
+    });
+    if (!entity) throw new NotFoundException('Participacion no encontrada');
+    if (entity.rol !== RolEjecucion.Evaluador) {
+      throw new BadRequestException('Solo las propuestas de evaluador pueden aceptarse o declinarse');
+    }
+    if (entity.usuarioId !== docente.id) {
+      throw new BadRequestException('Solo el docente propuesto puede responder su propia propuesta');
+    }
+    if (entity.estado !== EstadoPropuestaEvaluador.Propuesto) {
+      throw new BadRequestException('Solo las propuestas pendientes pueden aceptarse o declinarse');
+    }
+
+    entity.estado = aceptada
+      ? EstadoPropuestaEvaluador.Aceptada
+      : EstadoPropuestaEvaluador.Declinada;
+    const saved = await this.repo.save(entity);
+    await this.notificarSecretariaRespuestaDocente(saved, aceptada);
+    await this.resolverNotificacionPropuesta(docente.id, saved.id);
+    return saved;
+  }
+
+  private async resolverNotificacionPropuesta(usuarioId: string, participacionId: string) {
+    try {
+      await this.notificacionRepo.update(
+        {
+          usuarioId,
+          participacionId,
+          tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
+        },
+        { leida: true },
+      );
+    } catch (err) {
+      this.logger.error(
+        `No se pudo marcar leída la notificación de propuesta: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+
+  private async notificarSecretariaRespuestaDocente(
+    entity: ParticipacionConvocatoria,
+    aceptada: boolean,
+  ): Promise<void> {
+    const docente = entity.usuario;
+    const convocatoria = entity.convocatoria;
+    if (!docente?.email || !convocatoria) return;
+
+    try {
+      const autoridades = await this.usuarioRepo.find({
+        where: { unidadAcademicaId: docente.unidadAcademicaId },
+      });
+      const destinos = autoridades
+        .filter(a =>
+          a.habilitado !== false &&
+          a.roles.some(
+            r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+          ),
+        )
+        .map(a => a.email);
+
+      if (destinos.length > 0) {
+        await this.mail.enviarRespuestaDocente(
+          destinos,
+          'equipo de la Unidad Académica',
+          docente.nombreCompleto,
+          convocatoria.nombre,
+          aceptada,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `No se pudo notificar a la Unidad Académica sobre la respuesta del docente ${docente?.email}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+
+  private async notificarAutoridadesEstadoEvaluador(
+    entity: ParticipacionConvocatoria,
+  ): Promise<void> {
+    const docente = entity.usuario;
+    const convocatoria = entity.convocatoria;
+    if (!docente?.email || !convocatoria) return;
+
+    try {
+      const aprobado = entity.estado === EstadoPropuestaEvaluador.Aprobado;
+
+      await this.mail.enviarResultadoPropuestaEvaluador(
+        docente.email,
+        docente.nombreCompleto,
+        convocatoria.nombre,
+        aprobado,
+      );
+
+      await this.notificacionRepo.save(
+        this.notificacionRepo.create({
+          usuarioId: docente.id,
+          tipo: TipoNotificacion.RESULTADO_EVALUADOR,
+          participacionId: entity.id,
+          mensaje: `Tu propuesta como evaluador en la convocatoria "${convocatoria.nombre}" fue ${aprobado ? 'aprobada' : 'rechazada'}`,
+        }),
+      );
+
+      const autoridades = await this.usuarioRepo.find({
+        where: { unidadAcademicaId: docente.unidadAcademicaId },
+      });
+      const destinos = autoridades
+        .filter(a =>
+          a.habilitado !== false &&
+          a.roles.some(
+            r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+          ),
+        )
+        .map(a => a.email);
+
+      if (destinos.length > 0) {
+        await this.mail.enviarEstadoEvaluador(
+          destinos,
+          'equipo de la Unidad Académica',
+          docente.nombreCompleto,
+          convocatoria.nombre,
+          aprobado,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `No se pudo notificar a la Unidad Académica sobre el evaluador ${docente?.email}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   private esAutoridad(usuario: Usuario): boolean {
@@ -308,6 +557,7 @@ export class ParticipacionConvocatoriaService {
       }
     }
 
+    await this.notificacionRepo.delete({ participacionId: id });
     await this.repo.remove(entity);
   }
 

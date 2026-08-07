@@ -8,9 +8,10 @@ import { CargoDocente } from '../../common/enums/cargo-docente.enum';
 import { TipoDesignacionDocente } from '../../common/enums/tipo-designacion-docente.enum';
 
 export class CrearUsuarioDto {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  nombreCompleto: string;
+  nombreCompleto?: string;
 
   @IsEmail()
   email: string;

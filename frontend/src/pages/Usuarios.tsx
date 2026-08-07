@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -29,9 +29,16 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { esTelefonoValido } from '@/lib/utils'
 
-import type { Usuario, UnidadAcademica, PaginatedResponse } from '@/data/types'
+import type { Usuario, UnidadAcademica, Carrera, CrearUsuarioDto, PaginatedResponse, Genero, CargoDocente, TipoDesignacionDocente } from '@/data/types'
 import { RolUsuario } from '@/data/types'
+import {
+  generoOptions,
+  cargoDocenteOptions,
+  tipoDesignacionDocenteOptions,
+  personaConDiscapacidadOptions,
+} from '@/data/perfil'
 import { Plus, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -53,6 +60,7 @@ function rolColor(rol: string): string {
 
 const rolesDisponibles: Record<string, RolUsuario[]> = {
   [RolUsuario.AutoridadDeRectorado]: [
+    RolUsuario.AutoridadDeRectorado,
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
@@ -60,6 +68,7 @@ const rolesDisponibles: Record<string, RolUsuario[]> = {
     RolUsuario.Estudiante,
   ],
   [RolUsuario.AutoridadDeSecretaria]: [
+    RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
     RolUsuario.Docente,
     RolUsuario.Estudiante,
@@ -327,32 +336,99 @@ function NuevoUsuarioDialog({
   uaId?: string
   onCreated: () => void
 }) {
-  const [nombreCompleto, setNombreCompleto] = useState('')
+  const [nombre, setNombre] = useState('')
+  const [apellido, setApellido] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [roles, setRoles] = useState<string[]>([])
+  const [rol, setRol] = useState('')
   const [unidadAcademicaId, setUnidadAcademicaId] = useState(uaId ?? '')
+  const [telefono, setTelefono] = useState('')
+  const [genero, setGenero] = useState('')
+  const [personaConDiscapacidad, setPersonaConDiscapacidad] = useState('')
+  const [cargoDocente, setCargoDocente] = useState('')
+  const [tipoDesignacionDocente, setTipoDesignacionDocente] = useState('')
+  const [areaDocente, setAreaDocente] = useState('')
+  const [direccionLocalidad, setDireccionLocalidad] = useState('')
+  const [porcentajeCarrera, setPorcentajeCarrera] = useState('')
+  const [carreraId, setCarreraId] = useState('')
+  const [carreras, setCarreras] = useState<Carrera[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    api.carreras.list().then(setCarreras).catch(() => {})
+  }, [])
+
+  const esDocente = rol === RolUsuario.Docente
+  const esEstudiante = rol === RolUsuario.Estudiante
+  const esRolRectorado =
+    rol === RolUsuario.AutoridadDeRectorado || rol === RolUsuario.AsistenteDeRectorado
+
+  const carrerasDisponibles = useMemo(() => {
+    if (!unidadAcademicaId) return []
+    const deLaUa = carreras.filter(c => c.unidadAcademicaId === unidadAcademicaId)
+    return deLaUa.length > 0 ? deLaUa : carreras
+  }, [unidadAcademicaId, carreras])
+
+  const limpiarFormulario = () => {
+    setNombre('')
+    setApellido('')
+    setEmail('')
+    setPassword('')
+    setRol('')
+    setUnidadAcademicaId(uaId ?? '')
+    setTelefono('')
+    setGenero('')
+    setPersonaConDiscapacidad('')
+    setCargoDocente('')
+    setTipoDesignacionDocente('')
+    setAreaDocente('')
+    setDireccionLocalidad('')
+    setPorcentajeCarrera('')
+    setCarreraId('')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (roles.length === 0) return
+    if (!rol) return
+    if (esDocente && !telefono.trim()) {
+      setError('El teléfono es obligatorio para docentes')
+      return
+    }
+    if (esDocente && telefono.trim() && !esTelefonoValido(telefono.trim())) {
+      setError('El teléfono no tiene un formato válido')
+      return
+    }
     setError('')
     setSubmitting(true)
     try {
-      await api.usuarios.crear({
-        nombreCompleto,
+      const payload: CrearUsuarioDto = {
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
         email,
         password,
-        roles: roles as RolUsuario[],
-        unidadAcademicaId: unidadAcademicaId || undefined,
-      })
-      setNombreCompleto('')
-      setEmail('')
-      setPassword('')
-      setRoles([])
-      setUnidadAcademicaId(uaId ?? '')
+        roles: [rol as RolUsuario],
+        unidadAcademicaId: esRolRectorado ? undefined : (unidadAcademicaId || undefined),
+      }
+      if (esDocente) {
+        payload.telefono = telefono.trim()
+        payload.genero = genero ? genero as Genero : undefined
+        payload.personaConDiscapacidad = personaConDiscapacidad === ''
+          ? undefined
+          : personaConDiscapacidad === 'true'
+        payload.cargoDocente = cargoDocente ? cargoDocente as CargoDocente : undefined
+        payload.tipoDesignacionDocente = tipoDesignacionDocente ? tipoDesignacionDocente as TipoDesignacionDocente : undefined
+        payload.areaDocente = areaDocente.trim() || undefined
+        payload.direccionLocalidad = direccionLocalidad.trim() || undefined
+      }
+      if (esEstudiante) {
+        payload.porcentajeCarrera = porcentajeCarrera === ''
+          ? undefined
+          : Number(porcentajeCarrera)
+        payload.carreraId = carreraId || undefined
+      }
+      await api.usuarios.crear(payload)
+      limpiarFormulario()
       onCreated()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear usuario')
@@ -362,7 +438,7 @@ function NuevoUsuarioDialog({
   }
 
   return (
-    <DialogContent>
+    <DialogContent className="max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>Nuevo Usuario</DialogTitle></DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4 pt-4">
         {error && (
@@ -370,61 +446,180 @@ function NuevoUsuarioDialog({
             {error}
           </div>
         )}
-        <Input
-          placeholder="Nombre completo"
-          value={nombreCompleto}
-          onChange={e => setNombreCompleto(e.target.value)}
-          required
-        />
-        <Input
-          placeholder="Email"
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <Input
-          placeholder="Contraseña"
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Roles</p>
-          <div className="flex flex-wrap gap-2">
-            {rolesCreables.map(r => {
-              const selected = roles.includes(r)
-              return (
-                <Button
-                  key={r}
-                  type="button"
-                  variant={selected ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    if (selected) {
-                      setRoles(roles.filter(x => x !== r))
-                    } else {
-                      setRoles([...roles, r])
-                    }
-                  }}
-                >
-                  {rolLabels[r]}
-                </Button>
-              )
-            })}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Apellido</label>
+            <Input
+              placeholder="Pérez"
+              value={apellido}
+              onChange={e => setApellido(e.target.value)}
+              required
+            />
           </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nombre</label>
+            <Input
+              placeholder="Juan"
+              value={nombre}
+              onChange={e => setNombre(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              type="email"
+              placeholder="email@ejemplo.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <label className="text-sm font-medium">Contraseña</label>
+            <Input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <label className="text-sm font-medium">Rol</label>
+            <Select value={rol} onValueChange={nuevoRol => {
+              setRol(nuevoRol)
+              if (nuevoRol === RolUsuario.AutoridadDeRectorado || nuevoRol === RolUsuario.AsistenteDeRectorado) {
+                setUnidadAcademicaId('')
+                setCarreraId('')
+              }
+            }} required>
+              <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
+              <SelectContent>
+                {rolesCreables.map(r => (
+                  <SelectItem key={r} value={r}>{rolLabels[r]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {!esSecretaria && (
+            <div className="space-y-2 sm:col-span-2">
+              <label className="text-sm font-medium">Unidad Académica</label>
+              <Select value={unidadAcademicaId} disabled={esRolRectorado} onValueChange={id => {
+                setUnidadAcademicaId(id)
+                setCarreraId('')
+              }}>
+                <SelectTrigger><SelectValue placeholder={esRolRectorado ? 'No aplica para roles de Rectorado' : 'Seleccionar (opcional)'} /></SelectTrigger>
+                <SelectContent>
+                  {uaList.map(ua => (
+                    <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {esDocente && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Teléfono</label>
+                <Input
+                  type="tel"
+                  placeholder="11 1234 5678"
+                  value={telefono}
+                  onChange={e => setTelefono(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Identidad de género</label>
+                <Select value={genero} onValueChange={setGenero}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    {generoOptions.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Persona con discapacidad</label>
+                <Select value={personaConDiscapacidad} onValueChange={setPersonaConDiscapacidad}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    {personaConDiscapacidadOptions.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Cargo</label>
+                <Select value={cargoDocente} onValueChange={setCargoDocente}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    {cargoDocenteOptions.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tipo de designación</label>
+                <Select value={tipoDesignacionDocente} onValueChange={setTipoDesignacionDocente}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    {tipoDesignacionDocenteOptions.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Materia / Área / Departamento</label>
+                <Input
+                  placeholder="Ej: Matemática, Depto. de Física"
+                  value={areaDocente}
+                  onChange={e => setAreaDocente(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-sm font-medium">Dirección o localidad</label>
+                <Input
+                  placeholder="Ej: Av. San Juan 1000, CABA"
+                  value={direccionLocalidad}
+                  onChange={e => setDireccionLocalidad(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+          {esEstudiante && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Porcentaje de la carrera (%)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="0 a 100"
+                  value={porcentajeCarrera}
+                  onChange={e => setPorcentajeCarrera(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Carrera</label>
+                <Select value={carreraId} onValueChange={setCarreraId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar (opcional)" /></SelectTrigger>
+                  <SelectContent>
+                    {carrerasDisponibles.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
         </div>
-        {!esSecretaria && (
-          <Select value={unidadAcademicaId} onValueChange={setUnidadAcademicaId}>
-            <SelectTrigger><SelectValue placeholder="Unidad Académica (opcional)" /></SelectTrigger>
-            <SelectContent>
-              {uaList.map(ua => (
-                <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           {submitting ? 'Creando...' : 'Crear'}

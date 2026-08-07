@@ -97,6 +97,7 @@ classDiagram
     class Edicion {
         +id: string
         +estado: EstadoEdicion
+        +anioEdicion: number
         +datosFormulario: object
         +creadoPor: Usuario
     }
@@ -304,6 +305,7 @@ classDiagram
         +id: string
         +rol: RolEjecucion
         +esDirectorPrincipal: boolean
+        +estado: EstadoPropuestaEvaluador
     }
 
     class RolUsuario {
@@ -322,6 +324,15 @@ classDiagram
         Evaluador
     }
 
+    class EstadoPropuestaEvaluador {
+        <<enumeration>>
+        Propuesto
+        Aceptada
+        Declinada
+        Aprobado
+        Rechazado
+    }
+
     class EstadoValidacionDocente {
         <<enumeration>>
         PendienteDeValidacion
@@ -336,6 +347,7 @@ classDiagram
     Usuario --> ParticipacionConvocatoria : tiene
     ParticipacionConvocatoria --> Convocatoria : en
     ParticipacionConvocatoria *-- RolEjecucion : rol
+    ParticipacionConvocatoria *-- EstadoPropuestaEvaluador : estado (solo si rol = Evaluador)
     ParticipacionConvocatoria --> Edicion : opcional
 ```
 
@@ -346,7 +358,7 @@ classDiagram
 - **Estudiante**: 0 a N. Se registra solo. Puede crear proyectos.
 - **Docente**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Puede ser asignado como Director o Evaluador en una convocatoria mediante `ParticipacionConvocatoria`.
 - **Director de Proyecto**: rol de ejecución asignado por convocatoria. Máximo 2 participaciones como director por convocatoria.
-- **Evaluador**: rol de ejecución asignado por convocatoria. Asignado por Autoridad de Secretaría.
+- **Evaluador**: rol de ejecución por convocatoria. No se asigna de forma directa: lo **propone** una Autoridad o un Asistente de Secretaría, y la propuesta recorre el circuito descrito más abajo hasta quedar `Aprobado`.
 - Los roles se dividen en dos **grupos** excluyentes:
   - **Gestión**: AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria
   - **Ejecución**: Estudiante, Docente (roles globales en `RolUsuario`), DirectorDeProyecto, Evaluador (roles por convocatoria en `RolEjecucion` vía `ParticipacionConvocatoria`)
@@ -354,6 +366,91 @@ classDiagram
 - `estadoValidacionDocente` solo aplica cuando el usuario tiene `Docente` en sus roles (PendienteDeValidacion → Validado | Rechazado). Si es Rechazado, no puede iniciar sesión.
 - `ParticipacionConvocatoria` asigna un `RolEjecucion` (DirectorDeProyecto o Evaluador) a un usuario dentro de una convocatoria específica. Un usuario puede tener múltiples participaciones en distintas convocatorias, pero solo un rol por convocatoria.
 - `creadoPor` referencia al Usuario que creó la cuenta (aplica para todo tipo de usuarios).
+
+#### Propuesta de evaluadores
+
+- `estado` solo aplica cuando el `rol` de la participación es `Evaluador`. Para `DirectorDeProyecto` no tiene valor.
+- Al proponer un evaluador, la participación se crea en estado `Propuesto`. El ciclo de vida es:
+  - `Propuesto → Aceptada | Declinada`: responde **únicamente el docente propuesto**, nadie puede responder por él.
+  - `Aceptada → Aprobado | Rechazado`: decide una **Autoridad de Rectorado**. Solo las propuestas ya aceptadas por el docente pueden aprobarse o rechazarse.
+  - `Declinada` y `Rechazado` son terminales. Un evaluador cuenta como tal recién cuando llega a `Aprobado`.
+- Cada paso del circuito notifica a los involucrados (mail + notificación en la aplicación): al docente cuando se lo propone y cuando Rectorado resuelve, y a la Secretaría de su UA cuando el docente responde y cuando Rectorado resuelve.
+- Solo la Secretaría puede proponer, y únicamente a docentes validados **de su propia Unidad Académica**.
+- Cada Unidad Académica tiene un cupo de **3 evaluadores activos** por convocatoria. Cuentan como activos los estados `Propuesto`, `Aceptada` y `Aprobado`; `Declinada` y `Rechazado` no ocupan cupo.
+- Ser evaluador y presentar proyectos en la misma convocatoria es **incompatible en ambos sentidos**: no se puede proponer como evaluador a un docente que ya creó ediciones en esa convocatoria, ni un docente con una propuesta de evaluador activa puede crear proyectos en ella.
+
+---
+
+## Sugerencias y Notificaciones
+
+```mermaid
+classDiagram
+    class SugerenciaCambio {
+        +id: string
+        +campo: string
+        +valorActual: string
+        +valorSugerido: string
+        +comentario: string
+        +estado: EstadoSugerencia
+        +respuestaDirector: string
+        +creadoEn: Date
+        +respondidoEn: Date
+    }
+
+    class EstadoSugerencia {
+        <<enumeration>>
+        Pendiente
+        Aceptada
+        Rechazada
+        MasInformacion
+    }
+
+    class Notificacion {
+        +id: string
+        +tipo: TipoNotificacion
+        +mensaje: string
+        +leida: boolean
+        +creadoEn: Date
+    }
+
+    class TipoNotificacion {
+        <<enumeration>>
+        NUEVA_SUGERENCIA
+        RESPUESTA_SUGERENCIA
+        PROPUESTA_EVALUADOR
+        RESULTADO_EVALUADOR
+    }
+
+    SugerenciaCambio --> Edicion : sobre
+    SugerenciaCambio --> Usuario : sugerida por
+    SugerenciaCambio *-- EstadoSugerencia : estado
+
+    Notificacion --> Usuario : destinatario
+    Notificacion --> SugerenciaCambio : sugerencia (si tipo = NUEVA_SUGERENCIA o RESPUESTA_SUGERENCIA)
+    Notificacion --> ParticipacionConvocatoria : participacion (si tipo = PROPUESTA_EVALUADOR o RESULTADO_EVALUADOR)
+    Notificacion *-- TipoNotificacion : tipo
+```
+
+### Notas
+
+#### Sugerencias de cambio
+
+- Una `SugerenciaCambio` es un pedido de corrección sobre una `Edicion` ya presentada. Solo puede crearla la Secretaría de la **misma unidad académica** que la edición (o Rectorado), y únicamente mientras la edición esté en estado `Presentado`.
+- `campo` identifica qué se propone cambiar. Puede ser un atributo del `Proyecto` (`nombre`, `esConsolidado`, `esInterfacultad`), uno de la `Edicion` (`anioEdicion`), o una ruta dentro de `presupuesto` o `datosFormulario` (por ejemplo `datosFormulario.<id>`, donde `<id>` es el `CampoFormulario.id` de la convocatoria).
+- `valorActual` es una foto del valor al momento de crear la sugerencia, no un valor vivo: si el dato cambia después por otra vía, la sugerencia sigue mostrando el valor original.
+- Responde el creador de la edición o alguno de sus `DirectorDeProyecto` (o Rectorado). La respuesta es **única y terminal**: solo se pueden responder las sugerencias en estado `Pendiente`, y los tres estados de respuesta (`Aceptada`, `Rechazada`, `MasInformacion`) cierran la sugerencia. `MasInformacion` no la reabre — para seguir la conversación hay que crear una sugerencia nueva.
+- Si la respuesta es `Aceptada`, el sistema **aplica el cambio automáticamente** sobre el `Proyecto` o la `Edicion` según corresponda. No hay un paso manual posterior de aplicación.
+
+#### Notificaciones
+
+- Una `Notificacion` siempre tiene un `Usuario` destinatario y referencia **exactamente una** entidad de origen: una `SugerenciaCambio` o una `ParticipacionConvocatoria`. Cuál de las dos lo determina el `tipo`.
+- Destinatarios según el tipo:
+  - `NUEVA_SUGERENCIA`: el creador de la edición y sus directores, salvo quien haya hecho la sugerencia.
+  - `RESPUESTA_SUGERENCIA`: quien había hecho la sugerencia.
+  - `PROPUESTA_EVALUADOR` y `RESULTADO_EVALUADOR`: el docente propuesto como evaluador.
+- Las notificaciones del circuito de sugerencias existen **solo dentro de la aplicación**; las del circuito de evaluadores se acompañan además de un mail.
+- En el circuito de evaluadores la Secretaría recibe **mail pero no notificación en la aplicación** cuando el docente responde y cuando Rectorado resuelve. La notificación in-app es siempre para el docente.
+- El destinatario puede marcar sus notificaciones como leídas (de a una o todas) o eliminarlas. Cuando el docente responde una propuesta, su notificación `PROPUESTA_EVALUADOR` queda marcada como leída automáticamente, y si se desasigna una participación se eliminan las notificaciones asociadas a ella.
 
 ---
 
