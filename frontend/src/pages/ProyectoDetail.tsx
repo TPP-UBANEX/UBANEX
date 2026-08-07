@@ -78,10 +78,12 @@ export function ProyectoDetail() {
 
   const [uas, setUas] = useState<UnidadAcademica[]>([])
   const [candidatosDireccion, setCandidatosDireccion] = useState<Usuario[]>([])
+  const [candidatosCodireccion, setCandidatosCodireccion] = useState<Usuario[]>([])
   const [loadingCandidatos, setLoadingCandidatos] = useState(false)
   const [editDirectorId, setEditDirectorId] = useState('')
   const [editCodirectorId, setEditCodirectorId] = useState('')
-  const [editUnidadAcademicaAdicionalId, setEditUnidadAcademicaAdicionalId] = useState('')
+  const [editDirectorUaId, setEditDirectorUaId] = useState('')
+  const [editCodirectorUaId, setEditCodirectorUaId] = useState('')
 
   const [modoSugerencia, setModoSugerencia] = useState(false)
   const [sugerenciasPropias, setSugerenciasPropias] = useState<SugerenciaCambio[]>([])
@@ -194,17 +196,17 @@ export function ProyectoDetail() {
       .catch(() => toast.error('Error al cargar sugerencias'))
   }, [modoSugerencia, edicion?.id, user?.id])
 
-  const cargarCandidatos = async (uaId: string, uaAdicionalId?: string) => {
+  const cargarCandidatos = async (uaId: string, setter: (u: Usuario[]) => void) => {
     if (!edicion) return
     setLoadingCandidatos(true)
     try {
       const res = await api.participaciones.candidatos({
         unidadAcademicaId: uaId,
-        ...(uaAdicionalId ? { unidadAcademicaAdicionalId: uaAdicionalId } : {}),
         convocatoriaId: edicion.convocatoriaId,
         edicionId: edicion.id,
+        incluirDeshabilitados: true,
       })
-      setCandidatosDireccion(res)
+      setter(res)
     } catch {
       toast.error('Error al cargar docentes candidatos')
     } finally {
@@ -212,34 +214,52 @@ export function ProyectoDetail() {
     }
   }
 
-  const directoresActuales = directores
-    .map(d => d.usuario)
-    .filter((u): u is Usuario => !!u)
-  const opcionesDireccion = [...candidatosDireccion, ...directoresActuales]
+  const nombreUA = (uaId?: string) => uas.find(u => u.id === uaId)?.nombre ?? 'Sin UA'
+
+  const directorPrincipalUsuario = directores.find(d => d.esDirectorPrincipal)?.usuario
+  const codirectorUsuario = directores.find(d => !d.esDirectorPrincipal)?.usuario
+
+  const opcionesDireccion = [...candidatosDireccion, ...(directorPrincipalUsuario ? [directorPrincipalUsuario] : [])]
     .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
+
+  const opcionesCodireccion = [...candidatosCodireccion, ...(codirectorUsuario ? [codirectorUsuario] : [])]
+    .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
+
+  const motivoDireccion = (() => {
+    if (!editEsInterfacultad || !edicion) return ''
+    const uaCreador = edicion.unidadAcademicaId
+    if (editDirectorUaId !== uaCreador && editCodirectorUaId !== uaCreador) {
+      return `Una unidad académica participante tiene que ser Facultad de ${nombreUA(uaCreador)}`
+    }
+    if (editDirectorUaId === editCodirectorUaId) {
+      return 'La dirección y la codirección deben pertenecer a unidades académicas distintas para ser Interfacultad'
+    }
+    return ''
+  })()
 
   const toggleInterfacultad = (v: boolean) => {
     setEditEsInterfacultad(v)
     setEditDirectorId('')
     setEditCodirectorId('')
-    if (v) {
-      setEditUnidadAcademicaAdicionalId(proyecto?.unidadAcademicaAdicionalId ?? '')
-      const ua = proyecto?.unidadAcademicaAdicionalId
-      if (ua && edicion) cargarCandidatos(edicion.unidadAcademicaId, ua)
-      else setCandidatosDireccion([])
-    } else {
-      setEditUnidadAcademicaAdicionalId('')
-      if (edicion) cargarCandidatos(edicion.unidadAcademicaId)
-      else setCandidatosDireccion([])
+    const uaCreador = edicion?.unidadAcademicaId ?? ''
+    setEditDirectorUaId(uaCreador)
+    setEditCodirectorUaId(uaCreador)
+    if (edicion) {
+      cargarCandidatos(uaCreador, setCandidatosDireccion)
+      cargarCandidatos(uaCreador, setCandidatosCodireccion)
     }
   }
 
-  const handleCambioUA = (uaId: string) => {
-    setEditUnidadAcademicaAdicionalId(uaId)
+  const handleCambioDirectorUA = (uaId: string) => {
+    setEditDirectorUaId(uaId)
     setEditDirectorId('')
+    cargarCandidatos(uaId, setCandidatosDireccion)
+  }
+
+  const handleCambioCodirectorUA = (uaId: string) => {
+    setEditCodirectorUaId(uaId)
     setEditCodirectorId('')
-    if (uaId && edicion) cargarCandidatos(edicion.unidadAcademicaId, uaId)
-    else setCandidatosDireccion([])
+    cargarCandidatos(uaId, setCandidatosCodireccion)
   }
 
   const iniciarEdicion = () => {
@@ -249,19 +269,18 @@ export function ProyectoDetail() {
     setEditEsConsolidado(proyecto.esConsolidado)
     setEditEsInterfacultad(proyecto.esInterfacultad)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
-    setEditUnidadAcademicaAdicionalId(proyecto.unidadAcademicaAdicionalId ?? '')
     setEditDirectorId(directores.find(d => d.esDirectorPrincipal)?.usuarioId ?? '')
     setEditCodirectorId(directores.find(d => !d.esDirectorPrincipal)?.usuarioId ?? '')
+    const uaDirector = directores.find(d => d.esDirectorPrincipal)?.usuario?.unidadAcademica?.id ?? edicion.unidadAcademicaId
+    const uaCodirector = directores.find(d => !d.esDirectorPrincipal)?.usuario?.unidadAcademica?.id
+      ?? (proyecto.esInterfacultad ? proyecto.unidadAcademicaAdicionalId : edicion.unidadAcademicaId)
+      ?? edicion.unidadAcademicaId
+    setEditDirectorUaId(uaDirector)
+    setEditCodirectorUaId(uaCodirector)
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
-    if (proyecto.esInterfacultad) {
-      if (edicion) cargarCandidatos(edicion.unidadAcademicaId, proyecto.unidadAcademicaAdicionalId ?? '')
-      else setCandidatosDireccion([])
-    } else if (edicion) {
-      cargarCandidatos(edicion.unidadAcademicaId)
-    } else {
-      setCandidatosDireccion([])
-    }
+    cargarCandidatos(uaDirector, setCandidatosDireccion)
+    cargarCandidatos(uaCodirector, setCandidatosCodireccion)
   }
 
   const cancelarEdicion = () => {
@@ -299,14 +318,22 @@ export function ProyectoDetail() {
 
   const handleGuardar = async () => {
     if (!id || !edicion) return
+    if (motivoDireccion) {
+      toast.error(motivoDireccion)
+      return
+    }
     setGuardando(true)
     try {
+      const uaCreador = edicion.unidadAcademicaId
+      const unidadAcademicaAdicionalId = editEsInterfacultad
+        ? (editDirectorUaId !== uaCreador ? editDirectorUaId : editCodirectorUaId)
+        : null
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
         anioEdicion: editAnioEdicion ?? undefined,
         esConsolidado: editEsConsolidado,
         esInterfacultad: editEsInterfacultad,
-        unidadAcademicaAdicionalId: editEsInterfacultad ? (editUnidadAcademicaAdicionalId || undefined) : undefined,
+        unidadAcademicaAdicionalId,
         presupuesto: editPresupuesto || undefined,
         datosFormulario: editDatosFormulario,
       })
@@ -491,10 +518,23 @@ export function ProyectoDetail() {
           {editando && (
             <>
               <Button variant="outline" onClick={cancelarEdicion}>Cancelar</Button>
-              <Button onClick={handleGuardar} disabled={guardando}>
-                {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Guardar
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button onClick={handleGuardar} disabled={guardando || !!motivoDireccion}>
+                        {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        Guardar
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {motivoDireccion && (
+                    <TooltipContent>
+                      <p>{motivoDireccion}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </>
           )}
           {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
@@ -684,37 +724,56 @@ export function ProyectoDetail() {
                       <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => toggleInterfacultad(false)}>No</Button>
                     </div>
                   </div>
-                  {editEsInterfacultad && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Unidad académica adicional</p>
-                      <Select value={editUnidadAcademicaAdicionalId} onValueChange={handleCambioUA}>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Dirección</p>
+                    {editEsInterfacultad ? (
+                      <Select value={editDirectorUaId} onValueChange={handleCambioDirectorUA}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar unidad académica" /></SelectTrigger>
                         <SelectContent>
-                          {uas.filter(u => u.id !== user?.unidadAcademicaId).map(u => (
+                          {uas.map(u => (
                             <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Dirección</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Unidad académica: <span className="font-medium text-foreground">{nombreUA(edicion?.unidadAcademicaId)}</span>
+                      </p>
+                    )}
                     <Select value={editDirectorId} onValueChange={setEditDirectorId}>
                       <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar director'} /></SelectTrigger>
                       <SelectContent>
                         {opcionesDireccion.map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
+                          <SelectItem key={u.id} value={u.id} disabled={u.habilitado === false}>
+                            {u.nombreCompleto}{u.habilitado === false ? ' — Deshabilitado' : ''}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Codirección</p>
+                    {editEsInterfacultad ? (
+                      <Select value={editCodirectorUaId} onValueChange={handleCambioCodirectorUA}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar unidad académica" /></SelectTrigger>
+                        <SelectContent>
+                          {uas.map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Unidad académica: <span className="font-medium text-foreground">{nombreUA(edicion?.unidadAcademicaId)}</span>
+                      </p>
+                    )}
                     <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
                       <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar codirector'} /></SelectTrigger>
                       <SelectContent>
-                        {opcionesDireccion.filter(u => u.id !== editDirectorId).map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
+                        {opcionesCodireccion.filter(u => u.id !== editDirectorId).map(u => (
+                          <SelectItem key={u.id} value={u.id} disabled={u.habilitado === false}>
+                            {u.nombreCompleto}{u.habilitado === false ? ' — Deshabilitado' : ''}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -889,8 +948,7 @@ function AsignarDirectorModal({
         const idsConRol = new Set(resParticipaciones.map(p => p.usuarioId))
         setUsuarios(res.data.filter(u =>
           !idsConRol.has(u.id) &&
-          u.estadoValidacionDocente === 'Validado' &&
-          u.habilitado !== false
+          u.estadoValidacionDocente === 'Validado'
         ))
       } catch {
         toast.error('Error al cargar docentes')
@@ -961,8 +1019,8 @@ function AsignarDirectorModal({
                 {usuarios.map(u => {
                   const incompleto = camposPerfilFaltantes(u).length > 0
                   return (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.nombreCompleto}{incompleto ? ' — perfil incompleto' : ''}
+                    <SelectItem key={u.id} value={u.id} disabled={u.habilitado === false}>
+                      {u.nombreCompleto}{incompleto ? ' — perfil incompleto' : ''}{u.habilitado === false ? ' — Deshabilitado' : ''}
                     </SelectItem>
                   )
                 })}

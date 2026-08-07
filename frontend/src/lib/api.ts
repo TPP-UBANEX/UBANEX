@@ -100,11 +100,13 @@ export const api = {
       post<import('@/data/types').ParticipacionConvocatoria>(`/participaciones-convocatoria/${id}/declinar`, {}),
     listar: (convocatoriaId: string) =>
       get<import('@/data/types').ParticipacionConvocatoria[]>(`/participaciones-convocatoria?convocatoriaId=${convocatoriaId}`),
-    candidatos: (params: { unidadAcademicaId: string; unidadAcademicaAdicionalId?: string; convocatoriaId: string; edicionId?: string }) => {
+    candidatos: (params: { unidadAcademicaId: string; unidadAcademicaAdicionalId?: string; convocatoriaId: string; edicionId?: string; incluirDeshabilitados?: boolean }) => {
       const qs = new URLSearchParams(
         Object.fromEntries(
-          Object.entries(params).filter(([_, v]) => v !== undefined && v !== '')
-        )
+          Object.entries(params)
+            .filter(([_, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)] as [string, string]),
+        ),
       ).toString()
       return get<import('@/data/types').Usuario[]>(`/participaciones-convocatoria/candidatos?${qs}`)
     },

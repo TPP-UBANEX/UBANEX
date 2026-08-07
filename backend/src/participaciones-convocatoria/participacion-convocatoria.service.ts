@@ -2,7 +2,7 @@ import {
   Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, FindOptionsWhere } from 'typeorm';
 import { ParticipacionConvocatoria } from './participacion-convocatoria.entity';
 import { CrearParticipacionDto } from './dto/crear-participacion.dto';
 import { ActualizarEstadoParticipacionDto } from './dto/actualizar-estado-participacion.dto';
@@ -472,6 +472,7 @@ export class ParticipacionConvocatoriaService {
     convocatoriaId: string,
     edicionId?: string,
     unidadAcademicaAdicionalId?: string,
+    incluirDeshabilitados = false,
   ): Promise<Usuario[]> {
     if (!unidadAcademicaId) throw new BadRequestException('unidadAcademicaId es requerido');
 
@@ -480,8 +481,13 @@ export class ParticipacionConvocatoriaService {
       ...(unidadAcademicaAdicionalId ? [unidadAcademicaAdicionalId] : []),
     ];
 
+    const where: FindOptionsWhere<Usuario> = {
+      unidadAcademicaId: In(unidadAcademicaIds),
+    };
+    if (!incluirDeshabilitados) where.habilitado = true;
+
     const usuarios = await this.usuarioRepo.find({
-      where: { unidadAcademicaId: In(unidadAcademicaIds), habilitado: true },
+      where,
       relations: { unidadAcademica: true },
       select: {
         id: true,

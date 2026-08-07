@@ -56,12 +56,14 @@ export class ParticipacionConvocatoriaController {
     @Query('convocatoriaId') convocatoriaId: string,
     @Query('edicionId') edicionId?: string,
     @Query('unidadAcademicaAdicionalId') unidadAcademicaAdicionalId?: string,
+    @Query('incluirDeshabilitados') incluirDeshabilitados?: string,
   ) {
     return this.service.listarCandidatos(
       unidadAcademicaId,
       convocatoriaId,
       edicionId,
       unidadAcademicaAdicionalId,
+      incluirDeshabilitados === 'true',
     );
   }
 

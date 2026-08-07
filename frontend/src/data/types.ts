@@ -326,7 +326,7 @@ export interface ActualizarEdicionDto {
   anioEdicion?: number
   esConsolidado?: boolean
   esInterfacultad?: boolean
-  unidadAcademicaAdicionalId?: string
+  unidadAcademicaAdicionalId?: string | null
   presupuesto?: Presupuesto
   datosFormulario?: Record<string, unknown>
 }

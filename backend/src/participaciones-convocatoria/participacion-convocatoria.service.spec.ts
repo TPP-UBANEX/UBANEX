@@ -197,6 +197,29 @@ describe('ParticipacionConvocatoriaService', () => {
       expect(result.map(u => u.id)).toEqual(['u-docente']);
     });
 
+    it('filtra habilitados por defecto y los incluye si se pide incluirDeshabilitados', async () => {
+      findUsuarios.mockResolvedValue([]);
+      findParticipaciones.mockResolvedValue([]);
+
+      await service.listarCandidatos('ua-derecho', 'convocatoria-1');
+      const opcionesDefault = findUsuarios.mock.calls[0][0] as {
+        where: { habilitado: boolean };
+      };
+      expect(opcionesDefault.where.habilitado).toBe(true);
+
+      await service.listarCandidatos(
+        'ua-derecho',
+        'convocatoria-1',
+        undefined,
+        undefined,
+        true,
+      );
+      const opcionesConDeshabilitados = findUsuarios.mock.calls[1][0] as {
+        where: { habilitado?: boolean };
+      };
+      expect(opcionesConDeshabilitados.where.habilitado).toBeUndefined();
+    });
+
     it('excluye ocupados pero no a los de la edicion actual ni los de ediciones eliminadas', async () => {
       findUsuarios.mockResolvedValue([
         docente({ id: 'u-ocupado' }),
