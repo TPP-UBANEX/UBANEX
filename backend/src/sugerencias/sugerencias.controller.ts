@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Param, Body, UseGuards,
+  Controller, Get, Post, Patch, Delete, Param, Body, UseGuards,
 } from '@nestjs/common';
 import { SugerenciasService } from './sugerencias.service';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
@@ -55,5 +55,13 @@ export class SugerenciasController {
   @Patch('notificaciones/leer-todas')
   marcarTodasLeidas(@CurrentUser() usuario: Usuario) {
     return this.service.marcarTodasLeidas(usuario);
+  }
+
+  @Delete('notificaciones/:id')
+  eliminar(
+    @Param('id') id: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.eliminar(id, usuario);
   }
 }

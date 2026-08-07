@@ -13,7 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria } from '@/data/types'
-import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario } from '@/data/types'
+import {
+  estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario,
+} from '@/data/types'
 import { FileText, Users, DollarSign, ClipboardCheck } from 'lucide-react'
 
 export function Dashboard() {

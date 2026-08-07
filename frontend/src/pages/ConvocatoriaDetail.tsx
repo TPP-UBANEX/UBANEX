@@ -32,8 +32,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Edicion } from '@/data/types'
-import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, RolUsuario } from '@/data/types'
+import type { Convocatoria, Edicion, ParticipacionConvocatoria } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
@@ -71,6 +71,7 @@ export function ConvocatoriaDetail() {
   const { user } = useAuth()
   const [conv, setConv] = useState<Convocatoria | null>(null)
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
+  const [invitacionEvaluador, setInvitacionEvaluador] = useState<ParticipacionConvocatoria | null>(null)
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
@@ -86,21 +87,44 @@ export function ConvocatoriaDetail() {
   )
   const errores = erroresFechas(editForm)
 
+  const tieneInvPendiente = invitacionEvaluador?.estado === EstadoPropuestaEvaluador.Propuesto
+  const esEvaluadorActivo =
+    invitacionEvaluador?.estado === EstadoPropuestaEvaluador.Aceptada ||
+    invitacionEvaluador?.estado === EstadoPropuestaEvaluador.Aprobado
+
   const cargarDatos = () => {
     if (!id) return
     setLoading(true)
     Promise.all([
       api.convocatorias.get(id),
       api.proyectos.list({ convocatoriaId: id }),
-    ]).then(([c, e]) => {
+      api.participaciones.listarMias().catch(() => []),
+    ]).then(([c, e, p]) => {
       setConv(c)
       setEdiciones(e)
+      const evaluador = (p as ParticipacionConvocatoria[]).find(pc =>
+        pc.convocatoriaId === id && pc.rol === RolEjecucion.Evaluador,
+      ) ?? null
+      setInvitacionEvaluador(evaluador)
     }).finally(() => setLoading(false))
   }
 
   useEffect(() => {
     cargarDatos()
   }, [id])
+
+  const responderInvitacion = async (aceptada: boolean) => {
+    if (!invitacionEvaluador) return
+    try {
+      await (aceptada
+        ? api.participaciones.aceptar(invitacionEvaluador.id)
+        : api.participaciones.declinar(invitacionEvaluador.id))
+      toast.success(aceptada ? 'Aceptaste la propuesta como evaluador' : 'Declinaste la propuesta')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al responder la propuesta')
+    }
+  }
 
   const abrirEdicion = () => {
     if (!conv) return
@@ -315,7 +339,9 @@ export function ConvocatoriaDetail() {
       <Tabs defaultValue="proyectos">
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
-          <TabsTrigger value="evaluadores">Usuarios de evaluación</TabsTrigger>
+          {!esUsuarioEjecucion && (
+            <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>
+          )}
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
           {esRectorado && <TabsTrigger value="formulario">Formulario</TabsTrigger>}
@@ -324,7 +350,7 @@ export function ConvocatoriaDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Proyectos Presentados</CardTitle>
-              {esUsuarioEjecucion && (
+              {esUsuarioEjecucion && !tieneInvPendiente && !esEvaluadorActivo && (
                 <NuevoProyectoDialog
                   onCreated={cargarDatos}
                   convocatoriaId={conv?.id}
@@ -335,6 +361,26 @@ export function ConvocatoriaDetail() {
                 />
               )}
             </CardHeader>
+            {esUsuarioEjecucion && tieneInvPendiente && (
+              <div className="px-6 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-muted rounded-md px-3 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    Fuiste propuesto como evaluador de esta convocatoria. Mientras no respondas, no podés presentar proyectos.
+                  </p>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" onClick={() => responderInvitacion(true)}>Aceptar</Button>
+                    <Button size="sm" variant="outline" onClick={() => responderInvitacion(false)}>Declinar</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {esUsuarioEjecucion && esEvaluadorActivo && (
+              <div className="px-6 pb-4">
+                <p className="text-sm bg-muted text-muted-foreground rounded-md px-3 py-2">
+                  Sos evaluador de esta convocatoria. No podés presentar proyectos.
+                </p>
+              </div>
+            )}
             <CardContent>
               <Table>
                 <TableHeader>

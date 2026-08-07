@@ -6,6 +6,7 @@ import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 
 @Entity()
 @Unique(['usuarioId', 'convocatoriaId'])
@@ -29,6 +30,9 @@ export class ParticipacionConvocatoria {
 
   @Column({ type: 'varchar' })
   rol: RolEjecucion;
+
+  @Column({ type: 'varchar', nullable: true })
+  estado: EstadoPropuestaEvaluador | null;
 
   @ManyToOne(() => Edicion, { nullable: true })
   @JoinColumn({ name: 'edicionId' })

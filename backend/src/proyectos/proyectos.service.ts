@@ -15,6 +15,7 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 import { campoFormularioVacio } from '../formularios/campo-formulario.util';
 
 @Injectable()
@@ -30,6 +31,24 @@ export class ProyectosService {
 
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
     await this.validarConvocatoriaPresentacion(dto.convocatoriaId);
+
+    const evaluador = await this.participacionRepo.findOne({
+      where: {
+        usuarioId: usuario.id,
+        convocatoriaId: dto.convocatoriaId,
+        rol: RolEjecucion.Evaluador,
+      },
+    });
+    const estadosQueBloquean = [
+      EstadoPropuestaEvaluador.Propuesto,
+      EstadoPropuestaEvaluador.Aceptada,
+      EstadoPropuestaEvaluador.Aprobado,
+    ];
+    if (evaluador?.estado && estadosQueBloquean.includes(evaluador.estado)) {
+      throw new ForbiddenException(
+        'No podés crear proyectos en una convocatoria donde sos evaluador',
+      );
+    }
 
     const proyecto = await this.proyectoRepo.save(
       this.proyectoRepo.create({
