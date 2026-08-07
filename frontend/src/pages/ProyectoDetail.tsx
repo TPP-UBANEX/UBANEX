@@ -228,10 +228,20 @@ export function ProyectoDetail() {
   const directorPrincipalUsuario = directores.find(d => d.esDirectorPrincipal)?.usuario
   const codirectorUsuario = directores.find(d => !d.esDirectorPrincipal)?.usuario
 
-  const opcionesDireccion = [...candidatosDireccion, ...(directorPrincipalUsuario ? [directorPrincipalUsuario] : [])]
+  const opcionesDireccion = [
+    ...candidatosDireccion,
+    ...(directorPrincipalUsuario && directorPrincipalUsuario.unidadAcademica?.id === editDirectorUaId
+      ? [directorPrincipalUsuario]
+      : []),
+  ]
     .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
 
-  const opcionesCodireccion = [...candidatosCodireccion, ...(codirectorUsuario ? [codirectorUsuario] : [])]
+  const opcionesCodireccion = [
+    ...candidatosCodireccion,
+    ...(codirectorUsuario && codirectorUsuario.unidadAcademica?.id === editCodirectorUaId
+      ? [codirectorUsuario]
+      : []),
+  ]
     .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
 
   const motivoDireccion = (() => {
