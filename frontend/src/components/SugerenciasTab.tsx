@@ -31,9 +31,10 @@ interface SugerenciasTabProps {
   creadoPorId: string
   directorIds?: string[]
   camposFormulario?: CampoFormulario[]
+  onRespondida?: () => void
 }
 
-export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], camposFormulario = [] }: SugerenciasTabProps) {
+export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], camposFormulario = [], onRespondida }: SugerenciasTabProps) {
   const { user } = useAuth()
   const [sugerencias, setSugerencias] = useState<SugerenciaCambio[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +74,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
       setRespondiendo(null)
       setRespuestaTexto('')
       cargar()
+      onRespondida?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al responder')
     }

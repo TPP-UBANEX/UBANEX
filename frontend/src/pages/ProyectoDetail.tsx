@@ -795,7 +795,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="sugerencias" className="mt-4">
           {edicion ? (
-            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} />
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} onRespondida={cargarDatos} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
