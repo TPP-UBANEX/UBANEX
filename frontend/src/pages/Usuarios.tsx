@@ -67,6 +67,7 @@ const rolesDisponibles: Record<string, RolUsuario[]> = {
     RolUsuario.Estudiante,
   ],
   [RolUsuario.AutoridadDeSecretaria]: [
+    RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
     RolUsuario.Docente,
     RolUsuario.Estudiante,

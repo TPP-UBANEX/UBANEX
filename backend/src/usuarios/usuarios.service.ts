@@ -31,6 +31,8 @@ const GRUPO_EJECUCION: RolUsuario[] = [
   RolUsuario.Docente,
 ];
 
+const LIMITE_AUTORIDADES = 3;
+
 function validarGruposRoles(roles: RolUsuario[]): void {
   if (roles.length === 0) return;
   const enGestion = roles.some((r) => GRUPO_GESTION.includes(r));
@@ -81,18 +83,23 @@ export class UsuariosService {
       const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
         creador.roles.includes(RolUsuario.AsistenteDeSecretaria);
       if (esSecretaria) {
-        const rolesPermitidos = [RolUsuario.Docente, RolUsuario.AsistenteDeSecretaria, RolUsuario.Estudiante];
+        const rolesPermitidos = [
+          RolUsuario.AutoridadDeSecretaria,
+          RolUsuario.AsistenteDeSecretaria,
+          RolUsuario.Docente,
+          RolUsuario.Estudiante,
+        ];
         const todosPermitidos = dto.roles.every((r) => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
           throw new BadRequestException(
-            'Autoridad de Secretaría solo puede crear Evaluadores y Asistentes de Secretaría',
+            'Autoridad de Secretaría solo puede crear autoridades, asistentes, docentes y estudiantes de su Unidad Académica',
           );
         }
-        if (!dto.unidadAcademicaId) {
-          dto.unidadAcademicaId = creador.unidadAcademicaId;
-        }
+        dto.unidadAcademicaId = creador.unidadAcademicaId;
       }
     }
+
+    await this.validarCupoAutoridades(dto.roles, dto.unidadAcademicaId);
 
     const password = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const entity = this.repo.create({
@@ -266,8 +273,22 @@ export class UsuariosService {
       this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
+        const antesTeníaAutoridad = rolesAnteriores.some(r =>
+          r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AutoridadDeSecretaria,
+        );
         entity.roles = dto.roles;
         huboCambioRol = true;
+        if (
+          dto.roles.some(r =>
+            r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AutoridadDeSecretaria,
+          ) &&
+          !antesTeníaAutoridad
+        ) {
+          await this.validarCupoAutoridades(
+            dto.roles,
+            dto.unidadAcademicaId ?? entity.unidadAcademicaId ?? undefined,
+          );
+        }
         if (
           dto.roles.includes(RolUsuario.Docente) &&
           !rolesAnteriores.includes(RolUsuario.Docente) &&
@@ -427,6 +448,41 @@ export class UsuariosService {
         descripcion: 'Usuario deshabilitado',
         responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
       });
+    }
+  }
+
+  private async validarCupoAutoridades(
+    roles: RolUsuario[],
+    unidadAcademicaId?: string,
+  ): Promise<void> {
+    if (roles.includes(RolUsuario.AutoridadDeRectorado)) {
+      const cantidad = await this.repo
+        .createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: `%${RolUsuario.AutoridadDeRectorado}%` })
+        .getCount();
+      if (cantidad >= LIMITE_AUTORIDADES) {
+        throw new BadRequestException(
+          `Ya existen ${LIMITE_AUTORIDADES} autoridades de Rectorado. No se pueden crear más`,
+        );
+      }
+    }
+
+    if (roles.includes(RolUsuario.AutoridadDeSecretaria)) {
+      if (!unidadAcademicaId) {
+        throw new BadRequestException(
+          'Debe indicarse la unidad académica de la autoridad de Secretaría',
+        );
+      }
+      const cantidad = await this.repo
+        .createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: `%${RolUsuario.AutoridadDeSecretaria}%` })
+        .andWhere('u.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId })
+        .getCount();
+      if (cantidad >= LIMITE_AUTORIDADES) {
+        throw new BadRequestException(
+          `Ya existen ${LIMITE_AUTORIDADES} autoridades de Secretaría para esa unidad académica`,
+        );
+      }
     }
   }
 

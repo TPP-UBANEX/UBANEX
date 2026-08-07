@@ -7,6 +7,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
+import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 
 describe('UsuariosService', () => {
   const findOne = jest.fn<() => Promise<Usuario | null>>();
@@ -14,6 +15,16 @@ describe('UsuariosService', () => {
   const save = jest.fn<(entity: unknown) => Promise<Usuario>>();
   const update = jest.fn<() => Promise<unknown>>();
   const count = jest.fn<() => Promise<number>>();
+  const andWhere = jest.fn<(condition: string, params?: unknown) => unknown>();
+  const qb = {
+    where: jest.fn(() => qb),
+    andWhere: jest.fn((condition: string, params?: unknown) => {
+      andWhere(condition, params)
+      return qb
+    }),
+    getCount: jest.fn(() => count()),
+  };
+  const createQueryBuilder = jest.fn(() => qb);
 
   const repo = {
     findOne,
@@ -21,6 +32,7 @@ describe('UsuariosService', () => {
     save,
     update,
     count,
+    createQueryBuilder,
   } as unknown as Repository<Usuario>;
 
   const auditoria = {
@@ -33,6 +45,9 @@ describe('UsuariosService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    create.mockImplementation((data: unknown) => ({ ...(data as object) }) as Usuario);
+    save.mockImplementation(async (entity: unknown) => entity as Usuario);
+    count.mockResolvedValue(0);
   });
 
   describe('crear', () => {
@@ -56,6 +71,130 @@ describe('UsuariosService', () => {
       } as CrearUsuarioDto;
 
       await expect(service.crear(dto)).rejects.toBeInstanceOf(BadRequestException);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('permite a Secretaría crear una autoridad de Secretaría con su misma UA', async () => {
+      findOne.mockResolvedValue(null);
+      const creador = {
+        id: 'secretaria-1',
+        nombreCompleto: 'Autoridad de Derecho',
+        roles: [RolUsuario.AutoridadDeSecretaria],
+        unidadAcademicaId: 'ua-derecho',
+      } as unknown as Usuario;
+
+      const dto = {
+        email: 'nueva-autoridad@uba.ar',
+        password: '123456',
+        nombre: 'Nueva',
+        apellido: 'Autoridad',
+        roles: [RolUsuario.AutoridadDeSecretaria],
+      } as CrearUsuarioDto;
+
+      const resultado = await service.crear(dto, creador);
+
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          unidadAcademicaId: 'ua-derecho',
+          creadoPorId: 'secretaria-1',
+        }),
+      );
+      expect(resultado.unidadAcademicaId).toBe('ua-derecho');
+    });
+
+    it('rechaza crear una 4ta autoridad de Secretaría en la misma UA', async () => {
+      findOne.mockResolvedValue(null);
+      count.mockResolvedValue(3);
+      const creador = {
+        id: 'secretaria-1',
+        nombreCompleto: 'Autoridad de Derecho',
+        roles: [RolUsuario.AutoridadDeSecretaria],
+        unidadAcademicaId: 'ua-derecho',
+      } as unknown as Usuario;
+
+      const dto = {
+        email: 'cuarta-autoridad@uba.ar',
+        password: '123456',
+        nombre: 'Cuarta',
+        apellido: 'Autoridad',
+        roles: [RolUsuario.AutoridadDeSecretaria],
+      } as CrearUsuarioDto;
+
+      await expect(service.crear(dto, creador)).rejects.toBeInstanceOf(BadRequestException);
+      expect(andWhere).toHaveBeenCalledWith('u.unidadAcademicaId = :uaId', { uaId: 'ua-derecho' });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('permite a Secretaría crear una autoridad cuando el cupo de su UA no está completo', async () => {
+      findOne.mockResolvedValue(null);
+      count.mockResolvedValue(1);
+      const creador = {
+        id: 'secretaria-1',
+        nombreCompleto: 'Autoridad de Derecho',
+        roles: [RolUsuario.AutoridadDeSecretaria],
+        unidadAcademicaId: 'ua-derecho',
+      } as unknown as Usuario;
+
+      const dto = {
+        email: 'autoridad-2@uba.ar',
+        password: '123456',
+        nombre: 'Otra',
+        apellido: 'Autoridad',
+        roles: [RolUsuario.AutoridadDeSecretaria],
+      } as CrearUsuarioDto;
+
+      await expect(service.crear(dto, creador)).resolves.toBeDefined();
+      expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechaza a Rectorado crear una 4ta autoridad de Rectorado', async () => {
+      findOne.mockResolvedValue(null);
+      count.mockResolvedValue(3);
+      const creador = {
+        id: 'rectorado-1',
+        nombreCompleto: 'Admin Rectorado',
+        roles: [RolUsuario.AutoridadDeRectorado],
+      } as unknown as Usuario;
+
+      const dto = {
+        email: 'cuarta-autoridad-rectorado@uba.ar',
+        password: '123456',
+        nombre: 'Cuarta',
+        apellido: 'Autoridad',
+        roles: [RolUsuario.AutoridadDeRectorado],
+      } as CrearUsuarioDto;
+
+      await expect(service.crear(dto, creador)).rejects.toBeInstanceOf(BadRequestException);
+      expect(save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('actualizar', () => {
+    it('rechaza a Rectorado otorgar una autoridad cuando el cupo está completo', async () => {
+      const target = {
+        id: 'docente-1',
+        email: 'docente@uba.ar',
+        roles: [RolUsuario.Docente],
+        unidadAcademicaId: 'ua-derecho',
+        nombreCompleto: 'Docente',
+        estadoValidacionDocente: null,
+      } as unknown as Usuario;
+      findOne.mockResolvedValue(target);
+      count.mockResolvedValue(3);
+
+      const rectorado = {
+        id: 'rectorado-1',
+        nombreCompleto: 'Admin Rectorado',
+        roles: [RolUsuario.AutoridadDeRectorado],
+      } as unknown as Usuario;
+
+      const dto = {
+        roles: [RolUsuario.AutoridadDeRectorado],
+      } as ActualizarUsuarioDto;
+
+      await expect(service.actualizar('docente-1', dto, rectorado))
+        .rejects.toBeInstanceOf(BadRequestException);
       expect(save).not.toHaveBeenCalled();
     });
   });
