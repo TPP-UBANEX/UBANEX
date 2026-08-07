@@ -60,6 +60,7 @@ function rolColor(rol: string): string {
 
 const rolesDisponibles: Record<string, RolUsuario[]> = {
   [RolUsuario.AutoridadDeRectorado]: [
+    RolUsuario.AutoridadDeRectorado,
     RolUsuario.AsistenteDeRectorado,
     RolUsuario.AutoridadDeSecretaria,
     RolUsuario.AsistenteDeSecretaria,
