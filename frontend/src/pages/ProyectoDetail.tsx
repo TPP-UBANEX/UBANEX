@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -55,6 +55,7 @@ const tipoRubroLabels: Record<TipoRubro, string> = {
 export function ProyectoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [edicion, setEdicion] = useState<Edicion | null>(null)
@@ -62,6 +63,16 @@ export function ProyectoDetail() {
   const [enviando, setEnviando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
+
+  const TABS = ['info', 'direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias'] as const
+  const [tabActivo, setTabActivo] = useState<string>(() => {
+    const t = searchParams.get('tab')
+    return t && (TABS as readonly string[]).includes(t) ? t : 'info'
+  })
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && (TABS as readonly string[]).includes(t)) setTabActivo(t)
+  }, [searchParams])
 
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
@@ -630,7 +641,7 @@ export function ProyectoDetail() {
         )}
       </div>
 
-      <Tabs defaultValue="info">
+      <Tabs value={tabActivo} onValueChange={setTabActivo}>
         <TabsList>
           <TabsTrigger value="info">Resumen</TabsTrigger>
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
