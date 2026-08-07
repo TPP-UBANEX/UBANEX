@@ -31,6 +31,8 @@ const GRUPO_EJECUCION: RolUsuario[] = [
   RolUsuario.Docente,
 ];
 
+const LIMITE_AUTORIDADES = 3;
+
 function validarGruposRoles(roles: RolUsuario[]): void {
   if (roles.length === 0) return;
   const enGestion = roles.some((r) => GRUPO_GESTION.includes(r));
@@ -39,6 +41,12 @@ function validarGruposRoles(roles: RolUsuario[]): void {
     throw new BadRequestException(
       'Un usuario no puede tener roles de Gestión y Ejecución simultáneamente',
     );
+  }
+}
+
+function validarRolUnico(roles: RolUsuario[]): void {
+  if (roles.length !== 1) {
+    throw new BadRequestException('El usuario debe tener exactamente un rol');
   }
 }
 
@@ -53,11 +61,15 @@ export class UsuariosService {
 
   async crear(dto: CrearUsuarioDto, creador?: Usuario): Promise<Usuario> {
     validarGruposRoles(dto.roles);
+    validarRolUnico(dto.roles);
 
     if ((dto.nombre && !dto.apellido) || (!dto.nombre && dto.apellido)) {
       throw new BadRequestException('Deben completarse nombre y apellido');
     }
-    if (dto.nombre && dto.apellido) {
+    if (!dto.nombreCompleto) {
+      if (!dto.nombre || !dto.apellido) {
+        throw new BadRequestException('Deben completarse nombre y apellido');
+      }
       dto.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
     }
 
@@ -71,18 +83,23 @@ export class UsuariosService {
       const esSecretaria = creador.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
         creador.roles.includes(RolUsuario.AsistenteDeSecretaria);
       if (esSecretaria) {
-        const rolesPermitidos = [RolUsuario.Docente, RolUsuario.AsistenteDeSecretaria, RolUsuario.Estudiante];
+        const rolesPermitidos = [
+          RolUsuario.AutoridadDeSecretaria,
+          RolUsuario.AsistenteDeSecretaria,
+          RolUsuario.Docente,
+          RolUsuario.Estudiante,
+        ];
         const todosPermitidos = dto.roles.every((r) => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
           throw new BadRequestException(
-            'Autoridad de Secretaría solo puede crear Evaluadores y Asistentes de Secretaría',
+            'Autoridad de Secretaría solo puede crear autoridades, asistentes, docentes y estudiantes de su Unidad Académica',
           );
         }
-        if (!dto.unidadAcademicaId) {
-          dto.unidadAcademicaId = creador.unidadAcademicaId;
-        }
+        dto.unidadAcademicaId = creador.unidadAcademicaId;
       }
     }
+
+    await this.validarCupoAutoridades(dto.roles, dto.unidadAcademicaId);
 
     const password = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const entity = this.repo.create({
@@ -223,17 +240,7 @@ export class UsuariosService {
       if (dto.habilitado !== undefined) {
         throw new ForbiddenException('No puedes cambiar tu propio estado');
       }
-      const hayNombreApellido = dto.nombre !== undefined || dto.apellido !== undefined;
-      if (hayNombreApellido) {
-        if (!dto.nombre || !dto.apellido) {
-          throw new BadRequestException('Deben completarse nombre y apellido');
-        }
-        entity.nombre = dto.nombre;
-        entity.apellido = dto.apellido;
-        entity.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
-      } else if (dto.nombreCompleto !== undefined) {
-        entity.nombreCompleto = dto.nombreCompleto;
-      }
+      this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.telefono !== undefined) entity.telefono = dto.telefono;
       if (dto.genero !== undefined) entity.genero = dto.genero;
@@ -259,12 +266,29 @@ export class UsuariosService {
     }
 
     if (esRectorado) {
-      if (dto.roles) validarGruposRoles(dto.roles);
-      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      if (dto.roles) {
+        validarGruposRoles(dto.roles);
+        validarRolUnico(dto.roles);
+      }
+      this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
+        const antesTeníaAutoridad = rolesAnteriores.some(r =>
+          r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AutoridadDeSecretaria,
+        );
         entity.roles = dto.roles;
         huboCambioRol = true;
+        if (
+          dto.roles.some(r =>
+            r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AutoridadDeSecretaria,
+          ) &&
+          !antesTeníaAutoridad
+        ) {
+          await this.validarCupoAutoridades(
+            dto.roles,
+            dto.unidadAcademicaId ?? entity.unidadAcademicaId ?? undefined,
+          );
+        }
         if (
           dto.roles.includes(RolUsuario.Docente) &&
           !rolesAnteriores.includes(RolUsuario.Docente) &&
@@ -304,23 +328,23 @@ export class UsuariosService {
     }
 
     if (esSecretaria && mismaUA) {
-      if (dto.nombreCompleto !== undefined) entity.nombreCompleto = dto.nombreCompleto;
+      this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
+        validarRolUnico(dto.roles);
         const rolesPermitidos = [RolUsuario.Estudiante, RolUsuario.Docente];
+        const tieneRolGestion = entity.roles.some(r => !rolesPermitidos.includes(r));
+        if (tieneRolGestion) {
+          throw new ForbiddenException('No puedes cambiar los roles de usuarios de Gestión');
+        }
         const todosPermitidos = dto.roles.every(r => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
           throw new BadRequestException('Solo puedes asignar roles de Estudiante y Docente');
         }
-        const nuevosRoles = [
-          ...entity.roles.filter(r => !rolesPermitidos.includes(r)),
-          ...dto.roles,
-        ];
-        validarGruposRoles(nuevosRoles);
-        entity.roles = nuevosRoles;
+        entity.roles = dto.roles;
         huboCambioRol = true;
         if (
-          nuevosRoles.includes(RolUsuario.Docente) &&
+          dto.roles.includes(RolUsuario.Docente) &&
           !rolesAnteriores.includes(RolUsuario.Docente) &&
           !entity.estadoValidacionDocente
         ) {
@@ -424,6 +448,55 @@ export class UsuariosService {
         descripcion: 'Usuario deshabilitado',
         responsableId: usuarioLogueado.id, responsableNombre: usuarioLogueado.nombreCompleto,
       });
+    }
+  }
+
+  private async validarCupoAutoridades(
+    roles: RolUsuario[],
+    unidadAcademicaId?: string,
+  ): Promise<void> {
+    if (roles.includes(RolUsuario.AutoridadDeRectorado)) {
+      const cantidad = await this.repo
+        .createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: `%${RolUsuario.AutoridadDeRectorado}%` })
+        .getCount();
+      if (cantidad >= LIMITE_AUTORIDADES) {
+        throw new BadRequestException(
+          `Ya existen ${LIMITE_AUTORIDADES} autoridades de Rectorado. No se pueden crear más`,
+        );
+      }
+    }
+
+    if (roles.includes(RolUsuario.AutoridadDeSecretaria)) {
+      if (!unidadAcademicaId) {
+        throw new BadRequestException(
+          'Debe indicarse la unidad académica de la autoridad de Secretaría',
+        );
+      }
+      const cantidad = await this.repo
+        .createQueryBuilder('u')
+        .where('u.roles LIKE :rol', { rol: `%${RolUsuario.AutoridadDeSecretaria}%` })
+        .andWhere('u.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId })
+        .getCount();
+      if (cantidad >= LIMITE_AUTORIDADES) {
+        throw new BadRequestException(
+          `Ya existen ${LIMITE_AUTORIDADES} autoridades de Secretaría para esa unidad académica`,
+        );
+      }
+    }
+  }
+
+  private aplicarNombreApellido(entity: Usuario, dto: ActualizarUsuarioDto): void {
+    const hayNombreApellido = dto.nombre !== undefined || dto.apellido !== undefined;
+    if (hayNombreApellido) {
+      if (!dto.nombre || !dto.apellido) {
+        throw new BadRequestException('Deben completarse nombre y apellido');
+      }
+      entity.nombre = dto.nombre;
+      entity.apellido = dto.apellido;
+      entity.nombreCompleto = `${dto.nombre} ${dto.apellido}`.trim();
+    } else if (dto.nombreCompleto !== undefined) {
+      entity.nombreCompleto = dto.nombreCompleto;
     }
   }
 }
