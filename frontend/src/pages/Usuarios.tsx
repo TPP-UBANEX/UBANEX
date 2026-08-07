@@ -361,6 +361,8 @@ function NuevoUsuarioDialog({
 
   const esDocente = rol === RolUsuario.Docente
   const esEstudiante = rol === RolUsuario.Estudiante
+  const esRolRectorado =
+    rol === RolUsuario.AutoridadDeRectorado || rol === RolUsuario.AsistenteDeRectorado
 
   const carrerasDisponibles = useMemo(() => {
     if (!unidadAcademicaId) return []
@@ -406,7 +408,7 @@ function NuevoUsuarioDialog({
         email,
         password,
         roles: [rol as RolUsuario],
-        unidadAcademicaId: unidadAcademicaId || undefined,
+        unidadAcademicaId: esRolRectorado ? undefined : (unidadAcademicaId || undefined),
       }
       if (esDocente) {
         payload.telefono = telefono.trim()
@@ -486,7 +488,13 @@ function NuevoUsuarioDialog({
           </div>
           <div className="space-y-2 sm:col-span-2">
             <label className="text-sm font-medium">Rol</label>
-            <Select value={rol} onValueChange={setRol} required>
+            <Select value={rol} onValueChange={nuevoRol => {
+              setRol(nuevoRol)
+              if (nuevoRol === RolUsuario.AutoridadDeRectorado || nuevoRol === RolUsuario.AsistenteDeRectorado) {
+                setUnidadAcademicaId('')
+                setCarreraId('')
+              }
+            }} required>
               <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
               <SelectContent>
                 {rolesCreables.map(r => (
@@ -498,11 +506,11 @@ function NuevoUsuarioDialog({
           {!esSecretaria && (
             <div className="space-y-2 sm:col-span-2">
               <label className="text-sm font-medium">Unidad Académica</label>
-              <Select value={unidadAcademicaId} onValueChange={id => {
+              <Select value={unidadAcademicaId} disabled={esRolRectorado} onValueChange={id => {
                 setUnidadAcademicaId(id)
                 setCarreraId('')
               }}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar (opcional)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={esRolRectorado ? 'No aplica para roles de Rectorado' : 'Seleccionar (opcional)'} /></SelectTrigger>
                 <SelectContent>
                   {uaList.map(ua => (
                     <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
