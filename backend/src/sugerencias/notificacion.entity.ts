@@ -4,6 +4,7 @@ import {
 } from 'typeorm';
 import { Usuario } from '../usuarios/usuario.entity';
 import { SugerenciaCambio } from './sugerencia-cambio.entity';
+import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 
 @Entity()
@@ -21,12 +22,19 @@ export class Notificacion {
   @Column({ type: 'varchar' })
   tipo: TipoNotificacion;
 
-  @ManyToOne(() => SugerenciaCambio)
+  @ManyToOne(() => SugerenciaCambio, { nullable: true })
   @JoinColumn({ name: 'sugerenciaId' })
   sugerencia: SugerenciaCambio;
 
-  @Column()
-  sugerenciaId: string;
+  @Column({ type: 'uuid', nullable: true })
+  sugerenciaId: string | null;
+
+  @ManyToOne(() => ParticipacionConvocatoria, { nullable: true })
+  @JoinColumn({ name: 'participacionId' })
+  participacion: ParticipacionConvocatoria;
+
+  @Column({ type: 'uuid', nullable: true })
+  participacionId: string | null;
 
   @Column({ type: 'text' })
   mensaje: string;
