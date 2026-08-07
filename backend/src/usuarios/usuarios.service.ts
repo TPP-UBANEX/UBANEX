@@ -42,6 +42,12 @@ function validarGruposRoles(roles: RolUsuario[]): void {
   }
 }
 
+function validarRolUnico(roles: RolUsuario[]): void {
+  if (roles.length !== 1) {
+    throw new BadRequestException('El usuario debe tener exactamente un rol');
+  }
+}
+
 @Injectable()
 export class UsuariosService {
   constructor(
@@ -53,6 +59,7 @@ export class UsuariosService {
 
   async crear(dto: CrearUsuarioDto, creador?: Usuario): Promise<Usuario> {
     validarGruposRoles(dto.roles);
+    validarRolUnico(dto.roles);
 
     if ((dto.nombre && !dto.apellido) || (!dto.nombre && dto.apellido)) {
       throw new BadRequestException('Deben completarse nombre y apellido');
@@ -252,7 +259,10 @@ export class UsuariosService {
     }
 
     if (esRectorado) {
-      if (dto.roles) validarGruposRoles(dto.roles);
+      if (dto.roles) {
+        validarGruposRoles(dto.roles);
+        validarRolUnico(dto.roles);
+      }
       this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
@@ -300,20 +310,20 @@ export class UsuariosService {
       this.aplicarNombreApellido(entity, dto);
       if (dto.email !== undefined) entity.email = dto.email;
       if (dto.roles !== undefined) {
+        validarRolUnico(dto.roles);
         const rolesPermitidos = [RolUsuario.Estudiante, RolUsuario.Docente];
+        const tieneRolGestion = entity.roles.some(r => !rolesPermitidos.includes(r));
+        if (tieneRolGestion) {
+          throw new ForbiddenException('No puedes cambiar los roles de usuarios de Gestión');
+        }
         const todosPermitidos = dto.roles.every(r => rolesPermitidos.includes(r));
         if (!todosPermitidos) {
           throw new BadRequestException('Solo puedes asignar roles de Estudiante y Docente');
         }
-        const nuevosRoles = [
-          ...entity.roles.filter(r => !rolesPermitidos.includes(r)),
-          ...dto.roles,
-        ];
-        validarGruposRoles(nuevosRoles);
-        entity.roles = nuevosRoles;
+        entity.roles = dto.roles;
         huboCambioRol = true;
         if (
-          nuevosRoles.includes(RolUsuario.Docente) &&
+          dto.roles.includes(RolUsuario.Docente) &&
           !rolesAnteriores.includes(RolUsuario.Docente) &&
           !entity.estadoValidacionDocente
         ) {

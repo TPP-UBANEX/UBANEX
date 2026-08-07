@@ -87,7 +87,10 @@ export function EditarUsuarioDialog({
   const esSecretariaMismaUA =
     user?.roles.includes(RolUsuario.AutoridadDeSecretaria) &&
     user?.unidadAcademicaId === usuario.unidadAcademicaId
-  const puedeEditarRoles = esRectorado || esSecretariaMismaUA
+  const esTargetEjecucion = usuario.roles.some(r =>
+    r === RolUsuario.Docente || r === RolUsuario.Estudiante,
+  )
+  const puedeEditarRoles = esRectorado || (esSecretariaMismaUA && esTargetEjecucion)
   const puedeEditarUA = esRectorado
   const rolesDisponibles: RolUsuario[] = esRectorado
     ? Object.keys(rolLabels) as RolUsuario[]
@@ -428,11 +431,7 @@ export function EditarUsuarioDialog({
                           variant={selected ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => {
-                            if (selected) {
-                              setRoles(roles.filter(r => r !== rol))
-                            } else {
-                              setRoles([...roles, rol])
-                            }
+                            setRoles(selected ? [] : [rol])
                           }}
                         >
                           {rolLabels[rol]}
