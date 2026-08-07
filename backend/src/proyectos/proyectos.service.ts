@@ -83,6 +83,7 @@ export class ProyectosService {
 
     const query = this.edicionRepo.createQueryBuilder('edicion')
       .leftJoinAndSelect('edicion.proyecto', 'proyecto')
+      .leftJoinAndSelect('proyecto.unidadAcademicaAdicional', 'unidadAcademicaAdicional')
       .leftJoinAndSelect('edicion.creadoPor', 'creadoPor')
       .leftJoinAndSelect('edicion.unidadAcademica', 'unidadAcademica')
       .leftJoinAndSelect('edicion.convocatoria', 'convocatoria')

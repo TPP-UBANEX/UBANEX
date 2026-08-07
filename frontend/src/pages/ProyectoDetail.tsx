@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,8 +24,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -55,6 +55,7 @@ const tipoRubroLabels: Record<TipoRubro, string> = {
 export function ProyectoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [edicion, setEdicion] = useState<Edicion | null>(null)
@@ -62,6 +63,16 @@ export function ProyectoDetail() {
   const [enviando, setEnviando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
+
+  const TABS = ['info', 'direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias'] as const
+  const [tabActivo, setTabActivo] = useState<string>(() => {
+    const t = searchParams.get('tab')
+    return t && (TABS as readonly string[]).includes(t) ? t : 'info'
+  })
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && (TABS as readonly string[]).includes(t)) setTabActivo(t)
+  }, [searchParams])
 
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
@@ -78,14 +89,24 @@ export function ProyectoDetail() {
 
   const [uas, setUas] = useState<UnidadAcademica[]>([])
   const [candidatosDireccion, setCandidatosDireccion] = useState<Usuario[]>([])
+  const [candidatosCodireccion, setCandidatosCodireccion] = useState<Usuario[]>([])
   const [loadingCandidatos, setLoadingCandidatos] = useState(false)
   const [editDirectorId, setEditDirectorId] = useState('')
   const [editCodirectorId, setEditCodirectorId] = useState('')
-  const [editUnidadAcademicaAdicionalId, setEditUnidadAcademicaAdicionalId] = useState('')
+  const [editDirectorUaId, setEditDirectorUaId] = useState('')
+  const [editCodirectorUaId, setEditCodirectorUaId] = useState('')
 
   const [modoSugerencia, setModoSugerencia] = useState(false)
-  const [sugerenciaModal, setSugerenciaModal] = useState<{ open: boolean; campo: string; valorActual: string; label: string }>({
-    open: false, campo: '', valorActual: '', label: '',
+  const [sugerenciasPropias, setSugerenciasPropias] = useState<SugerenciaCambio[]>([])
+  const [sugerenciaModal, setSugerenciaModal] = useState<{
+    open: boolean
+    campo: string
+    valorActual: string
+    label: string
+    valorSugeridoInicial: string
+    comentarioInicial: string
+  }>({
+    open: false, campo: '', valorActual: '', label: '', valorSugeridoInicial: '', comentarioInicial: '',
   })
 
   const esPropietario = edicion?.creadoPorId === user?.id
@@ -110,6 +131,23 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
+
+  const nombreUnidadesAcademicas = () => {
+    const principal = edicion?.unidadAcademica?.nombre
+    const adicionalId = proyecto?.esInterfacultad ? proyecto.unidadAcademicaAdicionalId : undefined
+    const adicional = adicionalId && adicionalId !== edicion?.unidadAcademicaId
+      ? proyecto?.unidadAcademicaAdicional?.nombre
+      : undefined
+    if (principal && adicional) return `${principal} y ${adicional}`
+    return principal || 'Sin UA'
+  }
+
+  const nombreConUA = (d: ParticipacionConvocatoria | undefined) => {
+    if (!d?.usuario) return '-'
+    const ua = d.usuario.unidadAcademica?.nombre
+    return ua ? `${d.usuario.nombreCompleto} (${ua})` : d.usuario.nombreCompleto
+  }
+
   const motivoEnvio = !esDocenteValidado
     ? 'Tu usuario no está validado'
     : !directoresCompletos
@@ -156,17 +194,30 @@ export function ProyectoDetail() {
       .catch(() => toast.error('Error al cargar unidades académicas'))
   }, [])
 
-  const cargarCandidatos = async (uaId: string, uaAdicionalId?: string) => {
+  useEffect(() => {
+    if (!modoSugerencia || !edicion?.id || !user?.id) return
+    api.sugerencias.listar(edicion.id)
+      .then(data =>
+        setSugerenciasPropias(
+          data.filter(s =>
+            s.sugeridoPor?.id === user.id && s.estado === EstadoSugerencia.Pendiente,
+          ),
+        ),
+      )
+      .catch(() => toast.error('Error al cargar sugerencias'))
+  }, [modoSugerencia, edicion?.id, user?.id])
+
+  const cargarCandidatos = async (uaId: string, setter: (u: Usuario[]) => void) => {
     if (!edicion) return
     setLoadingCandidatos(true)
     try {
       const res = await api.participaciones.candidatos({
         unidadAcademicaId: uaId,
-        ...(uaAdicionalId ? { unidadAcademicaAdicionalId: uaAdicionalId } : {}),
         convocatoriaId: edicion.convocatoriaId,
         edicionId: edicion.id,
+        incluirBloqueados: true,
       })
-      setCandidatosDireccion(res)
+      setter(res)
     } catch {
       toast.error('Error al cargar docentes candidatos')
     } finally {
@@ -174,34 +225,85 @@ export function ProyectoDetail() {
     }
   }
 
-  const directoresActuales = directores
-    .map(d => d.usuario)
-    .filter((u): u is Usuario => !!u)
-  const opcionesDireccion = [...candidatosDireccion, ...directoresActuales]
+  const nombreUA = (uaId?: string) => uas.find(u => u.id === uaId)?.nombre ?? 'Sin UA'
+
+  const motivoCandidato = (u: Usuario): string | null => {
+    if (u.ocupado) return 'Participa de otro proyecto'
+    if (u.estadoValidacionDocente && u.estadoValidacionDocente !== EstadoValidacionDocente.Validado) {
+      return 'No validado'
+    }
+    if (u.habilitado === false) return 'Deshabilitado'
+    return null
+  }
+
+  const directorPrincipalUsuario = directores.find(d => d.esDirectorPrincipal)?.usuario
+  const codirectorUsuario = directores.find(d => !d.esDirectorPrincipal)?.usuario
+
+  const opcionesDireccion = [
+    ...candidatosDireccion,
+    ...(directorPrincipalUsuario && directorPrincipalUsuario.unidadAcademica?.id === editDirectorUaId
+      ? [directorPrincipalUsuario]
+      : []),
+  ]
     .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
+
+  const opcionesCodireccion = [
+    ...candidatosCodireccion,
+    ...(codirectorUsuario && codirectorUsuario.unidadAcademica?.id === editCodirectorUaId
+      ? [codirectorUsuario]
+      : []),
+  ]
+    .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
+
+  const motivoDireccion = (() => {
+    if (!editEsInterfacultad || !edicion) return ''
+    const uaCreador = edicion.unidadAcademicaId
+    if (editDirectorUaId !== uaCreador && editCodirectorUaId !== uaCreador) {
+      return `Una unidad académica participante tiene que ser ${nombreUA(uaCreador)}`
+    }
+    if (editDirectorUaId === editCodirectorUaId) {
+      return 'La dirección y la codirección deben pertenecer a unidades académicas distintas para ser interfacultad'
+    }
+    return ''
+  })()
 
   const toggleInterfacultad = (v: boolean) => {
     setEditEsInterfacultad(v)
     setEditDirectorId('')
     setEditCodirectorId('')
+    const uaCreador = edicion?.unidadAcademicaId ?? ''
     if (v) {
-      setEditUnidadAcademicaAdicionalId(proyecto?.unidadAcademicaAdicionalId ?? '')
-      const ua = proyecto?.unidadAcademicaAdicionalId
-      if (ua && edicion) cargarCandidatos(edicion.unidadAcademicaId, ua)
-      else setCandidatosDireccion([])
+      const uaDirector = directorPrincipalUsuario?.unidadAcademica?.id ?? uaCreador
+      const uaCodirector = codirectorUsuario?.unidadAcademica?.id
+        ?? (proyecto?.unidadAcademicaAdicionalId && proyecto.unidadAcademicaAdicionalId !== uaCreador
+          ? proyecto.unidadAcademicaAdicionalId
+          : uaCreador)
+      setEditDirectorUaId(uaDirector)
+      setEditCodirectorUaId(uaCodirector)
+      if (edicion) {
+        cargarCandidatos(uaDirector, setCandidatosDireccion)
+        cargarCandidatos(uaCodirector, setCandidatosCodireccion)
+      }
     } else {
-      setEditUnidadAcademicaAdicionalId('')
-      if (edicion) cargarCandidatos(edicion.unidadAcademicaId)
-      else setCandidatosDireccion([])
+      setEditDirectorUaId(uaCreador)
+      setEditCodirectorUaId(uaCreador)
+      if (edicion) {
+        cargarCandidatos(uaCreador, setCandidatosDireccion)
+        cargarCandidatos(uaCreador, setCandidatosCodireccion)
+      }
     }
   }
 
-  const handleCambioUA = (uaId: string) => {
-    setEditUnidadAcademicaAdicionalId(uaId)
+  const handleCambioDirectorUA = (uaId: string) => {
+    setEditDirectorUaId(uaId)
     setEditDirectorId('')
+    cargarCandidatos(uaId, setCandidatosDireccion)
+  }
+
+  const handleCambioCodirectorUA = (uaId: string) => {
+    setEditCodirectorUaId(uaId)
     setEditCodirectorId('')
-    if (uaId && edicion) cargarCandidatos(edicion.unidadAcademicaId, uaId)
-    else setCandidatosDireccion([])
+    cargarCandidatos(uaId, setCandidatosCodireccion)
   }
 
   const iniciarEdicion = () => {
@@ -211,19 +313,18 @@ export function ProyectoDetail() {
     setEditEsConsolidado(proyecto.esConsolidado)
     setEditEsInterfacultad(proyecto.esInterfacultad)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
-    setEditUnidadAcademicaAdicionalId(proyecto.unidadAcademicaAdicionalId ?? '')
     setEditDirectorId(directores.find(d => d.esDirectorPrincipal)?.usuarioId ?? '')
     setEditCodirectorId(directores.find(d => !d.esDirectorPrincipal)?.usuarioId ?? '')
+    const uaDirector = directores.find(d => d.esDirectorPrincipal)?.usuario?.unidadAcademica?.id ?? edicion.unidadAcademicaId
+    const uaCodirector = directores.find(d => !d.esDirectorPrincipal)?.usuario?.unidadAcademica?.id
+      ?? (proyecto.esInterfacultad ? proyecto.unidadAcademicaAdicionalId : edicion.unidadAcademicaId)
+      ?? edicion.unidadAcademicaId
+    setEditDirectorUaId(uaDirector)
+    setEditCodirectorUaId(uaCodirector)
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
-    if (proyecto.esInterfacultad) {
-      if (edicion) cargarCandidatos(edicion.unidadAcademicaId, proyecto.unidadAcademicaAdicionalId ?? '')
-      else setCandidatosDireccion([])
-    } else if (edicion) {
-      cargarCandidatos(edicion.unidadAcademicaId)
-    } else {
-      setCandidatosDireccion([])
-    }
+    cargarCandidatos(uaDirector, setCandidatosDireccion)
+    cargarCandidatos(uaCodirector, setCandidatosCodireccion)
   }
 
   const cancelarEdicion = () => {
@@ -261,14 +362,22 @@ export function ProyectoDetail() {
 
   const handleGuardar = async () => {
     if (!id || !edicion) return
+    if (motivoDireccion) {
+      toast.error(motivoDireccion)
+      return
+    }
     setGuardando(true)
     try {
+      const uaCreador = edicion.unidadAcademicaId
+      const unidadAcademicaAdicionalId = editEsInterfacultad
+        ? (editDirectorUaId !== uaCreador ? editDirectorUaId : editCodirectorUaId)
+        : null
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
         anioEdicion: editAnioEdicion ?? undefined,
         esConsolidado: editEsConsolidado,
         esInterfacultad: editEsInterfacultad,
-        unidadAcademicaAdicionalId: editEsInterfacultad ? (editUnidadAcademicaAdicionalId || undefined) : undefined,
+        unidadAcademicaAdicionalId,
         presupuesto: editPresupuesto || undefined,
         datosFormulario: editDatosFormulario,
       })
@@ -313,7 +422,15 @@ export function ProyectoDetail() {
   }
 
   const handleSugerirClick = (campo: string, valorActual: string, label: string) => {
-    setSugerenciaModal({ open: true, campo, valorActual, label })
+    const previa = sugerenciasPropias.find(s => s.campo === campo)
+    setSugerenciaModal({
+      open: true,
+      campo,
+      valorActual,
+      label,
+      valorSugeridoInicial: previa?.valorSugerido ?? '',
+      comentarioInicial: previa?.comentario ?? '',
+    })
   }
 
   const presupuestoVacio = (): Presupuesto => ({
@@ -406,7 +523,7 @@ export function ProyectoDetail() {
           </div>
           {edicion && (
             <p className="text-sm text-muted-foreground">
-              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {edicion.unidadAcademica?.nombre || 'Sin UA'}
+              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {nombreUnidadesAcademicas()}
               {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
             </p>
           )}
@@ -445,15 +562,28 @@ export function ProyectoDetail() {
           {editando && (
             <>
               <Button variant="outline" onClick={cancelarEdicion}>Cancelar</Button>
-              <Button onClick={handleGuardar} disabled={guardando}>
-                {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Guardar
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button onClick={handleGuardar} disabled={guardando || !!motivoDireccion}>
+                        {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        Guardar
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {motivoDireccion && (
+                    <TooltipContent>
+                      <p>{motivoDireccion}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </>
           )}
           {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
             <Button variant="outline" onClick={() => setModoSugerencia(true)}>
-              <MessageSquare className="h-4 w-4 mr-2" />Sugerir cambios
+              <MessageSquare className="h-4 w-4 mr-2" />Sugerir
             </Button>
           )}
           {modoSugerencia && (
@@ -478,7 +608,7 @@ export function ProyectoDetail() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.unidadAcademica?.nombre || '-'}</p></CardContent>
+          <CardContent><p className="text-sm">{nombreUnidadesAcademicas()}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Dirección</CardTitle></CardHeader>
@@ -486,11 +616,11 @@ export function ProyectoDetail() {
             <div className="space-y-1 text-sm">
               <div>
                 <span className="text-muted-foreground">Dirección:</span>{' '}
-                {directores.find(d => d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
               </div>
               <div>
                 <span className="text-muted-foreground">Codirección:</span>{' '}
-                {directores.find(d => !d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
               </div>
             </div>
           </CardContent>
@@ -511,9 +641,9 @@ export function ProyectoDetail() {
         )}
       </div>
 
-      <Tabs defaultValue="info">
+      <Tabs value={tabActivo} onValueChange={setTabActivo}>
         <TabsList>
-          <TabsTrigger value="info">Información</TabsTrigger>
+          <TabsTrigger value="info">Resumen</TabsTrigger>
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
           <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
@@ -578,7 +708,7 @@ export function ProyectoDetail() {
                       </CampoSugerible>
                     </div>
                     <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
-                    <div><span className="text-muted-foreground">Unidad Académica:</span> {edicion?.unidadAcademica?.nombre || '-'}</div>
+                    <div><span className="text-muted-foreground">Unidad Académica:</span> {nombreUnidadesAcademicas()}</div>
                     <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Edición:</span>{' '}
@@ -638,38 +768,63 @@ export function ProyectoDetail() {
                       <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => toggleInterfacultad(false)}>No</Button>
                     </div>
                   </div>
-                  {editEsInterfacultad && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Unidad académica adicional</p>
-                      <Select value={editUnidadAcademicaAdicionalId} onValueChange={handleCambioUA}>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Dirección</p>
+                    {editEsInterfacultad ? (
+                      <Select value={editDirectorUaId} onValueChange={handleCambioDirectorUA}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar unidad académica" /></SelectTrigger>
                         <SelectContent>
-                          {uas.filter(u => u.id !== user?.unidadAcademicaId).map(u => (
+                          {uas.map(u => (
                             <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Dirección</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Unidad académica: <span className="font-medium text-foreground">{nombreUA(edicion?.unidadAcademicaId)}</span>
+                      </p>
+                    )}
                     <Select value={editDirectorId} onValueChange={setEditDirectorId}>
                       <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar director'} /></SelectTrigger>
                       <SelectContent>
-                        {opcionesDireccion.map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
-                        ))}
+                        {opcionesDireccion.map(u => {
+                          const motivo = motivoCandidato(u)
+                          return (
+                            <SelectItem key={u.id} value={u.id} disabled={!!motivo}>
+                              {u.nombreCompleto}{motivo ? ` — ${motivo}` : ''}
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Codirección</p>
+                    {editEsInterfacultad ? (
+                      <Select value={editCodirectorUaId} onValueChange={handleCambioCodirectorUA}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar unidad académica" /></SelectTrigger>
+                        <SelectContent>
+                          {uas.map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Unidad académica: <span className="font-medium text-foreground">{nombreUA(edicion?.unidadAcademicaId)}</span>
+                      </p>
+                    )}
                     <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
                       <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar codirector'} /></SelectTrigger>
                       <SelectContent>
-                        {opcionesDireccion.filter(u => u.id !== editDirectorId).map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.nombreCompleto}</SelectItem>
-                        ))}
+                        {opcionesCodireccion.filter(u => u.id !== editDirectorId).map(u => {
+                          const motivo = motivoCandidato(u)
+                          return (
+                            <SelectItem key={u.id} value={u.id} disabled={!!motivo}>
+                              {u.nombreCompleto}{motivo ? ` — ${motivo}` : ''}
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -687,12 +842,12 @@ export function ProyectoDetail() {
                     </div>
                   )}
                   <div>
-                    <span className="text-muted-foreground">Dirección principal:</span>{' '}
-                    {directores.find(d => d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                    <span className="text-muted-foreground">Dirección:</span>{' '}
+                    {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Codirección:</span>{' '}
-                    {directores.find(d => !d.esDirectorPrincipal)?.usuario?.nombreCompleto || '-'}
+                    {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
                   </div>
                   {!esEditable && (
                     <p className="text-muted-foreground text-xs col-span-2">
@@ -749,7 +904,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="sugerencias" className="mt-4">
           {edicion ? (
-            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} camposFormulario={camposFormulario} />
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} onRespondida={cargarDatos} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
@@ -776,6 +931,8 @@ export function ProyectoDetail() {
         label={sugerenciaModal.label}
         valorActual={sugerenciaModal.valorActual}
         edicionId={edicion?.id ?? ''}
+        valorSugeridoInicial={sugerenciaModal.valorSugeridoInicial}
+        comentarioInicial={sugerenciaModal.comentarioInicial}
       />
 
       {edicion && (
@@ -841,8 +998,7 @@ function AsignarDirectorModal({
         const idsConRol = new Set(resParticipaciones.map(p => p.usuarioId))
         setUsuarios(res.data.filter(u =>
           !idsConRol.has(u.id) &&
-          u.estadoValidacionDocente === 'Validado' &&
-          u.habilitado !== false
+          u.estadoValidacionDocente === 'Validado'
         ))
       } catch {
         toast.error('Error al cargar docentes')
@@ -913,8 +1069,8 @@ function AsignarDirectorModal({
                 {usuarios.map(u => {
                   const incompleto = camposPerfilFaltantes(u).length > 0
                   return (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.nombreCompleto}{incompleto ? ' — perfil incompleto' : ''}
+                    <SelectItem key={u.id} value={u.id} disabled={u.habilitado === false}>
+                      {u.nombreCompleto}{incompleto ? ' — perfil incompleto' : ''}{u.habilitado === false ? ' — Deshabilitado' : ''}
                     </SelectItem>
                   )
                 })}

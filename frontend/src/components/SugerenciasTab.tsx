@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { SugerenciaCambio, CampoFormulario } from '@/data/types'
@@ -21,19 +29,21 @@ const estadoLabel: Record<string, string> = {
 interface SugerenciasTabProps {
   edicionId: string
   creadoPorId: string
+  directorIds?: string[]
   camposFormulario?: CampoFormulario[]
+  onRespondida?: () => void
 }
 
-export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }: SugerenciasTabProps) {
+export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], camposFormulario = [], onRespondida }: SugerenciasTabProps) {
   const { user } = useAuth()
   const [sugerencias, setSugerencias] = useState<SugerenciaCambio[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [respondiendo, setRespondiendo] = useState<string | null>(null)
   const [respuestaTexto, setRespuestaTexto] = useState('')
+  const [confirmacion, setConfirmacion] = useState<{ id: string; estado: EstadoSugerencia; campo: string } | null>(null)
 
-  const esDirector = user?.id === creadoPorId
-  const puedeResponder = esDirector
+  const puedeResponder = user?.id === creadoPorId || directorIds.includes(user?.id ?? '')
 
   const cargar = useCallback(async () => {
     try {
@@ -64,6 +74,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }
       setRespondiendo(null)
       setRespuestaTexto('')
       cargar()
+      onRespondida?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al responder')
     }
@@ -169,10 +180,10 @@ export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }
                   <Button
                     size="sm"
                     variant="default"
-                    onClick={() => handleResponder(s.id, EstadoSugerencia.Aceptada)}
+                    onClick={() => setConfirmacion({ id: s.id, estado: EstadoSugerencia.Aceptada, campo: s.campo })}
                     disabled={respondiendo === s.id}
                   >
-                    {respondiendo === s.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
+                    <Check className="h-3 w-3 mr-1" />
                     Aceptar
                   </Button>
                   <Button
@@ -190,7 +201,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleResponder(s.id, EstadoSugerencia.MasInformacion)}
+                      onClick={() => setConfirmacion({ id: s.id, estado: EstadoSugerencia.MasInformacion, campo: s.campo })}
                     >
                       Enviar
                     </Button>
@@ -198,7 +209,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => handleResponder(s.id, EstadoSugerencia.Rechazada)}
+                    onClick={() => setConfirmacion({ id: s.id, estado: EstadoSugerencia.Rechazada, campo: s.campo })}
                     disabled={respondiendo === s.id}
                   >
                     <X className="h-3 w-3 mr-1" />
@@ -210,6 +221,42 @@ export function SugerenciasTab({ edicionId, creadoPorId, camposFormulario = [] }
           </CardContent>
         </Card>
       ))}
+
+      <Dialog
+        open={confirmacion !== null}
+        onOpenChange={open => {
+          if (!open) setConfirmacion(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmacion?.estado === EstadoSugerencia.Aceptada && '¿Aceptar sugerencia?'}
+              {confirmacion?.estado === EstadoSugerencia.Rechazada && '¿Rechazar sugerencia?'}
+              {confirmacion?.estado === EstadoSugerencia.MasInformacion && '¿Pedir más información?'}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmacion?.estado === EstadoSugerencia.Aceptada &&
+                `¿Estás seguro de que querés aceptar la sugerencia en "${nombreCampo(confirmacion.campo)}"?`}
+              {confirmacion?.estado === EstadoSugerencia.Rechazada &&
+                `¿Estás seguro de que querés rechazar la sugerencia en "${nombreCampo(confirmacion.campo)}"?`}
+              {confirmacion?.estado === EstadoSugerencia.MasInformacion &&
+                `¿Estás seguro de que querés pedir más información sobre la sugerencia en "${nombreCampo(confirmacion.campo)}"?`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmacion(null)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (confirmacion) handleResponder(confirmacion.id, confirmacion.estado)
+                setConfirmacion(null)
+              }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

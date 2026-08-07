@@ -72,6 +72,7 @@ export interface Usuario {
   unidadAcademicaId?: string
   estadoValidacionDocente?: EstadoValidacionDocente
   habilitado: boolean
+  ocupado?: boolean
   ultimaActividad?: string
   creadoPor?: Usuario
   creadoPorId?: string
@@ -326,7 +327,7 @@ export interface ActualizarEdicionDto {
   anioEdicion?: number
   esConsolidado?: boolean
   esInterfacultad?: boolean
-  unidadAcademicaAdicionalId?: string
+  unidadAcademicaAdicionalId?: string | null
   presupuesto?: Presupuesto
   datosFormulario?: Record<string, unknown>
 }

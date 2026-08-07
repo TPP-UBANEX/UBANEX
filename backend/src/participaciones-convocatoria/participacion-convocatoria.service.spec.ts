@@ -11,6 +11,8 @@ import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { MailService } from '../common/mail/mail.service';
+import { Notificacion } from '../sugerencias/notificacion.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
@@ -62,12 +64,17 @@ describe('ParticipacionConvocatoriaService', () => {
     registrar: registrarAuditoria,
   } as unknown as AuditoriaService;
 
+  const notificacionRepo = {} as unknown as Repository<Notificacion>;
+  const mail = {} as unknown as MailService;
+
   const service = new ParticipacionConvocatoriaService(
     participacionRepo,
     usuarioRepo,
     convocatoriaRepo,
     edicionRepo,
+    notificacionRepo,
     auditoria,
+    mail,
   );
 
   function docente(overrides: Partial<Usuario> = {}): Usuario {
@@ -195,6 +202,62 @@ describe('ParticipacionConvocatoriaService', () => {
 
       const result = await service.listarCandidatos('ua-derecho', 'convocatoria-1');
       expect(result.map(u => u.id)).toEqual(['u-docente']);
+    });
+
+    it('filtra habilitados por defecto y los incluye si se pide incluirBloqueados', async () => {
+      findUsuarios.mockResolvedValue([]);
+      findParticipaciones.mockResolvedValue([]);
+
+      await service.listarCandidatos('ua-derecho', 'convocatoria-1');
+      const opcionesDefault = findUsuarios.mock.calls[0][0] as {
+        where: { habilitado: boolean };
+      };
+      expect(opcionesDefault.where.habilitado).toBe(true);
+
+      await service.listarCandidatos(
+        'ua-derecho',
+        'convocatoria-1',
+        undefined,
+        undefined,
+        true,
+      );
+      const opcionesConBloqueados = findUsuarios.mock.calls[1][0] as {
+        where: { habilitado?: boolean };
+      };
+      expect(opcionesConBloqueados.where.habilitado).toBeUndefined();
+    });
+
+    it('con incluirBloqueados devuelve no validados, deshabilitados y ocupados con el flag ocupado', async () => {
+      findUsuarios.mockResolvedValue([
+        docente({ id: 'u-validado' }),
+        docente({ id: 'u-pendiente', estadoValidacionDocente: EstadoValidacionDocente.PendienteDeValidacion }),
+        docente({ id: 'u-ocupado' }),
+        docente({ id: 'u-deshabilitado', habilitado: false }),
+        docente({ id: 'u-estudiante', roles: [RolUsuario.Estudiante] }),
+      ]);
+      findParticipaciones.mockResolvedValue([
+        participacion({ id: 'p-ocupado', usuarioId: 'u-ocupado', edicionId: 'e-otra' }),
+      ]);
+      findEdiciones.mockResolvedValue([
+        { id: 'e-otra', eliminadoEn: null },
+      ] as Edicion[]);
+
+      const result = await service.listarCandidatos(
+        'ua-derecho',
+        'convocatoria-1',
+        'edicion-1',
+        undefined,
+        true,
+      );
+
+      expect(result.map(u => u.id)).toEqual([
+        'u-validado',
+        'u-pendiente',
+        'u-ocupado',
+        'u-deshabilitado',
+      ]);
+      expect(result.find(u => u.id === 'u-ocupado')?.ocupado).toBe(true);
+      expect(result.find(u => u.id === 'u-validado')?.ocupado).toBe(false);
     });
 
     it('excluye ocupados pero no a los de la edicion actual ni los de ediciones eliminadas', async () => {

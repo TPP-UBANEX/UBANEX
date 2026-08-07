@@ -2,7 +2,7 @@ import {
   Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, FindOptionsWhere } from 'typeorm';
 import { ParticipacionConvocatoria } from './participacion-convocatoria.entity';
 import { CrearParticipacionDto } from './dto/crear-participacion.dto';
 import { ActualizarEstadoParticipacionDto } from './dto/actualizar-estado-participacion.dto';
@@ -472,7 +472,8 @@ export class ParticipacionConvocatoriaService {
     convocatoriaId: string,
     edicionId?: string,
     unidadAcademicaAdicionalId?: string,
-  ): Promise<Usuario[]> {
+    incluirBloqueados = false,
+  ): Promise<(Usuario & { ocupado: boolean })[]> {
     if (!unidadAcademicaId) throw new BadRequestException('unidadAcademicaId es requerido');
 
     const unidadAcademicaIds = [
@@ -480,8 +481,13 @@ export class ParticipacionConvocatoriaService {
       ...(unidadAcademicaAdicionalId ? [unidadAcademicaAdicionalId] : []),
     ];
 
+    const where: FindOptionsWhere<Usuario> = {
+      unidadAcademicaId: In(unidadAcademicaIds),
+    };
+    if (!incluirBloqueados) where.habilitado = true;
+
     const usuarios = await this.usuarioRepo.find({
-      where: { unidadAcademicaId: In(unidadAcademicaIds), habilitado: true },
+      where,
       relations: { unidadAcademica: true },
       select: {
         id: true,
@@ -524,11 +530,14 @@ export class ParticipacionConvocatoriaService {
         .map(p => p.usuarioId),
     );
 
-    return usuarios.filter(u =>
-      u.roles.includes(RolUsuario.Docente) &&
-      u.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
-      !usuarioIdsOcupados.has(u.id),
-    );
+    return usuarios
+      .filter(u => u.roles.includes(RolUsuario.Docente))
+      .filter(u =>
+        incluirBloqueados ||
+        (u.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
+          !usuarioIdsOcupados.has(u.id)),
+      )
+      .map(u => ({ ...u, ocupado: usuarioIdsOcupados.has(u.id) }));
   }
 
   private async separarActivasYEstancadas(

@@ -158,7 +158,11 @@ export function Proyectos() {
                     <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {e.proyecto?.esInterfacultad && e.proyecto.unidadAcademicaAdicionalId !== e.unidadAcademicaId && e.proyecto.unidadAcademicaAdicional
+                          ? `${e.unidadAcademica?.nombre} y ${e.proyecto.unidadAcademicaAdicional.nombre}`
+                          : e.unidadAcademica?.nombre || '-'}
+                      </TableCell>
                       <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                       <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
                       <TableCell>

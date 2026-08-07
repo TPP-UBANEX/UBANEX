@@ -50,6 +50,32 @@ export class SugerenciasService {
     if (!proyecto) throw new NotFoundException('Proyecto no encontrado');
 
     const valorActual = this.obtenerValorActual(edicion, proyecto, dto.campo);
+    const valorSugerido = dto.valorSugerido?.trim() ? dto.valorSugerido.trim() : null;
+
+    const pendienteExistente = await this.sugerenciaRepo.findOne({
+      where: {
+        edicionId,
+        sugeridoPorId: usuario.id,
+        campo: dto.campo,
+        estado: EstadoSugerencia.Pendiente,
+      },
+    });
+
+    if (pendienteExistente) {
+      pendienteExistente.valorActual = valorActual;
+      pendienteExistente.valorSugerido = valorSugerido;
+      pendienteExistente.comentario = dto.comentario;
+      pendienteExistente.estado = EstadoSugerencia.Pendiente;
+      pendienteExistente.respuestaDirector = null;
+      pendienteExistente.respondidoEn = null;
+      pendienteExistente.creadoEn = new Date();
+      await this.sugerenciaRepo.save(pendienteExistente);
+
+      return this.sugerenciaRepo.findOne({
+        where: { id: pendienteExistente.id },
+        relations: { sugeridoPor: true },
+      });
+    }
 
     const sugerencia = await this.sugerenciaRepo.save(
       this.sugerenciaRepo.create({
@@ -57,7 +83,7 @@ export class SugerenciasService {
         sugeridoPorId: usuario.id,
         campo: dto.campo,
         valorActual,
-        valorSugerido: dto.valorSugerido?.trim() ? dto.valorSugerido.trim() : null,
+        valorSugerido,
         comentario: dto.comentario,
         estado: EstadoSugerencia.Pendiente,
       }),

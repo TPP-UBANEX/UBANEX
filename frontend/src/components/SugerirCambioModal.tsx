@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import { api } from '@/lib/api'
 import { Loader2 } from 'lucide-react'
@@ -20,6 +21,8 @@ interface SugerirCambioModalProps {
   label: string
   valorActual: string
   edicionId: string
+  valorSugeridoInicial?: string
+  comentarioInicial?: string
   onSuccess?: () => void
 }
 
@@ -30,20 +33,36 @@ export function SugerirCambioModal({
   label,
   valorActual,
   edicionId,
+  valorSugeridoInicial = '',
+  comentarioInicial = '',
   onSuccess,
 }: SugerirCambioModalProps) {
-  const [valorSugerido, setValorSugerido] = useState('')
-  const [comentario, setComentario] = useState('')
+  const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
+  const [comentario, setComentario] = useState(comentarioInicial)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [confirmar, setConfirmar] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (open) {
+      setValorSugerido(valorSugeridoInicial)
+      setComentario(comentarioInicial)
+      setError('')
+      setConfirmar(false)
+    }
+  }, [open, valorSugeridoInicial, comentarioInicial])
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!comentario.trim()) {
       setError('El comentario es obligatorio')
       return
     }
     setError('')
+    setConfirmar(true)
+  }
+
+  const enviar = async () => {
     setSubmitting(true)
     try {
       await api.sugerencias.crear(edicionId, {
@@ -52,6 +71,7 @@ export function SugerirCambioModal({
         comentario: comentario.trim(),
       })
       toast.success('Sugerencia enviada correctamente')
+      setConfirmar(false)
       onOpenChange(false)
       onSuccess?.()
     } catch (err) {
@@ -112,6 +132,24 @@ export function SugerirCambioModal({
           </Button>
         </form>
       </DialogContent>
+
+      <Dialog open={confirmar} onOpenChange={setConfirmar}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Enviar sugerencia?</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que querés enviar la sugerencia para <strong>{label}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmar(false)} disabled={submitting}>Cancelar</Button>
+            <Button onClick={enviar} disabled={submitting}>
+              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {submitting ? 'Enviando...' : 'Enviar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

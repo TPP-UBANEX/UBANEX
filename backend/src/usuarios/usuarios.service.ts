@@ -6,6 +6,8 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { Usuario } from './usuario.entity';
+import { Carrera } from '../carreras/carrera.entity';
+import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { ActualizarEstadoValidacionDocenteDto } from './dto/actualizar-estado-validacion-docente.dto';
@@ -55,6 +57,10 @@ export class UsuariosService {
   constructor(
     @InjectRepository(Usuario)
     private readonly repo: Repository<Usuario>,
+    @InjectRepository(Carrera)
+    private readonly carreraRepo: Repository<Carrera>,
+    @InjectRepository(UnidadAcademica)
+    private readonly unidadAcademicaRepo: Repository<UnidadAcademica>,
     private readonly auditoria: AuditoriaService,
     private readonly mail: MailService,
   ) {}
@@ -251,9 +257,10 @@ export class UsuariosService {
       if (dto.direccionLocalidad !== undefined) entity.direccionLocalidad = dto.direccionLocalidad;
       if (dto.porcentajeCarrera !== undefined) entity.porcentajeCarrera = dto.porcentajeCarrera;
       if (dto.carreraId !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        entity.carrera = null as any;
         entity.carreraId = dto.carreraId;
+        entity.carrera = dto.carreraId
+          ? (await this.carreraRepo.findOne({ where: { id: dto.carreraId } })) ?? null
+          : null;
       }
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
       const saved = await this.repo.save(entity);
@@ -298,9 +305,10 @@ export class UsuariosService {
         }
       }
       if (dto.unidadAcademicaId !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        entity.unidadAcademica = null as any;
         entity.unidadAcademicaId = dto.unidadAcademicaId;
+        entity.unidadAcademica = dto.unidadAcademicaId
+          ? (await this.unidadAcademicaRepo.findOne({ where: { id: dto.unidadAcademicaId } })) ?? null
+          : null;
       }
       if (dto.habilitado !== undefined) entity.habilitado = dto.habilitado;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
