@@ -72,6 +72,7 @@ export interface Usuario {
   unidadAcademicaId?: string
   estadoValidacionDocente?: EstadoValidacionDocente
   habilitado: boolean
+  ocupado?: boolean
   ultimaActividad?: string
   creadoPor?: Usuario
   creadoPorId?: string

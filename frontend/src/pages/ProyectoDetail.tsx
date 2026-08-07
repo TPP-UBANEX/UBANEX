@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -204,7 +204,7 @@ export function ProyectoDetail() {
         unidadAcademicaId: uaId,
         convocatoriaId: edicion.convocatoriaId,
         edicionId: edicion.id,
-        incluirDeshabilitados: true,
+        incluirBloqueados: true,
       })
       setter(res)
     } catch {
@@ -215,6 +215,15 @@ export function ProyectoDetail() {
   }
 
   const nombreUA = (uaId?: string) => uas.find(u => u.id === uaId)?.nombre ?? 'Sin UA'
+
+  const motivoCandidato = (u: Usuario): string | null => {
+    if (u.ocupado) return 'Participa de otro proyecto'
+    if (u.estadoValidacionDocente && u.estadoValidacionDocente !== EstadoValidacionDocente.Validado) {
+      return 'No validado'
+    }
+    if (u.habilitado === false) return 'Deshabilitado'
+    return null
+  }
 
   const directorPrincipalUsuario = directores.find(d => d.esDirectorPrincipal)?.usuario
   const codirectorUsuario = directores.find(d => !d.esDirectorPrincipal)?.usuario
@@ -242,11 +251,25 @@ export function ProyectoDetail() {
     setEditDirectorId('')
     setEditCodirectorId('')
     const uaCreador = edicion?.unidadAcademicaId ?? ''
-    setEditDirectorUaId(uaCreador)
-    setEditCodirectorUaId(uaCreador)
-    if (edicion) {
-      cargarCandidatos(uaCreador, setCandidatosDireccion)
-      cargarCandidatos(uaCreador, setCandidatosCodireccion)
+    if (v) {
+      const uaDirector = directorPrincipalUsuario?.unidadAcademica?.id ?? uaCreador
+      const uaCodirector = codirectorUsuario?.unidadAcademica?.id
+        ?? (proyecto?.unidadAcademicaAdicionalId && proyecto.unidadAcademicaAdicionalId !== uaCreador
+          ? proyecto.unidadAcademicaAdicionalId
+          : uaCreador)
+      setEditDirectorUaId(uaDirector)
+      setEditCodirectorUaId(uaCodirector)
+      if (edicion) {
+        cargarCandidatos(uaDirector, setCandidatosDireccion)
+        cargarCandidatos(uaCodirector, setCandidatosCodireccion)
+      }
+    } else {
+      setEditDirectorUaId(uaCreador)
+      setEditCodirectorUaId(uaCreador)
+      if (edicion) {
+        cargarCandidatos(uaCreador, setCandidatosDireccion)
+        cargarCandidatos(uaCreador, setCandidatosCodireccion)
+      }
     }
   }
 
@@ -743,11 +766,14 @@ export function ProyectoDetail() {
                     <Select value={editDirectorId} onValueChange={setEditDirectorId}>
                       <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar director'} /></SelectTrigger>
                       <SelectContent>
-                        {opcionesDireccion.map(u => (
-                          <SelectItem key={u.id} value={u.id} disabled={u.habilitado === false}>
-                            {u.nombreCompleto}{u.habilitado === false ? ' — Deshabilitado' : ''}
-                          </SelectItem>
-                        ))}
+                        {opcionesDireccion.map(u => {
+                          const motivo = motivoCandidato(u)
+                          return (
+                            <SelectItem key={u.id} value={u.id} disabled={!!motivo}>
+                              {u.nombreCompleto}{motivo ? ` — ${motivo}` : ''}
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -770,11 +796,14 @@ export function ProyectoDetail() {
                     <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
                       <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar codirector'} /></SelectTrigger>
                       <SelectContent>
-                        {opcionesCodireccion.filter(u => u.id !== editDirectorId).map(u => (
-                          <SelectItem key={u.id} value={u.id} disabled={u.habilitado === false}>
-                            {u.nombreCompleto}{u.habilitado === false ? ' — Deshabilitado' : ''}
-                          </SelectItem>
-                        ))}
+                        {opcionesCodireccion.filter(u => u.id !== editDirectorId).map(u => {
+                          const motivo = motivoCandidato(u)
+                          return (
+                            <SelectItem key={u.id} value={u.id} disabled={!!motivo}>
+                              {u.nombreCompleto}{motivo ? ` — ${motivo}` : ''}
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>

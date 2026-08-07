@@ -472,8 +472,8 @@ export class ParticipacionConvocatoriaService {
     convocatoriaId: string,
     edicionId?: string,
     unidadAcademicaAdicionalId?: string,
-    incluirDeshabilitados = false,
-  ): Promise<Usuario[]> {
+    incluirBloqueados = false,
+  ): Promise<(Usuario & { ocupado: boolean })[]> {
     if (!unidadAcademicaId) throw new BadRequestException('unidadAcademicaId es requerido');
 
     const unidadAcademicaIds = [
@@ -484,7 +484,7 @@ export class ParticipacionConvocatoriaService {
     const where: FindOptionsWhere<Usuario> = {
       unidadAcademicaId: In(unidadAcademicaIds),
     };
-    if (!incluirDeshabilitados) where.habilitado = true;
+    if (!incluirBloqueados) where.habilitado = true;
 
     const usuarios = await this.usuarioRepo.find({
       where,
@@ -530,11 +530,14 @@ export class ParticipacionConvocatoriaService {
         .map(p => p.usuarioId),
     );
 
-    return usuarios.filter(u =>
-      u.roles.includes(RolUsuario.Docente) &&
-      u.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
-      !usuarioIdsOcupados.has(u.id),
-    );
+    return usuarios
+      .filter(u => u.roles.includes(RolUsuario.Docente))
+      .filter(u =>
+        incluirBloqueados ||
+        (u.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
+          !usuarioIdsOcupados.has(u.id)),
+      )
+      .map(u => ({ ...u, ocupado: usuarioIdsOcupados.has(u.id) }));
   }
 
   private async separarActivasYEstancadas(
