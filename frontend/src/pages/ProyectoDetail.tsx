@@ -259,10 +259,10 @@ export function ProyectoDetail() {
     if (!editEsInterfacultad || !edicion) return ''
     const uaCreador = edicion.unidadAcademicaId
     if (editDirectorUaId !== uaCreador && editCodirectorUaId !== uaCreador) {
-      return `Una unidad académica participante tiene que ser Facultad de ${nombreUA(uaCreador)}`
+      return `Una unidad académica participante tiene que ser ${nombreUA(uaCreador)}`
     }
     if (editDirectorUaId === editCodirectorUaId) {
-      return 'La dirección y la codirección deben pertenecer a unidades académicas distintas para ser Interfacultad'
+      return 'La dirección y la codirección deben pertenecer a unidades académicas distintas para ser interfacultad'
     }
     return ''
   })()
@@ -842,7 +842,7 @@ export function ProyectoDetail() {
                     </div>
                   )}
                   <div>
-                    <span className="text-muted-foreground">Dirección principal:</span>{' '}
+                    <span className="text-muted-foreground">Dirección:</span>{' '}
                     {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
                   </div>
                   <div>
