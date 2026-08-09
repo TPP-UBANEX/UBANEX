@@ -7,13 +7,20 @@ import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
 import { GuardarFormularioDto } from './dto/guardar-formulario.dto';
+import { GuardarEstructuraInstitucionalDto, GuardarEstructuraCruzadaDto } from './dto/guardar-estructura-template.dto';
 import { Emparejamiento } from './emparejamiento.entity';
 import { Formulario } from '../formularios/formulario.entity';
+import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
+import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
 import { validarCamposFormulario } from '../common/dto/validador-campos-formulario';
+import {
+  validarEstructuraInstitucional,
+  validarEstructuraCruzada,
+} from '../common/dto/validador-estructura-evaluacion';
 
 @Injectable()
 export class ConvocatoriasService {
@@ -26,6 +33,10 @@ export class ConvocatoriasService {
     private readonly emparejamientoRepo: Repository<Emparejamiento>,
     @InjectRepository(UnidadAcademica)
     private readonly uaRepo: Repository<UnidadAcademica>,
+    @InjectRepository(TemplateEvaluacionInstitucional)
+    private readonly templateInstitucionalRepo: Repository<TemplateEvaluacionInstitucional>,
+    @InjectRepository(TemplateEvaluacionCruzada)
+    private readonly templateCruzadaRepo: Repository<TemplateEvaluacionCruzada>,
   ) {}
 
   listar() {
@@ -165,6 +176,124 @@ export class ConvocatoriasService {
     if (convocatoria.formularioId !== guardado.id) {
       convocatoria.formularioId = guardado.id;
       convocatoria.formulario = guardado;
+      await this.repo.save(convocatoria);
+    }
+
+    return guardado;
+  }
+
+  // ───────────── Templates de evaluación ─────────────
+
+  async obtenerTemplateInstitucional(convocatoriaId: string): Promise<TemplateEvaluacionInstitucional> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateEvaluacionInstitucional: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.templateEvaluacionInstitucional) {
+      return convocatoria.templateEvaluacionInstitucional;
+    }
+
+    return {
+      id: '',
+      nombre: '',
+      esDefault: false,
+      esPlantilla: false,
+      estructura: null,
+    } as TemplateEvaluacionInstitucional;
+  }
+
+  async guardarTemplateInstitucional(
+    convocatoriaId: string,
+    dto: GuardarEstructuraInstitucionalDto,
+  ): Promise<TemplateEvaluacionInstitucional> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateEvaluacionInstitucional: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.estado !== EstadoConvocatoria.Configuracion) {
+      throw new BadRequestException(
+        'El template de evaluación institucional solo puede editarse mientras la convocatoria está en etapa de configuración',
+      );
+    }
+
+    validarEstructuraInstitucional(dto.estructura);
+
+    let template = convocatoria.templateEvaluacionInstitucional;
+    if (!template) {
+      template = this.templateInstitucionalRepo.create({
+        nombre: `Evaluación institucional ${convocatoria.nombre}`,
+        esDefault: false,
+        esPlantilla: false,
+      });
+    }
+    template.estructura = dto.estructura ?? null;
+    const guardado = await this.templateInstitucionalRepo.save(template);
+
+    if (convocatoria.templateEvaluacionInstitucionalId !== guardado.id) {
+      convocatoria.templateEvaluacionInstitucionalId = guardado.id;
+      convocatoria.templateEvaluacionInstitucional = guardado;
+      await this.repo.save(convocatoria);
+    }
+
+    return guardado;
+  }
+
+  async obtenerTemplateCruzada(convocatoriaId: string): Promise<TemplateEvaluacionCruzada> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateEvaluacionCruzada: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.templateEvaluacionCruzada) {
+      return convocatoria.templateEvaluacionCruzada;
+    }
+
+    return {
+      id: '',
+      nombre: '',
+      esDefault: false,
+      esPlantilla: false,
+      estructura: null,
+    } as TemplateEvaluacionCruzada;
+  }
+
+  async guardarTemplateCruzada(
+    convocatoriaId: string,
+    dto: GuardarEstructuraCruzadaDto,
+  ): Promise<TemplateEvaluacionCruzada> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateEvaluacionCruzada: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.estado !== EstadoConvocatoria.Configuracion) {
+      throw new BadRequestException(
+        'El template de evaluación cruzada solo puede editarse mientras la convocatoria está en etapa de configuración',
+      );
+    }
+
+    validarEstructuraCruzada(dto.estructura);
+
+    let template = convocatoria.templateEvaluacionCruzada;
+    if (!template) {
+      template = this.templateCruzadaRepo.create({
+        nombre: `Evaluación cruzada ${convocatoria.nombre}`,
+        esDefault: false,
+        esPlantilla: false,
+      });
+    }
+    template.estructura = dto.estructura ?? null;
+    const guardado = await this.templateCruzadaRepo.save(template);
+
+    if (convocatoria.templateEvaluacionCruzadaId !== guardado.id) {
+      convocatoria.templateEvaluacionCruzadaId = guardado.id;
+      convocatoria.templateEvaluacionCruzada = guardado;
       await this.repo.save(convocatoria);
     }
 

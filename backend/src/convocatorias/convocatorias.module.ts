@@ -6,9 +6,20 @@ import { Convocatoria } from './convocatoria.entity';
 import { Emparejamiento } from './emparejamiento.entity';
 import { Formulario } from '../formularios/formulario.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
+import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
+import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Convocatoria, Emparejamiento, Formulario, UnidadAcademica])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Convocatoria,
+      Emparejamiento,
+      Formulario,
+      UnidadAcademica,
+      TemplateEvaluacionInstitucional,
+      TemplateEvaluacionCruzada,
+    ]),
+  ],
   controllers: [ConvocatoriasController],
   providers: [ConvocatoriasService],
   exports: [ConvocatoriasService],
