@@ -259,7 +259,7 @@ function InstitucionalView({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Ediciones de mi Unidad Académica</CardTitle>
+          <CardTitle className="text-sm font-medium">Proyectos de mi Unidad Académica</CardTitle>
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
