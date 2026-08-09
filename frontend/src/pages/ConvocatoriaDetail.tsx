@@ -38,6 +38,7 @@ import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab'
+import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -345,6 +346,7 @@ export function ConvocatoriaDetail() {
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
           {esRectorado && <TabsTrigger value="formulario">Formulario</TabsTrigger>}
+          {esRectorado && <TabsTrigger value="evaluacion">Evaluación</TabsTrigger>}
         </TabsList>
         <TabsContent value="proyectos" className="mt-4">
           <Card>
@@ -417,6 +419,11 @@ export function ConvocatoriaDetail() {
         {esRectorado && (
           <TabsContent value="formulario" className="mt-4">
             {id && conv && <FormularioBuilderTab convocatoriaId={id} estadoConvocatoria={conv.estado} />}
+          </TabsContent>
+        )}
+        {esRectorado && (
+          <TabsContent value="evaluacion" className="mt-4">
+            {id && conv && <EvaluacionConfigTab convocatoriaId={id} estadoConvocatoria={conv.estado} />}
           </TabsContent>
         )}
         <TabsContent value="evaluadores" className="mt-4">

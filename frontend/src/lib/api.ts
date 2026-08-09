@@ -133,6 +133,18 @@ export const api = {
       guardar: (convocatoriaId: string, campos: import('@/data/types').CampoFormulario[]) =>
         request<import('@/data/types').Formulario>('PUT', `/convocatorias/${convocatoriaId}/formulario`, { campos }),
     },
+    templateInstitucional: {
+      get: (convocatoriaId: string) =>
+        get<import('@/data/types').TemplateEvaluacionInstitucional>(`/convocatorias/${convocatoriaId}/template-evaluacion-institucional`),
+      guardar: (convocatoriaId: string, estructura: import('@/data/types').EstructuraTemplateInstitucional | null) =>
+        request<import('@/data/types').TemplateEvaluacionInstitucional>('PUT', `/convocatorias/${convocatoriaId}/template-evaluacion-institucional`, { estructura }),
+    },
+    templateCruzada: {
+      get: (convocatoriaId: string) =>
+        get<import('@/data/types').TemplateEvaluacionCruzada>(`/convocatorias/${convocatoriaId}/template-evaluacion-cruzada`),
+      guardar: (convocatoriaId: string, estructura: import('@/data/types').EstructuraTemplateCruzada | null) =>
+        request<import('@/data/types').TemplateEvaluacionCruzada>('PUT', `/convocatorias/${convocatoriaId}/template-evaluacion-cruzada`, { estructura }),
+    },
   },
   proyectos: {
     list: (params?: Record<string, string>) => {
