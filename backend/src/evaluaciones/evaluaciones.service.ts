@@ -6,17 +6,23 @@ import { Repository } from 'typeorm';
 import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
 import { EvaluacionCruzada } from './evaluacion-cruzada.entity';
 import { GuardarEvaluacionInstitucionalDto } from './dto/guardar-evaluacion-institucional.dto';
+import { GuardarEvaluacionCruzadaDto } from './dto/guardar-evaluacion-cruzada.dto';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
+import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { Usuario } from '../usuarios/usuario.entity';
+import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoEvaluacion } from '../common/enums/estado-evaluacion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
+import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
-import { validarRespuestasInstitucionales } from './validar-respuestas-evaluacion';
-import { EstructuraTemplateInstitucional } from '../templates-evaluacion/estructura-template';
+import { validarRespuestasInstitucionales, validarRespuestasCruzadas } from './validar-respuestas-evaluacion';
+import { EstructuraTemplateInstitucional, EstructuraTemplateCruzada } from '../templates-evaluacion/estructura-template';
 
 @Injectable()
 export class EvaluacionesService {
@@ -29,6 +35,10 @@ export class EvaluacionesService {
     private readonly convocatoriaRepo: Repository<Convocatoria>,
     @InjectRepository(Edicion)
     private readonly edicionRepo: Repository<Edicion>,
+    @InjectRepository(Emparejamiento)
+    private readonly emparejamientoRepo: Repository<Emparejamiento>,
+    @InjectRepository(ParticipacionConvocatoria)
+    private readonly participacionRepo: Repository<ParticipacionConvocatoria>,
     private readonly auditoria: AuditoriaService,
   ) {}
 
@@ -229,6 +239,321 @@ export class EvaluacionesService {
     if (faltantes.length > 0) {
       throw new BadRequestException(
         `La evaluación está incompleta. Faltan responder: ${faltantes.join(', ')}`,
+      );
+    }
+  }
+
+  // ───────────── Evaluación Cruzada ─────────────
+
+  async listarCruzadasDisponibles(convocatoriaId: string, usuario: Usuario) {
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    await this.validarEvaluadorAprobado(convocatoriaId, usuario);
+
+    const uaEmparejada = await this.obtenerUaEmparejada(convocatoriaId, usuario.unidadAcademicaId);
+    const conflictos = await this.edicionesConConflicto(usuario.id, convocatoriaId);
+
+    const misEvaluaciones = await this.cruzadaRepo.find({ where: { evaluadorId: usuario.id, convocatoriaId } });
+    const misEdicionesEvaluadas = new Set(misEvaluaciones.map(e => e.edicionId));
+
+    const evaluacionesConvocatoria = await this.cruzadaRepo.find({ where: { convocatoriaId } });
+    const propiosEvaluados = new Set(
+      evaluacionesConvocatoria
+        .filter(e => e.tipo === TipoEvaluacionCruzada.Propia)
+        .map(e => e.edicionId),
+    );
+    const ajenosEvaluados = new Set(
+      evaluacionesConvocatoria
+        .filter(e => e.tipo === TipoEvaluacionCruzada.Ajena)
+        .map(e => e.edicionId),
+    );
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion },
+      relations: { proyecto: true, unidadAcademica: true, creadoPor: true },
+      order: { actualizadoEn: 'DESC' },
+    });
+
+    const resultado: Array<{ edicion: Edicion; tipo: TipoEvaluacionCruzada; evaluacion: EvaluacionCruzada | null }> = [];
+
+    for (const ed of ediciones) {
+      if (conflictos.has(ed.id)) continue;
+
+      if (misEdicionesEvaluadas.has(ed.id)) {
+        const miEvaluacion = misEvaluaciones.find(
+          e => e.edicionId === ed.id && e.tipo === TipoEvaluacionCruzada.TerceraUa,
+        );
+        if (miEvaluacion) {
+          resultado.push({ edicion: ed, tipo: TipoEvaluacionCruzada.TerceraUa, evaluacion: miEvaluacion });
+        }
+        continue;
+      }
+
+      if (ed.unidadAcademicaId === usuario.unidadAcademicaId) {
+        if (!propiosEvaluados.has(ed.id)) {
+          resultado.push({ edicion: ed, tipo: TipoEvaluacionCruzada.Propia, evaluacion: null });
+        }
+      } else if (uaEmparejada && ed.unidadAcademicaId === uaEmparejada) {
+        if (!ajenosEvaluados.has(ed.id)) {
+          resultado.push({ edicion: ed, tipo: TipoEvaluacionCruzada.Ajena, evaluacion: null });
+        }
+      }
+    }
+
+    for (const evaluacion of misEvaluaciones) {
+      if (evaluacion.tipo !== TipoEvaluacionCruzada.TerceraUa) continue;
+      if (resultado.some(r => r.edicion.id === evaluacion.edicionId)) continue;
+      const ed = ediciones.find(x => x.id === evaluacion.edicionId);
+      if (ed) {
+        resultado.push({ edicion: ed, tipo: TipoEvaluacionCruzada.TerceraUa, evaluacion });
+      }
+    }
+
+    return resultado;
+  }
+
+  async obtenerCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {
+    const { convocatoria } = await this.validarEdicionParaCruzada(convocatoriaId, edicionId, usuario);
+
+    const template = convocatoria.templateEvaluacionCruzada;
+    if (!template) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el template de evaluación cruzada',
+      );
+    }
+
+    const evaluacion = await this.cruzadaRepo.findOne({
+      where: { edicionId, evaluadorId: usuario.id },
+      relations: { edicion: { proyecto: true } },
+    });
+
+    return { evaluacion, template };
+  }
+
+  async guardarCruzada(
+    convocatoriaId: string,
+    edicionId: string,
+    dto: GuardarEvaluacionCruzadaDto,
+    usuario: Usuario,
+  ) {
+    const { convocatoria, edicion, tipo } = await this.validarEdicionParaCruzada(
+      convocatoriaId,
+      edicionId,
+      usuario,
+    );
+
+    const template = convocatoria.templateEvaluacionCruzada;
+    if (!template) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el template de evaluación cruzada',
+      );
+    }
+
+    validarRespuestasCruzadas(template.estructura, dto.items);
+
+    let evaluacion = await this.cruzadaRepo.findOne({
+      where: { edicionId, evaluadorId: usuario.id },
+    });
+    if (evaluacion && evaluacion.estado === EstadoEvaluacion.Confirmada) {
+      throw new BadRequestException('La evaluación ya fue confirmada y no puede modificarse');
+    }
+
+    if (!evaluacion) {
+      if (tipo === TipoEvaluacionCruzada.Propia) {
+        const otra = await this.cruzadaRepo.findOne({
+          where: { edicionId, tipo: TipoEvaluacionCruzada.Propia },
+        });
+        if (otra) {
+          throw new BadRequestException('La edición ya tiene una evaluación propia de tu Unidad Académica');
+        }
+      } else if (tipo === TipoEvaluacionCruzada.Ajena) {
+        const otra = await this.cruzadaRepo.findOne({
+          where: { edicionId, tipo: TipoEvaluacionCruzada.Ajena },
+        });
+        if (otra) {
+          throw new BadRequestException('La edición ya tiene una evaluación ajena de la Unidad Académica emparejada');
+        }
+      }
+
+      evaluacion = this.cruzadaRepo.create({
+        convocatoriaId,
+        edicionId,
+        evaluadorId: usuario.id,
+        tipo,
+        templateId: template.id,
+        estado: EstadoEvaluacion.Borrador,
+      });
+    }
+
+    if (dto.items !== undefined) evaluacion.items = dto.items;
+    if (dto.observaciones !== undefined) evaluacion.observaciones = dto.observaciones;
+    const guardado = await this.cruzadaRepo.save(evaluacion);
+
+    return {
+      evaluacion: guardado,
+      template,
+      edicion: { id: edicion.id, proyectoId: edicion.proyectoId },
+    };
+  }
+
+  async confirmarCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {
+    const { convocatoria, edicion } = await this.validarEdicionParaCruzada(
+      convocatoriaId,
+      edicionId,
+      usuario,
+    );
+
+    const template = convocatoria.templateEvaluacionCruzada;
+    if (!template) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el template de evaluación cruzada',
+      );
+    }
+
+    const evaluacion = await this.cruzadaRepo.findOne({
+      where: { edicionId, evaluadorId: usuario.id },
+    });
+    if (!evaluacion) throw new NotFoundException('La evaluación cruzada no existe todavía');
+    if (evaluacion.estado === EstadoEvaluacion.Confirmada) {
+      throw new BadRequestException('La evaluación ya fue confirmada');
+    }
+
+    this.validarCompletitudCruzada(template.estructura, evaluacion);
+
+    evaluacion.estado = EstadoEvaluacion.Confirmada;
+    const guardado = await this.cruzadaRepo.save(evaluacion);
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EVALUACION,
+      descripcion: `Confirmó la evaluación cruzada (${evaluacion.tipo}) de la edición ${edicion.id.slice(0, 8)}...`,
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+    });
+
+    return guardado;
+  }
+
+  private async validarEvaluadorAprobado(convocatoriaId: string, usuario: Usuario): Promise<void> {
+    const participacion = await this.participacionRepo.findOne({
+      where: {
+        usuarioId: usuario.id,
+        convocatoriaId,
+        rol: RolEjecucion.Evaluador,
+        estado: EstadoPropuestaEvaluador.Aprobado,
+      },
+    });
+    if (!participacion) {
+      throw new ForbiddenException('Solo evaluadores aprobados de la convocatoria pueden evaluar');
+    }
+  }
+
+  private async obtenerUaEmparejada(convocatoriaId: string, uaId: string): Promise<string | null> {
+    const par = await this.emparejamientoRepo.findOne({
+      where: [{ unidadAId: uaId }, { unidadBId: uaId }],
+    });
+    if (!par) return null;
+    return par.unidadAId === uaId ? par.unidadBId : par.unidadAId;
+  }
+
+  private async edicionesConConflicto(
+    usuarioId: string,
+    convocatoriaId: string,
+  ): Promise<Set<string>> {
+    const creadas = await this.edicionRepo.find({
+      where: { creadoPorId: usuarioId, convocatoriaId },
+      select: { id: true },
+    });
+    const participaciones = await this.participacionRepo.find({
+      where: { usuarioId, convocatoriaId },
+      select: { edicionId: true },
+    });
+    const ids = new Set<string>(creadas.map(e => e.id));
+    for (const p of participaciones) {
+      if (p.edicionId) ids.add(p.edicionId);
+    }
+    return ids;
+  }
+
+  private async validarEdicionParaCruzada(
+    convocatoriaId: string,
+    edicionId: string,
+    usuario: Usuario,
+  ): Promise<{ convocatoria: Convocatoria; edicion: Edicion; tipo: TipoEvaluacionCruzada }> {
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateEvaluacionCruzada: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    await this.validarEvaluadorAprobado(convocatoriaId, usuario);
+
+    const edicion = await this.edicionRepo.findOne({
+      where: { id: edicionId, convocatoriaId },
+      relations: { proyecto: true },
+    });
+    if (!edicion) throw new NotFoundException('Edición no encontrada');
+
+    const conflictos = await this.edicionesConConflicto(usuario.id, convocatoriaId);
+    if (conflictos.has(edicion.id)) {
+      throw new ForbiddenException('No podés evaluar un proyecto en el que participás');
+    }
+
+    const uaEmparejada = await this.obtenerUaEmparejada(convocatoriaId, usuario.unidadAcademicaId);
+    const tipo = await this.tipoParaEdicion(convocatoriaId, edicion, usuario, uaEmparejada);
+    if (!tipo) {
+      throw new ForbiddenException(
+        'Esta edición no corresponde a tu Unidad Académica ni a la emparejada',
+      );
+    }
+
+    return { convocatoria, edicion, tipo };
+  }
+
+  private async tipoParaEdicion(
+    convocatoriaId: string,
+    edicion: Edicion,
+    usuario: Usuario,
+    uaEmparejada: string | null,
+  ): Promise<TipoEvaluacionCruzada | null> {
+    if (edicion.unidadAcademicaId === usuario.unidadAcademicaId) {
+      return TipoEvaluacionCruzada.Propia;
+    }
+    if (uaEmparejada && edicion.unidadAcademicaId === uaEmparejada) {
+      return TipoEvaluacionCruzada.Ajena;
+    }
+    const designada = await this.cruzadaRepo.findOne({
+      where: {
+        evaluadorId: usuario.id,
+        edicionId: edicion.id,
+        tipo: TipoEvaluacionCruzada.TerceraUa,
+      },
+    });
+    if (designada) return TipoEvaluacionCruzada.TerceraUa;
+    return null;
+  }
+
+  private validarCompletitudCruzada(
+    estructura: EstructuraTemplateCruzada | null | undefined,
+    evaluacion: EvaluacionCruzada,
+  ): void {
+    const items = (evaluacion.items ?? {}) as Record<string, unknown>;
+    const faltantes: string[] = [];
+    for (const categoria of estructura?.categorias ?? []) {
+      for (const item of categoria.items) {
+        if (items[item.id] === undefined || items[item.id] === null) {
+          faltantes.push(item.nombre);
+        }
+      }
+    }
+    if (faltantes.length > 0) {
+      throw new BadRequestException(
+        `La evaluación está incompleta. Faltan puntajes: ${faltantes.join(', ')}`,
       );
     }
   }
