@@ -915,7 +915,17 @@ async function bootstrap() {
 
   async function seedConvocatoria(data: Partial<Convocatoria>): Promise<Convocatoria> {
     const existe = await convocatoriaRepo.findOne({ where: { nombre: data.nombre } });
-    if (existe) return existe;
+    if (existe) {
+      // Reconciliación idempotente del estado: bases previas crearon conv2026 en
+      // Presentacion y no se puede avanzar por la UI porque sus fechas son
+      // anteriores a hoy (validarFechasConvocatoria las rechaza).
+      if (data.estado && existe.estado !== data.estado) {
+        existe.estado = data.estado;
+        await convocatoriaRepo.save(existe);
+        console.log(`  ${existe.nombre} — estado reconciliado a ${existe.estado}`);
+      }
+      return existe;
+    }
     const conv = convocatoriaRepo.create(data as Convocatoria);
     const saved = await convocatoriaRepo.save(conv);
     console.log(`  ${saved.nombre} (${saved.estado})`);
@@ -965,7 +975,7 @@ async function bootstrap() {
     nombre: 'UBANEX 2026',
     descripcion: 'Convocatoria UBANEX del año 2026',
     anio: 2026,
-    estado: EstadoConvocatoria.Presentacion,
+    estado: EstadoConvocatoria.Evaluacion,
     fechaInicioPresentacion: crearFecha(2026, 3, 1),
     fechaFinPresentacion: crearFecha(2026, 7, 31),
     fechaInicioEvaluacion: crearFecha(2026, 8, 15),
@@ -1071,7 +1081,20 @@ async function bootstrap() {
     const existeProyecto = await proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
     if (existeProyecto) {
       const ed = await edicionRepo.findOne({ where: { proyectoId: existeProyecto.id, convocatoriaId: convocatoria.id } });
-      if (ed) return { proyecto: existeProyecto, edicion: ed };
+      if (ed) {
+        // Reconciliación idempotente: al avanzar conv2026 a Evaluación, las
+        // ediciones presentadas quedan EnEvaluacion (mismo criterio que
+        // convocatorias.service.ts).
+        if (
+          estado === EstadoEdicion.EnEvaluacion &&
+          (ed.estado === EstadoEdicion.Presentado || ed.estado === EstadoEdicion.PendienteDeCambios)
+        ) {
+          ed.estado = EstadoEdicion.EnEvaluacion;
+          await edicionRepo.save(ed);
+          console.log(`  ${nombreProyecto} — estado reconciliado a ${ed.estado}`);
+        }
+        return { proyecto: existeProyecto, edicion: ed };
+      }
     }
 
     const proyecto = await proyectoRepo.save(
@@ -1097,14 +1120,14 @@ async function bootstrap() {
     return { proyecto, edicion };
   }
 
-  // UBANEX 2026 — en Presentacion
+  // UBANEX 2026 — en Evaluacion
   const p1 = await seedProyectoConEdicion(
     'Red de Voluntariado Ambiental',
     garcia, derecho, conv2026, EstadoEdicion.Borrador, presupuestoBorrador,
   );
   const p2 = await seedProyectoConEdicion(
     'Inclusión Digital en Barrios Populares',
-    perez, derecho, conv2026, EstadoEdicion.Presentado, presupuestoBorrador,
+    perez, derecho, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador,
   );
   const p3 = await seedProyectoConEdicion(
     'Huerta Comunitaria y Seguridad Alimentaria',
@@ -1112,7 +1135,7 @@ async function bootstrap() {
   );
   const p4 = await seedProyectoConEdicion(
     'Alfabetización Científica en Escuelas',
-    diaz, ingenieria, conv2026, EstadoEdicion.Presentado, presupuestoBorrador,
+    diaz, ingenieria, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador,
   );
 
   // UBANEX 2025 — en Ejecucion
