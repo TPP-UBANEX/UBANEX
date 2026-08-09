@@ -162,7 +162,6 @@ export const api = {
       del(`/proyectos/${id}/ediciones/${edicionId}`),
   },
   evaluaciones: {
-    list: (): Promise<import('@/data/types').Evaluacion[]> => Promise.resolve([]),
     monitoreo: (convocatoriaId: string) =>
       get<import('@/data/types').MonitoreoEvaluacion>(`/evaluaciones?convocatoriaId=${convocatoriaId}`),
     institucionales: {
