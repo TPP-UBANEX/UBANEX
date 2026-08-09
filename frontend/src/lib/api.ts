@@ -150,9 +150,50 @@ export const api = {
       del(`/proyectos/${id}/ediciones/${edicionId}`),
   },
   evaluaciones: {
-    list: (proyectoId?: string) => {
-      const qs = proyectoId ? `?proyectoId=${proyectoId}` : ''
-      return get<import('@/data/types').Evaluacion[]>(`/evaluaciones${qs}`)
+    list: (): Promise<import('@/data/types').Evaluacion[]> => Promise.resolve([]),
+    monitoreo: (convocatoriaId: string) =>
+      get<import('@/data/types').MonitoreoEvaluacion>(`/evaluaciones?convocatoriaId=${convocatoriaId}`),
+    institucionales: {
+      listar: (convocatoriaId: string) =>
+        get<import('@/data/types').EdicionEvaluableInstitucional[]>(`/evaluaciones/institucionales?convocatoriaId=${convocatoriaId}`),
+      obtener: (convocatoriaId: string, edicionId: string) =>
+        get<{ evaluacion: import('@/data/types').EvaluacionInstitucional | null; template: import('@/data/types').TemplateEvaluacionInstitucional | null }>(`/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`),
+      guardar: (convocatoriaId: string, edicionId: string, data: import('@/data/types').GuardarEvaluacionInstitucionalDto) =>
+        request<{ evaluacion: import('@/data/types').EvaluacionInstitucional; template: import('@/data/types').TemplateEvaluacionInstitucional | null }>('PUT', `/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`, data),
+      confirmar: (convocatoriaId: string, edicionId: string) =>
+        post<import('@/data/types').EvaluacionInstitucional>(`/evaluaciones/institucionales/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
+    },
+    cruzadas: {
+      disponibles: (convocatoriaId: string) =>
+        get<import('@/data/types').EdicionEvaluableCruzada[]>(`/evaluaciones/cruzadas/disponibles?convocatoriaId=${convocatoriaId}`),
+      obtener: (convocatoriaId: string, edicionId: string) =>
+        get<{ evaluacion: import('@/data/types').EvaluacionCruzada | null; template: import('@/data/types').TemplateEvaluacionCruzada | null }>(`/evaluaciones/cruzadas/${edicionId}?convocatoriaId=${convocatoriaId}`),
+      guardar: (convocatoriaId: string, edicionId: string, data: import('@/data/types').GuardarEvaluacionCruzadaDto) =>
+        request<{ evaluacion: import('@/data/types').EvaluacionCruzada; template: import('@/data/types').TemplateEvaluacionCruzada | null }>('PUT', `/evaluaciones/cruzadas/${edicionId}?convocatoriaId=${convocatoriaId}`, data),
+      confirmar: (convocatoriaId: string, edicionId: string) =>
+        post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
+      designarTercera: (convocatoriaId: string, edicionId: string, evaluadorId: string) =>
+        post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/designar-tercera?convocatoriaId=${convocatoriaId}`, { evaluadorId }),
+    },
+  },
+  templatesEvaluacion: {
+    institucionales: {
+      list: () => get<import('@/data/types').TemplateEvaluacionInstitucional[]>('/templates-evaluacion-institucional'),
+      get: (id: string) => get<import('@/data/types').TemplateEvaluacionInstitucional>(`/templates-evaluacion-institucional/${id}`),
+      crear: (data: import('@/data/types').GuardarTemplateInstitucionalDto) =>
+        post<import('@/data/types').TemplateEvaluacionInstitucional>('/templates-evaluacion-institucional', data),
+      actualizar: (id: string, data: Partial<import('@/data/types').GuardarTemplateInstitucionalDto>) =>
+        patch<import('@/data/types').TemplateEvaluacionInstitucional>(`/templates-evaluacion-institucional/${id}`, data),
+      eliminar: (id: string) => del(`/templates-evaluacion-institucional/${id}`),
+    },
+    cruzadas: {
+      list: () => get<import('@/data/types').TemplateEvaluacionCruzada[]>('/templates-evaluacion-cruzada'),
+      get: (id: string) => get<import('@/data/types').TemplateEvaluacionCruzada>(`/templates-evaluacion-cruzada/${id}`),
+      crear: (data: import('@/data/types').GuardarTemplateCruzadaDto) =>
+        post<import('@/data/types').TemplateEvaluacionCruzada>('/templates-evaluacion-cruzada', data),
+      actualizar: (id: string, data: Partial<import('@/data/types').GuardarTemplateCruzadaDto>) =>
+        patch<import('@/data/types').TemplateEvaluacionCruzada>(`/templates-evaluacion-cruzada/${id}`, data),
+      eliminar: (id: string) => del(`/templates-evaluacion-cruzada/${id}`),
     },
   },
   formularios: {
