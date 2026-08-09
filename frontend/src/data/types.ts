@@ -487,6 +487,35 @@ export interface MonitoreoEvaluacion {
   }>
 }
 
+export interface EvaluacionEdicionDetalle {
+  convocatoria: {
+    id: string
+    nombre: string | null
+    estado: string | null
+  }
+  institucional: {
+    id: string
+    estado: EstadoEvaluacion
+    observaciones: string | null
+    realizadoPor: { id: string; nombreCompleto: string } | null
+    confirmadoPor: { id: string; nombreCompleto: string } | null
+    categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
+    checklist: Record<string, boolean> | null
+  } | null
+  cruzadas: Array<{
+    id: string
+    tipo: TipoEvaluacionCruzada
+    estado: EstadoEvaluacion
+    evaluador: { id: string; nombreCompleto: string } | null
+    observaciones: string | null
+    items: Record<string, number> | null
+    puntaje: number | null
+    puntajeMaximo: number | null
+  }>
+  estructuraInstitucional: EstructuraTemplateInstitucional | null
+  estructuraCruzada: EstructuraTemplateCruzada | null
+}
+
 export interface GuardarEvaluacionInstitucionalDto {
   categorias?: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
   checklist?: Record<string, boolean> | null
@@ -652,6 +681,7 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Aceptada: 'default',
   Rechazada: 'destructive',
   MasInformacion: 'outline',
+  Confirmada: 'default',
 }
 
 export const estadoConvocatoriaLabel: Record<string, string> = {

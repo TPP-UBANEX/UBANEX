@@ -164,6 +164,8 @@ export const api = {
   evaluaciones: {
     monitoreo: (convocatoriaId: string) =>
       get<import('@/data/types').MonitoreoEvaluacion>(`/evaluaciones?convocatoriaId=${convocatoriaId}`),
+    edicion: (edicionId: string) =>
+      get<import('@/data/types').EvaluacionEdicionDetalle>(`/evaluaciones/edicion/${edicionId}`),
     institucionales: {
       listar: (convocatoriaId: string) =>
         get<import('@/data/types').EdicionEvaluableInstitucional[]>(`/evaluaciones/institucionales?convocatoriaId=${convocatoriaId}`),

@@ -100,6 +100,112 @@ export class EvaluacionesService {
     };
   }
 
+  // Resumen de la evaluación de una edición para su director y las autoridades.
+  // Durante el proceso solo se expone el estado; los detalles (valoraciones,
+  // fundamentaciones, observaciones y puntajes) se muestran una vez confirmados.
+  async evaluacionDeEdicion(edicionId: string, usuario: Usuario) {
+    const edicion = await this.edicionRepo.findOne({
+      where: { id: edicionId },
+      relations: {
+        unidadAcademica: true,
+        creadoPor: true,
+        convocatoria: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+      },
+    });
+    if (!edicion) throw new NotFoundException('Edición no encontrada');
+
+    const roles = usuario.roles ?? [];
+    const esRectorado = roles.some(
+      r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+    );
+    const esSecretariaUA =
+      roles.some(
+        r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+      ) && edicion.unidadAcademicaId === usuario.unidadAcademicaId;
+    const esDirector =
+      edicion.creadoPorId === usuario.id ||
+      !!(await this.participacionRepo.findOne({
+        where: {
+          usuarioId: usuario.id,
+          convocatoriaId: edicion.convocatoriaId,
+          rol: RolEjecucion.DirectorDeProyecto,
+        },
+      }));
+
+    if (!esDirector && !esSecretariaUA && !esRectorado) {
+      throw new ForbiddenException('No tenés acceso a la evaluación de esta edición');
+    }
+
+    const institucional = await this.institucionalRepo.findOne({
+      where: { edicionId },
+      relations: { realizadoPor: true, confirmadoPor: true },
+    });
+    const cruzadas = await this.cruzadaRepo.find({
+      where: { edicionId },
+      relations: { evaluador: true },
+      order: { tipo: 'ASC' },
+    });
+
+    const estructuraCruzada = edicion.convocatoria?.templateEvaluacionCruzada?.estructura ?? null;
+    const maxCruzada = estructuraCruzada
+      ? (estructuraCruzada.categorias ?? [])
+          .flatMap(c => c.items ?? [])
+          .reduce((suma, item) => suma + (item.puntajeMaximo ?? 0), 0)
+      : null;
+
+    const verDetalleInst =
+      esSecretariaUA || esRectorado || institucional?.estado === EstadoEvaluacion.Confirmada;
+    const verDetalleCruz = (c: EvaluacionCruzada) =>
+      esSecretariaUA || esRectorado || c.estado === EstadoEvaluacion.Confirmada;
+    const algunaCruzadaConfirmada = cruzadas.some(c => c.estado === EstadoEvaluacion.Confirmada);
+
+    return {
+      convocatoria: {
+        id: edicion.convocatoriaId,
+        nombre: edicion.convocatoria?.nombre ?? null,
+        estado: edicion.convocatoria?.estado ?? null,
+      },
+      institucional: institucional
+        ? {
+            id: institucional.id,
+            estado: institucional.estado,
+            observaciones: verDetalleInst ? institucional.observaciones : null,
+            realizadoPor: institucional.realizadoPor
+              ? { id: institucional.realizadoPor.id, nombreCompleto: institucional.realizadoPor.nombreCompleto }
+              : null,
+            confirmadoPor: institucional.confirmadoPor
+              ? { id: institucional.confirmadoPor.id, nombreCompleto: institucional.confirmadoPor.nombreCompleto }
+              : null,
+            categorias: verDetalleInst ? institucional.categorias : null,
+            checklist: verDetalleInst ? institucional.checklist : null,
+          }
+        : null,
+      cruzadas: cruzadas.map(c => {
+        const ver = verDetalleCruz(c);
+        return {
+          id: c.id,
+          tipo: c.tipo,
+          estado: c.estado,
+          evaluador: c.evaluador
+            ? { id: c.evaluador.id, nombreCompleto: c.evaluador.nombreCompleto }
+            : null,
+          observaciones: ver ? c.observaciones : null,
+          items: ver ? c.items : null,
+          puntaje: ver
+            ? Object.values(c.items ?? {}).reduce<number>((suma, v) => suma + Number(v), 0)
+            : null,
+          puntajeMaximo: ver ? maxCruzada : null,
+        };
+      }),
+      estructuraInstitucional: verDetalleInst
+        ? (edicion.convocatoria?.templateEvaluacionInstitucional?.estructura ?? null)
+        : null,
+      estructuraCruzada: esSecretariaUA || esRectorado || algunaCruzadaConfirmada
+        ? estructuraCruzada
+        : null,
+    };
+  }
+
   // ───────────── Evaluación Institucional ─────────────
 
   async listarInstitucionales(convocatoriaId: string, usuario: Usuario) {

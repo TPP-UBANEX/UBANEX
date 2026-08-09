@@ -21,6 +21,11 @@ export class EvaluacionesController {
     return this.service.monitoreo(convocatoriaId);
   }
 
+  @Get('edicion/:edicionId')
+  evaluacionDeEdicion(@Param('edicionId') edicionId: string, @CurrentUser() usuario: Usuario) {
+    return this.service.evaluacionDeEdicion(edicionId, usuario);
+  }
+
   @Get('institucionales')
   @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
   listarInstitucionales(
