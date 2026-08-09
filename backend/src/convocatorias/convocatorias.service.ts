@@ -75,6 +75,13 @@ export class ConvocatoriasService {
     const convocatoriaGuardada = await this.repo.save(convocatoria);
 
     if (
+      estadoAnterior === EstadoConvocatoria.Configuracion &&
+      convocatoriaGuardada.estado !== EstadoConvocatoria.Configuracion
+    ) {
+      await this.congelarTemplatesSiCompartidos(convocatoria.id);
+    }
+
+    if (
       convocatoriaGuardada.estado === EstadoConvocatoria.Evaluacion &&
       estadoAnterior !== EstadoConvocatoria.Evaluacion
     ) {
@@ -246,11 +253,14 @@ export class ConvocatoriasService {
     validarEstructuraInstitucional(dto.estructura);
 
     let template = convocatoria.templateEvaluacionInstitucional;
-    if (!template) {
+    if (!template || template.esPlantilla) {
+      // Copy-on-write: si no tiene template o apunta a uno compartido de la biblioteca
+      // (default/plantilla), crear una copia privada propia para no modificarlo.
       template = this.templateInstitucionalRepo.create({
         nombre: `Evaluación institucional ${convocatoria.nombre}`,
         esDefault: false,
         esPlantilla: false,
+        estructura: template?.estructura ?? null,
       });
     }
     template.estructura = dto.estructura ?? null;
@@ -304,11 +314,14 @@ export class ConvocatoriasService {
     validarEstructuraCruzada(dto.estructura);
 
     let template = convocatoria.templateEvaluacionCruzada;
-    if (!template) {
+    if (!template || template.esPlantilla) {
+      // Copy-on-write: si no tiene template o apunta a uno compartido de la biblioteca
+      // (default/plantilla), crear una copia privada propia para no modificarlo.
       template = this.templateCruzadaRepo.create({
         nombre: `Evaluación cruzada ${convocatoria.nombre}`,
         esDefault: false,
         esPlantilla: false,
+        estructura: template?.estructura ?? null,
       });
     }
     template.estructura = dto.estructura ?? null;
@@ -321,5 +334,53 @@ export class ConvocatoriasService {
     }
 
     return guardado;
+  }
+
+  // Al salir de Configuración la convocatoria "toma como propios" los templates que
+  // estuviera compartiendo con la biblioteca: los congela en copias privadas
+  // (esPlantilla: false, invisibles en la biblioteca e inmutables). Idempotente: si ya
+  // apunta a templates privados no hace nada.
+  private async congelarTemplatesSiCompartidos(convocatoriaId: string) {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+    });
+    if (!convocatoria) return;
+
+    let huboCambios = false;
+
+    const inst = convocatoria.templateEvaluacionInstitucional;
+    if (inst?.esPlantilla) {
+      const copia = await this.templateInstitucionalRepo.save(
+        this.templateInstitucionalRepo.create({
+          nombre: `Evaluación institucional ${convocatoria.nombre}`,
+          esDefault: false,
+          esPlantilla: false,
+          estructura: inst.estructura,
+        }),
+      );
+      convocatoria.templateEvaluacionInstitucionalId = copia.id;
+      convocatoria.templateEvaluacionInstitucional = copia;
+      huboCambios = true;
+    }
+
+    const cruzada = convocatoria.templateEvaluacionCruzada;
+    if (cruzada?.esPlantilla) {
+      const copia = await this.templateCruzadaRepo.save(
+        this.templateCruzadaRepo.create({
+          nombre: `Evaluación cruzada ${convocatoria.nombre}`,
+          esDefault: false,
+          esPlantilla: false,
+          estructura: cruzada.estructura,
+        }),
+      );
+      convocatoria.templateEvaluacionCruzadaId = copia.id;
+      convocatoria.templateEvaluacionCruzada = copia;
+      huboCambios = true;
+    }
+
+    if (huboCambios) {
+      await this.repo.save(convocatoria);
+    }
   }
 }

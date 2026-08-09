@@ -32,6 +32,8 @@ import {
   TEMPLATE_INSTITUCIONAL_DEFAULT,
   TEMPLATE_CRUZADA_DEFAULT,
 } from './evaluaciones/templates-default';
+import { EvaluacionInstitucional } from './evaluaciones/evaluacion-institucional.entity';
+import { EvaluacionCruzada } from './evaluaciones/evaluacion-cruzada.entity';
 
 // ───────────────── Helpers ─────────────────
 
@@ -859,51 +861,132 @@ async function bootstrap() {
 
   // ─────────────── CONVOCATORIAS ───────────────
 
-  // Cada convocatoria tiene sus propios templates (OneToOne sobre
-  // templateEvaluacionInstitucionalId/CruzadaId). Para que el flujo de evaluación
-  // funcione sin pasos manuales, cada convocatoria recibe una copia del template
-  // default. Idempotente: reutiliza la copia si ya existe.
-  async function templatesParaConvocatoria(convocatoria: Convocatoria) {
-    if (convocatoria.templateEvaluacionInstitucionalId && convocatoria.templateEvaluacionCruzadaId) {
-      return;
-    }
+  // Los templates de evaluación se comparten entre convocatorias (ManyToOne sobre
+  // templateEvaluacionInstitucionalId/CruzadaId). En Configuración la convocatoria usa
+  // el template default de la biblioteca sin copiarlo; al salir de Configuración lo
+  // "toma como propio": se congela en una copia privada (esPlantilla: false, invisible
+  // en la biblioteca) para que no reciba más cambios mientras se evalúa.
+  // Idempotente, y reconcilia copias viejas del esquema OneToOne anterior.
+  async function asegurarTemplatesConvocatoria(convocatoria: Convocatoria) {
+    const conv = await convocatoriaRepo.findOne({
+      where: { id: convocatoria.id },
+      relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+    });
+    if (!conv) return;
 
-    if (!convocatoria.templateEvaluacionInstitucionalId) {
-      const nombreCopia = `${templateInst.nombre} (copia ${convocatoria.anio})`;
-      let copia = await templateInstRepo.findOne({ where: { nombre: nombreCopia } });
-      if (!copia) {
-        copia = await templateInstRepo.save(
+    const congelada = conv.estado !== EstadoConvocatoria.Configuracion;
+    let huboCambios = false;
+
+    const inst = conv.templateEvaluacionInstitucional;
+    if (!inst) {
+      if (congelada) {
+        const copia = await templateInstRepo.save(
           templateInstRepo.create({
-            nombre: nombreCopia,
+            nombre: `Evaluación institucional ${conv.nombre}`,
             esDefault: false,
-            esPlantilla: true,
+            esPlantilla: false,
             estructura: templateInst.estructura,
           }),
         );
-        console.log(`  ${nombreCopia}`);
+        conv.templateEvaluacionInstitucionalId = copia.id;
+        conv.templateEvaluacionInstitucional = copia;
+        console.log(`  ${conv.nombre} — template institucional congelado (copia privada)`);
+      } else {
+        conv.templateEvaluacionInstitucionalId = templateInst.id;
+        conv.templateEvaluacionInstitucional = templateInst;
       }
-      convocatoria.templateEvaluacionInstitucionalId = copia.id;
+      huboCambios = true;
+    } else if (inst.esPlantilla && !inst.esDefault && / \(copia \d{4}\)$/.test(inst.nombre)) {
+      // Copia del esquema anterior (OneToOne): cada convocatoria tenía la suya.
+      if (congelada) {
+        // La convocatoria ya la usaba: queda como su template privado congelado.
+        inst.esPlantilla = false;
+        await templateInstRepo.save(inst);
+        console.log(`  ${conv.nombre} — template institucional tomado como propio (privado)`);
+      } else {
+        // En Configuración vuelve a usar el default compartido y se elimina la copia.
+        const enUso = await dataSource
+          .getRepository(EvaluacionInstitucional)
+          .count({ where: { templateId: inst.id } });
+        if (enUso === 0) {
+          await templateInstRepo.delete(inst.id);
+          console.log(`  ${conv.nombre} — copia institucional removida`);
+        }
+        conv.templateEvaluacionInstitucionalId = templateInst.id;
+        conv.templateEvaluacionInstitucional = templateInst;
+        huboCambios = true;
+      }
+    } else if (congelada && inst.esPlantilla) {
+      // Comparte un template de la biblioteca y ya salió de Configuración: congelar.
+      const copia = await templateInstRepo.save(
+        templateInstRepo.create({
+          nombre: `Evaluación institucional ${conv.nombre}`,
+          esDefault: false,
+          esPlantilla: false,
+          estructura: inst.estructura,
+        }),
+      );
+      conv.templateEvaluacionInstitucionalId = copia.id;
+      conv.templateEvaluacionInstitucional = copia;
+      huboCambios = true;
+      console.log(`  ${conv.nombre} — template institucional congelado (copia privada)`);
     }
 
-    if (!convocatoria.templateEvaluacionCruzadaId) {
-      const nombreCopia = `${templateCruzada.nombre} (copia ${convocatoria.anio})`;
-      let copia = await templateCruzadaRepo.findOne({ where: { nombre: nombreCopia } });
-      if (!copia) {
-        copia = await templateCruzadaRepo.save(
+    const cruzada = conv.templateEvaluacionCruzada;
+    if (!cruzada) {
+      if (congelada) {
+        const copia = await templateCruzadaRepo.save(
           templateCruzadaRepo.create({
-            nombre: nombreCopia,
+            nombre: `Evaluación cruzada ${conv.nombre}`,
             esDefault: false,
-            esPlantilla: true,
+            esPlantilla: false,
             estructura: templateCruzada.estructura,
           }),
         );
-        console.log(`  ${nombreCopia}`);
+        conv.templateEvaluacionCruzadaId = copia.id;
+        conv.templateEvaluacionCruzada = copia;
+        console.log(`  ${conv.nombre} — template cruzada congelado (copia privada)`);
+      } else {
+        conv.templateEvaluacionCruzadaId = templateCruzada.id;
+        conv.templateEvaluacionCruzada = templateCruzada;
       }
-      convocatoria.templateEvaluacionCruzadaId = copia.id;
+      huboCambios = true;
+    } else if (cruzada.esPlantilla && !cruzada.esDefault && / \(copia \d{4}\)$/.test(cruzada.nombre)) {
+      if (congelada) {
+        cruzada.esPlantilla = false;
+        await templateCruzadaRepo.save(cruzada);
+        console.log(`  ${conv.nombre} — template cruzada tomado como propio (privado)`);
+      } else {
+        const enUso = await dataSource
+          .getRepository(EvaluacionCruzada)
+          .count({ where: { templateId: cruzada.id } });
+        if (enUso === 0) {
+          await templateCruzadaRepo.delete(cruzada.id);
+          console.log(`  ${conv.nombre} — copia cruzada removida`);
+        }
+        conv.templateEvaluacionCruzadaId = templateCruzada.id;
+        conv.templateEvaluacionCruzada = templateCruzada;
+        huboCambios = true;
+      }
+    } else if (congelada && cruzada.esPlantilla) {
+      const copia = await templateCruzadaRepo.save(
+        templateCruzadaRepo.create({
+          nombre: `Evaluación cruzada ${conv.nombre}`,
+          esDefault: false,
+          esPlantilla: false,
+          estructura: cruzada.estructura,
+        }),
+      );
+      conv.templateEvaluacionCruzadaId = copia.id;
+      conv.templateEvaluacionCruzada = copia;
+      huboCambios = true;
+      console.log(`  ${conv.nombre} — template cruzada congelado (copia privada)`);
     }
 
-    await convocatoriaRepo.save(convocatoria);
-    console.log(`  ${convocatoria.nombre} — templates de evaluación asociados`);
+    if (huboCambios) {
+      await convocatoriaRepo.save(conv);
+    }
+    console.log(`  ${conv.nombre} — templates de evaluación asociados`);
   }
 
   console.log('\n=== SEED: Convocatorias ===');
@@ -985,10 +1068,11 @@ async function bootstrap() {
     formularioId: f2026,
   });
 
-  // UBANEX 2026 es la convocatoria con proyectos presentados: se le asocian los
-  // templates de evaluación por defecto para poder avanzarla a Evaluación y
-  // probar el flujo completo sin pasos manuales.
-  await templatesParaConvocatoria(conv2026);
+  // UBANEX 2025/2026 salieron de Configuración: toman como propios los templates de
+  // evaluación (privados y congelados). La 2026 es la convocatoria con proyectos en
+  // evaluación: así el flujo se prueba de punta a punta sin pasos manuales.
+  await asegurarTemplatesConvocatoria(conv2025);
+  await asegurarTemplatesConvocatoria(conv2026);
 
   const conv2027 = await seedConvocatoria({
     nombre: 'UBANEX 2027',
@@ -1004,9 +1088,9 @@ async function bootstrap() {
     formularioId: f2027,
   });
 
-  // La convocatoria en Configuración recibe los templates de evaluación por defecto,
-  // para que el usuario pueda avanzarla y probar el flujo de evaluación.
-  await templatesParaConvocatoria(conv2027);
+  // La convocatoria en Configuración usa el template default de la biblioteca
+  // (compartido), para que el usuario pueda avanzarla y probar el flujo de evaluación.
+  await asegurarTemplatesConvocatoria(conv2027);
 
   // ─────────────── PROYECTOS Y EDICIONES ───────────────
 
