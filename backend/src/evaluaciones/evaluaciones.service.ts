@@ -42,8 +42,62 @@ export class EvaluacionesService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  findAll(): Promise<[]> {
-    return Promise.resolve([]);
+  async monitoreo(convocatoriaId: string) {
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId },
+      relations: { proyecto: true, unidadAcademica: true },
+      order: { actualizadoEn: 'DESC' },
+    });
+    const institucionales = await this.institucionalRepo.find({
+      where: { convocatoriaId },
+      relations: { realizadoPor: true, confirmadoPor: true },
+    });
+    const cruzadas = await this.cruzadaRepo.find({
+      where: { convocatoriaId },
+      relations: { evaluador: true },
+    });
+
+    const instPorEdicion = new Map(institucionales.map(i => [i.edicionId, i]));
+    const cruzadasPorEdicion = new Map<string, EvaluacionCruzada[]>();
+    for (const c of cruzadas) {
+      const arr = cruzadasPorEdicion.get(c.edicionId) ?? [];
+      arr.push(c);
+      cruzadasPorEdicion.set(c.edicionId, arr);
+    }
+
+    return {
+      convocatoria,
+      ediciones: ediciones.map(ed => {
+        const inst = instPorEdicion.get(ed.id) ?? null;
+        return {
+          edicion: ed,
+          institucional: inst
+            ? {
+                id: inst.id,
+                estado: inst.estado,
+                observaciones: inst.observaciones,
+                realizadoPor: inst.realizadoPor
+                  ? { id: inst.realizadoPor.id, nombreCompleto: inst.realizadoPor.nombreCompleto }
+                  : null,
+                confirmadoPor: inst.confirmadoPor
+                  ? { id: inst.confirmadoPor.id, nombreCompleto: inst.confirmadoPor.nombreCompleto }
+                  : null,
+              }
+            : null,
+          cruzadas: (cruzadasPorEdicion.get(ed.id) ?? []).map(c => ({
+            id: c.id,
+            tipo: c.tipo,
+            estado: c.estado,
+            evaluador: c.evaluador
+              ? { id: c.evaluador.id, nombreCompleto: c.evaluador.nombreCompleto }
+              : null,
+          })),
+        };
+      }),
+    };
   }
 
   // ───────────── Evaluación Institucional ─────────────

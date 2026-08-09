@@ -16,8 +16,9 @@ export class EvaluacionesController {
   constructor(private readonly service: EvaluacionesService) {}
 
   @Get()
-  findAll(@Query('proyectoId') _proyectoId?: string) {
-    return this.service.findAll();
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  monitoreo(@Query('convocatoriaId') convocatoriaId: string) {
+    return this.service.monitoreo(convocatoriaId);
   }
 
   @Get('institucionales')
