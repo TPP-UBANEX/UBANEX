@@ -152,15 +152,6 @@ export function PlantillasEvaluacion() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Plantillas de evaluación</h1>
-          <p className="text-sm text-muted-foreground">
-            Biblioteca de templates de evaluación institucional y cruzada que se asignan a las convocatorias.
-          </p>
-        </div>
-      </div>
-
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}

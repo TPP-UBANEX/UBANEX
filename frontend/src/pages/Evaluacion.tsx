@@ -46,6 +46,8 @@ import type {
 } from '@/data/types'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ProyectoEvaluablePanel } from '@/components/ProyectoEvaluablePanel'
+import type { CampoFormulario } from '@/data/types'
 
 const tipoCruzadaLabel: Record<TipoEvaluacionCruzada, string> = {
   [TipoEvaluacionCruzada.Propia]: 'Propia',
@@ -54,11 +56,15 @@ const tipoCruzadaLabel: Record<TipoEvaluacionCruzada, string> = {
 }
 
 const esSecretaria = (u: Usuario | null) =>
-  u?.roles.some(r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria) ?? false
+  u?.roles.some(
+    (r) => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+  ) ?? false
 const esAutoridadSecretaria = (u: Usuario | null) =>
   u?.roles.includes(RolUsuario.AutoridadDeSecretaria) ?? false
 const esRectorado = (u: Usuario | null) =>
-  u?.roles.some(r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado) ?? false
+  u?.roles.some(
+    (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+  ) ?? false
 
 export function Evaluacion() {
   const { user } = useAuth()
@@ -67,9 +73,10 @@ export function Evaluacion() {
   const [loadingConv, setLoadingConv] = useState(true)
 
   useEffect(() => {
-    api.convocatorias.list()
-      .then(cs => {
-        const evaluables = cs.filter(c => c.estado === EstadoConvocatoria.Evaluacion)
+    api.convocatorias
+      .list()
+      .then((cs) => {
+        const evaluables = cs.filter((c) => c.estado === EstadoConvocatoria.Evaluacion)
         setConvocatorias(evaluables)
         if (evaluables.length > 0) setConvocatoriaId(evaluables[0].id)
       })
@@ -84,23 +91,24 @@ export function Evaluacion() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Evaluación</h1>
-        <p className="text-sm text-muted-foreground">
-          Evaluación institucional y cruzada de proyectos de la convocatoria.
-        </p>
-      </div>
-
       <div className="space-y-1 max-w-sm">
         <span className="text-xs text-muted-foreground">Convocatoria en evaluación</span>
         {loadingConv ? (
           <Skeleton className="h-10 w-full" />
         ) : (
-          <Select value={convocatoriaId} onValueChange={setConvocatoriaId} disabled={!convocatoriaId}>
-            <SelectTrigger><SelectValue placeholder="Seleccionar convocatoria..." /></SelectTrigger>
+          <Select
+            value={convocatoriaId}
+            onValueChange={setConvocatoriaId}
+            disabled={!convocatoriaId}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar convocatoria..." />
+            </SelectTrigger>
             <SelectContent>
-              {convocatorias.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+              {convocatorias.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.nombre}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -111,8 +119,12 @@ export function Evaluacion() {
         <Tabs defaultValue={defaultTab}>
           <TabsList>
             {tabs.includes('monitoreo') && <TabsTrigger value="monitoreo">Monitoreo</TabsTrigger>}
-            {tabs.includes('institucional') && <TabsTrigger value="institucional">Institucional</TabsTrigger>}
-            {tabs.includes('cruzada') && <TabsTrigger value="cruzada">Evaluación cruzada</TabsTrigger>}
+            {tabs.includes('institucional') && (
+              <TabsTrigger value="institucional">Institucional</TabsTrigger>
+            )}
+            {tabs.includes('cruzada') && (
+              <TabsTrigger value="cruzada">Evaluación cruzada</TabsTrigger>
+            )}
           </TabsList>
           {tabs.includes('monitoreo') && (
             <TabsContent value="monitoreo" className="mt-4">
@@ -141,9 +153,18 @@ export function Evaluacion() {
 
 // ───────────── Institucional ─────────────
 
-type RespuestaCategoriasInst = Record<string, { valor: number | boolean | null; fundamentacion: string }>
+type RespuestaCategoriasInst = Record<
+  string,
+  { valor: number | boolean | null; fundamentacion: string }
+>
 
-function InstitucionalView({ convocatoriaId, user }: { convocatoriaId: string; user: Usuario | null }) {
+function InstitucionalView({
+  convocatoriaId,
+  user,
+}: {
+  convocatoriaId: string
+  user: Usuario | null
+}) {
   const [items, setItems] = useState<EdicionEvaluableInstitucional[]>([])
   const [loading, setLoading] = useState(true)
   const [edicionId, setEdicionId] = useState<string | null>(null)
@@ -154,20 +175,32 @@ function InstitucionalView({ convocatoriaId, user }: { convocatoriaId: string; u
   const [observaciones, setObservaciones] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
+  const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
 
   const cargarLista = () => {
-    api.evaluaciones.institucionales.listar(convocatoriaId)
+    api.evaluaciones.institucionales
+      .listar(convocatoriaId)
       .then(setItems)
       .finally(() => setLoading(false))
   }
 
   useEffect(cargarLista, [convocatoriaId])
 
+  useEffect(() => {
+    api.convocatorias.formulario
+      .get(convocatoriaId)
+      .then((f) => setCamposFormulario(f.campos ?? []))
+      .catch(() => setCamposFormulario([]))
+  }, [convocatoriaId])
+
   const seleccionar = async (id: string) => {
     setEdicionId(id)
     setTemplate(null)
     setEvaluacion(null)
-    const { evaluacion, template } = await api.evaluaciones.institucionales.obtener(convocatoriaId, id)
+    const { evaluacion, template } = await api.evaluaciones.institucionales.obtener(
+      convocatoriaId,
+      id,
+    )
     setTemplate(template)
     setEvaluacion(evaluacion)
     initRespuestas(template?.estructura ?? null, evaluacion)
@@ -243,175 +276,230 @@ function InstitucionalView({ convocatoriaId, user }: { convocatoriaId: string; u
   if (loading) return <Skeleton className="h-64 w-full" />
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+    <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-sm font-medium">Ediciones de mi Unidad Académica</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {items.length === 0 && (
-            <p className="text-sm text-muted-foreground">No hay ediciones en evaluación de tu Unidad Académica.</p>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Ediciones de mi Unidad Académica</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No hay ediciones en evaluación de tu Unidad Académica.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map(({ edicion, evaluacion }) => (
+                <button
+                  key={edicion.id}
+                  onClick={() => seleccionar(edicion.id)}
+                  className={`text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
+                >
+                  <p className="text-sm font-medium">
+                    {edicion.proyecto?.nombre || edicion.proyectoId}
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={estadoBadge[edicion.estado]}>
+                      {estadoEdicionLabel[edicion.estado]}
+                    </Badge>
+                    {evaluacion && (
+                      <Badge
+                        variant={
+                          evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
+                        }
+                      >
+                        {evaluacion.estado === EstadoEvaluacion.Confirmada
+                          ? 'Confirmada'
+                          : 'Borrador'}
+                      </Badge>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
           )}
-          {items.map(({ edicion, evaluacion }) => (
-            <button
-              key={edicion.id}
-              onClick={() => seleccionar(edicion.id)}
-              className={`w-full text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
-            >
-              <p className="text-sm font-medium">{edicion.proyecto?.nombre || edicion.proyectoId}</p>
-              <div className="flex items-center gap-2">
-                <Badge variant={estadoBadge[edicion.estado]}>{estadoEdicionLabel[edicion.estado]}</Badge>
-                {evaluacion && (
-                  <Badge variant={evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'}>
-                    {evaluacion.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
-                  </Badge>
-                )}
-              </div>
-            </button>
-          ))}
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        {!edicionId ? (
-          <Card><CardContent className="pt-6 text-sm text-muted-foreground text-center py-10">Seleccioná una edición para evaluarla.</CardContent></Card>
-        ) : (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Evaluación institucional</CardTitle>
-              {evaluacion && (
-                <Badge variant={evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'}>
-                  {evaluacion.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {template?.estructura ? (
-                <>
-                  {template.estructura.categorias.map(cat => (
-                    <div key={cat.id} className="space-y-3">
-                      <h3 className="text-sm font-semibold border-b pb-1">{cat.nombre}</h3>
-                      {cat.subcategorias.map(sub => {
-                        const resp = respuestas[sub.id] ?? { valor: null, fundamentacion: '' }
-                        return (
-                          <div key={sub.id} className="space-y-2">
-                            <div className="flex items-start justify-between gap-4">
-                              <p className="text-sm flex-1">{sub.texto}</p>
-                              {sub.tipoValor === 'numerico' ? (
-                                <Input
-                                  type="number"
-                                  className="w-24"
-                                  disabled={confirmada}
-                                  value={resp.valor === null ? '' : String(resp.valor)}
-                                  onChange={e => setRespuestas(prev => ({
+      {!edicionId ? (
+        <Card>
+          <CardContent className="pt-6 text-sm text-muted-foreground text-center py-10">
+            Seleccioná una edición para evaluarla.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ProyectoEvaluablePanel
+            edicion={items.find((i) => i.edicion.id === edicionId)?.edicion ?? null}
+            campos={camposFormulario}
+          />
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">Evaluación institucional</CardTitle>
+                {evaluacion && (
+                  <Badge
+                    variant={
+                      evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
+                    }
+                  >
+                    {evaluacion.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
+                  </Badge>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {template?.estructura ? (
+                  <>
+                    {template.estructura.categorias.map((cat) => (
+                      <div key={cat.id} className="space-y-3">
+                        <h3 className="text-sm font-semibold border-b pb-1">{cat.nombre}</h3>
+                        {cat.subcategorias.map((sub) => {
+                          const resp = respuestas[sub.id] ?? { valor: null, fundamentacion: '' }
+                          return (
+                            <div key={sub.id} className="space-y-2">
+                              <div className="flex items-start justify-between gap-4">
+                                <p className="text-sm flex-1">{sub.texto}</p>
+                                {sub.tipoValor === 'numerico' ? (
+                                  <Input
+                                    type="number"
+                                    className="w-24"
+                                    disabled={confirmada}
+                                    value={resp.valor === null ? '' : String(resp.valor)}
+                                    onChange={(e) =>
+                                      setRespuestas((prev) => ({
+                                        ...prev,
+                                        [sub.id]: {
+                                          ...prev[sub.id],
+                                          valor:
+                                            e.target.value === '' ? null : Number(e.target.value),
+                                        },
+                                      }))
+                                    }
+                                    placeholder={`${sub.minimo}-${sub.maximo}`}
+                                  />
+                                ) : (
+                                  <div className="flex gap-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={resp.valor === true ? 'default' : 'outline'}
+                                      disabled={confirmada}
+                                      onClick={() =>
+                                        setRespuestas((prev) => ({
+                                          ...prev,
+                                          [sub.id]: { ...prev[sub.id], valor: true },
+                                        }))
+                                      }
+                                    >
+                                      Sí
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={resp.valor === false ? 'default' : 'outline'}
+                                      disabled={confirmada}
+                                      onClick={() =>
+                                        setRespuestas((prev) => ({
+                                          ...prev,
+                                          [sub.id]: { ...prev[sub.id], valor: false },
+                                        }))
+                                      }
+                                    >
+                                      No
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                              <Textarea
+                                className="min-h-[60px] text-sm"
+                                disabled={confirmada}
+                                value={resp.fundamentacion}
+                                onChange={(e) =>
+                                  setRespuestas((prev) => ({
                                     ...prev,
-                                    [sub.id]: { ...prev[sub.id], valor: e.target.value === '' ? null : Number(e.target.value) },
-                                  }))}
-                                  placeholder={`${sub.minimo}-${sub.maximo}`}
-                                />
-                              ) : (
-                                <div className="flex gap-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={resp.valor === true ? 'default' : 'outline'}
-                                    disabled={confirmada}
-                                    onClick={() => setRespuestas(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], valor: true } }))}
-                                  >
-                                    Sí
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={resp.valor === false ? 'default' : 'outline'}
-                                    disabled={confirmada}
-                                    onClick={() => setRespuestas(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], valor: false } }))}
-                                  >
-                                    No
-                                  </Button>
-                                </div>
-                              )}
+                                    [sub.id]: { ...prev[sub.id], fundamentacion: e.target.value },
+                                  }))
+                                }
+                                placeholder={`Fundamentación de "${sub.texto}"`}
+                              />
                             </div>
-                            <Textarea
-                              className="min-h-[60px] text-sm"
-                              disabled={confirmada}
-                              value={resp.fundamentacion}
-                              onChange={e => setRespuestas(prev => ({
-                                ...prev,
-                                [sub.id]: { ...prev[sub.id], fundamentacion: e.target.value },
-                              }))}
-                              placeholder={`Fundamentación de "${sub.texto}"`}
-                            />
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ))}
+                          )
+                        })}
+                      </div>
+                    ))}
 
-                  {template.estructura.checklist.length > 0 && (
+                    {template.estructura.checklist.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold border-b pb-1">
+                          Checklist institucional
+                        </h3>
+                        {template.estructura.checklist.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between gap-4">
+                            <p className="text-sm flex-1">{item.texto}</p>
+                            <div className="flex gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={checklist[item.id] ? 'default' : 'outline'}
+                                disabled={confirmada}
+                                onClick={() =>
+                                  setChecklist((prev) => ({ ...prev, [item.id]: true }))
+                                }
+                              >
+                                Sí
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={!checklist[item.id] ? 'default' : 'outline'}
+                                disabled={confirmada}
+                                onClick={() =>
+                                  setChecklist((prev) => ({ ...prev, [item.id]: false }))
+                                }
+                              >
+                                No
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold border-b pb-1">Checklist institucional</h3>
-                      {template.estructura.checklist.map(item => (
-                        <div key={item.id} className="flex items-center justify-between gap-4">
-                          <p className="text-sm flex-1">{item.texto}</p>
-                          <div className="flex gap-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={checklist[item.id] ? 'default' : 'outline'}
-                              disabled={confirmada}
-                              onClick={() => setChecklist(prev => ({ ...prev, [item.id]: true }))}
-                            >
-                              Sí
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={!checklist[item.id] ? 'default' : 'outline'}
-                              disabled={confirmada}
-                              onClick={() => setChecklist(prev => ({ ...prev, [item.id]: false }))}
-                            >
-                              No
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                      <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
+                      <Textarea
+                        className="min-h-[80px]"
+                        disabled={confirmada}
+                        value={observaciones}
+                        onChange={(e) => setObservaciones(e.target.value)}
+                        placeholder="Observaciones generales de la evaluación..."
+                      />
                     </div>
-                  )}
 
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
-                    <Textarea
-                      className="min-h-[80px]"
-                      disabled={confirmada}
-                      value={observaciones}
-                      onChange={e => setObservaciones(e.target.value)}
-                      placeholder="Observaciones generales de la evaluación..."
-                    />
-                  </div>
-
-                  {!confirmada && (
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={guardar} disabled={guardando}>
-                        {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Guardar borrador
-                      </Button>
-                      {esAutoridadSecretaria(user) && (
-                        <Button onClick={confirmar} disabled={confirmando}>
-                          {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Confirmar evaluación
+                    {!confirmada && (
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={guardar} disabled={guardando}>
+                          {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Guardar borrador
                         </Button>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  La convocatoria no tiene configurado el template de evaluación institucional.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                        {esAutoridadSecretaria(user) && (
+                          <Button onClick={confirmar} disabled={confirmando}>
+                            {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Confirmar evaluación
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    La convocatoria no tiene configurado el template de evaluación institucional.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -429,14 +517,23 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
   const [observaciones, setObservaciones] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
+  const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
 
   const cargarDisponibles = () => {
-    api.evaluaciones.cruzadas.disponibles(convocatoriaId)
+    api.evaluaciones.cruzadas
+      .disponibles(convocatoriaId)
       .then(setItems)
       .finally(() => setLoading(false))
   }
 
   useEffect(cargarDisponibles, [convocatoriaId])
+
+  useEffect(() => {
+    api.convocatorias.formulario
+      .get(convocatoriaId)
+      .then((f) => setCamposFormulario(f.campos ?? []))
+      .catch(() => setCamposFormulario([]))
+  }, [convocatoriaId])
 
   const seleccionar = async (id: string) => {
     setEdicionId(id)
@@ -504,125 +601,171 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
 
   const sumaItems = (ids: string[]) => ids.reduce((acc, id) => acc + (puntajes[id] ?? 0), 0)
   const total = template
-    ? sumaItems((template.estructura?.categorias ?? []).flatMap(c => c.items.map(i => i.id)))
+    ? sumaItems((template.estructura?.categorias ?? []).flatMap((c) => c.items.map((i) => i.id)))
     : 0
 
   if (loading) return <Skeleton className="h-64 w-full" />
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+    <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-sm font-medium">Evaluaciones disponibles</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {items.length === 0 && (
-            <p className="text-sm text-muted-foreground">No hay ediciones disponibles para evaluar.</p>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Evaluaciones disponibles</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No hay ediciones disponibles para evaluar.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map(({ edicion, tipo, evaluacion }) => (
+                <button
+                  key={edicion.id}
+                  onClick={() => seleccionar(edicion.id)}
+                  className={`text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
+                >
+                  <p className="text-sm font-medium">
+                    {edicion.proyecto?.nombre || edicion.proyectoId}
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="secondary">{tipoCruzadaLabel[tipo]}</Badge>
+                    <Badge variant={estadoBadge[edicion.estado]}>
+                      {estadoEdicionLabel[edicion.estado]}
+                    </Badge>
+                    {evaluacion && (
+                      <Badge
+                        variant={
+                          evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
+                        }
+                      >
+                        {evaluacion.estado === EstadoEvaluacion.Confirmada
+                          ? 'Confirmada'
+                          : 'Borrador'}
+                      </Badge>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
           )}
-          {items.map(({ edicion, tipo, evaluacion }) => (
-            <button
-              key={edicion.id}
-              onClick={() => seleccionar(edicion.id)}
-              className={`w-full text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
-            >
-              <p className="text-sm font-medium">{edicion.proyecto?.nombre || edicion.proyectoId}</p>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{tipoCruzadaLabel[tipo]}</Badge>
-                <Badge variant={estadoBadge[edicion.estado]}>{estadoEdicionLabel[edicion.estado]}</Badge>
-                {evaluacion && (
-                  <Badge variant={evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'}>
-                    {evaluacion.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
-                  </Badge>
-                )}
-              </div>
-            </button>
-          ))}
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        {!edicionId ? (
-          <Card><CardContent className="pt-6 text-sm text-muted-foreground text-center py-10">Seleccioná una edición para evaluarla.</CardContent></Card>
-        ) : (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">
-                Evaluación cruzada {tipo ? <Badge variant="secondary" className="ml-1">{tipoCruzadaLabel[tipo]}</Badge> : null}
-              </CardTitle>
-              {evaluacion && (
-                <Badge variant={evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'}>
-                  {evaluacion.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {template?.estructura ? (
-                <>
-                  {template.estructura.categorias.map(cat => {
-                    const ids = cat.items.map(i => i.id)
-                    return (
-                      <div key={cat.id} className="space-y-2">
-                        <h3 className="text-sm font-semibold border-b pb-1">
-                          {cat.nombre} <span className="text-muted-foreground font-normal">({sumaItems(ids)} / {cat.puntajeMaximo})</span>
-                        </h3>
-                        {cat.items.map(item => (
-                          <div key={item.id} className="flex items-center justify-between gap-4">
-                            <p className="text-sm flex-1">{item.nombre}</p>
-                            <Input
-                              type="number"
-                              className="w-24"
-                              min={0}
-                              max={item.puntajeMaximo}
-                              disabled={confirmada}
-                              value={puntajes[item.id] === null || puntajes[item.id] === undefined ? '' : String(puntajes[item.id])}
-                              onChange={e => setPuntajes(prev => ({
-                                ...prev,
-                                [item.id]: e.target.value === '' ? null : Number(e.target.value),
-                              }))}
-                              placeholder={`0-${item.puntajeMaximo}`}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  })}
+      {!edicionId ? (
+        <Card>
+          <CardContent className="pt-6 text-sm text-muted-foreground text-center py-10">
+            Seleccioná una edición para evaluarla.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ProyectoEvaluablePanel
+            edicion={items.find((i) => i.edicion.id === edicionId)?.edicion ?? null}
+            campos={camposFormulario}
+          />
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">
+                  Evaluación cruzada{' '}
+                  {tipo ? (
+                    <Badge variant="secondary" className="ml-1">
+                      {tipoCruzadaLabel[tipo]}
+                    </Badge>
+                  ) : null}
+                </CardTitle>
+                {evaluacion && (
+                  <Badge
+                    variant={
+                      evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
+                    }
+                  >
+                    {evaluacion.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
+                  </Badge>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {template?.estructura ? (
+                  <>
+                    {template.estructura.categorias.map((cat) => {
+                      const ids = cat.items.map((i) => i.id)
+                      return (
+                        <div key={cat.id} className="space-y-2">
+                          <h3 className="text-sm font-semibold border-b pb-1">
+                            {cat.nombre}{' '}
+                            <span className="text-muted-foreground font-normal">
+                              ({sumaItems(ids)} / {cat.puntajeMaximo})
+                            </span>
+                          </h3>
+                          {cat.items.map((item) => (
+                            <div key={item.id} className="flex items-center justify-between gap-4">
+                              <p className="text-sm flex-1">{item.nombre}</p>
+                              <Input
+                                type="number"
+                                className="w-24"
+                                min={0}
+                                max={item.puntajeMaximo}
+                                disabled={confirmada}
+                                value={
+                                  puntajes[item.id] === null || puntajes[item.id] === undefined
+                                    ? ''
+                                    : String(puntajes[item.id])
+                                }
+                                onChange={(e) =>
+                                  setPuntajes((prev) => ({
+                                    ...prev,
+                                    [item.id]:
+                                      e.target.value === '' ? null : Number(e.target.value),
+                                  }))
+                                }
+                                placeholder={`0-${item.puntajeMaximo}`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
 
-                  <div className="bg-muted/50 rounded-md p-3 flex items-center justify-between">
-                    <span className="text-sm font-medium">Puntaje total</span>
-                    <span className="text-lg font-bold">{total} pts</span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
-                    <Textarea
-                      className="min-h-[80px]"
-                      disabled={confirmada}
-                      value={observaciones}
-                      onChange={e => setObservaciones(e.target.value)}
-                      placeholder="Observaciones de la evaluación..."
-                    />
-                  </div>
-
-                  {!confirmada && (
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={guardar} disabled={guardando}>
-                        {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Guardar borrador
-                      </Button>
-                      <Button onClick={confirmar} disabled={confirmando}>
-                        {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Confirmar evaluación
-                      </Button>
+                    <div className="bg-muted/50 rounded-md p-3 flex items-center justify-between">
+                      <span className="text-sm font-medium">Puntaje total</span>
+                      <span className="text-lg font-bold">{total} pts</span>
                     </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  La convocatoria no tiene configurado el template de evaluación cruzada.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
+                      <Textarea
+                        className="min-h-[80px]"
+                        disabled={confirmada}
+                        value={observaciones}
+                        onChange={(e) => setObservaciones(e.target.value)}
+                        placeholder="Observaciones de la evaluación..."
+                      />
+                    </div>
+
+                    {!confirmada && (
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={guardar} disabled={guardando}>
+                          {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Guardar borrador
+                        </Button>
+                        <Button onClick={confirmar} disabled={confirmando}>
+                          {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Confirmar evaluación
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    La convocatoria no tiene configurado el template de evaluación cruzada.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -634,7 +777,8 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.evaluaciones.monitoreo(convocatoriaId)
+    api.evaluaciones
+      .monitoreo(convocatoriaId)
       .then(setData)
       .finally(() => setLoading(false))
   }, [convocatoriaId])
@@ -643,7 +787,9 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-sm font-medium">Estado de evaluación por edición</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Estado de evaluación por edición</CardTitle>
+      </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
@@ -658,13 +804,27 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
           <TableBody>
             {(data?.ediciones ?? []).map(({ edicion, institucional, cruzadas }) => (
               <TableRow key={edicion.id}>
-                <TableCell className="font-medium text-sm">{edicion.proyecto?.nombre || edicion.proyectoId}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{edicion.unidadAcademica?.nombre || '-'}</TableCell>
-                <TableCell><Badge variant={estadoBadge[edicion.estado]}>{estadoEdicionLabel[edicion.estado]}</Badge></TableCell>
+                <TableCell className="font-medium text-sm">
+                  {edicion.proyecto?.nombre || edicion.proyectoId}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {edicion.unidadAcademica?.nombre || '-'}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={estadoBadge[edicion.estado]}>
+                    {estadoEdicionLabel[edicion.estado]}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   {institucional ? (
-                    <Badge variant={institucional.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'}>
-                      {institucional.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
+                    <Badge
+                      variant={
+                        institucional.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
+                      }
+                    >
+                      {institucional.estado === EstadoEvaluacion.Confirmada
+                        ? 'Confirmada'
+                        : 'Borrador'}
                     </Badge>
                   ) : (
                     <span className="text-xs text-muted-foreground">Sin evaluar</span>
@@ -675,9 +835,13 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
                     <span className="text-xs text-muted-foreground">Sin evaluar</span>
                   ) : (
                     <div className="flex flex-wrap gap-1">
-                      {cruzadas.map(c => (
-                        <Badge key={c.id} variant={c.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'}>
-                          {tipoCruzadaLabel[c.tipo]} · {c.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
+                      {cruzadas.map((c) => (
+                        <Badge
+                          key={c.id}
+                          variant={c.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'}
+                        >
+                          {tipoCruzadaLabel[c.tipo]} ·{' '}
+                          {c.estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'}
                         </Badge>
                       ))}
                     </div>
@@ -688,7 +852,9 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
           </TableBody>
         </Table>
         {(data?.ediciones.length ?? 0) === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-6">Esta convocatoria no tiene ediciones.</p>
+          <p className="text-sm text-muted-foreground text-center py-6">
+            Esta convocatoria no tiene ediciones.
+          </p>
         )}
       </CardContent>
     </Card>
