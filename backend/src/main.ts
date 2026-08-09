@@ -25,6 +25,12 @@ import { ParticipacionConvocatoria } from './participaciones-convocatoria/partic
 import { Emparejamiento } from './convocatorias/emparejamiento.entity';
 import { UnidadAcademica } from './unidades-academicas/unidad-academica.entity';
 import { EMPAREJAMIENTO_DEFAULT } from './convocatorias/emparejamiento-default';
+import { TemplateEvaluacionInstitucional } from './templates-evaluacion/template-evaluacion-institucional.entity';
+import { TemplateEvaluacionCruzada } from './templates-evaluacion/template-evaluacion-cruzada.entity';
+import {
+  TEMPLATE_INSTITUCIONAL_DEFAULT,
+  TEMPLATE_CRUZADA_DEFAULT,
+} from './evaluaciones/templates-default';
 
 // ───────────────── Helpers ─────────────────
 
@@ -811,6 +817,45 @@ async function bootstrap() {
 
   const formularioDefault = formulariosCreados.find(f => f.esDefault)!;
 
+  // ─────────────── TEMPLATES DE EVALUACIÓN ───────────────
+
+  console.log('\n=== SEED: Templates de evaluación ===');
+  const templateInstRepo = dataSource.getRepository(TemplateEvaluacionInstitucional);
+  const templateCruzadaRepo = dataSource.getRepository(TemplateEvaluacionCruzada);
+
+  async function seedTemplateInstitucionalDefault() {
+    const existente = await templateInstRepo.findOne({ where: { esDefault: true } });
+    if (existente) return existente;
+    const creado = await templateInstRepo.save(
+      templateInstRepo.create({
+        nombre: 'Template institucional UBANEX',
+        esDefault: true,
+        esPlantilla: true,
+        estructura: TEMPLATE_INSTITUCIONAL_DEFAULT,
+      }),
+    );
+    console.log(`  ${creado.nombre}`);
+    return creado;
+  }
+
+  async function seedTemplateCruzadaDefault() {
+    const existente = await templateCruzadaRepo.findOne({ where: { esDefault: true } });
+    if (existente) return existente;
+    const creado = await templateCruzadaRepo.save(
+      templateCruzadaRepo.create({
+        nombre: 'Template cruzada UBANEX',
+        esDefault: true,
+        esPlantilla: true,
+        estructura: TEMPLATE_CRUZADA_DEFAULT,
+      }),
+    );
+    console.log(`  ${creado.nombre}`);
+    return creado;
+  }
+
+  const templateInst = await seedTemplateInstitucionalDefault();
+  const templateCruzada = await seedTemplateCruzadaDefault();
+
   // ─────────────── CONVOCATORIAS ───────────────
 
   console.log('\n=== SEED: Convocatorias ===');
@@ -895,6 +940,15 @@ async function bootstrap() {
     fechaFinEjecucion: crearFecha(2028, 2, 28),
     formularioId: f2027,
   });
+
+  // La convocatoria en Configuración recibe los templates de evaluación por defecto,
+  // para que el usuario pueda avanzarla y probar el flujo de evaluación.
+  if (!conv2027.templateEvaluacionInstitucionalId) {
+    conv2027.templateEvaluacionInstitucionalId = templateInst.id;
+    conv2027.templateEvaluacionCruzadaId = templateCruzada.id;
+    await convocatoriaRepo.save(conv2027);
+    console.log(`  ${conv2027.nombre} — templates de evaluación asociados`);
+  }
 
   // ─────────────── PROYECTOS Y EDICIONES ───────────────
 
