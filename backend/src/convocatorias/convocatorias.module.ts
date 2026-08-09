@@ -8,6 +8,7 @@ import { Formulario } from '../formularios/formulario.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
+import { Edicion } from '../proyectos/edicion.entity';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-eval
       UnidadAcademica,
       TemplateEvaluacionInstitucional,
       TemplateEvaluacionCruzada,
+      Edicion,
     ]),
   ],
   controllers: [ConvocatoriasController],

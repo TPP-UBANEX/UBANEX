@@ -14,7 +14,9 @@ import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/templat
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { Usuario } from '../usuarios/usuario.entity';
+import { Edicion } from '../proyectos/edicion.entity';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
+import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
 import { validarCamposFormulario } from '../common/dto/validador-campos-formulario';
 import {
@@ -37,6 +39,8 @@ export class ConvocatoriasService {
     private readonly templateInstitucionalRepo: Repository<TemplateEvaluacionInstitucional>,
     @InjectRepository(TemplateEvaluacionCruzada)
     private readonly templateCruzadaRepo: Repository<TemplateEvaluacionCruzada>,
+    @InjectRepository(Edicion)
+    private readonly edicionRepo: Repository<Edicion>,
   ) {}
 
   listar() {
@@ -66,8 +70,27 @@ export class ConvocatoriasService {
       fechaFinEjecucion: dto.fechaFinEjecucion ?? convocatoria.fechaFinEjecucion,
     });
 
+    const estadoAnterior = convocatoria.estado;
     Object.assign(convocatoria, dto);
-    return this.repo.save(convocatoria);
+    const convocatoriaGuardada = await this.repo.save(convocatoria);
+
+    if (
+      convocatoriaGuardada.estado === EstadoConvocatoria.Evaluacion &&
+      estadoAnterior !== EstadoConvocatoria.Evaluacion
+    ) {
+      await this.edicionRepo
+        .createQueryBuilder()
+        .update(Edicion)
+        .set({ estado: EstadoEdicion.EnEvaluacion })
+        .where('convocatoriaId = :convocatoriaId', { convocatoriaId: convocatoria.id })
+        .andWhere('estado IN (:...estados)', {
+          estados: [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios],
+        })
+        .andWhere('eliminadoEn IS NULL')
+        .execute();
+    }
+
+    return convocatoriaGuardada;
   }
 
   async eliminar(id: string, _usuario: Usuario) {
