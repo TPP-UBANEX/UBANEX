@@ -859,6 +859,53 @@ async function bootstrap() {
 
   // ─────────────── CONVOCATORIAS ───────────────
 
+  // Cada convocatoria tiene sus propios templates (OneToOne sobre
+  // templateEvaluacionInstitucionalId/CruzadaId). Para que el flujo de evaluación
+  // funcione sin pasos manuales, cada convocatoria recibe una copia del template
+  // default. Idempotente: reutiliza la copia si ya existe.
+  async function templatesParaConvocatoria(convocatoria: Convocatoria) {
+    if (convocatoria.templateEvaluacionInstitucionalId && convocatoria.templateEvaluacionCruzadaId) {
+      return;
+    }
+
+    if (!convocatoria.templateEvaluacionInstitucionalId) {
+      const nombreCopia = `${templateInst.nombre} (copia ${convocatoria.anio})`;
+      let copia = await templateInstRepo.findOne({ where: { nombre: nombreCopia } });
+      if (!copia) {
+        copia = await templateInstRepo.save(
+          templateInstRepo.create({
+            nombre: nombreCopia,
+            esDefault: false,
+            esPlantilla: true,
+            estructura: templateInst.estructura,
+          }),
+        );
+        console.log(`  ${nombreCopia}`);
+      }
+      convocatoria.templateEvaluacionInstitucionalId = copia.id;
+    }
+
+    if (!convocatoria.templateEvaluacionCruzadaId) {
+      const nombreCopia = `${templateCruzada.nombre} (copia ${convocatoria.anio})`;
+      let copia = await templateCruzadaRepo.findOne({ where: { nombre: nombreCopia } });
+      if (!copia) {
+        copia = await templateCruzadaRepo.save(
+          templateCruzadaRepo.create({
+            nombre: nombreCopia,
+            esDefault: false,
+            esPlantilla: true,
+            estructura: templateCruzada.estructura,
+          }),
+        );
+        console.log(`  ${nombreCopia}`);
+      }
+      convocatoria.templateEvaluacionCruzadaId = copia.id;
+    }
+
+    await convocatoriaRepo.save(convocatoria);
+    console.log(`  ${convocatoria.nombre} — templates de evaluación asociados`);
+  }
+
   console.log('\n=== SEED: Convocatorias ===');
   const convocatoriaRepo = dataSource.getRepository(Convocatoria);
 
@@ -931,12 +978,7 @@ async function bootstrap() {
   // UBANEX 2026 es la convocatoria con proyectos presentados: se le asocian los
   // templates de evaluación por defecto para poder avanzarla a Evaluación y
   // probar el flujo completo sin pasos manuales.
-  if (!conv2026.templateEvaluacionInstitucionalId) {
-    conv2026.templateEvaluacionInstitucionalId = templateInst.id;
-    conv2026.templateEvaluacionCruzadaId = templateCruzada.id;
-    await convocatoriaRepo.save(conv2026);
-    console.log(`  ${conv2026.nombre} — templates de evaluación asociados`);
-  }
+  await templatesParaConvocatoria(conv2026);
 
   const conv2027 = await seedConvocatoria({
     nombre: 'UBANEX 2027',
@@ -954,12 +996,7 @@ async function bootstrap() {
 
   // La convocatoria en Configuración recibe los templates de evaluación por defecto,
   // para que el usuario pueda avanzarla y probar el flujo de evaluación.
-  if (!conv2027.templateEvaluacionInstitucionalId) {
-    conv2027.templateEvaluacionInstitucionalId = templateInst.id;
-    conv2027.templateEvaluacionCruzadaId = templateCruzada.id;
-    await convocatoriaRepo.save(conv2027);
-    console.log(`  ${conv2027.nombre} — templates de evaluación asociados`);
-  }
+  await templatesParaConvocatoria(conv2027);
 
   // ─────────────── PROYECTOS Y EDICIONES ───────────────
 
