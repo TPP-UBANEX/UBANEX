@@ -1,17 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Evaluacion } from './evaluacion.entity';
+import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
+import { EvaluacionCruzada } from './evaluacion-cruzada.entity';
 
 @Injectable()
 export class EvaluacionesService {
   constructor(
-    @InjectRepository(Evaluacion)
-    private readonly repo: Repository<Evaluacion>,
+    @InjectRepository(EvaluacionInstitucional)
+    private readonly institucionalRepo: Repository<EvaluacionInstitucional>,
+    @InjectRepository(EvaluacionCruzada)
+    private readonly cruzadaRepo: Repository<EvaluacionCruzada>,
   ) {}
 
-  findAll(proyectoId?: string) {
-    const where = proyectoId ? { proyectoId } : {};
-    return this.repo.find({ where, order: { puntaje: 'DESC' } });
+  findAll(_proyectoId?: string): Promise<[]> {
+    return Promise.resolve([]);
   }
 }
