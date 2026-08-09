@@ -11,6 +11,7 @@ import { RolUsuario } from './common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from './common/enums/estado-validacion-docente.enum';
 import { EstadoEdicion } from './common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from './common/enums/estado-convocatoria.enum';
+import { EstadoPropuestaEvaluador } from './common/enums/estado-propuesta-evaluador.enum';
 import { RolEjecucion } from './common/enums/rol-ejecucion.enum';
 import { TipoCampo } from './common/enums/tipo-campo.enum';
 import { Genero } from './common/enums/genero.enum';
@@ -927,6 +928,16 @@ async function bootstrap() {
     formularioId: f2026,
   });
 
+  // UBANEX 2026 es la convocatoria con proyectos presentados: se le asocian los
+  // templates de evaluación por defecto para poder avanzarla a Evaluación y
+  // probar el flujo completo sin pasos manuales.
+  if (!conv2026.templateEvaluacionInstitucionalId) {
+    conv2026.templateEvaluacionInstitucionalId = templateInst.id;
+    conv2026.templateEvaluacionCruzadaId = templateCruzada.id;
+    await convocatoriaRepo.save(conv2026);
+    console.log(`  ${conv2026.nombre} — templates de evaluación asociados`);
+  }
+
   const conv2027 = await seedConvocatoria({
     nombre: 'UBANEX 2027',
     descripcion: 'Convocatoria UBANEX del año 2027',
@@ -1089,11 +1100,21 @@ async function bootstrap() {
     edicionId?: string;
     esDirectorPrincipal?: boolean;
     asignadoPorId: string;
+    estado?: EstadoPropuestaEvaluador | null;
   }) {
     const existe = await participacionRepo.findOne({
       where: { usuarioId: data.usuarioId, convocatoriaId: data.convocatoriaId },
     });
-    if (existe) return existe;
+    if (existe) {
+      // Reconciliación: bases previas crearon evaluadores con estado null (no se
+      // pueden aprobar por la UI porque el flujo espera Propuesto → Aceptada → Aprobado).
+      if (data.estado && existe.estado !== data.estado) {
+        existe.estado = data.estado;
+        await participacionRepo.save(existe);
+        console.log(`  ${data.rol} — ${data.usuarioId.slice(0, 8)}... estado reconciliado a ${data.estado}`);
+      }
+      return existe;
+    }
 
     const p = participacionRepo.create({
       usuarioId: data.usuarioId,
@@ -1102,6 +1123,7 @@ async function bootstrap() {
       edicionId: data.edicionId ?? null,
       esDirectorPrincipal: data.esDirectorPrincipal ?? null,
       asignadoPorId: data.asignadoPorId,
+      estado: data.estado ?? null,
     });
     const saved = await participacionRepo.save(p);
     console.log(`  ${data.rol} — ${data.usuarioId.slice(0, 8)}... en convocatoria ${data.convocatoriaId.slice(0, 8)}...`);
@@ -1113,15 +1135,15 @@ async function bootstrap() {
   await seedParticipacion({ usuarioId: perez.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p2.edicion.id, esDirectorPrincipal: true, asignadoPorId: authDerecho.id });
   await seedParticipacion({ usuarioId: fernandez.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p3.edicion.id, esDirectorPrincipal: true, asignadoPorId: authIngenieria.id });
   await seedParticipacion({ usuarioId: diaz.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p4.edicion.id, esDirectorPrincipal: true, asignadoPorId: authIngenieria.id });
-  await seedParticipacion({ usuarioId: moreno.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, asignadoPorId: authIngenieria.id });
-  await seedParticipacion({ usuarioId: evaluadorDerecho.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, asignadoPorId: authDerecho.id });
-  await seedParticipacion({ usuarioId: evaluadorIngenieria.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, asignadoPorId: authIngenieria.id });
+  await seedParticipacion({ usuarioId: moreno.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authIngenieria.id });
+  await seedParticipacion({ usuarioId: evaluadorDerecho.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authDerecho.id });
+  await seedParticipacion({ usuarioId: evaluadorIngenieria.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authIngenieria.id });
 
   // UBANEX 2025
   await seedParticipacion({ usuarioId: garcia.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p5.edicion.id, esDirectorPrincipal: true, asignadoPorId: authDerecho.id });
   await seedParticipacion({ usuarioId: perez.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p5.edicion.id, esDirectorPrincipal: false, asignadoPorId: authDerecho.id });
   await seedParticipacion({ usuarioId: torres.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p6.edicion.id, esDirectorPrincipal: true, asignadoPorId: authMedicina.id });
-  await seedParticipacion({ usuarioId: romero.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, asignadoPorId: authMedicina.id });
+  await seedParticipacion({ usuarioId: romero.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authMedicina.id });
 
   // ─────────────── EMPAREJAMIENTOS ───────────────
 
