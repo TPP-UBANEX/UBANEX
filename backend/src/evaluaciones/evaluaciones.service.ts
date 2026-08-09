@@ -251,7 +251,7 @@ export class EvaluacionesService {
     if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
       throw new BadRequestException('La convocatoria no está en etapa de evaluación');
     }
-    await this.validarEvaluadorAprobado(convocatoriaId, usuario);
+    await this.validarEvaluadorAprobado(convocatoriaId, usuario.id);
 
     const uaEmparejada = await this.obtenerUaEmparejada(convocatoriaId, usuario.unidadAcademicaId);
     const conflictos = await this.edicionesConConflicto(usuario.id, convocatoriaId);
@@ -437,10 +437,10 @@ export class EvaluacionesService {
     return guardado;
   }
 
-  private async validarEvaluadorAprobado(convocatoriaId: string, usuario: Usuario): Promise<void> {
+  private async validarEvaluadorAprobado(convocatoriaId: string, usuarioId: string): Promise<void> {
     const participacion = await this.participacionRepo.findOne({
       where: {
-        usuarioId: usuario.id,
+        usuarioId,
         convocatoriaId,
         rol: RolEjecucion.Evaluador,
         estado: EstadoPropuestaEvaluador.Aprobado,
@@ -491,7 +491,7 @@ export class EvaluacionesService {
     if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
       throw new BadRequestException('La convocatoria no está en etapa de evaluación');
     }
-    await this.validarEvaluadorAprobado(convocatoriaId, usuario);
+    await this.validarEvaluadorAprobado(convocatoriaId, usuario.id);
 
     const edicion = await this.edicionRepo.findOne({
       where: { id: edicionId, convocatoriaId },
@@ -556,5 +556,80 @@ export class EvaluacionesService {
         `La evaluación está incompleta. Faltan puntajes: ${faltantes.join(', ')}`,
       );
     }
+  }
+
+  // ───────────── Tercera Unidad Académica de resolución ─────────────
+
+  async designarTercera(
+    convocatoriaId: string,
+    edicionId: string,
+    evaluadorId: string,
+    usuario: Usuario,
+  ) {
+    if (!usuario.roles.some(r =>
+      r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+    )) {
+      throw new ForbiddenException('Solo el Rectorado puede designar la tercera Unidad Académica');
+    }
+
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateEvaluacionCruzada: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    if (!convocatoria.templateEvaluacionCruzada) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el template de evaluación cruzada',
+      );
+    }
+
+    const edicion = await this.edicionRepo.findOne({
+      where: { id: edicionId, convocatoriaId },
+      relations: { proyecto: true },
+    });
+    if (!edicion) throw new NotFoundException('Edición no encontrada');
+    if (edicion.estado !== EstadoEdicion.EnEvaluacion) {
+      throw new BadRequestException('Solo las ediciones en evaluación pueden recibir una tercera designación');
+    }
+
+    await this.validarEvaluadorAprobado(convocatoriaId, evaluadorId);
+
+    const existente = await this.cruzadaRepo.findOne({
+      where: { edicionId, tipo: TipoEvaluacionCruzada.TerceraUa },
+    });
+    if (existente) {
+      throw new BadRequestException('La edición ya tiene designada una tercera Unidad Académica');
+    }
+
+    const previa = await this.cruzadaRepo.findOne({
+      where: { edicionId, evaluadorId },
+    });
+    if (previa) {
+      throw new BadRequestException('El evaluador ya tiene una evaluación asignada sobre esta edición');
+    }
+
+    const evaluacion = await this.cruzadaRepo.save(
+      this.cruzadaRepo.create({
+        convocatoriaId,
+        edicionId,
+        evaluadorId,
+        tipo: TipoEvaluacionCruzada.TerceraUa,
+        templateId: convocatoria.templateEvaluacionCruzada.id,
+        estado: EstadoEvaluacion.Borrador,
+      }),
+    );
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EVALUACION,
+      descripcion: `Designó al evaluador ${evaluadorId.slice(0, 8)}... como tercera Unidad Académica de la edición ${edicion.id.slice(0, 8)}...`,
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+    });
+
+    return evaluacion;
   }
 }

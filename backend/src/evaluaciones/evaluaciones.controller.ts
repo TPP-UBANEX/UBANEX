@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Query, Body, Param, UseGuards } from '@nest
 import { EvaluacionesService } from './evaluaciones.service';
 import { GuardarEvaluacionInstitucionalDto } from './dto/guardar-evaluacion-institucional.dto';
 import { GuardarEvaluacionCruzadaDto } from './dto/guardar-evaluacion-cruzada.dto';
+import { DesignarTerceraEvaluadorDto } from './dto/designar-tercera-evaluador.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -93,5 +94,16 @@ export class EvaluacionesController {
     @CurrentUser() usuario: Usuario,
   ) {
     return this.service.confirmarCruzada(convocatoriaId, edicionId, usuario);
+  }
+
+  @Post('cruzadas/:edicionId/designar-tercera')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  designarTercera(
+    @Param('edicionId') edicionId: string,
+    @Query('convocatoriaId') convocatoriaId: string,
+    @Body() dto: DesignarTerceraEvaluadorDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.designarTercera(convocatoriaId, edicionId, dto.evaluadorId, usuario);
   }
 }
