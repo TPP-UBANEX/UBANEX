@@ -2,49 +2,7 @@
 // Se usan como base para seedear las plantillas de biblioteca (esDefault/esPlantilla)
 // y como referencia del dominio.
 
-export type TipoValorSubcategoria = 'numerico' | 'booleano';
-
-export interface SubcategoriaInstitucional {
-  id: string;
-  texto: string;
-  tipoValor: TipoValorSubcategoria;
-  minimo: number | null;
-  maximo: number | null;
-  fundamentacion: string | null;
-}
-
-export interface CategoriaInstitucional {
-  id: string;
-  nombre: string;
-  subcategorias: SubcategoriaInstitucional[];
-}
-
-export interface ItemChecklist {
-  id: string;
-  texto: string;
-}
-
-export interface EstructuraTemplateInstitucional {
-  categorias: CategoriaInstitucional[];
-  checklist: ItemChecklist[];
-}
-
-export interface ItemCruzada {
-  id: string;
-  nombre: string;
-  puntajeMaximo: number;
-}
-
-export interface CategoriaCruzada {
-  id: string;
-  nombre: string;
-  puntajeMaximo: number;
-  items: ItemCruzada[];
-}
-
-export interface EstructuraTemplateCruzada {
-  categorias: CategoriaCruzada[];
-}
+import { EstructuraTemplateInstitucional, EstructuraTemplateCruzada } from '../templates-evaluacion/estructura-template';
 
 export const TEMPLATE_INSTITUCIONAL_DEFAULT: EstructuraTemplateInstitucional = {
   categorias: [
