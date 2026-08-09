@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -83,11 +82,11 @@ export function Evaluacion() {
       .finally(() => setLoadingConv(false))
   }, [])
 
-  const tabs: string[] = []
-  if (esRectorado(user)) tabs.push('monitoreo')
-  if (esSecretaria(user)) tabs.push('institucional')
-  if (!esRectorado(user)) tabs.push('cruzada')
-  const defaultTab = tabs[0] ?? 'monitoreo'
+  const vista: 'monitoreo' | 'institucional' | 'cruzada' = esRectorado(user)
+    ? 'monitoreo'
+    : esSecretaria(user)
+      ? 'institucional'
+      : 'cruzada'
 
   return (
     <div className="p-6 space-y-6">
@@ -116,32 +115,13 @@ export function Evaluacion() {
       </div>
 
       {convocatoriaId ? (
-        <Tabs defaultValue={defaultTab}>
-          <TabsList>
-            {tabs.includes('monitoreo') && <TabsTrigger value="monitoreo">Monitoreo</TabsTrigger>}
-            {tabs.includes('institucional') && (
-              <TabsTrigger value="institucional">Institucional</TabsTrigger>
-            )}
-            {tabs.includes('cruzada') && (
-              <TabsTrigger value="cruzada">Evaluación cruzada</TabsTrigger>
-            )}
-          </TabsList>
-          {tabs.includes('monitoreo') && (
-            <TabsContent value="monitoreo" className="mt-4">
-              <MonitoreoView convocatoriaId={convocatoriaId} />
-            </TabsContent>
-          )}
-          {tabs.includes('institucional') && (
-            <TabsContent value="institucional" className="mt-4">
-              <InstitucionalView convocatoriaId={convocatoriaId} user={user} />
-            </TabsContent>
-          )}
-          {tabs.includes('cruzada') && (
-            <TabsContent value="cruzada" className="mt-4">
-              <CruzadaView convocatoriaId={convocatoriaId} />
-            </TabsContent>
-          )}
-        </Tabs>
+        vista === 'monitoreo' ? (
+          <MonitoreoView convocatoriaId={convocatoriaId} />
+        ) : vista === 'institucional' ? (
+          <InstitucionalView convocatoriaId={convocatoriaId} user={user} />
+        ) : (
+          <CruzadaView convocatoriaId={convocatoriaId} />
+        )
       ) : (
         <p className="text-sm text-muted-foreground">
           No hay convocatorias en etapa de evaluación.
