@@ -1077,6 +1077,7 @@ async function bootstrap() {
     convocatoria: Convocatoria,
     estado: EstadoEdicion,
     presupuesto?: object,
+    datosFormulario?: object,
   ): Promise<{ proyecto: Proyecto; edicion: Edicion }> {
     const existeProyecto = await proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
     if (existeProyecto) {
@@ -1092,6 +1093,12 @@ async function bootstrap() {
           ed.estado = EstadoEdicion.EnEvaluacion;
           await edicionRepo.save(ed);
           console.log(`  ${nombreProyecto} — estado reconciliado a ${ed.estado}`);
+        }
+        // Backfill del formulario completado para bases que lo crearon sin datos.
+        if (datosFormulario && ed.datosFormulario == null) {
+          ed.datosFormulario = datosFormulario;
+          await edicionRepo.save(ed);
+          console.log(`  ${nombreProyecto} — formulario de presentación completado`);
         }
         return { proyecto: existeProyecto, edicion: ed };
       }
@@ -1113,6 +1120,7 @@ async function bootstrap() {
         unidadAcademicaId: unidadAcademica.id,
         anioEdicion: convocatoria.anio,
         presupuesto: presupuesto || null,
+        datosFormulario: datosFormulario ?? null,
       }),
     );
 
@@ -1120,32 +1128,82 @@ async function bootstrap() {
     return { proyecto, edicion };
   }
 
+  const [campoResumen, campoAntecedentes, campoArea, campoPoblaciones] = camposFormularioEstandar;
+
+  // Respuestas del formulario de presentación (keyed por CampoFormulario.id) para
+  // que el evaluador lea el formulario completado por quien presentó el proyecto.
+  function seedDatosFormulario(opts: {
+    resumen: string;
+    area: string;
+    poblaciones: string[];
+    antecedentes?: boolean;
+  }): Record<string, unknown> {
+    return {
+      [campoResumen.id]: opts.resumen,
+      [campoAntecedentes.id]: opts.antecedentes ?? false,
+      [campoArea.id]: opts.area,
+      [campoPoblaciones.id]: opts.poblaciones,
+    };
+  }
+
   // UBANEX 2026 — en Evaluacion
   const p1 = await seedProyectoConEdicion(
     'Red de Voluntariado Ambiental',
     garcia, derecho, conv2026, EstadoEdicion.Borrador, presupuestoBorrador,
+    seedDatosFormulario({
+      resumen: 'Red de voluntarios para la restauración de humedales y espacios verdes urbanos.',
+      area: 'Ambiente',
+      poblaciones: ['Comunidad general'],
+    }),
   );
   const p2 = await seedProyectoConEdicion(
     'Inclusión Digital en Barrios Populares',
     perez, derecho, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador,
+    seedDatosFormulario({
+      resumen: 'Talleres de alfabetización digital y acceso a herramientas tecnológicas en barrios populares.',
+      area: 'Tecnología',
+      poblaciones: ['Niños y adolescentes', 'Adultos mayores'],
+      antecedentes: true,
+    }),
   );
   const p3 = await seedProyectoConEdicion(
     'Huerta Comunitaria y Seguridad Alimentaria',
     fernandez, ingenieria, conv2026, EstadoEdicion.Borrador, presupuestoBorrador,
+    seedDatosFormulario({
+      resumen: 'Huertas comunitarias con técnicas agroecológicas para mejorar la seguridad alimentaria del barrio.',
+      area: 'Ambiente',
+      poblaciones: ['Comunidad general'],
+    }),
   );
   const p4 = await seedProyectoConEdicion(
     'Alfabetización Científica en Escuelas',
     diaz, ingenieria, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador,
+    seedDatosFormulario({
+      resumen: 'Laboratorios itinerantes de ciencias en escuelas secundarias para fomentar vocaciones científicas.',
+      area: 'Educación',
+      poblaciones: ['Niños y adolescentes'],
+      antecedentes: true,
+    }),
   );
 
   // UBANEX 2025 — en Ejecucion
   const p5 = await seedProyectoConEdicion(
     'Taller de Oficios para la Inclusión Laboral',
     garcia, derecho, conv2025, EstadoEdicion.EnEjecucion, presupuestoEjecucion,
+    seedDatosFormulario({
+      resumen: 'Talleres de oficios orientados a la inserción laboral de personas en situación de vulnerabilidad.',
+      area: 'Cultura',
+      poblaciones: ['Comunidad general'],
+    }),
   );
   const p6 = await seedProyectoConEdicion(
     'Salud Comunitaria en Barrios Vulnerables',
     torres, medicina, conv2025, EstadoEdicion.EnEjecucion, presupuestoEjecucion,
+    seedDatosFormulario({
+      resumen: 'Atención primaria de salud y prevención en barrios vulnerables con participación comunitaria.',
+      area: 'Salud',
+      poblaciones: ['Comunidad general'],
+    }),
   );
 
   // ─────────────── PARTICIPACIONES ───────────────
