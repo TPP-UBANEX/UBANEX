@@ -521,11 +521,9 @@ export class EvaluacionesService {
       if (conflictos.has(ed.id)) continue;
 
       if (misEdicionesEvaluadas.has(ed.id)) {
-        const miEvaluacion = misEvaluaciones.find(
-          e => e.edicionId === ed.id && e.tipo === TipoEvaluacionCruzada.TerceraUa,
-        );
+        const miEvaluacion = misEvaluaciones.find(e => e.edicionId === ed.id);
         if (miEvaluacion) {
-          resultado.push({ edicion: ed, tipo: TipoEvaluacionCruzada.TerceraUa, evaluacion: miEvaluacion });
+          resultado.push({ edicion: ed, tipo: miEvaluacion.tipo, evaluacion: miEvaluacion });
         }
         continue;
       }

@@ -557,6 +557,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
       await api.evaluaciones.cruzadas.guardar(convocatoriaId, edicionId, { items, observaciones })
       toast.success('Borrador de evaluación cruzada guardado')
       await seleccionar(edicionId)
+      cargarDisponibles()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
