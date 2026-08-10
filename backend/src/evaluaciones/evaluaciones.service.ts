@@ -24,6 +24,17 @@ import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum'
 import { validarRespuestasInstitucionales, validarRespuestasCruzadas } from './validar-respuestas-evaluacion';
 import { EstructuraTemplateInstitucional, EstructuraTemplateCruzada } from '../templates-evaluacion/estructura-template';
 
+// ── Fórmula del resumen final de evaluación ─────────────────────────────
+// Ajustar acá los pesos, el puntaje de los Sí y el umbral de adjudicación
+// cuando se quiera cambiar la regla de cálculo del resumen final de los
+// proyectos en ejecución. Por ahora: 50% institucional + 50% cruzada (en
+// porcentaje sobre el máximo del template), cada "Sí" del formulario suma 10
+// puntos, y se adjudica con notaFinal >= 60 y todo el checklist en "Sí".
+const PESO_INSTITUCIONAL = 0.5;
+const PESO_CRUZADA = 0.5;
+const PUNTAJE_BOOLEANO = 10;
+const UMBRAL_ADJUDICACION = 60;
+
 @Injectable()
 export class EvaluacionesService {
   constructor(
@@ -159,6 +170,9 @@ export class EvaluacionesService {
       esSecretariaUA || esRectorado || c.estado === EstadoEvaluacion.Confirmada;
     const algunaCruzadaConfirmada = cruzadas.some(c => c.estado === EstadoEvaluacion.Confirmada);
 
+    const cruzadasConfirmadas = cruzadas.filter(c => c.estado === EstadoEvaluacion.Confirmada);
+    const resumen = this.calcularResumen(institucional, cruzadasConfirmadas, edicion);
+
     return {
       convocatoria: {
         id: edicion.convocatoriaId,
@@ -203,6 +217,70 @@ export class EvaluacionesService {
       estructuraCruzada: esSecretariaUA || esRectorado || algunaCruzadaConfirmada
         ? estructuraCruzada
         : null,
+      resumen,
+    };
+  }
+
+  // Resumen final de la evaluación: se calcula cuando la edición ya está en
+  // ejecución (o cerrada) y tanto la evaluación institucional como al menos
+  // una cruzada fueron confirmadas. Es determinista: las evaluaciones
+  // confirmadas son inmutables, así que no hace falta persistirlo.
+  private calcularResumen(
+    institucional: EvaluacionInstitucional | null,
+    cruzadasConfirmadas: EvaluacionCruzada[],
+    edicion: Edicion,
+  ) {
+    if (
+      !institucional ||
+      institucional.estado !== EstadoEvaluacion.Confirmada ||
+      cruzadasConfirmadas.length === 0 ||
+      (edicion.estado !== EstadoEdicion.EnEjecucion && edicion.estado !== EstadoEdicion.Cerrado)
+    ) {
+      return null;
+    }
+
+    const estructuraInst = edicion.convocatoria?.templateEvaluacionInstitucional?.estructura ?? null;
+    const estructuraCruzada = edicion.convocatoria?.templateEvaluacionCruzada?.estructura ?? null;
+    if (!estructuraInst || !estructuraCruzada) return null;
+
+    const subcategorias = (estructuraInst.categorias ?? []).flatMap(c => c.subcategorias ?? []);
+    const respuestas = (institucional.categorias ?? {}) as Record<string, { valor?: unknown }>;
+    const maxInst = subcategorias.reduce<number>((suma, sub) => {
+      if (sub.tipoValor === 'numerico') return suma + (sub.maximo ?? PUNTAJE_BOOLEANO);
+      return suma + PUNTAJE_BOOLEANO;
+    }, 0);
+    const puntajeInst = subcategorias.reduce<number>((suma, sub) => {
+      const respuesta = respuestas[sub.id]?.valor;
+      if (sub.tipoValor === 'numerico') return suma + Number(respuesta ?? 0);
+      return suma + (respuesta === true ? PUNTAJE_BOOLEANO : 0);
+    }, 0);
+
+    const maxCruzada = (estructuraCruzada.categorias ?? [])
+      .flatMap(c => c.items ?? [])
+      .reduce<number>((suma, item) => suma + (item.puntajeMaximo ?? 0), 0);
+    const promedioCruzada = cruzadasConfirmadas.reduce<number>((suma, c) => {
+      const items = (c.items ?? {}) as Record<string, number>;
+      const total = Object.values(items).reduce<number>((acc, v) => acc + Number(v), 0);
+      return suma + total;
+    }, 0) / cruzadasConfirmadas.length;
+
+    const checklist = (institucional.checklist ?? {}) as Record<string, boolean>;
+    const checklistCompleto = (estructuraInst.checklist ?? []).every(
+      item => checklist[item.id] === true,
+    );
+
+    const notaFinal =
+      (PESO_INSTITUCIONAL * (puntajeInst / maxInst) +
+        PESO_CRUZADA * (promedioCruzada / maxCruzada)) *
+      100;
+
+    return {
+      puntajeInstitucional: puntajeInst,
+      puntajeInstitucionalMaximo: maxInst,
+      puntajeCruzadaPromedio: Math.round(promedioCruzada * 10) / 10,
+      puntajeCruzadaMaximo: maxCruzada,
+      notaFinal: Math.round(notaFinal * 10) / 10,
+      adjudicado: notaFinal >= UMBRAL_ADJUDICACION && checklistCompleto,
     };
   }
 
