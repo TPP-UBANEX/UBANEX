@@ -286,7 +286,7 @@ async function bootstrap() {
 
   console.log('\n=== SEED: Usuarios ===');
 
-  await seedUsuario(usuariosService, {
+  const admin = await seedUsuario(usuariosService, {
     nombreCompleto: 'Admin Rectorado',
     email: 'admin@uba.ar',
     password: 'admin',
@@ -464,6 +464,18 @@ async function bootstrap() {
     genero: Genero.Otro,
     personaConDiscapacidad: false,
     areaDocente: 'Ingeniería Industrial',
+  }, EstadoValidacionDocente.Validado);
+
+  const evaluadorEconomicas = await seedDocente(usuariosService, {
+    nombreCompleto: 'Evaluador de Ciencias Económicas',
+    email: 'evaluador-economicas@uba.ar',
+    password: '123456',
+    roles: [RolUsuario.Docente],
+    unidadAcademicaId: econ.id,
+    telefono: '11 6666 6666',
+    genero: Genero.Femenino,
+    cargoDocente: CargoDocente.ProfesorAdjunto,
+    areaDocente: 'Economía Aplicada',
   }, EstadoValidacionDocente.Validado);
 
   await seedDocente(usuariosService, {
@@ -1349,6 +1361,7 @@ async function bootstrap() {
   await seedParticipacion({ usuarioId: torres.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p6.edicion.id, esDirectorPrincipal: true, asignadoPorId: authMedicina.id });
   await seedParticipacion({ usuarioId: romero.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authMedicina.id });
   await seedParticipacion({ usuarioId: evaluadorDerecho.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authDerecho.id });
+  await seedParticipacion({ usuarioId: evaluadorEconomicas.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: admin.id });
 
   // ─────────────── EMPAREJAMIENTOS ───────────────
 
@@ -1377,6 +1390,7 @@ async function bootstrap() {
     console.log(`  ${EMPAREJAMIENTO_DEFAULT.length} pares para convocatoria ${convocatoriaId.slice(0, 8)}...`);
   }
 
+  await seedEmparejamientos(conv2025.id);
   await seedEmparejamientos(conv2026.id);
   await seedEmparejamientos(conv2027.id);
 
@@ -1499,6 +1513,26 @@ async function bootstrap() {
       'item-sostenibilidad': 6,
     },
     observaciones: 'Problema claramente relevante y metodología adecuada al territorio.',
+  });
+  await seedEvaluacionCruzadaConfirmada({
+    edicionId: p5.edicion.id,
+    evaluador: evaluadorEconomicas,
+    tipo: TipoEvaluacionCruzada.Ajena,
+    items: {
+      'item-problema': 9,
+      'item-objetivos': 7,
+      'item-metodologia': 6,
+      'item-participacion-diseno': 7,
+      'item-formacion-alumnos': 6,
+      'item-roles-alumnos': 5,
+      'item-viabilidad': 4,
+      'item-presupuesto': 4,
+      'item-comunidad': 5,
+      'item-articulacion': 5,
+      'item-impacto-esperado': 5,
+      'item-sostenibilidad': 5,
+    },
+    observaciones: 'Evaluación desde la Unidad Académica emparejada: buena viabilidad y fuerte articulación comunitaria.',
   });
 
   // p6 — Salud Comunitaria en Barrios Vulnerables (Medicina)
