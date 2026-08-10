@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, Not, Repository } from 'typeorm';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { UnidadesAcademicasService } from '../unidades-academicas/unidades-academicas.service';
 import { CarrerasService } from '../carreras/carreras.service';
@@ -125,7 +125,7 @@ export class SeedService {
   private readonly usuariosPorUa = new Map<string, PoolUa>();
   private readonly parMap = new Map<string, string>();
   private readonly titulosUsados = new Set<string>();
-  private readonly progreso = new Progreso(34_000);
+  private readonly progreso = new Progreso(42_000);
 
   private camposFormularioEstandar: CampoFormulario[];
   private formularioDefault!: Formulario;
@@ -154,6 +154,8 @@ export class SeedService {
   private p4!: Edicion;
   private p5!: Edicion;
   private p6!: Edicion;
+  private p7!: Edicion;
+  private p8!: Edicion;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -228,11 +230,11 @@ export class SeedService {
 
     console.log('\n=== SEED: Proyectos y Ediciones ===');
     await this.seedProyectosCanonicos();
-    await this.seedProyectosMasivos([2023, 2024, 2025, 2026]);
+    await this.seedProyectosMasivos([2023, 2024, 2025, 2026, 2027]);
 
     console.log('\n=== SEED: Participaciones ===');
     await this.seedParticipacionesCanonicas();
-    await this.seedParticipacionesMasivas([2023, 2024, 2025, 2026]);
+    await this.seedParticipacionesMasivas([2023, 2024, 2025, 2026, 2027]);
 
     console.log('\n=== SEED: Emparejamientos ===');
     await this.seedEmparejamientos();
@@ -395,7 +397,7 @@ export class SeedService {
     const generarEmails = (prefijo: string, cantidad: number): string[] =>
       Array.from({ length: cantidad }, (_, i) => `${prefijo}-${String(i + 1).padStart(3, '0')}-${slug}@uba.ar`);
 
-    const directoresSpecs: Array<Partial<Usuario>> = generarEmails('director', 18).map((email) => {
+    const directoresSpecs: Array<Partial<Usuario>> = generarEmails('director', 100).map((email) => {
       const nombre = this.rng.pick(NOMBRES);
       const apellido = this.rng.pick(APELLIDOS);
       return {
@@ -1185,7 +1187,7 @@ export class SeedService {
       { anio: 2024, estado: EstadoConvocatoria.Cierre },
       { anio: 2025, estado: EstadoConvocatoria.Ejecucion },
       { anio: 2026, estado: EstadoConvocatoria.Evaluacion },
-      { anio: 2027, estado: EstadoConvocatoria.Configuracion },
+      { anio: 2027, estado: EstadoConvocatoria.Presentacion },
       { anio: 2028, estado: EstadoConvocatoria.Configuracion },
     ];
 
@@ -1373,6 +1375,27 @@ export class SeedService {
         poblaciones: ['Comunidad general'],
       }),
     );
+
+    const conv2027 = this.convs.get(2027)!;
+    this.p7 = await this.seedProyectoConEdicion(
+      'Huerta Agroecológica y Educación Ambiental',
+      this.garcia, derecho, conv2027, EstadoEdicion.Presentado, presupuestoBorrador,
+      this.seedDatosFormulario({
+        resumen: 'Huerta agroecológica escolar con talleres de educación ambiental para niños y adolescentes.',
+        area: 'Ambiente',
+        poblaciones: ['Niños y adolescentes'],
+        antecedentes: true,
+      }),
+    );
+    this.p8 = await this.seedProyectoConEdicion(
+      'Cine Comunitario y Memoria Barrial',
+      this.fernandez, ingenieria, conv2027, EstadoEdicion.PendienteDeCambios, presupuestoBorrador,
+      this.seedDatosFormulario({
+        resumen: 'Ciclos de cine comunitario para la recuperación de la memoria barrial y la identidad local.',
+        area: 'Cultura',
+        poblaciones: ['Comunidad general'],
+      }),
+    );
   }
 
   private generarTituloUnico(): string {
@@ -1392,7 +1415,8 @@ export class SeedService {
 
     for (const anio of anios) {
       const conv = this.convs.get(anio)!;
-      const estadoEdicion = anio === 2026 ? EstadoEdicion.EnEvaluacion : EstadoEdicion.EnEjecucion;
+      const estadoEdicion =
+        anio === 2026 ? EstadoEdicion.EnEvaluacion : anio === 2027 ? null : EstadoEdicion.EnEjecucion;
 
       const edicionesExistentes = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id },
@@ -1407,10 +1431,18 @@ export class SeedService {
 
         const specs: EdicionMasiva[] = [];
         const proyectoEnts: Proyecto[] = [];
+        const directoresDisponibles = [...pool.directores];
 
         for (let i = 0; i < cantidad; i++) {
           const titulo = this.generarTituloUnico();
-          const director = pool.directores[this.rng.entero(0, pool.directores.length - 1)];
+          const director =
+            directoresDisponibles.splice(
+              this.rng.entero(0, directoresDisponibles.length - 1),
+              1,
+            )[0] ?? pool.directores[0];
+          const estado =
+            estadoEdicion ??
+            (this.rng.bool(0.85) ? EstadoEdicion.Presentado : EstadoEdicion.PendienteDeCambios);
           const presupuesto = generarPresupuesto(this.rng, anio);
           const datos = this.seedDatosFormulario({
             resumen: `Propuesta de ${titulo.toLowerCase()} con trabajo articulado con organizaciones de la zona.`,
@@ -1427,7 +1459,7 @@ export class SeedService {
             proyecto,
             uaId: ua.id,
             convocatoriaId: conv.id,
-            estado: estadoEdicion,
+            estado,
             directorId: director.id,
             presupuesto,
             datos,
@@ -1501,6 +1533,7 @@ export class SeedService {
   private async seedParticipacionesCanonicas(): Promise<void> {
     const conv2025 = this.convs.get(2025)!;
     const conv2026 = this.convs.get(2026)!;
+    const conv2027 = this.convs.get(2027)!;
 
     await this.seedParticipacion({ usuarioId: this.garcia.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p1.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.perez.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p2.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
@@ -1516,6 +1549,9 @@ export class SeedService {
     await this.seedParticipacion({ usuarioId: this.romero.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.authMedicina.id });
     await this.seedParticipacion({ usuarioId: this.evaluadorDerecho.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.evaluadorEconomicas.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.admin.id });
+
+    await this.seedParticipacion({ usuarioId: this.garcia.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p7.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
+    await this.seedParticipacion({ usuarioId: this.fernandez.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p8.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
   }
 
   private async seedParticipacionesMasivas(anios: number[]): Promise<void> {
@@ -1735,17 +1771,17 @@ export class SeedService {
       const estructuraCruzada = convConTemplates?.templateEvaluacionCruzada?.estructura;
 
       const ediciones = await this.edicionRepo.find({
-        where: { convocatoriaId: conv.id },
+        where: { convocatoriaId: conv.id, estado: Not(EstadoEdicion.Borrador) },
       });
       const [instExistentes, cruzadaExistentes] = await Promise.all([
         this.institucionalEvalRepo.find({ where: { convocatoriaId: conv.id }, select: { edicionId: true } }),
         this.cruzadaEvalRepo.find({
           where: { convocatoriaId: conv.id },
-          select: { edicionId: true, evaluadorId: true },
+          select: { edicionId: true, tipo: true },
         }),
       ]);
       const instSet = new Set(instExistentes.map((e) => e.edicionId));
-      const cruzadaSet = new Set(cruzadaExistentes.map((e) => `${e.edicionId}::${e.evaluadorId}`));
+      const cruzadaSet = new Set(cruzadaExistentes.map((e) => `${e.edicionId}::${e.tipo}`));
 
       const instRows: EvaluacionInstitucional[] = [];
       const cruzadaRows: EvaluacionCruzada[] = [];
@@ -1794,8 +1830,9 @@ export class SeedService {
         if (!conCruzadas || !estructuraCruzada || !convConTemplates?.templateEvaluacionCruzadaId) continue;
 
         const evaluadorPropia = pool.evaluadores[this.rng.entero(0, pool.evaluadores.length - 1)];
-        if (evaluadorPropia && !cruzadaSet.has(`${ed.id}::${evaluadorPropia.id}`)) {
+        if (evaluadorPropia && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`)) {
           const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
+          cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Propia}`);
           cruzadaRows.push(
             this.cruzadaEvalRepo.create({
               convocatoriaId: conv.id,
@@ -1814,8 +1851,9 @@ export class SeedService {
         const poolPar = uaPar ? this.usuariosPorUa.get(uaPar) : undefined;
         if (poolPar && poolPar.evaluadores.length > 0) {
           const evaluadorAjena = poolPar.evaluadores[this.rng.entero(0, poolPar.evaluadores.length - 1)];
-          if (!cruzadaSet.has(`${ed.id}::${evaluadorAjena.id}`)) {
+          if (!cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`)) {
             const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
+            cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`);
             cruzadaRows.push(
               this.cruzadaEvalRepo.create({
                 convocatoriaId: conv.id,
