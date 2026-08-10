@@ -98,10 +98,14 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
   }
 
   const ValorDiff = ({ actual, sugerido }: { actual: string | null; sugerido: string | null }) => (
-    <div className="flex items-center gap-3 text-sm mb-2">
-      <span className="text-muted-foreground line-through">{actual ?? '(sin valor)'}</span>
-      <span className="text-muted-foreground">→</span>
-      <span className="font-medium text-foreground">{sugerido ?? '(sin valor)'}</span>
+    <div className="flex items-start gap-3 text-sm mb-2">
+      <span className="text-muted-foreground line-through whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
+        {actual ?? '(sin valor)'}
+      </span>
+      <span className="text-muted-foreground shrink-0">→</span>
+      <span className="font-medium text-foreground whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
+        {sugerido ?? '(sin valor)'}
+      </span>
     </div>
   )
 

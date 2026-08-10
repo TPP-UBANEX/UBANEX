@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -40,6 +40,7 @@ import { SugerenciasTab } from '@/components/SugerenciasTab'
 import {
   CampoFormularioInput,
   EtiquetaCampoFormulario,
+  TextoLargoColapsable,
   campoFormularioVacio,
   formatearValorCampoFormulario,
 } from '@/components/CampoFormularioInput'
@@ -108,6 +109,11 @@ export function ProyectoDetail() {
   }>({
     open: false, campo: '', valorActual: '', label: '', valorSugeridoInicial: '', comentarioInicial: '',
   })
+
+  // Tipo del campo del formulario sobre el que se está sugiriendo (null si es un campo fijo del proyecto).
+  const tipoCampoSugerido = sugerenciaModal.campo.startsWith('datosFormulario.')
+    ? camposFormulario.find(c => c.id === sugerenciaModal.campo.replace('datosFormulario.', ''))?.tipo ?? null
+    : null
 
   const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
@@ -729,22 +735,39 @@ export function ProyectoDetail() {
                         {proyecto.esInterfacultad ? 'Sí' : 'No'}
                       </CampoSugerible>
                     </div>
-                    {camposFormulario.map(campo => (
-                      <div key={campo.id}>
-                        <span className="text-muted-foreground">
-                          <EtiquetaCampoFormulario campo={campo} />:
-                        </span>{' '}
-                        <CampoSugerible
-                          campo={`datosFormulario.${campo.id}`}
-                          valorActual={formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])}
-                          label={campo.nombre}
-                          activo={modoSugerencia}
-                          onClick={handleSugerirClick}
-                        >
-                          {formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])}
-                        </CampoSugerible>
-                      </div>
-                    ))}
+                    {camposFormulario.map(campo => {
+                      const valorFormateado = formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])
+                      // Los campos de texto largo ocupan las dos columnas, en su posición según el orden definido.
+                      const esTextoLargo = campo.tipo === TipoCampo.TextoLargo
+                      return (
+                        <div key={campo.id} className={esTextoLargo ? 'col-span-2 space-y-1' : undefined}>
+                          {esTextoLargo ? (
+                            <p className="text-muted-foreground">
+                              <EtiquetaCampoFormulario campo={campo} />:
+                            </p>
+                          ) : (
+                            <>
+                              <span className="text-muted-foreground">
+                                <EtiquetaCampoFormulario campo={campo} />:
+                              </span>{' '}
+                            </>
+                          )}
+                          <CampoSugerible
+                            campo={`datosFormulario.${campo.id}`}
+                            valorActual={valorFormateado}
+                            label={campo.nombre}
+                            activo={modoSugerencia}
+                            onClick={handleSugerirClick}
+                            display={esTextoLargo ? 'flex' : 'inline-flex'}
+                            className={esTextoLargo ? 'w-full items-start' : undefined}
+                          >
+                            {esTextoLargo
+                              ? <TextoLargoColapsable texto={valorFormateado} />
+                              : valorFormateado}
+                          </CampoSugerible>
+                        </div>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -933,6 +956,8 @@ export function ProyectoDetail() {
         edicionId={edicion?.id ?? ''}
         valorSugeridoInicial={sugerenciaModal.valorSugeridoInicial}
         comentarioInicial={sugerenciaModal.comentarioInicial}
+        multilinea={tipoCampoSugerido === TipoCampo.TextoLargo}
+        maxLongitud={tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined}
       />
 
       {edicion && (

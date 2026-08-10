@@ -1,4 +1,6 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -7,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { TipoCampo } from '@/data/types'
+import { MAX_LONGITUD_POR_TIPO, TipoCampo } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
 
 export function EtiquetaCampoFormulario({ campo }: { campo: Pick<CampoFormulario, 'nombre' | 'esObligatorio'> }) {
@@ -56,8 +58,23 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
       {campo.tipo === TipoCampo.Texto && (
         <Input
           value={typeof valor === 'string' ? valor : ''}
+          maxLength={MAX_LONGITUD_POR_TIPO[TipoCampo.Texto]}
           onChange={e => onChange(e.target.value)}
         />
+      )}
+
+      {campo.tipo === TipoCampo.TextoLargo && (
+        <>
+          <Textarea
+            rows={10}
+            value={typeof valor === 'string' ? valor : ''}
+            maxLength={MAX_LONGITUD_POR_TIPO[TipoCampo.TextoLargo]}
+            onChange={e => onChange(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground text-right">
+            {(typeof valor === 'string' ? valor.length : 0).toLocaleString('es-AR')} / {MAX_LONGITUD_POR_TIPO[TipoCampo.TextoLargo]!.toLocaleString('es-AR')}
+          </p>
+        </>
       )}
 
       {campo.tipo === TipoCampo.Booleano && (
@@ -106,6 +123,39 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
 
       {faltaCompletar && (
         <p className="text-xs text-muted-foreground">Falta completar</p>
+      )}
+    </div>
+  )
+}
+
+/** Muestra un texto largo respetando saltos de línea, truncado a 5 líneas con "Ver más". */
+export function TextoLargoColapsable({ texto }: { texto: string }) {
+  const [expandido, setExpandido] = useState(false)
+  const [desborda, setDesborda] = useState(false)
+  const ref = useRef<HTMLParagraphElement>(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    setDesborda(el.scrollHeight > el.clientHeight + 1)
+  }, [texto, expandido])
+
+  return (
+    <div className="w-full min-w-0">
+      <p
+        ref={ref}
+        className={`whitespace-pre-wrap break-words ${expandido ? '' : 'line-clamp-5'}`}
+      >
+        {texto}
+      </p>
+      {(desborda || expandido) && (
+        <button
+          type="button"
+          className="text-xs text-primary hover:underline mt-1"
+          onClick={() => setExpandido(prev => !prev)}
+        >
+          {expandido ? 'Ver menos' : 'Ver más'}
+        </button>
       )}
     </div>
   )

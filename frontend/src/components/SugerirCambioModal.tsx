@@ -23,6 +23,9 @@ interface SugerirCambioModalProps {
   edicionId: string
   valorSugeridoInicial?: string
   comentarioInicial?: string
+  /** Para campos de texto largo: muestra los valores en textarea en vez de input de una línea. */
+  multilinea?: boolean
+  maxLongitud?: number
   onSuccess?: () => void
 }
 
@@ -35,6 +38,8 @@ export function SugerirCambioModal({
   edicionId,
   valorSugeridoInicial = '',
   comentarioInicial = '',
+  multilinea = false,
+  maxLongitud,
   onSuccess,
 }: SugerirCambioModalProps) {
   const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
@@ -83,7 +88,7 @@ export function SugerirCambioModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className={multilinea ? 'max-w-2xl max-h-[90vh] overflow-y-auto' : 'max-w-md'}>
         <DialogHeader>
           <DialogTitle>Sugerir cambio</DialogTitle>
           <DialogDescription>
@@ -99,18 +104,31 @@ export function SugerirCambioModal({
 
           <div className="space-y-2">
             <p className="text-sm font-medium">Valor actual</p>
-            <Input value={valorActual} disabled className="bg-muted" />
+            {multilinea
+              ? <Textarea value={valorActual} disabled rows={6} className="bg-muted" />
+              : <Input value={valorActual} disabled className="bg-muted" />}
           </div>
 
           <div className="space-y-2">
             <p className="text-sm font-medium">
               Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
             </p>
-            <Input
-              value={valorSugerido}
-              onChange={e => setValorSugerido(e.target.value)}
-              placeholder="Nuevo valor propuesto"
-            />
+            {multilinea ? (
+              <Textarea
+                rows={8}
+                value={valorSugerido}
+                maxLength={maxLongitud}
+                onChange={e => setValorSugerido(e.target.value)}
+                placeholder="Nuevo valor propuesto"
+              />
+            ) : (
+              <Input
+                value={valorSugerido}
+                maxLength={maxLongitud}
+                onChange={e => setValorSugerido(e.target.value)}
+                placeholder="Nuevo valor propuesto"
+              />
+            )}
           </div>
 
           <div className="space-y-2">

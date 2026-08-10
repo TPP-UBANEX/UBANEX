@@ -16,7 +16,8 @@ import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
-import { campoFormularioVacio } from '../formularios/campo-formulario.util';
+import { campoFormularioVacio, validarValoresFormulario } from '../formularios/campo-formulario.util';
+import { CampoFormulario } from '../formularios/campo-formulario.interface';
 
 @Injectable()
 export class ProyectosService {
@@ -177,6 +178,8 @@ export class ProyectosService {
     }
 
     if (dto.datosFormulario !== undefined) {
+      const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
+      validarValoresFormulario(campos, dto.datosFormulario as Record<string, unknown>);
       edicion.datosFormulario = dto.datosFormulario;
     }
 
@@ -216,11 +219,7 @@ export class ProyectosService {
       motivos.push('El proyecto no tiene usuarios de dirección ni codirección asignados aún');
     }
 
-    const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
-      where: { id: edicion.convocatoriaId },
-      relations: { formulario: true },
-    });
-    const campos = convocatoria?.formulario?.campos ?? [];
+    const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
     const datosFormulario = (edicion.datosFormulario as Record<string, unknown> | null) ?? {};
     const camposObligatoriosFaltantes = campos
       .filter(c => c.esObligatorio)
@@ -234,6 +233,14 @@ export class ProyectosService {
     if (motivos.length > 0) {
       throw new BadRequestException(motivos.join('. '));
     }
+  }
+
+  private async obtenerCamposFormulario(convocatoriaId: string): Promise<CampoFormulario[]> {
+    const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
+      where: { id: convocatoriaId },
+      relations: { formulario: true },
+    });
+    return convocatoria?.formulario?.campos ?? [];
   }
 
   private async obtenerEdicion(proyectoId: string, edicionId: string): Promise<Edicion> {

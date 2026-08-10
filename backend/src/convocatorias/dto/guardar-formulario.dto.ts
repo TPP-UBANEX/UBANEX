@@ -6,6 +6,7 @@ import { TipoCampo } from '../../common/enums/tipo-campo.enum';
 
 const TIPOS_CAMPO_HABILITADOS = [
   TipoCampo.Texto,
+  TipoCampo.TextoLargo,
   TipoCampo.Booleano,
   TipoCampo.Checkbox,
   TipoCampo.Select,

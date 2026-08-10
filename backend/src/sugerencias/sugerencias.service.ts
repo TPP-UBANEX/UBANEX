@@ -10,6 +10,7 @@ import { Proyecto } from '../proyectos/proyecto.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
+import { validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
 import { ResponderSugerenciaDto } from './dto/responder-sugerencia.dto';
@@ -51,6 +52,7 @@ export class SugerenciasService {
 
     const valorActual = this.obtenerValorActual(edicion, proyecto, dto.campo);
     const valorSugerido = dto.valorSugerido?.trim() ? dto.valorSugerido.trim() : null;
+    await this.validarLongitudCampoFormulario(edicion, dto.campo, valorSugerido);
 
     const pendienteExistente = await this.sugerenciaRepo.findOne({
       where: {
@@ -364,6 +366,22 @@ export class SugerenciasService {
       relations: { formulario: true },
     });
     return convocatoria?.formulario?.campos ?? [];
+  }
+
+  /** Un valor sugerido sobre un campo del formulario debe respetar el mismo tope que la carga directa. */
+  private async validarLongitudCampoFormulario(
+    edicion: Edicion,
+    campo: string,
+    valorSugerido: string | null,
+  ): Promise<void> {
+    if (valorSugerido == null || !campo.startsWith('datosFormulario.')) return;
+
+    const campoId = campo.replace('datosFormulario.', '');
+    const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
+    const campoFormulario = campos.find(c => c.id === campoId);
+    if (!campoFormulario) return;
+
+    validarValoresFormulario([campoFormulario], { [campoId]: valorSugerido });
   }
 
   private nombreLegible(campo: string, campos: CampoFormulario[] = []): string {

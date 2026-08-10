@@ -356,10 +356,17 @@ export interface Rendicion {
 
 export enum TipoCampo {
   Texto = 'texto',
+  TextoLargo = 'texto_largo',
   Booleano = 'booleano',
   Checkbox = 'checkbox',
   Select = 'select',
   Archivo = 'archivo',
+}
+
+// Espejo de backend/src/common/enums/tipo-campo.enum.ts
+export const MAX_LONGITUD_POR_TIPO: Partial<Record<TipoCampo, number>> = {
+  [TipoCampo.Texto]: 255,
+  [TipoCampo.TextoLargo]: 10000,
 }
 
 export interface CampoFormulario {
@@ -382,6 +389,7 @@ export interface Formulario {
 
 export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Texto]: 'Texto',
+  [TipoCampo.TextoLargo]: 'Texto largo',
   [TipoCampo.Booleano]: 'Sí / No',
   [TipoCampo.Checkbox]: 'Casillas (múltiple)',
   [TipoCampo.Select]: 'Selección (única)',
