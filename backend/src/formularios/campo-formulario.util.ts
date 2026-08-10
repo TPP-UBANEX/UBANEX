@@ -13,17 +13,33 @@ export function maxLongitudCampo(tipo: TipoCampo): number | undefined {
   return MAX_LONGITUD_POR_TIPO[tipo];
 }
 
-/** Valida que las respuestas de texto no excedan el máximo permitido por su tipo. */
+const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Acepta solo fechas ISO (AAAA-MM-DD) reales: el parser nativo rechaza dias fuera de rango. */
+function esFechaValida(valor: string): boolean {
+  return FORMATO_FECHA.test(valor) && !Number.isNaN(new Date(valor).getTime());
+}
+
+/** Valida el formato de las respuestas segun el tipo de cada campo. */
 export function validarValoresFormulario(
   campos: CampoFormulario[],
   datos: Record<string, unknown>,
 ): void {
   for (const campo of campos) {
-    const maximo = maxLongitudCampo(campo.tipo);
     const valor = datos[campo.id];
-    if (maximo === undefined || typeof valor !== 'string') continue;
+    if (typeof valor !== 'string') continue;
 
-    if (valor.length > maximo) {
+    if (campo.tipo === TipoCampo.Fecha) {
+      if (valor !== '' && !esFechaValida(valor)) {
+        throw new BadRequestException(
+          `El campo "${campo.nombre}" debe tener una fecha válida (AAAA-MM-DD)`,
+        );
+      }
+      continue;
+    }
+
+    const maximo = maxLongitudCampo(campo.tipo);
+    if (maximo !== undefined && valor.length > maximo) {
       throw new BadRequestException(
         `El campo "${campo.nombre}" no puede superar los ${maximo} caracteres`,
       );

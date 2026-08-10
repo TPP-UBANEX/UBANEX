@@ -14,7 +14,8 @@ import {
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { SugerenciaCambio, CampoFormulario } from '@/data/types'
-import { estadoBadge, EstadoSugerencia } from '@/data/types'
+import { estadoBadge, EstadoSugerencia, TipoCampo } from '@/data/types'
+import { formatearFechaISO } from '@/components/CampoFormularioInput'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -97,17 +98,28 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return campo
   }
 
-  const ValorDiff = ({ actual, sugerido }: { actual: string | null; sugerido: string | null }) => (
-    <div className="flex items-start gap-3 text-sm mb-2">
-      <span className="text-muted-foreground line-through whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
-        {actual ?? '(sin valor)'}
-      </span>
-      <span className="text-muted-foreground shrink-0">→</span>
-      <span className="font-medium text-foreground whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
-        {sugerido ?? '(sin valor)'}
-      </span>
-    </div>
-  )
+  const esCampoFecha = (campo: string) => {
+    if (!campo.startsWith('datosFormulario.')) return false
+    return camposFormulario.find(c => c.id === campo.slice(16))?.tipo === TipoCampo.Fecha
+  }
+
+  const ValorDiff = ({ campo, actual, sugerido }: { campo: string; actual: string | null; sugerido: string | null }) => {
+    // Las fechas se guardan en ISO; se muestran como dd/mm/aaaa igual que en el detalle del proyecto.
+    const mostrar = (valor: string | null) =>
+      valor == null ? '(sin valor)' : esCampoFecha(campo) ? formatearFechaISO(valor) : valor
+
+    return (
+      <div className="flex items-start gap-3 text-sm mb-2">
+        <span className="text-muted-foreground line-through whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
+          {mostrar(actual)}
+        </span>
+        <span className="text-muted-foreground shrink-0">→</span>
+        <span className="font-medium text-foreground whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
+          {mostrar(sugerido)}
+        </span>
+      </div>
+    )
+  }
 
   if (loading) return (
     <div className="flex justify-center py-8">
@@ -146,7 +158,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
           </CardHeader>
           <CardContent className="pb-3">
             {s.valorSugerido != null && (
-              <ValorDiff actual={s.valorActual} sugerido={s.valorSugerido} />
+              <ValorDiff campo={s.campo} actual={s.valorActual} sugerido={s.valorSugerido} />
             )}
             <div className="text-sm bg-muted/50 rounded-md p-3">
               <p className="text-xs text-muted-foreground mb-1">Comentario:</p>

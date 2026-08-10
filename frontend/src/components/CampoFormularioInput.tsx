@@ -28,10 +28,17 @@ export function campoFormularioVacio(campo: CampoFormulario, valor: unknown): bo
   return false
 }
 
+/** Pasa una fecha ISO (AAAA-MM-DD) a dd/mm/aaaa sin usar Date, que la interpretaria como UTC y correria el dia. */
+export function formatearFechaISO(valor: string): string {
+  const [anio, mes, dia] = valor.split('-')
+  return anio && mes && dia ? `${dia}/${mes}/${anio}` : valor
+}
+
 export function formatearValorCampoFormulario(campo: CampoFormulario, valor: unknown): string {
   if (campoFormularioVacio(campo, valor)) return '-'
   if (campo.tipo === TipoCampo.Booleano) return valor === true ? 'Sí' : 'No'
   if (campo.tipo === TipoCampo.Checkbox) return (valor as string[]).join(', ')
+  if (campo.tipo === TipoCampo.Fecha) return formatearFechaISO(String(valor))
   return String(valor)
 }
 
@@ -75,6 +82,14 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
             {(typeof valor === 'string' ? valor.length : 0).toLocaleString('es-AR')} / {MAX_LONGITUD_POR_TIPO[TipoCampo.TextoLargo]!.toLocaleString('es-AR')}
           </p>
         </>
+      )}
+
+      {campo.tipo === TipoCampo.Fecha && (
+        <Input
+          type="date"
+          value={typeof valor === 'string' ? valor : ''}
+          onChange={e => onChange(e.target.value)}
+        />
       )}
 
       {campo.tipo === TipoCampo.Booleano && (

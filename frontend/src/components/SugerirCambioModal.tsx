@@ -26,6 +26,8 @@ interface SugerirCambioModalProps {
   /** Para campos de texto largo: muestra los valores en textarea en vez de input de una línea. */
   multilinea?: boolean
   maxLongitud?: number
+  /** Tipo del input de "Valor sugerido"; 'date' muestra el date picker nativo. */
+  tipoInput?: 'text' | 'date'
   onSuccess?: () => void
 }
 
@@ -40,6 +42,7 @@ export function SugerirCambioModal({
   comentarioInicial = '',
   multilinea = false,
   maxLongitud,
+  tipoInput = 'text',
   onSuccess,
 }: SugerirCambioModalProps) {
   const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
@@ -123,6 +126,7 @@ export function SugerirCambioModal({
               />
             ) : (
               <Input
+                type={tipoInput}
                 value={valorSugerido}
                 maxLength={maxLongitud}
                 onChange={e => setValorSugerido(e.target.value)}

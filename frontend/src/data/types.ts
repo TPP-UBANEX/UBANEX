@@ -357,6 +357,7 @@ export interface Rendicion {
 export enum TipoCampo {
   Texto = 'texto',
   TextoLargo = 'texto_largo',
+  Fecha = 'fecha',
   Booleano = 'booleano',
   Checkbox = 'checkbox',
   Select = 'select',
@@ -390,6 +391,7 @@ export interface Formulario {
 export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Texto]: 'Texto',
   [TipoCampo.TextoLargo]: 'Texto largo',
+  [TipoCampo.Fecha]: 'Fecha',
   [TipoCampo.Booleano]: 'Sí / No',
   [TipoCampo.Checkbox]: 'Casillas (múltiple)',
   [TipoCampo.Select]: 'Selección (única)',
