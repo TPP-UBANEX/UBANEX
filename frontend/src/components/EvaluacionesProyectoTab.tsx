@@ -113,6 +113,54 @@ export function EvaluacionesProyectoTab({
         </span>
       </div>
 
+      {data.resumen && (
+        <Card
+          className={
+            data.resumen.adjudicado ? 'border-emerald-300' : 'border-red-300'
+          }
+        >
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium">Resultado final</CardTitle>
+            <Badge
+              variant={
+                estadoBadge[data.resumen.adjudicado ? 'Adjudicado' : 'NoAdjudicado'] ?? 'outline'
+              }
+            >
+              {data.resumen.adjudicado ? 'Adjudicado' : 'No adjudicado'}
+            </Badge>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Nota final</p>
+              <p className="text-2xl font-bold">
+                {data.resumen.notaFinal}
+                <span className="text-sm font-medium text-muted-foreground"> / 100</span>
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Evaluación institucional</p>
+              <p className="text-lg font-semibold">
+                {data.resumen.puntajeInstitucional}
+                <span className="text-sm font-medium text-muted-foreground">
+                  {' '}/ {data.resumen.puntajeInstitucionalMaximo}
+                </span>
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Evaluación cruzada (promedio)</p>
+              <p className="text-lg font-semibold">
+                {data.resumen.puntajeCruzadaPromedio != null
+                  ? data.resumen.puntajeCruzadaPromedio
+                  : '—'}
+                <span className="text-sm font-medium text-muted-foreground">
+                  {' '}/ {data.resumen.puntajeCruzadaMaximo}
+                </span>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {sinEvaluaciones ? (
         <Card>
           <CardContent>

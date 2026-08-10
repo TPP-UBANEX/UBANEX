@@ -514,6 +514,14 @@ export interface EvaluacionEdicionDetalle {
   }>
   estructuraInstitucional: EstructuraTemplateInstitucional | null
   estructuraCruzada: EstructuraTemplateCruzada | null
+  resumen: {
+    puntajeInstitucional: number
+    puntajeInstitucionalMaximo: number
+    puntajeCruzadaPromedio: number | null
+    puntajeCruzadaMaximo: number
+    notaFinal: number
+    adjudicado: boolean
+  } | null
 }
 
 export interface GuardarEvaluacionInstitucionalDto {
