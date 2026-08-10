@@ -3,6 +3,7 @@ import { EvaluacionesService } from './evaluaciones.service';
 import { GuardarEvaluacionInstitucionalDto } from './dto/guardar-evaluacion-institucional.dto';
 import { GuardarEvaluacionCruzadaDto } from './dto/guardar-evaluacion-cruzada.dto';
 import { DesignarTerceraEvaluadorDto } from './dto/designar-tercera-evaluador.dto';
+import { ListarEvaluacionesDto } from './dto/listar-evaluaciones.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -17,8 +18,8 @@ export class EvaluacionesController {
 
   @Get()
   @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
-  monitoreo(@Query('convocatoriaId') convocatoriaId: string) {
-    return this.service.monitoreo(convocatoriaId);
+  monitoreo(@Query() dto: ListarEvaluacionesDto) {
+    return this.service.monitoreo(dto.convocatoriaId ?? '', dto);
   }
 
   @Get('edicion/:edicionId')
@@ -29,10 +30,10 @@ export class EvaluacionesController {
   @Get('institucionales')
   @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
   listarInstitucionales(
-    @Query('convocatoriaId') convocatoriaId: string,
+    @Query() dto: ListarEvaluacionesDto,
     @CurrentUser() usuario: Usuario,
   ) {
-    return this.service.listarInstitucionales(convocatoriaId, usuario);
+    return this.service.listarInstitucionales(dto.convocatoriaId ?? '', usuario, dto);
   }
 
   @Get('institucionales/:edicionId')
@@ -68,10 +69,10 @@ export class EvaluacionesController {
 
   @Get('cruzadas/disponibles')
   listarCruzadasDisponibles(
-    @Query('convocatoriaId') convocatoriaId: string,
+    @Query() dto: ListarEvaluacionesDto,
     @CurrentUser() usuario: Usuario,
   ) {
-    return this.service.listarCruzadasDisponibles(convocatoriaId, usuario);
+    return this.service.listarCruzadasDisponibles(dto.convocatoriaId ?? '', usuario, dto);
   }
 
   @Get('cruzadas/:edicionId')

@@ -32,6 +32,7 @@ import {
 } from '@/data/types'
 import type {
   Convocatoria,
+  Edicion,
   EdicionEvaluableInstitucional,
   EdicionEvaluableCruzada,
   EvaluacionCruzada,
@@ -42,8 +43,9 @@ import type {
   TemplateEvaluacionInstitucional,
   TemplateEvaluacionCruzada,
   Usuario,
+  PaginationMeta,
 } from '@/data/types'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { ProyectoEvaluablePanel } from '@/components/ProyectoEvaluablePanel'
 import type { CampoFormulario } from '@/data/types'
@@ -73,7 +75,7 @@ export function Evaluacion() {
 
   useEffect(() => {
     api.convocatorias
-      .list()
+      .todas()
       .then((cs) => {
         const evaluables = cs.filter((c) => c.estado === EstadoConvocatoria.Evaluacion)
         setConvocatorias(evaluables)
@@ -116,11 +118,11 @@ export function Evaluacion() {
 
       {convocatoriaId ? (
         vista === 'monitoreo' ? (
-          <MonitoreoView convocatoriaId={convocatoriaId} />
+          <MonitoreoView key={convocatoriaId} convocatoriaId={convocatoriaId} />
         ) : vista === 'institucional' ? (
-          <InstitucionalView convocatoriaId={convocatoriaId} user={user} />
+          <InstitucionalView key={convocatoriaId} convocatoriaId={convocatoriaId} user={user} />
         ) : (
-          <CruzadaView convocatoriaId={convocatoriaId} />
+          <CruzadaView key={convocatoriaId} convocatoriaId={convocatoriaId} />
         )
       ) : (
         <p className="text-sm text-muted-foreground">
@@ -146,8 +148,11 @@ function InstitucionalView({
   user: Usuario | null
 }) {
   const [items, setItems] = useState<EdicionEvaluableInstitucional[]>([])
+  const [meta, setMeta] = useState<PaginationMeta | null>(null)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [edicionId, setEdicionId] = useState<string | null>(null)
+  const [edicionSeleccionada, setEdicionSeleccionada] = useState<Edicion | null>(null)
   const [template, setTemplate] = useState<TemplateEvaluacionInstitucional | null>(null)
   const [evaluacion, setEvaluacion] = useState<EvaluacionInstitucional | null>(null)
   const [respuestas, setRespuestas] = useState<RespuestaCategoriasInst>({})
@@ -158,13 +163,18 @@ function InstitucionalView({
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
 
   const cargarLista = () => {
+    setLoading(true)
     api.evaluaciones.institucionales
-      .listar(convocatoriaId)
-      .then(setItems)
+      .listar(convocatoriaId, { page, limit: 10 })
+      .then((res) => {
+        setItems(res.data)
+        setMeta(res.meta)
+      })
+      .catch(() => {})
       .finally(() => setLoading(false))
   }
 
-  useEffect(cargarLista, [convocatoriaId])
+  useEffect(() => { cargarLista() }, [convocatoriaId, page])
 
   useEffect(() => {
     api.convocatorias.formulario
@@ -177,6 +187,7 @@ function InstitucionalView({
     setEdicionId(id)
     setTemplate(null)
     setEvaluacion(null)
+    setEdicionSeleccionada(items.find((i) => i.edicion.id === id)?.edicion ?? null)
     const { evaluacion, template } = await api.evaluaciones.institucionales.obtener(
       convocatoriaId,
       id,
@@ -297,6 +308,7 @@ function InstitucionalView({
               ))}
             </div>
           )}
+          <Paginador meta={meta} page={page} onPage={setPage} />
         </CardContent>
       </Card>
 
@@ -309,7 +321,7 @@ function InstitucionalView({
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           <ProyectoEvaluablePanel
-            edicion={items.find((i) => i.edicion.id === edicionId)?.edicion ?? null}
+            edicion={edicionSeleccionada}
             campos={camposFormulario}
           />
           <div className="space-y-4">
@@ -488,8 +500,11 @@ function InstitucionalView({
 
 function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
   const [items, setItems] = useState<EdicionEvaluableCruzada[]>([])
+  const [meta, setMeta] = useState<PaginationMeta | null>(null)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [edicionId, setEdicionId] = useState<string | null>(null)
+  const [edicionSeleccionada, setEdicionSeleccionada] = useState<Edicion | null>(null)
   const [tipo, setTipo] = useState<TipoEvaluacionCruzada | null>(null)
   const [template, setTemplate] = useState<TemplateEvaluacionCruzada | null>(null)
   const [evaluacion, setEvaluacion] = useState<EvaluacionCruzada | null>(null)
@@ -500,13 +515,18 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
 
   const cargarDisponibles = () => {
+    setLoading(true)
     api.evaluaciones.cruzadas
-      .disponibles(convocatoriaId)
-      .then(setItems)
+      .disponibles(convocatoriaId, { page, limit: 10 })
+      .then((res) => {
+        setItems(res.data)
+        setMeta(res.meta)
+      })
+      .catch(() => {})
       .finally(() => setLoading(false))
   }
 
-  useEffect(cargarDisponibles, [convocatoriaId])
+  useEffect(() => { cargarDisponibles() }, [convocatoriaId, page])
 
   useEffect(() => {
     api.convocatorias.formulario
@@ -519,6 +539,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
     setEdicionId(id)
     setTemplate(null)
     setEvaluacion(null)
+    setEdicionSeleccionada(items.find((i) => i.edicion.id === id)?.edicion ?? null)
     const { evaluacion, template } = await api.evaluaciones.cruzadas.obtener(convocatoriaId, id)
     setTemplate(template)
     setEvaluacion(evaluacion)
@@ -630,6 +651,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
               ))}
             </div>
           )}
+          <Paginador meta={meta} page={page} onPage={setPage} />
         </CardContent>
       </Card>
 
@@ -642,7 +664,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           <ProyectoEvaluablePanel
-            edicion={items.find((i) => i.edicion.id === edicionId)?.edicion ?? null}
+            edicion={edicionSeleccionada}
             campos={camposFormulario}
           />
           <div className="space-y-4">
@@ -755,14 +777,17 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
 
 function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
   const [data, setData] = useState<MonitoreoEvaluacion | null>(null)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setLoading(true)
     api.evaluaciones
-      .monitoreo(convocatoriaId)
+      .monitoreo(convocatoriaId, { page, limit: 10 })
       .then(setData)
+      .catch(() => {})
       .finally(() => setLoading(false))
-  }, [convocatoriaId])
+  }, [convocatoriaId, page])
 
   if (loading) return <Skeleton className="h-64 w-full" />
 
@@ -837,7 +862,53 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
             Esta convocatoria no tiene ediciones.
           </p>
         )}
+        <Paginador meta={data?.meta ?? null} page={page} onPage={setPage} />
       </CardContent>
     </Card>
+  )
+}
+
+function Paginador({ meta, page, onPage }: {
+  meta: PaginationMeta | null
+  page: number
+  onPage: (p: number) => void
+}) {
+  if (!meta || meta.totalPages <= 1) return null
+  return (
+    <div className="flex items-center justify-center gap-2 pt-4">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page <= 1}
+        onClick={() => onPage(Math.max(1, page - 1))}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
+        .filter(p => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 2)
+        .map((p, idx, arr) => (
+          <span key={p} className="flex items-center gap-1">
+            {idx > 0 && arr[idx - 1] !== p - 1 && (
+              <span className="text-muted-foreground px-1">...</span>
+            )}
+            <Button
+              variant={p === page ? 'default' : 'outline'}
+              size="sm"
+              className="min-w-[2rem]"
+              onClick={() => onPage(p)}
+            >
+              {p}
+            </Button>
+          </span>
+        ))}
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page >= meta.totalPages}
+        onClick={() => onPage(Math.min(meta.totalPages, page + 1))}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
   )
 }

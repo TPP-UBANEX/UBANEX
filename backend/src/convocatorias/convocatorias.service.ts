@@ -17,6 +17,9 @@ import { Usuario } from '../usuarios/usuario.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
+import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import { ListarConvocatoriasDto } from './dto/listar-convocatorias.dto';
 import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
 import { validarCamposFormulario } from '../common/dto/validador-campos-formulario';
 import {
@@ -43,8 +46,70 @@ export class ConvocatoriasService {
     private readonly edicionRepo: Repository<Edicion>,
   ) {}
 
-  listar() {
-    return this.repo.find({ order: { fechaInicioPresentacion: 'DESC' }, relations: { formulario: true } });
+  listar(usuario: Usuario, dto: ListarConvocatoriasDto): Promise<PaginatedResponse<Convocatoria>> {
+    const { page = 1, limit = 10, search, estado, fase } = dto;
+    const esGestion = usuario.roles.some(r =>
+      [
+        RolUsuario.AutoridadDeRectorado,
+        RolUsuario.AsistenteDeRectorado,
+        RolUsuario.AutoridadDeSecretaria,
+        RolUsuario.AsistenteDeSecretaria,
+      ].includes(r),
+    );
+
+    const query = this.repo.createQueryBuilder('convocatoria')
+      .leftJoinAndSelect('convocatoria.formulario', 'formulario')
+      .orderBy('convocatoria.fechaInicioPresentacion', 'DESC');
+
+    if (!esGestion) {
+      query.andWhere('convocatoria.estado != :estadoConfiguracion', {
+        estadoConfiguracion: EstadoConvocatoria.Configuracion,
+      });
+    }
+    if (estado) {
+      query.andWhere('convocatoria.estado = :estado', { estado });
+    }
+    if (fase === 'activas') {
+      query.andWhere('convocatoria.estado IN (:...activas)', {
+        activas: [EstadoConvocatoria.Presentacion, EstadoConvocatoria.Evaluacion],
+      });
+    } else if (fase === 'pasadas') {
+      query.andWhere('convocatoria.estado IN (:...pasadas)', {
+        pasadas: [EstadoConvocatoria.Ejecucion, EstadoConvocatoria.Cierre],
+      });
+    }
+    if (search) {
+      query.andWhere('convocatoria.nombre ILIKE :search', { search: `%${search}%` });
+    }
+
+    query.skip((page - 1) * limit).take(limit);
+    return query.getManyAndCount().then(([data, total]) => ({
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    }));
+  }
+
+  listarTodas(usuario: Usuario): Promise<Convocatoria[]> {
+    const esGestion = usuario.roles.some(r =>
+      [
+        RolUsuario.AutoridadDeRectorado,
+        RolUsuario.AsistenteDeRectorado,
+        RolUsuario.AutoridadDeSecretaria,
+        RolUsuario.AsistenteDeSecretaria,
+      ].includes(r),
+    );
+
+    const query = this.repo.createQueryBuilder('convocatoria')
+      .leftJoinAndSelect('convocatoria.formulario', 'formulario')
+      .orderBy('convocatoria.fechaInicioPresentacion', 'DESC');
+
+    if (!esGestion) {
+      query.andWhere('convocatoria.estado != :estadoConfiguracion', {
+        estadoConfiguracion: EstadoConvocatoria.Configuracion,
+      });
+    }
+
+    return query.getMany();
   }
 
   obtener(id: string) {

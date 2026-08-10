@@ -21,9 +21,9 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Edicion, Convocatoria } from '@/data/types'
+import type { Edicion, Convocatoria, PaginatedResponse } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion } from '@/data/types'
-import { Search } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const pipelineColumns = [
   { key: EstadoEdicion.Borrador, label: 'Borrador' },
@@ -40,42 +40,65 @@ export function Proyectos() {
   const [searchParams] = useSearchParams()
   const esRevision = searchParams.get('revision') === 'true'
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
+  const [kanbanEdiciones, setKanbanEdiciones] = useState<Edicion[]>([])
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filtroEtapa, setFiltroEtapa] = useState(esRevision ? EstadoEdicion.Presentado : 'todas')
   const [filtroConv, setFiltroConv] = useState('todas')
   const [filtroAnio, setFiltroAnio] = useState('todas')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState<PaginatedResponse<Edicion>['meta'] | null>(null)
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
   const [loading, setLoading] = useState(true)
 
-  const cargarDatos = () => {
-    setLoading(true)
-    Promise.all([
-      api.proyectos.list(),
-      api.convocatorias.list(),
-    ]).then(([e, c]) => {
-      setEdiciones(e)
-      setConvocatorias(c)
-    }).finally(() => setLoading(false))
-  }
-
   useEffect(() => {
-    cargarDatos()
-  }, [esRevision])
+    api.convocatorias.todas().then(setConvocatorias).catch(() => {})
+  }, [])
 
   useEffect(() => {
     setFiltroEtapa(esRevision ? EstadoEdicion.Presentado : 'todas')
+    setPage(1)
   }, [esRevision])
 
-  const anios = [...new Set(ediciones.map(e => e.anioEdicion).filter((a): a is number => a != null))].sort((a, b) => b - a)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
 
-  const filtrados = ediciones.filter(e => {
-    if (filtroEtapa !== 'todas' && e.estado !== filtroEtapa) return false
-    if (filtroConv !== 'todas' && e.convocatoriaId !== filtroConv) return false
-    if (filtroAnio !== 'todas' && e.anioEdicion !== Number(filtroAnio)) return false
-    if (search && !e.proyecto?.nombre?.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
+  useEffect(() => {
+    if (vista !== 'tabla') return
+    setLoading(true)
+    api.proyectos.list({
+      page,
+      limit: 10,
+      search: debouncedSearch || undefined,
+      estado: filtroEtapa !== 'todas' ? filtroEtapa : undefined,
+      convocatoriaId: filtroConv !== 'todas' ? filtroConv : undefined,
+      anio: filtroAnio !== 'todas' ? Number(filtroAnio) : undefined,
+    })
+      .then(res => {
+        setEdiciones(res.data)
+        setMeta(res.meta)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [page, debouncedSearch, filtroEtapa, filtroConv, filtroAnio, vista])
+
+  useEffect(() => {
+    if (vista !== 'kanban') return
+    setLoading(true)
+    api.proyectos.todas().then(setKanbanEdiciones).catch(() => {}).finally(() => setLoading(false))
+  }, [vista])
+
+  const anios = [...new Set(convocatorias.map(c => c.anio))].sort((a, b) => b - a)
+
+  const cambiarEtapa = (v: string) => { setFiltroEtapa(v); setPage(1) }
+  const cambiarConv = (v: string) => { setFiltroConv(v); setPage(1) }
+  const cambiarAnio = (v: string) => { setFiltroAnio(v); setPage(1) }
 
   return (
     <div className="p-6 space-y-6">
@@ -98,7 +121,7 @@ export function Proyectos() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filtroEtapa} onValueChange={setFiltroEtapa}>
+        <Select value={filtroEtapa} onValueChange={cambiarEtapa}>
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas las etapas</SelectItem>
@@ -107,7 +130,7 @@ export function Proyectos() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filtroConv} onValueChange={setFiltroConv}>
+        <Select value={filtroConv} onValueChange={cambiarConv}>
           <SelectTrigger className="w-48"><SelectValue placeholder="Todas las convocatorias" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas las convocatorias</SelectItem>
@@ -116,7 +139,7 @@ export function Proyectos() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filtroAnio} onValueChange={setFiltroAnio}>
+        <Select value={filtroAnio} onValueChange={cambiarAnio}>
           <SelectTrigger className="w-44"><SelectValue placeholder="Edición" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas las ediciones</SelectItem>
@@ -141,37 +164,78 @@ export function Proyectos() {
                   </div>
                 ))}
               </div>
+            ) : ediciones.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No hay proyectos que coincidan con la búsqueda</div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Proyecto</TableHead>
-                    <TableHead>Creado por</TableHead>
-                    <TableHead>Facultad</TableHead>
-                    <TableHead>Etapa</TableHead>
-                    <TableHead>Presupuesto</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtrados.map(e => (
-                    <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
-                      <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {e.proyecto?.esInterfacultad && e.proyecto.unidadAcademicaAdicionalId !== e.unidadAcademicaId && e.proyecto.unidadAcademicaAdicional
-                          ? `${e.unidadAcademica?.nombre} y ${e.proyecto.unidadAcademicaAdicional.nombre}`
-                          : e.unidadAcademica?.nombre || '-'}
-                      </TableCell>
-                      <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                      <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
-                      </TableCell>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Proyecto</TableHead>
+                      <TableHead>Creado por</TableHead>
+                      <TableHead>Facultad</TableHead>
+                      <TableHead>Etapa</TableHead>
+                      <TableHead>Presupuesto</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {ediciones.map(e => (
+                      <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
+                        <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {e.proyecto?.esInterfacultad && e.proyecto.unidadAcademicaAdicionalId !== e.unidadAcademicaId && e.proyecto.unidadAcademicaAdicional
+                            ? `${e.unidadAcademica?.nombre} y ${e.proyecto.unidadAcademicaAdicional.nombre}`
+                            : e.unidadAcademica?.nombre || '-'}
+                        </TableCell>
+                        <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
+                        <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {meta && meta.totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 1}
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 2)
+                      .map((p, idx, arr) => (
+                        <span key={p} className="flex items-center gap-1">
+                          {idx > 0 && arr[idx - 1] !== p - 1 && (
+                            <span className="text-muted-foreground px-1">...</span>
+                          )}
+                          <Button
+                            variant={p === page ? 'default' : 'outline'}
+                            size="sm"
+                            className="min-w-[2rem]"
+                            onClick={() => setPage(p)}
+                          >
+                            {p}
+                          </Button>
+                        </span>
+                      ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page >= meta.totalPages}
+                      onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -193,7 +257,7 @@ export function Proyectos() {
               <div key={col.key} className="min-w-[160px]">
                 <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{col.label}</div>
                 <div className="space-y-2">
-                  {ediciones.filter(e => e.estado === col.key).map(e => (
+                  {kanbanEdiciones.filter(e => e.estado === col.key).map(e => (
                     <Card key={e.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>

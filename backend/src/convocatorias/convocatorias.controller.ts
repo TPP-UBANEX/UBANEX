@@ -1,7 +1,8 @@
 import {
-  Controller, Get, Post, Patch, Put, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Patch, Put, Delete, Body, Param, Query, UseGuards,
 } from '@nestjs/common';
 import { ConvocatoriasService } from './convocatorias.service';
+import { ListarConvocatoriasDto } from './dto/listar-convocatorias.dto';
 import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
@@ -20,8 +21,13 @@ export class ConvocatoriasController {
   constructor(private readonly service: ConvocatoriasService) {}
 
   @Get()
-  listar() {
-    return this.service.listar();
+  listar(@CurrentUser() usuario: Usuario, @Query() dto: ListarConvocatoriasDto) {
+    return this.service.listar(usuario, dto);
+  }
+
+  @Get('todas')
+  listarTodas(@CurrentUser() usuario: Usuario) {
+    return this.service.listarTodas(usuario);
   }
 
   @Get(':id')

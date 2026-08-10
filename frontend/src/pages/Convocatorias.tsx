@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -31,11 +31,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, ParticipacionConvocatoria } from '@/data/types'
+import type { Convocatoria, ParticipacionConvocatoria, PaginatedResponse } from '@/data/types'
 import { RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
 import { estadoBadge, estadoConvocatoriaLabel } from '@/data/types'
 import { toast } from 'sonner'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function erroresFechas(f: {
   fechaInicioPresentacion: string; fechaFinPresentacion: string;
@@ -78,8 +78,13 @@ export function Convocatorias() {
      RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
   )
   const [data, setData] = useState<Convocatoria[]>([])
+  const [todas, setTodas] = useState<Convocatoria[]>([])
+  const [meta, setMeta] = useState<PaginatedResponse<Convocatoria>['meta'] | null>(null)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todas')
+  const [tab, setTab] = useState('todas')
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [creando, setCreando] = useState(false)
@@ -93,13 +98,38 @@ export function Convocatorias() {
 
   const errores = erroresFechas(form)
 
-  const cargar = () => {
-    api.convocatorias.list()
-      .then(setData)
+  const cargar = useCallback(() => {
+    setLoading(true)
+    const params = tab === 'todas'
+      ? {
+          page,
+          limit: 10,
+          search: debouncedSearch || undefined,
+          estado: filtroEstado !== 'todas' ? filtroEstado : undefined,
+        }
+      : { page, limit: 10, fase: tab }
+    Promise.all([
+      api.convocatorias.list(params),
+      api.convocatorias.todas(),
+    ])
+      .then(([res, todas]) => {
+        setData(res.data)
+        setMeta(res.meta)
+        setTodas(todas)
+      })
+      .catch(() => {})
       .finally(() => setLoading(false))
-  }
+  }, [page, debouncedSearch, filtroEstado, tab])
 
-  useEffect(cargar, [])
+  useEffect(() => { cargar() }, [cargar])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
 
   useEffect(() => {
     if (esGestion) return
@@ -151,16 +181,13 @@ export function Convocatorias() {
     }
   }
 
-  const convocatoriasVisibles = esGestion ? data : data.filter(c => c.estado !== 'configuracion')
-
-  const filtradas = convocatoriasVisibles.filter(c => {
-    const matchNombre = c.nombre.toLowerCase().includes(search.toLowerCase())
-    const matchEstado = filtroEstado === 'todas' || c.estado === filtroEstado
-    return matchNombre && matchEstado
-  })
+  const convocatoriasVisibles = todas
 
   const activas = convocatoriasVisibles.filter(c => c.estado === 'presentacion' || c.estado === 'evaluacion')
   const pasadas = convocatoriasVisibles.filter(c => c.estado === 'ejecucion' || c.estado === 'cierre')
+
+  const cambiarEstado = (v: string) => { setFiltroEstado(v); setPage(1) }
+  const cambiarTab = (v: string) => { setTab(v); setPage(1) }
 
   return (
     <div className="p-6 space-y-6">
@@ -247,7 +274,7 @@ export function Convocatorias() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+        <Select value={filtroEstado} onValueChange={cambiarEstado}>
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas</SelectItem>
@@ -260,70 +287,120 @@ export function Convocatorias() {
         </Select>
       </div>
 
-      <Tabs defaultValue="todas">
+      <Tabs value={tab} onValueChange={cambiarTab}>
         <TabsList>
           <TabsTrigger value="todas">Todas ({convocatoriasVisibles.length})</TabsTrigger>
           <TabsTrigger value="activas">Activas ({activas.length})</TabsTrigger>
           <TabsTrigger value="pasadas">Pasadas ({pasadas.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="todas" className="mt-4">
-          {loading ? <TableSkeleton /> : <TablaConvocatorias data={filtradas} convocatoriasEvaluador={convocatoriasEvaluador} onClick={id => navigate(`/convocatorias/${id}`)} />}
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={data} convocatoriasEvaluador={convocatoriasEvaluador} meta={meta} page={page} onPage={setPage} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
         <TabsContent value="activas" className="mt-4">
-          {loading ? <TableSkeleton /> : <TablaConvocatorias data={activas} convocatoriasEvaluador={convocatoriasEvaluador} onClick={id => navigate(`/convocatorias/${id}`)} />}
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={data} convocatoriasEvaluador={convocatoriasEvaluador} meta={meta} page={page} onPage={setPage} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
         <TabsContent value="pasadas" className="mt-4">
-          {loading ? <TableSkeleton /> : <TablaConvocatorias data={pasadas} convocatoriasEvaluador={convocatoriasEvaluador} onClick={id => navigate(`/convocatorias/${id}`)} />}
+          {loading ? <TableSkeleton /> : <TablaConvocatorias data={data} convocatoriasEvaluador={convocatoriasEvaluador} meta={meta} page={page} onPage={setPage} onClick={id => navigate(`/convocatorias/${id}`)} />}
         </TabsContent>
       </Tabs>
     </div>
   )
 }
 
-function TablaConvocatorias({ data, convocatoriasEvaluador, onClick }: { data: Convocatoria[]; convocatoriasEvaluador: Set<string>; onClick: (id: string) => void }) {
+function TablaConvocatorias({ data, convocatoriasEvaluador, meta, page, onPage, onClick }: {
+  data: Convocatoria[]
+  convocatoriasEvaluador: Set<string>
+  meta: PaginatedResponse<Convocatoria>['meta'] | null
+  page: number
+  onPage: (p: number | ((prev: number) => number)) => void
+  onClick: (id: string) => void
+}) {
   return (
     <Card>
       <CardHeader><CardTitle className="text-sm font-medium">Listado</CardTitle></CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Año</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Presentación</TableHead>
-              <TableHead>Formulario</TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map(c => (
-              <TableRow key={c.id} className="cursor-pointer" onClick={() => onClick(c.id)}>
-                <TableCell className="font-medium">
-                  {c.nombre}
-                  {convocatoriasEvaluador.has(c.id) && (
-                    <Badge variant="secondary" className="ml-2">Sos evaluador</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
-                <TableCell><Badge variant={estadoBadge[c.estado]}>{estadoConvocatoriaLabel[c.estado] || c.estado}</Badge></TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {c.fechaInicioPresentacion && c.fechaFinPresentacion
-                    ? `${c.fechaInicioPresentacion} — ${c.fechaFinPresentacion}`
-                    : '-'}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {c.formulario?.campos?.length
-                    ? `${c.formulario.campos.length} campos`
-                    : 'Sin configurar'}
-                </TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onClick(c.id) }}>Ver</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        {data.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">No hay convocatorias que coincidan con la búsqueda</div>
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Año</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Presentación</TableHead>
+                  <TableHead>Formulario</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map(c => (
+                  <TableRow key={c.id} className="cursor-pointer" onClick={() => onClick(c.id)}>
+                    <TableCell className="font-medium">
+                      {c.nombre}
+                      {convocatoriasEvaluador.has(c.id) && (
+                        <Badge variant="secondary" className="ml-2">Sos evaluador</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
+                    <TableCell><Badge variant={estadoBadge[c.estado]}>{estadoConvocatoriaLabel[c.estado] || c.estado}</Badge></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c.fechaInicioPresentacion && c.fechaFinPresentacion
+                        ? `${c.fechaInicioPresentacion} — ${c.fechaFinPresentacion}`
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c.formulario?.campos?.length
+                        ? `${c.formulario.campos.length} campos`
+                        : 'Sin configurar'}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onClick(c.id) }}>Ver</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {meta && meta.totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => onPage(p => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 2)
+                  .map((p, idx, arr) => (
+                    <span key={p} className="flex items-center gap-1">
+                      {idx > 0 && arr[idx - 1] !== p - 1 && (
+                        <span className="text-muted-foreground px-1">...</span>
+                      )}
+                      <Button
+                        variant={p === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="min-w-[2rem]"
+                        onClick={() => onPage(p)}
+                      >
+                        {p}
+                      </Button>
+                    </span>
+                  ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= meta.totalPages}
+                  onClick={() => onPage(p => Math.min(meta.totalPages, p + 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   )

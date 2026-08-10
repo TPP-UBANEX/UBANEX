@@ -17,6 +17,8 @@ import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { campoFormularioVacio } from '../formularios/campo-formulario.util';
 
 @Injectable()
@@ -76,7 +78,15 @@ export class ProyectosService {
     return this.obtenerProyecto(proyecto.id);
   }
 
-  async listar(usuario: Usuario, convocatoriaId?: string) {
+  private async buildListado(
+    usuario: Usuario,
+    filtros: {
+      convocatoriaId?: string;
+      estado?: EstadoEdicion;
+      anio?: number;
+      search?: string;
+    },
+  ) {
     const esRectorado = usuario.roles.some(r =>
       [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado].includes(r),
     );
@@ -121,10 +131,32 @@ export class ProyectosService {
       query.andWhere(`(${condiciones.join(' OR ')})`, params);
     }
 
-    if (convocatoriaId) {
-      query.andWhere('edicion.convocatoriaId = :convId', { convId: convocatoriaId });
+    if (filtros.convocatoriaId) {
+      query.andWhere('edicion.convocatoriaId = :convId', { convId: filtros.convocatoriaId });
+    }
+    if (filtros.estado) {
+      query.andWhere('edicion.estado = :estado', { estado: filtros.estado });
+    }
+    if (filtros.anio) {
+      query.andWhere('edicion.anioEdicion = :anio', { anio: filtros.anio });
+    }
+    if (filtros.search) {
+      query.andWhere('proyecto.nombre ILIKE :search', { search: `%${filtros.search}%` });
     }
 
+    return query;
+  }
+
+  async listar(usuario: Usuario, dto: ListarProyectosDto): Promise<PaginatedResponse<Edicion>> {
+    const { page = 1, limit = 10 } = dto;
+    const query = await this.buildListado(usuario, dto);
+    query.skip((page - 1) * limit).take(limit);
+    const [data, total] = await query.getManyAndCount();
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async listarTodas(usuario: Usuario, convocatoriaId?: string): Promise<Edicion[]> {
+    const query = await this.buildListado(usuario, { convocatoriaId });
     return query.getMany();
   }
 

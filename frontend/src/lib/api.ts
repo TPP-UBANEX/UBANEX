@@ -114,7 +114,15 @@ export const api = {
       get<import('@/data/types').ParticipacionConvocatoria[]>('/participaciones-convocatoria/mias'),
   },
   convocatorias: {
-    list: () => get<import('@/data/types').Convocatoria[]>('/convocatorias'),
+    list: (params?: { page?: number; limit?: number; search?: string; estado?: string; fase?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== ''),
+        ) as Record<string, string>,
+      ).toString() : ''
+      return get<import('@/data/types').PaginatedResponse<import('@/data/types').Convocatoria>>(`/convocatorias${qs}`)
+    },
+    todas: () => get<import('@/data/types').Convocatoria[]>('/convocatorias/todas'),
     get: (id: string) => get<import('@/data/types').Convocatoria>(`/convocatorias/${id}`),
     crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
       post<import('@/data/types').Convocatoria>('/convocatorias', data),
@@ -147,9 +155,17 @@ export const api = {
     },
   },
   proyectos: {
-    list: (params?: Record<string, string>) => {
-      const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-      return get<import('@/data/types').Edicion[]>(`/proyectos${qs}`)
+    list: (params?: { page?: number; limit?: number; search?: string; estado?: string; convocatoriaId?: string; anio?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== ''),
+        ) as Record<string, string>,
+      ).toString() : ''
+      return get<import('@/data/types').PaginatedResponse<import('@/data/types').Edicion>>(`/proyectos${qs}`)
+    },
+    todas: (params?: { convocatoriaId?: string }) => {
+      const qs = params?.convocatoriaId ? `?convocatoriaId=${encodeURIComponent(params.convocatoriaId)}` : ''
+      return get<import('@/data/types').Edicion[]>(`/proyectos/todas${qs}`)
     },
     get: (id: string) => get<import('@/data/types').Proyecto>(`/proyectos/${id}`),
     crear: (data: import('@/data/types').CrearProyectoDto) =>
@@ -162,13 +178,13 @@ export const api = {
       del(`/proyectos/${id}/ediciones/${edicionId}`),
   },
   evaluaciones: {
-    monitoreo: (convocatoriaId: string) =>
-      get<import('@/data/types').MonitoreoEvaluacion>(`/evaluaciones?convocatoriaId=${convocatoriaId}`),
+    monitoreo: (convocatoriaId: string, params?: { page?: number; limit?: number }) =>
+      get<import('@/data/types').MonitoreoEvaluacion>(`/evaluaciones?convocatoriaId=${encodeURIComponent(convocatoriaId)}${params?.page ? `&page=${params.page}` : ''}${params?.limit ? `&limit=${params.limit}` : ''}`),
     edicion: (edicionId: string) =>
       get<import('@/data/types').EvaluacionEdicionDetalle>(`/evaluaciones/edicion/${edicionId}`),
     institucionales: {
-      listar: (convocatoriaId: string) =>
-        get<import('@/data/types').EdicionEvaluableInstitucional[]>(`/evaluaciones/institucionales?convocatoriaId=${convocatoriaId}`),
+      listar: (convocatoriaId: string, params?: { page?: number; limit?: number }) =>
+        get<import('@/data/types').PaginatedResponse<import('@/data/types').EdicionEvaluableInstitucional>>(`/evaluaciones/institucionales?convocatoriaId=${encodeURIComponent(convocatoriaId)}${params?.page ? `&page=${params.page}` : ''}${params?.limit ? `&limit=${params.limit}` : ''}`),
       obtener: (convocatoriaId: string, edicionId: string) =>
         get<{ evaluacion: import('@/data/types').EvaluacionInstitucional | null; template: import('@/data/types').TemplateEvaluacionInstitucional | null }>(`/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`),
       guardar: (convocatoriaId: string, edicionId: string, data: import('@/data/types').GuardarEvaluacionInstitucionalDto) =>
@@ -177,8 +193,8 @@ export const api = {
         post<import('@/data/types').EvaluacionInstitucional>(`/evaluaciones/institucionales/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
     },
     cruzadas: {
-      disponibles: (convocatoriaId: string) =>
-        get<import('@/data/types').EdicionEvaluableCruzada[]>(`/evaluaciones/cruzadas/disponibles?convocatoriaId=${convocatoriaId}`),
+      disponibles: (convocatoriaId: string, params?: { page?: number; limit?: number }) =>
+        get<import('@/data/types').PaginatedResponse<import('@/data/types').EdicionEvaluableCruzada>>(`/evaluaciones/cruzadas/disponibles?convocatoriaId=${encodeURIComponent(convocatoriaId)}${params?.page ? `&page=${params.page}` : ''}${params?.limit ? `&limit=${params.limit}` : ''}`),
       obtener: (convocatoriaId: string, edicionId: string) =>
         get<{ evaluacion: import('@/data/types').EvaluacionCruzada | null; template: import('@/data/types').TemplateEvaluacionCruzada | null }>(`/evaluaciones/cruzadas/${edicionId}?convocatoriaId=${convocatoriaId}`),
       guardar: (convocatoriaId: string, edicionId: string, data: import('@/data/types').GuardarEvaluacionCruzadaDto) =>

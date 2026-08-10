@@ -469,6 +469,7 @@ export interface EdicionEvaluableCruzada {
 
 export interface MonitoreoEvaluacion {
   convocatoria: Convocatoria
+  meta: PaginationMeta
   ediciones: Array<{
     edicion: Edicion
     institucional: {

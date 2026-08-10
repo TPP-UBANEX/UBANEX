@@ -52,7 +52,7 @@ export function NuevoProyectoDialog({
       setConvocatorias([])
       return
     }
-    api.convocatorias.list().then(convs => {
+    api.convocatorias.todas().then(convs => {
       setConvocatorias(convs.filter(c => c.estado === EstadoConvocatoria.Presentacion))
     })
   }, [open, convocatoriaFija])

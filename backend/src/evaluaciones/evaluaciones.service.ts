@@ -22,6 +22,8 @@ import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evalu
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { validarRespuestasInstitucionales, validarRespuestasCruzadas } from './validar-respuestas-evaluacion';
+import { ListarEvaluacionesDto } from './dto/listar-evaluaciones.dto';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { EstructuraTemplateInstitucional, EstructuraTemplateCruzada } from '../templates-evaluacion/estructura-template';
 
 // ── Fórmula del resumen final de evaluación ─────────────────────────────
@@ -53,14 +55,17 @@ export class EvaluacionesService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  async monitoreo(convocatoriaId: string) {
+  async monitoreo(convocatoriaId: string, dto: ListarEvaluacionesDto) {
+    const { page = 1, limit = 10 } = dto;
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
-    const ediciones = await this.edicionRepo.find({
+    const [ediciones, total] = await this.edicionRepo.findAndCount({
       where: { convocatoriaId },
       relations: { proyecto: true, unidadAcademica: true },
       order: { actualizadoEn: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
     const institucionales = await this.institucionalRepo.find({
       where: { convocatoriaId },
@@ -81,6 +86,7 @@ export class EvaluacionesService {
 
     return {
       convocatoria,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
       ediciones: ediciones.map(ed => {
         const inst = instPorEdicion.get(ed.id) ?? null;
         return {
@@ -286,12 +292,17 @@ export class EvaluacionesService {
 
   // ───────────── Evaluación Institucional ─────────────
 
-  async listarInstitucionales(convocatoriaId: string, usuario: Usuario) {
+  async listarInstitucionales(
+    convocatoriaId: string,
+    usuario: Usuario,
+    dto: ListarEvaluacionesDto,
+  ): Promise<PaginatedResponse<{ edicion: Edicion; evaluacion: EvaluacionInstitucional | null }>> {
+    const { page = 1, limit = 10 } = dto;
     this.validarEsSecretaria(usuario);
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
-    const ediciones = await this.edicionRepo.find({
+    const [ediciones, total] = await this.edicionRepo.findAndCount({
       where: {
         convocatoriaId,
         unidadAcademicaId: usuario.unidadAcademicaId,
@@ -299,6 +310,8 @@ export class EvaluacionesService {
       },
       relations: { proyecto: true, unidadAcademica: true, creadoPor: true },
       order: { actualizadoEn: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     const evaluaciones = await this.institucionalRepo.find({
@@ -307,10 +320,13 @@ export class EvaluacionesService {
     });
     const evaluacionPorEdicion = new Map(evaluaciones.map(e => [e.edicionId, e]));
 
-    return ediciones.map(ed => ({
-      edicion: ed,
-      evaluacion: evaluacionPorEdicion.get(ed.id) ?? null,
-    }));
+    return {
+      data: ediciones.map(ed => ({
+        edicion: ed,
+        evaluacion: evaluacionPorEdicion.get(ed.id) ?? null,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async obtenerInstitucional(
@@ -483,7 +499,12 @@ export class EvaluacionesService {
 
   // ───────────── Evaluación Cruzada ─────────────
 
-  async listarCruzadasDisponibles(convocatoriaId: string, usuario: Usuario) {
+  async listarCruzadasDisponibles(
+    convocatoriaId: string,
+    usuario: Usuario,
+    dto: ListarEvaluacionesDto,
+  ): Promise<PaginatedResponse<{ edicion: Edicion; tipo: TipoEvaluacionCruzada; evaluacion: EvaluacionCruzada | null }>> {
+    const { page = 1, limit = 10 } = dto;
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
     if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
@@ -548,7 +569,13 @@ export class EvaluacionesService {
       }
     }
 
-    return resultado;
+    const total = resultado.length;
+    const pagina = resultado.slice((page - 1) * limit, page * limit);
+
+    return {
+      data: pagina,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async obtenerCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {
