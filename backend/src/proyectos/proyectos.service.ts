@@ -2,13 +2,14 @@ import {
   Injectable, NotFoundException, BadRequestException, ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In, IsNull } from 'typeorm';
 import { Proyecto } from './proyecto.entity';
 import { Edicion } from './edicion.entity';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
+import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
@@ -27,6 +28,8 @@ export class ProyectosService {
     private readonly edicionRepo: Repository<Edicion>,
     @InjectRepository(ParticipacionConvocatoria)
     private readonly participacionRepo: Repository<ParticipacionConvocatoria>,
+    @InjectRepository(Emparejamiento)
+    private readonly emparejamientoRepo: Repository<Emparejamiento>,
   ) {}
 
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
@@ -103,14 +106,19 @@ export class ProyectosService {
         .map(p => p.edicionId)
         .filter(Boolean) as string[];
 
+      const poolIds = await this.edicionesEvaluablesParaEvaluador(usuario);
+
+      const condiciones: string[] = ['edicion.creadoPorId = :userId'];
+      const params: Record<string, unknown> = { userId: usuario.id };
       if (edicionIds.length > 0) {
-        query.andWhere(
-          '(edicion.creadoPorId = :userId OR edicion.id IN (:...edicionIds))',
-          { userId: usuario.id, edicionIds },
-        );
-      } else {
-        query.andWhere('edicion.creadoPorId = :userId', { userId: usuario.id });
+        condiciones.push('edicion.id IN (:...edicionIds)');
+        params.edicionIds = edicionIds;
       }
+      if (poolIds.length > 0) {
+        condiciones.push('edicion.id IN (:...poolIds)');
+        params.poolIds = poolIds;
+      }
+      query.andWhere(`(${condiciones.join(' OR ')})`, params);
     }
 
     if (convocatoriaId) {
@@ -118,6 +126,61 @@ export class ProyectosService {
     }
 
     return query.getMany();
+  }
+
+  // Ediciones que un evaluador aprobado puede ver para evaluar: las de su Unidad
+  // Académica y las de la Unidad emparejada, en convocatorias en etapa de Evaluación.
+  private async edicionesEvaluablesParaEvaluador(usuario: Usuario): Promise<string[]> {
+    if (!usuario.unidadAcademicaId) return [];
+
+    const participaciones = await this.participacionRepo.find({
+      where: {
+        usuarioId: usuario.id,
+        rol: RolEjecucion.Evaluador,
+        estado: EstadoPropuestaEvaluador.Aprobado,
+      },
+      select: { convocatoriaId: true },
+    });
+    if (participaciones.length === 0) return [];
+
+    const convIds = participaciones.map(p => p.convocatoriaId);
+    const convocatorias = await this.edicionRepo.manager.find(Convocatoria, {
+      where: { id: In(convIds) },
+      select: { id: true, estado: true },
+    });
+    const convEnEvaluacion = convocatorias
+      .filter(c => c.estado === EstadoConvocatoria.Evaluacion)
+      .map(c => c.id);
+    if (convEnEvaluacion.length === 0) return [];
+
+    const emparejamientos = await this.emparejamientoRepo.find({
+      where: { convocatoriaId: In(convEnEvaluacion) },
+      select: { convocatoriaId: true, unidadAId: true, unidadBId: true },
+    });
+
+    const poolIds = new Set<string>();
+    for (const convId of convEnEvaluacion) {
+      const par = emparejamientos.find(
+        p => p.convocatoriaId === convId &&
+          (p.unidadAId === usuario.unidadAcademicaId || p.unidadBId === usuario.unidadAcademicaId),
+      );
+      const uasPermitidas = new Set<string>([usuario.unidadAcademicaId]);
+      if (par) {
+        uasPermitidas.add(par.unidadAId === usuario.unidadAcademicaId ? par.unidadBId : par.unidadAId);
+      }
+
+      const ediciones = await this.edicionRepo.find({
+        where: {
+          convocatoriaId: convId,
+          estado: EstadoEdicion.EnEvaluacion,
+          eliminadoEn: IsNull(),
+          unidadAcademicaId: In([...uasPermitidas]),
+        },
+        select: { id: true },
+      });
+      for (const ed of ediciones) poolIds.add(ed.id);
+    }
+    return [...poolIds];
   }
 
   async obtenerProyecto(id: string) {
