@@ -125,12 +125,12 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     }
 
     return (
-      <div className="flex items-start gap-3 text-sm mb-2">
-        <span className="text-muted-foreground line-through whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
+      <div className="flex items-start gap-2 text-sm mb-2">
+        <span className="text-muted-foreground line-through whitespace-pre-wrap break-words line-clamp-3 min-w-0">
           {mostrar(actual)}
         </span>
         <span className="text-muted-foreground shrink-0">→</span>
-        <span className="font-medium text-foreground whitespace-pre-wrap break-words line-clamp-3 flex-1 min-w-0">
+        <span className="font-medium text-foreground whitespace-pre-wrap break-words line-clamp-3 min-w-0">
           {mostrar(sugerido)}
         </span>
       </div>
