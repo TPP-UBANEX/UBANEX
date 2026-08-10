@@ -12,6 +12,8 @@ import { EstadoValidacionDocente } from './common/enums/estado-validacion-docent
 import { EstadoEdicion } from './common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from './common/enums/estado-convocatoria.enum';
 import { EstadoPropuestaEvaluador } from './common/enums/estado-propuesta-evaluador.enum';
+import { EstadoEvaluacion } from './common/enums/estado-evaluacion.enum';
+import { TipoEvaluacionCruzada } from './common/enums/tipo-evaluacion-cruzada.enum';
 import { RolEjecucion } from './common/enums/rol-ejecucion.enum';
 import { TipoCampo } from './common/enums/tipo-campo.enum';
 import { Genero } from './common/enums/genero.enum';
@@ -1346,6 +1348,7 @@ async function bootstrap() {
   await seedParticipacion({ usuarioId: perez.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p5.edicion.id, esDirectorPrincipal: false, asignadoPorId: authDerecho.id });
   await seedParticipacion({ usuarioId: torres.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: p6.edicion.id, esDirectorPrincipal: true, asignadoPorId: authMedicina.id });
   await seedParticipacion({ usuarioId: romero.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authMedicina.id });
+  await seedParticipacion({ usuarioId: evaluadorDerecho.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: authDerecho.id });
 
   // ─────────────── EMPAREJAMIENTOS ───────────────
 
@@ -1376,6 +1379,170 @@ async function bootstrap() {
 
   await seedEmparejamientos(conv2026.id);
   await seedEmparejamientos(conv2027.id);
+
+  // ─────────────── EVALUACIONES CONFIRMADAS (UBANEX 2025) ───────────────
+  // Las ediciones en ejecución ya tienen la evaluación completa: institucional
+  // confirmada por la autoridad de la Unidad Académica y cruzada confirmada por
+  // un evaluador, para que el panel del proyecto muestre el resumen final.
+
+  console.log('\n=== SEED: Evaluaciones confirmadas (UBANEX 2025) ===');
+  const institucionalEvalRepo = dataSource.getRepository(EvaluacionInstitucional);
+  const cruzadaEvalRepo = dataSource.getRepository(EvaluacionCruzada);
+
+  const conv2025ConTemplates = await convocatoriaRepo.findOne({
+    where: { id: conv2025.id },
+    relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+  });
+
+  async function seedEvaluacionInstitucionalConfirmada(data: {
+    edicionId: string;
+    realizadoPor: Usuario;
+    confirmadoPor: Usuario;
+    categorias: Record<string, unknown>;
+    checklist: Record<string, unknown>;
+    observaciones: string;
+  }) {
+    const existente = await institucionalEvalRepo.findOne({ where: { edicionId: data.edicionId } });
+    if (existente) return existente;
+    const conv = conv2025ConTemplates;
+    if (!conv?.templateEvaluacionInstitucionalId) {
+      console.warn('  conv2025 sin template institucional asociado');
+      return null;
+    }
+    const guardado = await institucionalEvalRepo.save(
+      institucionalEvalRepo.create({
+        convocatoriaId: conv.id,
+        edicionId: data.edicionId,
+        templateId: conv.templateEvaluacionInstitucionalId,
+        estado: EstadoEvaluacion.Confirmada,
+        realizadoPorId: data.realizadoPor.id,
+        confirmadoPorId: data.confirmadoPor.id,
+        categorias: data.categorias,
+        checklist: data.checklist,
+        observaciones: data.observaciones,
+      }),
+    );
+    console.log(`  Institucional confirmada — edición ${data.edicionId.slice(0, 8)}...`);
+    return guardado;
+  }
+
+  async function seedEvaluacionCruzadaConfirmada(data: {
+    edicionId: string;
+    evaluador: Usuario;
+    tipo: TipoEvaluacionCruzada;
+    items: Record<string, unknown>;
+    observaciones: string;
+  }) {
+    const existente = await cruzadaEvalRepo.findOne({
+      where: { edicionId: data.edicionId, evaluadorId: data.evaluador.id },
+    });
+    if (existente) return existente;
+    const conv = conv2025ConTemplates;
+    if (!conv?.templateEvaluacionCruzadaId) {
+      console.warn('  conv2025 sin template cruzada asociado');
+      return null;
+    }
+    const guardado = await cruzadaEvalRepo.save(
+      cruzadaEvalRepo.create({
+        convocatoriaId: conv.id,
+        edicionId: data.edicionId,
+        evaluadorId: data.evaluador.id,
+        tipo: data.tipo,
+        templateId: conv.templateEvaluacionCruzadaId,
+        estado: EstadoEvaluacion.Confirmada,
+        items: data.items,
+        observaciones: data.observaciones,
+      }),
+    );
+    console.log(`  Cruzada confirmada (${data.tipo}) — edición ${data.edicionId.slice(0, 8)}...`);
+    return guardado;
+  }
+
+  // p5 — Taller de Oficios para la Inclusión Laboral (Derecho)
+  await seedEvaluacionInstitucionalConfirmada({
+    edicionId: p5.edicion.id,
+    realizadoPor: authDerecho,
+    confirmadoPor: authDerecho,
+    categorias: {
+      'sub-trayectoria-equipo': { valor: 9, fundamentacion: 'El equipo acumula tres ediciones en extensión universitaria.' },
+      'sub-antecedentes': { valor: 8, fundamentacion: 'Proyectos previos en la misma línea de oficios.' },
+      'sub-complementariedad-equipo': { valor: true },
+      'sub-estudiantes-activos': { valor: true },
+      'sub-vinculacion-territorio': { valor: 9, fundamentacion: 'Acuerdos con parroquias, cooperativas y el Centro de Formación Laboral.' },
+      'sub-coherencia': { valor: 8, fundamentacion: 'Objetivos y actividades alineados con el itinerario de oficios.' },
+      'sub-politicas-publicas': { valor: true },
+      'sub-devolucion': { valor: true },
+    },
+    checklist: {
+      'check-superposicion': true,
+      'check-presupuesto': true,
+      'check-documentacion': true,
+    },
+    observaciones: 'El proyecto está muy bien articulado con el territorio y su equipo tiene una trayectoria sólida.',
+  });
+  await seedEvaluacionCruzadaConfirmada({
+    edicionId: p5.edicion.id,
+    evaluador: evaluadorDerecho,
+    tipo: TipoEvaluacionCruzada.Propia,
+    items: {
+      'item-problema': 9,
+      'item-objetivos': 7,
+      'item-metodologia': 6,
+      'item-participacion-diseno': 7,
+      'item-formacion-alumnos': 6,
+      'item-roles-alumnos': 4,
+      'item-viabilidad': 4,
+      'item-presupuesto': 4,
+      'item-comunidad': 5,
+      'item-articulacion': 5,
+      'item-impacto-esperado': 7,
+      'item-sostenibilidad': 6,
+    },
+    observaciones: 'Problema claramente relevante y metodología adecuada al territorio.',
+  });
+
+  // p6 — Salud Comunitaria en Barrios Vulnerables (Medicina)
+  await seedEvaluacionInstitucionalConfirmada({
+    edicionId: p6.edicion.id,
+    realizadoPor: authMedicina,
+    confirmadoPor: authMedicina,
+    categorias: {
+      'sub-trayectoria-equipo': { valor: 8, fundamentacion: 'El equipo médico tiene experiencia en atención primaria.' },
+      'sub-antecedentes': { valor: 7, fundamentacion: 'Dispositivos de salud previos en la misma zona.' },
+      'sub-complementariedad-equipo': { valor: true },
+      'sub-estudiantes-activos': { valor: true },
+      'sub-vinculacion-territorio': { valor: 8, fundamentacion: 'Trabajo conjunto con el hospital zonal y las sociedades de fomento.' },
+      'sub-coherencia': { valor: 7, fundamentacion: 'Actividades consistentes con los objetivos sanitarios.' },
+      'sub-politicas-publicas': { valor: true },
+      'sub-devolucion': { valor: true },
+    },
+    checklist: {
+      'check-superposicion': true,
+      'check-presupuesto': true,
+      'check-documentacion': true,
+    },
+    observaciones: 'Intervención oportuna de salud comunitaria con fuerte participación del equipo docente.',
+  });
+  await seedEvaluacionCruzadaConfirmada({
+    edicionId: p6.edicion.id,
+    evaluador: romero,
+    tipo: TipoEvaluacionCruzada.Propia,
+    items: {
+      'item-problema': 8,
+      'item-objetivos': 7,
+      'item-metodologia': 6,
+      'item-participacion-diseno': 7,
+      'item-formacion-alumnos': 6,
+      'item-roles-alumnos': 4,
+      'item-viabilidad': 4,
+      'item-presupuesto': 4,
+      'item-comunidad': 5,
+      'item-articulacion': 5,
+      'item-impacto-esperado': 6,
+      'item-sostenibilidad': 6,
+    },
+    observaciones: 'Buena articulación con el sistema de salud local y metodología factible.',
+  });
 
   console.log('\n=== SEED COMPLETADO ===\n');
 
