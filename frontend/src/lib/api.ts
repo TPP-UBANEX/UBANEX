@@ -74,6 +74,10 @@ export const api = {
     resetPassword: (id: string) => post<{ message: string }>(`/usuarios/${id}/reset-password`, {}),
     auditoria: (id: string) => get<import('@/data/types').Auditoria[]>(`/usuarios/${id}/auditoria`),
   },
+  geo: {
+    localidades: (q: string) =>
+      get<import('@/data/types').Localidad[]>(`/geo/localidades?q=${encodeURIComponent(q)}`),
+  },
   unidadesAcademicas: {
     list: () => get<import('@/data/types').UnidadAcademica[]>('/unidades-academicas'),
     get: (id: string) => get<import('@/data/types').UnidadAcademica>(`/unidades-academicas/${id}`),

@@ -10,7 +10,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { MAX_LONGITUD_POR_TIPO, TipoCampo } from '@/data/types'
-import type { CampoFormulario } from '@/data/types'
+import type { CampoFormulario, ValorGeolocalizacion } from '@/data/types'
+import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
 
 export function EtiquetaCampoFormulario({ campo }: { campo: Pick<CampoFormulario, 'nombre' | 'esObligatorio'> }) {
   return (
@@ -24,6 +25,10 @@ export function EtiquetaCampoFormulario({ campo }: { campo: Pick<CampoFormulario
 export function campoFormularioVacio(campo: CampoFormulario, valor: unknown): boolean {
   if (valor == null) return true
   if (campo.tipo === TipoCampo.Checkbox) return !Array.isArray(valor) || valor.length === 0
+  if (campo.tipo === TipoCampo.Geolocalizacion) {
+    const nombre = (valor as Partial<ValorGeolocalizacion>)?.nombre
+    return typeof nombre !== 'string' || nombre.trim() === ''
+  }
   if (typeof valor === 'string') return valor.trim() === ''
   return false
 }
@@ -39,6 +44,7 @@ export function formatearValorCampoFormulario(campo: CampoFormulario, valor: unk
   if (campo.tipo === TipoCampo.Booleano) return valor === true ? 'Sí' : 'No'
   if (campo.tipo === TipoCampo.Checkbox) return (valor as string[]).join(', ')
   if (campo.tipo === TipoCampo.Fecha) return formatearFechaISO(String(valor))
+  if (campo.tipo === TipoCampo.Geolocalizacion) return (valor as ValorGeolocalizacion).nombre
   return String(valor)
 }
 
@@ -89,6 +95,13 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
           type="date"
           value={typeof valor === 'string' ? valor : ''}
           onChange={e => onChange(e.target.value)}
+        />
+      )}
+
+      {campo.tipo === TipoCampo.Geolocalizacion && (
+        <LocalidadAutocomplete
+          value={valor as ValorGeolocalizacion | null}
+          onChange={onChange}
         />
       )}
 

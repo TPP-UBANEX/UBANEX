@@ -8,6 +8,7 @@ const TIPOS_CAMPO_HABILITADOS = [
   TipoCampo.Texto,
   TipoCampo.TextoLargo,
   TipoCampo.Fecha,
+  TipoCampo.Geolocalizacion,
   TipoCampo.Booleano,
   TipoCampo.Checkbox,
   TipoCampo.Select,

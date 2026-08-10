@@ -98,15 +98,31 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return campo
   }
 
-  const esCampoFecha = (campo: string) => {
-    if (!campo.startsWith('datosFormulario.')) return false
-    return camposFormulario.find(c => c.id === campo.slice(16))?.tipo === TipoCampo.Fecha
+  const tipoCampoFormulario = (campo: string): TipoCampo | null => {
+    if (!campo.startsWith('datosFormulario.')) return null
+    return camposFormulario.find(c => c.id === campo.slice(16))?.tipo ?? null
+  }
+
+  // Un valor sugerido de geolocalización viaja serializado; si no es JSON válido se muestra tal cual (texto libre).
+  const nombreValorGeo = (valor: string): string => {
+    try {
+      const parsed = JSON.parse(valor)
+      if (parsed && typeof parsed === 'object' && typeof parsed.nombre === 'string') return parsed.nombre
+    } catch {
+      // no era JSON
+    }
+    return valor
   }
 
   const ValorDiff = ({ campo, actual, sugerido }: { campo: string; actual: string | null; sugerido: string | null }) => {
-    // Las fechas se guardan en ISO; se muestran como dd/mm/aaaa igual que en el detalle del proyecto.
-    const mostrar = (valor: string | null) =>
-      valor == null ? '(sin valor)' : esCampoFecha(campo) ? formatearFechaISO(valor) : valor
+    const tipo = tipoCampoFormulario(campo)
+    // Las fechas se guardan en ISO y la geolocalización serializada; ambas se muestran legibles.
+    const mostrar = (valor: string | null) => {
+      if (valor == null) return '(sin valor)'
+      if (tipo === TipoCampo.Fecha) return formatearFechaISO(valor)
+      if (tipo === TipoCampo.Geolocalizacion) return nombreValorGeo(valor)
+      return valor
+    }
 
     return (
       <div className="flex items-start gap-3 text-sm mb-2">

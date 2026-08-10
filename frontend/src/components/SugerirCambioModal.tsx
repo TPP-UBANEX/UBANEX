@@ -11,8 +11,22 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { api } from '@/lib/api'
+import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
+import type { ValorGeolocalizacion } from '@/data/types'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+
+/** El valor sugerido de un campo geo viaja serializado; si no es JSON valido se trata como texto libre. */
+function parsearValorGeo(valor: string): ValorGeolocalizacion | null {
+  if (!valor.trim()) return null
+  try {
+    const parsed = JSON.parse(valor)
+    if (parsed && typeof parsed === 'object' && typeof parsed.nombre === 'string') return parsed
+  } catch {
+    // no era JSON: se interpreta como texto libre
+  }
+  return { nombre: valor }
+}
 
 interface SugerirCambioModalProps {
   open: boolean
@@ -28,6 +42,8 @@ interface SugerirCambioModalProps {
   maxLongitud?: number
   /** Tipo del input de "Valor sugerido"; 'date' muestra el date picker nativo. */
   tipoInput?: 'text' | 'date'
+  /** Para campos de geolocalización: reemplaza "Valor sugerido" por el buscador de localidades. */
+  geo?: boolean
   onSuccess?: () => void
 }
 
@@ -43,9 +59,11 @@ export function SugerirCambioModal({
   multilinea = false,
   maxLongitud,
   tipoInput = 'text',
+  geo = false,
   onSuccess,
 }: SugerirCambioModalProps) {
   const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
+  const [valorGeoSugerido, setValorGeoSugerido] = useState<ValorGeolocalizacion | null>(null)
   const [comentario, setComentario] = useState(comentarioInicial)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -54,11 +72,12 @@ export function SugerirCambioModal({
   useEffect(() => {
     if (open) {
       setValorSugerido(valorSugeridoInicial)
+      setValorGeoSugerido(geo ? parsearValorGeo(valorSugeridoInicial) : null)
       setComentario(comentarioInicial)
       setError('')
       setConfirmar(false)
     }
-  }, [open, valorSugeridoInicial, comentarioInicial])
+  }, [open, valorSugeridoInicial, comentarioInicial, geo])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,9 +92,12 @@ export function SugerirCambioModal({
   const enviar = async () => {
     setSubmitting(true)
     try {
+      const valorAEnviar = geo
+        ? (valorGeoSugerido?.nombre.trim() ? JSON.stringify(valorGeoSugerido) : undefined)
+        : (valorSugerido.trim() || undefined)
       await api.sugerencias.crear(edicionId, {
         campo,
-        valorSugerido: valorSugerido.trim() || undefined,
+        valorSugerido: valorAEnviar,
         comentario: comentario.trim(),
       })
       toast.success('Sugerencia enviada correctamente')
@@ -116,7 +138,9 @@ export function SugerirCambioModal({
             <p className="text-sm font-medium">
               Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
             </p>
-            {multilinea ? (
+            {geo ? (
+              <LocalidadAutocomplete value={valorGeoSugerido} onChange={setValorGeoSugerido} />
+            ) : multilinea ? (
               <Textarea
                 rows={8}
                 value={valorSugerido}

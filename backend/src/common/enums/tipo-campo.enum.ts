@@ -2,6 +2,7 @@ export enum TipoCampo {
   Texto = 'texto',
   TextoLargo = 'texto_largo',
   Fecha = 'fecha',
+  Geolocalizacion = 'geolocalizacion',
   Booleano = 'booleano',
   Checkbox = 'checkbox',
   Select = 'select',

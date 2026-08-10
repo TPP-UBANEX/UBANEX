@@ -959,6 +959,7 @@ export function ProyectoDetail() {
         multilinea={tipoCampoSugerido === TipoCampo.TextoLargo}
         maxLongitud={tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined}
         tipoInput={tipoCampoSugerido === TipoCampo.Fecha ? 'date' : 'text'}
+        geo={tipoCampoSugerido === TipoCampo.Geolocalizacion}
       />
 
       {edicion && (

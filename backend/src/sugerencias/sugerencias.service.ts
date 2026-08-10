@@ -19,6 +19,7 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { TipoCampo } from '../common/enums/tipo-campo.enum';
 
 @Injectable()
 export class SugerenciasService {
@@ -52,7 +53,7 @@ export class SugerenciasService {
 
     const valorActual = this.obtenerValorActual(edicion, proyecto, dto.campo);
     const valorSugerido = dto.valorSugerido?.trim() ? dto.valorSugerido.trim() : null;
-    await this.validarLongitudCampoFormulario(edicion, dto.campo, valorSugerido);
+    await this.validarValorSugerido(edicion, dto.campo, valorSugerido);
 
     const pendienteExistente = await this.sugerenciaRepo.findOne({
       where: {
@@ -259,10 +260,24 @@ export class SugerenciasService {
         if (valor == null || typeof valor !== 'object') return null;
         valor = (valor as Record<string, unknown>)[parte];
       }
-      return valor != null ? String(valor) : null;
+      if (valor == null) return null;
+      // Un campo de geolocalizacion guarda un objeto: se serializa para viajar por la columna text.
+      return typeof valor === 'object' ? JSON.stringify(valor) : String(valor);
     } catch {
       return null;
     }
+  }
+
+  /** Intenta interpretar el valor sugerido como el objeto { nombre, ... } de un campo de geolocalizacion.
+   *  Si no es JSON valido (se sugirio como texto libre), lo trata como el nombre de la localidad. */
+  private parsearValorGeo(valor: string): unknown {
+    try {
+      const parsed: unknown = JSON.parse(valor);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      // no era JSON: se interpreta como texto libre
+    }
+    return { nombre: valor };
   }
 
   private async aplicarCambio(edicion: Edicion, campo: string, valorSugerido: string | null) {
@@ -292,13 +307,19 @@ export class SugerenciasService {
           this.aplicarCambioJson(edicion, 'presupuesto', campo.replace('presupuesto.', ''), valorSugerido);
           await this.edicionRepo.save(edicion);
         } else if (campo.startsWith('datosFormulario.')) {
-          this.aplicarCambioJson(edicion, 'datosFormulario', campo.replace('datosFormulario.', ''), valorSugerido);
+          const campoId = campo.replace('datosFormulario.', '');
+          const campoFormulario = (await this.obtenerCamposFormulario(edicion.convocatoriaId))
+            .find(c => c.id === campoId);
+          const valor = campoFormulario?.tipo === TipoCampo.Geolocalizacion
+            ? this.parsearValorGeo(valorSugerido)
+            : valorSugerido;
+          this.aplicarCambioJson(edicion, 'datosFormulario', campoId, valor);
           await this.edicionRepo.save(edicion);
         }
     }
   }
 
-  private aplicarCambioJson(edicion: Edicion, columna: 'presupuesto' | 'datosFormulario', path: string, valor: string) {
+  private aplicarCambioJson(edicion: Edicion, columna: 'presupuesto' | 'datosFormulario', path: string, valor: unknown) {
     const obj = edicion[columna] ? JSON.parse(JSON.stringify(edicion[columna])) : {};
     const partes = path.match(/[^.[\]]+/g);
     if (!partes || partes.length === 0) return;
@@ -368,8 +389,8 @@ export class SugerenciasService {
     return convocatoria?.formulario?.campos ?? [];
   }
 
-  /** Un valor sugerido sobre un campo del formulario debe respetar el mismo tope que la carga directa. */
-  private async validarLongitudCampoFormulario(
+  /** Un valor sugerido sobre un campo del formulario debe cumplir las mismas reglas que la carga directa. */
+  private async validarValorSugerido(
     edicion: Edicion,
     campo: string,
     valorSugerido: string | null,
@@ -381,7 +402,10 @@ export class SugerenciasService {
     const campoFormulario = campos.find(c => c.id === campoId);
     if (!campoFormulario) return;
 
-    validarValoresFormulario([campoFormulario], { [campoId]: valorSugerido });
+    const valor = campoFormulario.tipo === TipoCampo.Geolocalizacion
+      ? this.parsearValorGeo(valorSugerido)
+      : valorSugerido;
+    validarValoresFormulario([campoFormulario], { [campoId]: valor });
   }
 
   private nombreLegible(campo: string, campos: CampoFormulario[] = []): string {

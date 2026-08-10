@@ -358,10 +358,27 @@ export enum TipoCampo {
   Texto = 'texto',
   TextoLargo = 'texto_largo',
   Fecha = 'fecha',
+  Geolocalizacion = 'geolocalizacion',
   Booleano = 'booleano',
   Checkbox = 'checkbox',
   Select = 'select',
   Archivo = 'archivo',
+}
+
+export interface Localidad {
+  id: string
+  nombre: string
+  provincia: string
+  lat?: number
+  lon?: number
+}
+
+export interface ValorGeolocalizacion {
+  nombre: string
+  id?: string
+  provincia?: string
+  lat?: number
+  lon?: number
 }
 
 // Espejo de backend/src/common/enums/tipo-campo.enum.ts
@@ -392,6 +409,7 @@ export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Texto]: 'Texto',
   [TipoCampo.TextoLargo]: 'Texto largo',
   [TipoCampo.Fecha]: 'Fecha',
+  [TipoCampo.Geolocalizacion]: 'Ubicación (localidad)',
   [TipoCampo.Booleano]: 'Sí / No',
   [TipoCampo.Checkbox]: 'Casillas (múltiple)',
   [TipoCampo.Select]: 'Selección (única)',
