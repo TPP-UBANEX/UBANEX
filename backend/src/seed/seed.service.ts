@@ -12,6 +12,8 @@ import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 import { EstadoEvaluacion } from '../common/enums/estado-evaluacion.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
+import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
+import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { TipoCampo } from '../common/enums/tipo-campo.enum';
 import { Genero } from '../common/enums/genero.enum';
@@ -36,6 +38,7 @@ import {
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
 import { Notificacion } from '../sugerencias/notificacion.entity';
+import { Auditoria } from '../auditoria/auditoria.entity';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import {
   UAS_NOMBRES,
@@ -120,6 +123,7 @@ export class SeedService {
   private readonly institucionalEvalRepo: Repository<EvaluacionInstitucional>;
   private readonly cruzadaEvalRepo: Repository<EvaluacionCruzada>;
   private readonly notificacionRepo: Repository<Notificacion>;
+  private readonly auditoriaRepo: Repository<Auditoria>;
 
   private readonly rng = new Rng(20260810);
   private readonly uaMap = new Map<string, UnidadAcademica>();
@@ -148,6 +152,7 @@ export class SeedService {
   private moreno!: Usuario;
   private torres!: Usuario;
   private romero!: Usuario;
+  private castro!: Usuario;
   private evaluadorDerecho!: Usuario;
   private evaluadorIngenieria!: Usuario;
   private evaluadorEconomicas!: Usuario;
@@ -179,6 +184,7 @@ export class SeedService {
     this.institucionalEvalRepo = dataSource.getRepository(EvaluacionInstitucional);
     this.cruzadaEvalRepo = dataSource.getRepository(EvaluacionCruzada);
     this.notificacionRepo = dataSource.getRepository(Notificacion);
+    this.auditoriaRepo = dataSource.getRepository(Auditoria);
 
     this.camposFormularioEstandar = [
       {
@@ -786,7 +792,7 @@ export class SeedService {
       roles: [RolUsuario.AutoridadDeSecretaria],
       unidadAcademicaId: this.uaMap.get('Ciclo Básico Común (CBC)')!.id,
     });
-    await this.seedDocente(
+    this.castro = await this.seedDocente(
       {
         nombreCompleto: 'Prof. Castro',
         email: 'castro@uba.ar',
@@ -1228,9 +1234,20 @@ export class SeedService {
     estado: EstadoEdicion,
     presupuesto?: object,
     datosFormulario?: object,
+    esInterfacultad = false,
+    unidadAcademicaAdicionalId?: string,
   ): Promise<Edicion> {
     const existeProyecto = await this.proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
     if (existeProyecto) {
+      if (
+        existeProyecto.esInterfacultad !== esInterfacultad ||
+        existeProyecto.unidadAcademicaAdicionalId !== (unidadAcademicaAdicionalId ?? null)
+      ) {
+        existeProyecto.esInterfacultad = esInterfacultad;
+        existeProyecto.unidadAcademicaAdicionalId = unidadAcademicaAdicionalId ?? null;
+        await this.proyectoRepo.save(existeProyecto);
+        console.log(`  ${nombreProyecto} — condición de interfacultad reconciliada`);
+      }
       const ed = await this.edicionRepo.findOne({
         where: { proyectoId: existeProyecto.id, convocatoriaId: convocatoria.id },
       });
@@ -1253,7 +1270,12 @@ export class SeedService {
     }
 
     const proyecto = await this.proyectoRepo.save(
-      this.proyectoRepo.create({ nombre: nombreProyecto, creadoPorId: creadoPor.id }),
+      this.proyectoRepo.create({
+        nombre: nombreProyecto,
+        creadoPorId: creadoPor.id,
+        esInterfacultad,
+        unidadAcademicaAdicionalId: unidadAcademicaAdicionalId ?? null,
+      }),
     );
     const edicion = await this.edicionRepo.save(
       this.edicionRepo.create({
@@ -1321,6 +1343,7 @@ export class SeedService {
     const derecho = this.uaMap.get('Facultad de Derecho')!;
     const ingenieria = this.uaMap.get('Facultad de Ingeniería')!;
     const medicina = this.uaMap.get('Facultad de Medicina')!;
+    const cbc = this.uaMap.get('Ciclo Básico Común (CBC)')!;
     const conv2025 = this.convs.get(2025)!;
     const conv2026 = this.convs.get(2026)!;
 
@@ -1342,6 +1365,8 @@ export class SeedService {
         poblaciones: ['Niños y adolescentes', 'Adultos mayores'],
         antecedentes: true,
       }),
+      true,
+      cbc.id,
     );
     this.p3 = await this.seedProyectoConEdicion(
       'Huerta Comunitaria y Seguridad Alimentaria',
@@ -1361,6 +1386,8 @@ export class SeedService {
         poblaciones: ['Niños y adolescentes'],
         antecedentes: true,
       }),
+      true,
+      medicina.id,
     );
     this.p5 = await this.seedProyectoConEdicion(
       'Taller de Oficios para la Inclusión Laboral',
@@ -1458,7 +1485,16 @@ export class SeedService {
 
           if (nombresExistentes.has(titulo)) continue;
 
-          const proyecto = this.proyectoRepo.create({ nombre: titulo, creadoPorId: director.id });
+          const esInterfacultad = this.rng.bool(0.4);
+          const unidadAcademicaAdicionalId = esInterfacultad
+            ? this.rng.pick(this.uas.filter((u) => u.id !== ua.id)).id
+            : null;
+          const proyecto = this.proyectoRepo.create({
+            nombre: titulo,
+            creadoPorId: director.id,
+            esInterfacultad,
+            unidadAcademicaAdicionalId,
+          });
           proyectoEnts.push(proyecto);
           specs.push({
             proyecto,
@@ -1570,8 +1606,10 @@ export class SeedService {
 
     await this.seedParticipacion({ usuarioId: this.garcia.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p1.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.perez.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p2.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
+    await this.seedParticipacion({ usuarioId: this.castro.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p2.id, esDirectorPrincipal: false, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.fernandez.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p3.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
     await this.seedParticipacion({ usuarioId: this.diaz.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p4.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
+    await this.seedParticipacion({ usuarioId: this.romero.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p4.id, esDirectorPrincipal: false, asignadoPorId: this.authIngenieria.id });
     await this.seedEvaluadorAprobadoCanonico(this.moreno.id, conv2026.id, conv2026.nombre, this.authIngenieria.id);
     await this.seedEvaluadorAprobadoCanonico(this.evaluadorDerecho.id, conv2026.id, conv2026.nombre, this.authDerecho.id);
     await this.seedEvaluadorAprobadoCanonico(this.evaluadorIngenieria.id, conv2026.id, conv2026.nombre, this.authIngenieria.id);
@@ -1584,6 +1622,7 @@ export class SeedService {
     await this.seedEvaluadorAprobadoCanonico(this.evaluadorEconomicas.id, conv2025.id, conv2025.nombre, this.admin.id);
 
     await this.seedParticipacion({ usuarioId: this.garcia.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p7.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
+    await this.seedParticipacion({ usuarioId: this.perez.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p7.id, esDirectorPrincipal: false, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.fernandez.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p8.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
   }
 
@@ -1592,19 +1631,26 @@ export class SeedService {
       const conv = this.convs.get(anio)!;
       const ediciones = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id },
-        relations: { creadoPor: true },
+        relations: { creadoPor: true, proyecto: true },
       });
       const existentes = await this.participacionRepo.find({
         where: { convocatoriaId: conv.id },
         relations: { usuario: true },
         select: {
           usuarioId: true,
+          edicionId: true,
           estado: true,
           rol: true,
+          esDirectorPrincipal: true,
           usuario: { id: true, unidadAcademicaId: true },
         },
       });
       const existSet = new Set(existentes.map((p) => p.usuarioId));
+      const edicionesConCodirector = new Set(
+        existentes
+          .filter((p) => p.rol === RolEjecucion.DirectorDeProyecto && p.esDirectorPrincipal === false)
+          .map((p) => p.edicionId),
+      );
       const rows: ParticipacionConvocatoria[] = [];
 
       for (const ed of ediciones) {
@@ -1612,6 +1658,12 @@ export class SeedService {
         const secretaria = pool?.secretaria;
         const director = ed.creadoPor;
         if (!secretaria || !director) continue;
+
+        const esInterfacultad = ed.proyecto?.esInterfacultad ?? false;
+        const uaAdicionalId = ed.proyecto?.unidadAcademicaAdicionalId ?? null;
+        const fuenteCodirector = esInterfacultad && uaAdicionalId
+          ? (this.usuariosPorUa.get(uaAdicionalId) ?? pool)
+          : pool;
 
         if (!existSet.has(director.id)) {
           rows.push(
@@ -1628,11 +1680,21 @@ export class SeedService {
           existSet.add(director.id);
         }
 
-        const docentesValidados = (pool?.docentes ?? []).filter(
-          (d) =>
-            d.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
-            !existSet.has(d.id),
-        );
+        let docentesValidados: Usuario[] = [];
+        if (!edicionesConCodirector.has(ed.id)) {
+          docentesValidados = (fuenteCodirector?.docentes ?? []).filter(
+            (d) =>
+              d.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
+              !existSet.has(d.id),
+          );
+          if (docentesValidados.length === 0 && fuenteCodirector !== pool) {
+            docentesValidados = (pool?.docentes ?? []).filter(
+              (d) =>
+                d.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
+                !existSet.has(d.id),
+            );
+          }
+        }
         const integrante =
           docentesValidados.length > 0
             ? docentesValidados[this.rng.entero(0, docentesValidados.length - 1)]
@@ -1820,6 +1882,36 @@ export class SeedService {
 
   // ─────────────────── Evaluaciones ───────────────────
 
+  private construirHistorialEvaluacion(opts: {
+    evaluacionId: string;
+    entidad: TipoEntidadAuditoria;
+    usuario: Usuario;
+    descripcionGuardado: string;
+    descripcionConfirmacion: string;
+    confirmada: boolean;
+  }): Auditoria[] {
+    const filas = [
+      {
+        usuarioId: opts.usuario.id,
+        accion: TipoAccionAuditoria.EVALUACION,
+        descripcion: opts.descripcionGuardado,
+        responsableId: opts.usuario.id,
+        responsableNombre: opts.usuario.nombreCompleto,
+        entidad: opts.entidad,
+        entidadId: opts.evaluacionId,
+        fecha: new Date(Date.now() - 5 * 86_400_000),
+      },
+    ];
+    if (opts.confirmada) {
+      filas.push({
+        ...filas[0],
+        descripcion: opts.descripcionConfirmacion,
+        fecha: new Date(Date.now() - 86_400_000),
+      });
+    }
+    return this.auditoriaRepo.create(filas);
+  }
+
   private async seedEvaluacionesCanonicas(): Promise<void> {
     const conv2025 = this.convs.get(2025)!;
     const conv = await this.convocatoriaRepo.findOne({
@@ -1832,7 +1924,7 @@ export class SeedService {
       const existente = await this.institucionalEvalRepo.findOne({ where: { edicionId } });
       if (existente) return;
       if (!conv.templateEvaluacionInstitucionalId) return;
-      await this.institucionalEvalRepo.save(
+      const guardada = await this.institucionalEvalRepo.save(
         this.institucionalEvalRepo.create({
           convocatoriaId: conv.id,
           edicionId,
@@ -1845,6 +1937,14 @@ export class SeedService {
           observaciones,
         }),
       );
+      await this.auditoriaRepo.save(this.construirHistorialEvaluacion({
+        evaluacionId: guardada.id,
+        entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
+        usuario: autoridad,
+        descripcionGuardado: `Guardó la evaluación institucional de la edición ${edicionId.slice(0, 8)}...`,
+        descripcionConfirmacion: `Confirmó la evaluación institucional de la edición ${edicionId.slice(0, 8)}...`,
+        confirmada: true,
+      }));
     };
 
     const cruzada = async (
@@ -1857,7 +1957,7 @@ export class SeedService {
       const existente = await this.cruzadaEvalRepo.findOne({ where: { edicionId, evaluadorId: evaluador.id } });
       if (existente) return;
       if (!conv.templateEvaluacionCruzadaId) return;
-      await this.cruzadaEvalRepo.save(
+      const guardada = await this.cruzadaEvalRepo.save(
         this.cruzadaEvalRepo.create({
           convocatoriaId: conv.id,
           edicionId,
@@ -1869,6 +1969,14 @@ export class SeedService {
           observaciones,
         }),
       );
+      await this.auditoriaRepo.save(this.construirHistorialEvaluacion({
+        evaluacionId: guardada.id,
+        entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
+        usuario: evaluador,
+        descripcionGuardado: `Guardó la evaluación cruzada (${tipo}) de la edición ${edicionId.slice(0, 8)}...`,
+        descripcionConfirmacion: `Confirmó la evaluación cruzada (${tipo}) de la edición ${edicionId.slice(0, 8)}...`,
+        confirmada: true,
+      }));
     };
 
     await institucional(
@@ -1952,6 +2060,8 @@ export class SeedService {
 
       const instRows: EvaluacionInstitucional[] = [];
       const cruzadaRows: EvaluacionCruzada[] = [];
+      const instMeta: Array<{ usuario: Usuario; edicionId: string; confirmada: boolean }> = [];
+      const cruzadaMeta: Array<{ usuario: Usuario; edicionId: string; tipo: TipoEvaluacionCruzada }> = [];
 
       for (const ed of ediciones) {
         const pool = this.usuariosPorUa.get(ed.unidadAcademicaId);
@@ -1991,6 +2101,11 @@ export class SeedService {
                 observaciones: generada.observaciones,
               }),
             );
+            instMeta.push({
+              usuario: pool.secretaria,
+              edicionId: ed.id,
+              confirmada: instEstado === EstadoEvaluacion.Confirmada,
+            });
           }
         }
 
@@ -2015,6 +2130,7 @@ export class SeedService {
               observaciones: generada.observaciones,
             }),
           );
+          cruzadaMeta.push({ usuario: evaluadorPropia, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Propia });
         }
 
         const uaPar = this.parMap.get(ed.unidadAcademicaId);
@@ -2037,19 +2153,59 @@ export class SeedService {
               observaciones: generada.observaciones,
             }),
           );
+          cruzadaMeta.push({ usuario: evaluadorAjena, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Ajena });
         }
       }
 
+      const auditoriaBuffer: Auditoria[] = [];
+      const drenarAuditoria = async (): Promise<void> => {
+        if (auditoriaBuffer.length === 0) return;
+        await this.auditoriaRepo.save(auditoriaBuffer);
+        this.progreso.sumar(auditoriaBuffer.length);
+        auditoriaBuffer.length = 0;
+      };
+
       for (let i = 0; i < instRows.length; i += TAMANIO_LOTE) {
         const chunk = instRows.slice(i, i + TAMANIO_LOTE);
-        await this.institucionalEvalRepo.save(chunk);
+        const guardados = await this.institucionalEvalRepo.save(chunk);
+        for (let j = 0; j < guardados.length; j++) {
+          const meta = instMeta[i + j];
+          if (!meta) continue;
+          auditoriaBuffer.push(
+            ...this.construirHistorialEvaluacion({
+              evaluacionId: guardados[j].id,
+              entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
+              usuario: meta.usuario,
+              descripcionGuardado: `Guardó la evaluación institucional de la edición ${meta.edicionId.slice(0, 8)}...`,
+              descripcionConfirmacion: `Confirmó la evaluación institucional de la edición ${meta.edicionId.slice(0, 8)}...`,
+              confirmada: meta.confirmada,
+            }),
+          );
+          if (auditoriaBuffer.length >= TAMANIO_LOTE) await drenarAuditoria();
+        }
         this.progreso.sumar(chunk.length);
       }
       for (let i = 0; i < cruzadaRows.length; i += TAMANIO_LOTE) {
         const chunk = cruzadaRows.slice(i, i + TAMANIO_LOTE);
-        await this.cruzadaEvalRepo.save(chunk);
+        const guardados = await this.cruzadaEvalRepo.save(chunk);
+        for (let j = 0; j < guardados.length; j++) {
+          const meta = cruzadaMeta[i + j];
+          if (!meta) continue;
+          auditoriaBuffer.push(
+            ...this.construirHistorialEvaluacion({
+              evaluacionId: guardados[j].id,
+              entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
+              usuario: meta.usuario,
+              descripcionGuardado: `Guardó la evaluación cruzada (${meta.tipo}) de la edición ${meta.edicionId.slice(0, 8)}...`,
+              descripcionConfirmacion: `Confirmó la evaluación cruzada (${meta.tipo}) de la edición ${meta.edicionId.slice(0, 8)}...`,
+              confirmada: true,
+            }),
+          );
+          if (auditoriaBuffer.length >= TAMANIO_LOTE) await drenarAuditoria();
+        }
         this.progreso.sumar(chunk.length);
       }
+      await drenarAuditoria();
     }
   }
 
