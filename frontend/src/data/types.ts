@@ -364,6 +364,7 @@ export enum TipoCampo {
   Checkbox = 'checkbox',
   Select = 'select',
   Archivo = 'archivo',
+  Seccion = 'seccion',
 }
 
 export interface Localidad {
@@ -419,6 +420,7 @@ export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Checkbox]: 'Casillas (múltiple)',
   [TipoCampo.Select]: 'Selección (única)',
   [TipoCampo.Archivo]: 'Archivo',
+  [TipoCampo.Seccion]: 'Sección',
 }
 
 export interface Emparejamiento {

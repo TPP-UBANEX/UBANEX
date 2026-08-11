@@ -55,7 +55,7 @@ interface Props {
 }
 
 export function CampoFormularioInput({ campo, valor, onChange }: Props) {
-  if (campo.tipo === TipoCampo.Archivo) return null
+  if (campo.tipo === TipoCampo.Archivo || campo.tipo === TipoCampo.Seccion) return null
 
   const faltaCompletar = campo.esObligatorio && campoFormularioVacio(campo, valor)
 

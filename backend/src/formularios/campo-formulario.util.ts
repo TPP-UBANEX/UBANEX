@@ -82,6 +82,8 @@ export function validarValoresFormulario(
   datos: Record<string, unknown>,
 ): void {
   for (const campo of campos) {
+    if (campo.tipo === TipoCampo.Seccion) continue;
+
     const valor = datos[campo.id];
     if (valor == null) continue;
 

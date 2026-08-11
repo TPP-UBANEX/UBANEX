@@ -402,6 +402,10 @@ export class SugerenciasService {
     const campoFormulario = campos.find(c => c.id === campoId);
     if (!campoFormulario) return;
 
+    if (campoFormulario.tipo === TipoCampo.Seccion) {
+      throw new BadRequestException('No se puede sugerir un cambio sobre una sección');
+    }
+
     const valor = campoFormulario.tipo === TipoCampo.Geolocalizacion
       ? this.parsearValorGeo(valorSugerido)
       : valorSugerido;

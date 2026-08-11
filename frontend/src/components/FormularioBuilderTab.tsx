@@ -65,6 +65,9 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
         actualizado.maximo = undefined
         actualizado.admiteDecimales = undefined
       }
+      if (cambios.tipo === TipoCampo.Seccion) {
+        actualizado.esObligatorio = false
+      }
       return actualizado
     }))
   }
@@ -212,8 +215,13 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
           )
         ) : (
           <div className="space-y-3">
-            {campos.map((campo, index) => (
-              <div key={campo.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
+            {campos.map((campo, index) => {
+              const esSeccion = campo.tipo === TipoCampo.Seccion
+              return (
+              <div
+                key={campo.id}
+                className={esSeccion ? 'border rounded-lg p-4 space-y-3 bg-primary/5 border-primary/30' : 'border rounded-lg p-4 space-y-3 bg-muted/30'}
+              >
                 <div className="flex items-start gap-2">
                   <div className="flex-[2] space-y-1">
                     <span className="text-xs text-muted-foreground">Etiqueta</span>
@@ -221,7 +229,7 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
                       value={campo.nombre}
                       disabled={!editable}
                       onChange={e => actualizarCampo(campo.id, { nombre: e.target.value })}
-                      placeholder="Ej: Resumen del proyecto"
+                      placeholder={esSeccion ? 'Ej: Contraparte' : 'Ej: Resumen del proyecto'}
                     />
                   </div>
                   <div className="flex-1 space-y-1">
@@ -256,37 +264,41 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
 
                 <div className="flex items-end gap-2">
                   <div className="flex-[2] space-y-1">
-                    <span className="text-xs text-muted-foreground">Texto de ayuda (opcional)</span>
+                    <span className="text-xs text-muted-foreground">
+                      {esSeccion ? 'Descripción (opcional)' : 'Texto de ayuda (opcional)'}
+                    </span>
                     <Input
                       value={campo.textoAyuda ?? ''}
                       disabled={!editable}
                       onChange={e => actualizarCampo(campo.id, { textoAyuda: e.target.value })}
-                      placeholder="Aclaración que ve quien completa el formulario"
+                      placeholder={esSeccion ? 'Texto que se muestra al inicio de la pestaña' : 'Aclaración que ve quien completa el formulario'}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">¿Obligatorio?</span>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={campo.esObligatorio ? 'default' : 'outline'}
-                        size="sm"
-                        disabled={!editable}
-                        onClick={() => actualizarCampo(campo.id, { esObligatorio: true })}
-                      >
-                        Sí
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={!campo.esObligatorio ? 'default' : 'outline'}
-                        size="sm"
-                        disabled={!editable}
-                        onClick={() => actualizarCampo(campo.id, { esObligatorio: false })}
-                      >
-                        No
-                      </Button>
+                  {!esSeccion && (
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">¿Obligatorio?</span>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={campo.esObligatorio ? 'default' : 'outline'}
+                          size="sm"
+                          disabled={!editable}
+                          onClick={() => actualizarCampo(campo.id, { esObligatorio: true })}
+                        >
+                          Sí
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={!campo.esObligatorio ? 'default' : 'outline'}
+                          size="sm"
+                          disabled={!editable}
+                          onClick={() => actualizarCampo(campo.id, { esObligatorio: false })}
+                        >
+                          No
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {TIPOS_CON_OPCIONES.includes(campo.tipo) && (
@@ -364,7 +376,8 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
                   </div>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 

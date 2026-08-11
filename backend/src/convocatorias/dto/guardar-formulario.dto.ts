@@ -13,6 +13,7 @@ const TIPOS_CAMPO_HABILITADOS = [
   TipoCampo.Booleano,
   TipoCampo.Checkbox,
   TipoCampo.Select,
+  TipoCampo.Seccion,
 ];
 
 export class CampoFormularioDto {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -44,6 +44,7 @@ import {
   campoFormularioVacio,
   formatearValorCampoFormulario,
 } from '@/components/CampoFormularioInput'
+import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -65,16 +66,6 @@ export function ProyectoDetail() {
   const [eliminando, setEliminando] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
 
-  const TABS = ['info', 'direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias'] as const
-  const [tabActivo, setTabActivo] = useState<string>(() => {
-    const t = searchParams.get('tab')
-    return t && (TABS as readonly string[]).includes(t) ? t : 'info'
-  })
-  useEffect(() => {
-    const t = searchParams.get('tab')
-    if (t && (TABS as readonly string[]).includes(t)) setTabActivo(t)
-  }, [searchParams])
-
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
@@ -85,6 +76,30 @@ export function ProyectoDetail() {
   const [guardando, setGuardando] = useState(false)
 
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
+  const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
+  const seccionResumen = secciones[0]
+  const seccionesExtra = secciones.slice(1)
+
+  const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
+  const tabs = useMemo(
+    () => ['info', ...seccionesExtra.map(s => `seccion-${s.id}`), ...TABS_FIJAS_POST],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [seccionesExtra],
+  )
+  const [tabActivo, setTabActivo] = useState<string>(() => {
+    const t = searchParams.get('tab')
+    return t && tabs.includes(t) ? t : 'info'
+  })
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && tabs.includes(t)) {
+      setTabActivo(t)
+    } else if (!tabs.includes(tabActivo)) {
+      setTabActivo('info')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, tabs])
+
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showAsignarDirector, setShowAsignarDirector] = useState(false)
 
@@ -514,6 +529,57 @@ export function ProyectoDetail() {
     montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
   })
 
+  const renderCamposEdicion = (campos: CampoFormulario[]) => (
+    <>
+      {campos.map(campo => (
+        <CampoFormularioInput
+          key={campo.id}
+          campo={campo}
+          valor={editDatosFormulario[campo.id]}
+          onChange={v => setEditDatosFormulario(prev => ({ ...prev, [campo.id]: v }))}
+        />
+      ))}
+    </>
+  )
+
+  const renderCamposLectura = (campos: CampoFormulario[]) => (
+    <>
+      {campos.map(campo => {
+        const valorFormateado = formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])
+        // Los campos de texto largo ocupan las dos columnas, en su posición según el orden definido.
+        const esTextoLargo = campo.tipo === TipoCampo.TextoLargo
+        return (
+          <div key={campo.id} className={esTextoLargo ? 'col-span-2 space-y-1' : undefined}>
+            {esTextoLargo ? (
+              <p className="text-muted-foreground">
+                <EtiquetaCampoFormulario campo={campo} />:
+              </p>
+            ) : (
+              <>
+                <span className="text-muted-foreground">
+                  <EtiquetaCampoFormulario campo={campo} />:
+                </span>{' '}
+              </>
+            )}
+            <CampoSugerible
+              campo={`datosFormulario.${campo.id}`}
+              valorActual={valorFormateado}
+              label={campo.nombre}
+              activo={modoSugerencia}
+              onClick={handleSugerirClick}
+              display={esTextoLargo ? 'flex' : 'inline-flex'}
+              className={esTextoLargo ? 'w-full items-start' : undefined}
+            >
+              {esTextoLargo
+                ? <TextoLargoColapsable texto={valorFormateado} />
+                : valorFormateado}
+            </CampoSugerible>
+          </div>
+        )
+      })}
+    </>
+  )
+
   if (loading) return <ProyectoDetailSkeleton />
 
   if (!proyecto) return <div className="p-6"><p className="text-muted-foreground">Proyecto no encontrado</p></div>
@@ -651,6 +717,9 @@ export function ProyectoDetail() {
       <Tabs value={tabActivo} onValueChange={setTabActivo}>
         <TabsList>
           <TabsTrigger value="info">Resumen</TabsTrigger>
+          {seccionesExtra.map(seccion => (
+            <TabsTrigger key={seccion.id} value={`seccion-${seccion.id}`}>{seccion.nombre}</TabsTrigger>
+          ))}
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
           <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
@@ -686,14 +755,7 @@ export function ProyectoDetail() {
                         <Button type="button" variant={!editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(false)}>No</Button>
                       </div>
                     </div>
-                  {camposFormulario.map(campo => (
-                    <CampoFormularioInput
-                      key={campo.id}
-                      campo={campo}
-                      valor={editDatosFormulario[campo.id]}
-                      onChange={v => setEditDatosFormulario(prev => ({ ...prev, [campo.id]: v }))}
-                    />
-                  ))}
+                  {renderCamposEdicion(seccionResumen.campos)}
                 </CardContent>
               </Card>
             </div>
@@ -736,39 +798,7 @@ export function ProyectoDetail() {
                         {proyecto.esInterfacultad ? 'Sí' : 'No'}
                       </CampoSugerible>
                     </div>
-                    {camposFormulario.map(campo => {
-                      const valorFormateado = formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])
-                      // Los campos de texto largo ocupan las dos columnas, en su posición según el orden definido.
-                      const esTextoLargo = campo.tipo === TipoCampo.TextoLargo
-                      return (
-                        <div key={campo.id} className={esTextoLargo ? 'col-span-2 space-y-1' : undefined}>
-                          {esTextoLargo ? (
-                            <p className="text-muted-foreground">
-                              <EtiquetaCampoFormulario campo={campo} />:
-                            </p>
-                          ) : (
-                            <>
-                              <span className="text-muted-foreground">
-                                <EtiquetaCampoFormulario campo={campo} />:
-                              </span>{' '}
-                            </>
-                          )}
-                          <CampoSugerible
-                            campo={`datosFormulario.${campo.id}`}
-                            valorActual={valorFormateado}
-                            label={campo.nombre}
-                            activo={modoSugerencia}
-                            onClick={handleSugerirClick}
-                            display={esTextoLargo ? 'flex' : 'inline-flex'}
-                            className={esTextoLargo ? 'w-full items-start' : undefined}
-                          >
-                            {esTextoLargo
-                              ? <TextoLargoColapsable texto={valorFormateado} />
-                              : valorFormateado}
-                          </CampoSugerible>
-                        </div>
-                      )
-                    })}
+                    {renderCamposLectura(seccionResumen.campos)}
                   </div>
                 </CardContent>
               </Card>
@@ -778,6 +808,34 @@ export function ProyectoDetail() {
             <p className="text-xs text-muted-foreground mt-2">* Campos obligatorios para enviar la presentación</p>
           )}
         </TabsContent>
+
+        {seccionesExtra.map(seccion => (
+          <TabsContent key={seccion.id} value={`seccion-${seccion.id}`} className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">{seccion.nombre}</CardTitle>
+                {seccion.descripcion && (
+                  <p className="text-sm text-muted-foreground">{seccion.descripcion}</p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {seccion.campos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Esta sección no cuenta con ningún campo.
+                  </p>
+                ) : editando ? (
+                  <div className="space-y-4">
+                    {renderCamposEdicion(seccion.campos)}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {renderCamposLectura(seccion.campos)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
 
         <TabsContent value="direccion" className="mt-4">
           <Card>

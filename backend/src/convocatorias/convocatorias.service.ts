@@ -148,7 +148,7 @@ export class ConvocatoriasService {
       tipo: campo.tipo,
       nombre: campo.nombre.trim(),
       textoAyuda: campo.textoAyuda?.trim() || undefined,
-      esObligatorio: campo.esObligatorio,
+      esObligatorio: campo.tipo === TipoCampo.Seccion ? false : campo.esObligatorio,
       orden: index,
       opciones: campo.opciones?.map((o) => o.trim()).filter(Boolean),
       ...(campo.tipo === TipoCampo.Numero
