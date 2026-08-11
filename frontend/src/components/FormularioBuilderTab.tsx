@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { EstadoConvocatoria, TipoCampo, tipoCampoLabels } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
+import { tipoCampoIconos } from '@/lib/tipo-campo-iconos'
 import { SeleccionarPlantillaDialog } from '@/components/SeleccionarPlantillaDialog'
 import { ArrowDown, ArrowUp, FileText, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -241,9 +242,17 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.values(TipoCampo).filter(t => t !== TipoCampo.Archivo).map(t => (
-                          <SelectItem key={t} value={t}>{tipoCampoLabels[t]}</SelectItem>
-                        ))}
+                        {Object.values(TipoCampo).filter(t => t !== TipoCampo.Archivo).map(t => {
+                          const Icono = tipoCampoIconos[t]
+                          return (
+                            <SelectItem key={t} value={t}>
+                              <span className="flex items-center gap-2">
+                                <Icono className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                {tipoCampoLabels[t]}
+                              </span>
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
