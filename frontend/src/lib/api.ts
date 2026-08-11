@@ -18,6 +18,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     method,
     headers: authHeaders(),
     body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
   })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
