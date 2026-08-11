@@ -15,6 +15,7 @@ import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/templat
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
+import { Notificacion } from '../sugerencias/notificacion.entity';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
       TemplateEvaluacionCruzada,
       EvaluacionInstitucional,
       EvaluacionCruzada,
+      Notificacion,
     ]),
   ],
   providers: [SeedService],

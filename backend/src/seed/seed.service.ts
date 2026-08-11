@@ -35,6 +35,8 @@ import {
 } from '../evaluaciones/templates-default';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
+import { Notificacion } from '../sugerencias/notificacion.entity';
+import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import {
   UAS_NOMBRES,
   CARRERAS_POR_UA,
@@ -117,6 +119,7 @@ export class SeedService {
   private readonly templateCruzadaRepo: Repository<TemplateEvaluacionCruzada>;
   private readonly institucionalEvalRepo: Repository<EvaluacionInstitucional>;
   private readonly cruzadaEvalRepo: Repository<EvaluacionCruzada>;
+  private readonly notificacionRepo: Repository<Notificacion>;
 
   private readonly rng = new Rng(20260810);
   private readonly uaMap = new Map<string, UnidadAcademica>();
@@ -125,6 +128,7 @@ export class SeedService {
   private readonly usuariosPorUa = new Map<string, PoolUa>();
   private readonly parMap = new Map<string, string>();
   private readonly titulosUsados = new Set<string>();
+  private readonly aprobadosPorConvUa = new Map<string, Map<string, Set<string>>>();
   private readonly progreso = new Progreso(42_000);
 
   private camposFormularioEstandar: CampoFormulario[];
@@ -174,6 +178,7 @@ export class SeedService {
     this.templateCruzadaRepo = dataSource.getRepository(TemplateEvaluacionCruzada);
     this.institucionalEvalRepo = dataSource.getRepository(EvaluacionInstitucional);
     this.cruzadaEvalRepo = dataSource.getRepository(EvaluacionCruzada);
+    this.notificacionRepo = dataSource.getRepository(Notificacion);
 
     this.camposFormularioEstandar = [
       {
@@ -1530,6 +1535,34 @@ export class SeedService {
     return saved;
   }
 
+  private async seedEvaluadorAprobadoCanonico(
+    usuarioId: string,
+    convocatoriaId: string,
+    convocatoriaNombre: string,
+    asignadoPorId: string,
+  ): Promise<void> {
+    const p = await this.seedParticipacion({
+      usuarioId,
+      convocatoriaId,
+      rol: RolEjecucion.Evaluador,
+      estado: EstadoPropuestaEvaluador.Aprobado,
+      asignadoPorId,
+    });
+    const notifExiste = await this.notificacionRepo.findOne({
+      where: { participacionId: p.id, tipo: TipoNotificacion.RESULTADO_EVALUADOR },
+    });
+    if (notifExiste) return;
+    await this.notificacionRepo.save(
+      this.notificacionRepo.create({
+        usuarioId,
+        tipo: TipoNotificacion.RESULTADO_EVALUADOR,
+        participacionId: p.id,
+        mensaje: `Tu propuesta como evaluador en la convocatoria "${convocatoriaNombre}" fue aprobada`,
+        leida: false,
+      }),
+    );
+  }
+
   private async seedParticipacionesCanonicas(): Promise<void> {
     const conv2025 = this.convs.get(2025)!;
     const conv2026 = this.convs.get(2026)!;
@@ -1539,16 +1572,16 @@ export class SeedService {
     await this.seedParticipacion({ usuarioId: this.perez.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p2.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.fernandez.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p3.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
     await this.seedParticipacion({ usuarioId: this.diaz.id, convocatoriaId: conv2026.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p4.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
-    await this.seedParticipacion({ usuarioId: this.moreno.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.authIngenieria.id });
-    await this.seedParticipacion({ usuarioId: this.evaluadorDerecho.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.authDerecho.id });
-    await this.seedParticipacion({ usuarioId: this.evaluadorIngenieria.id, convocatoriaId: conv2026.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.authIngenieria.id });
+    await this.seedEvaluadorAprobadoCanonico(this.moreno.id, conv2026.id, conv2026.nombre, this.authIngenieria.id);
+    await this.seedEvaluadorAprobadoCanonico(this.evaluadorDerecho.id, conv2026.id, conv2026.nombre, this.authDerecho.id);
+    await this.seedEvaluadorAprobadoCanonico(this.evaluadorIngenieria.id, conv2026.id, conv2026.nombre, this.authIngenieria.id);
 
     await this.seedParticipacion({ usuarioId: this.garcia.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p5.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.perez.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p5.id, esDirectorPrincipal: false, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.torres.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p6.id, esDirectorPrincipal: true, asignadoPorId: this.authMedicina.id });
-    await this.seedParticipacion({ usuarioId: this.romero.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.authMedicina.id });
-    await this.seedParticipacion({ usuarioId: this.evaluadorDerecho.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.authDerecho.id });
-    await this.seedParticipacion({ usuarioId: this.evaluadorEconomicas.id, convocatoriaId: conv2025.id, rol: RolEjecucion.Evaluador, estado: EstadoPropuestaEvaluador.Aprobado, asignadoPorId: this.admin.id });
+    await this.seedEvaluadorAprobadoCanonico(this.romero.id, conv2025.id, conv2025.nombre, this.authMedicina.id);
+    await this.seedEvaluadorAprobadoCanonico(this.evaluadorDerecho.id, conv2025.id, conv2025.nombre, this.authDerecho.id);
+    await this.seedEvaluadorAprobadoCanonico(this.evaluadorEconomicas.id, conv2025.id, conv2025.nombre, this.admin.id);
 
     await this.seedParticipacion({ usuarioId: this.garcia.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p7.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.fernandez.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p8.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
@@ -1563,7 +1596,13 @@ export class SeedService {
       });
       const existentes = await this.participacionRepo.find({
         where: { convocatoriaId: conv.id },
-        select: { usuarioId: true },
+        relations: { usuario: true },
+        select: {
+          usuarioId: true,
+          estado: true,
+          rol: true,
+          usuario: { id: true, unidadAcademicaId: true },
+        },
       });
       const existSet = new Set(existentes.map((p) => p.usuarioId));
       const rows: ParticipacionConvocatoria[] = [];
@@ -1589,13 +1628,22 @@ export class SeedService {
           existSet.add(director.id);
         }
 
-        const integrante = pool.docentes[this.rng.entero(0, pool.docentes.length - 1)];
-        if (!existSet.has(integrante.id)) {
+        const docentesValidados = (pool?.docentes ?? []).filter(
+          (d) =>
+            d.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
+            !existSet.has(d.id),
+        );
+        const integrante =
+          docentesValidados.length > 0
+            ? docentesValidados[this.rng.entero(0, docentesValidados.length - 1)]
+            : undefined;
+        if (integrante && !existSet.has(integrante.id)) {
           rows.push(
             this.participacionRepo.create({
               usuarioId: integrante.id,
               convocatoriaId: conv.id,
               rol: RolEjecucion.DirectorDeProyecto,
+              edicionId: ed.id,
               esDirectorPrincipal: false,
               asignadoPorId: secretaria.id,
               estado: null,
@@ -1605,12 +1653,44 @@ export class SeedService {
         }
       }
 
+      const evaluadorRows: ParticipacionConvocatoria[] = [];
+      const notifMeta: Array<{
+        usuarioId: string;
+        tipo: TipoNotificacion;
+        mensaje: string;
+        leida: boolean;
+      }> = [];
+      const aprobadosUa = new Map<string, Set<string>>();
+
       for (const ua of this.uas) {
         const pool = this.usuariosPorUa.get(ua.id);
         if (!pool) continue;
-        for (const evaluador of pool.evaluadores) {
-          if (existSet.has(evaluador.id)) continue;
-          rows.push(
+
+        const aprobadosEnUa = existentes.filter(
+          (p) =>
+            p.rol === RolEjecucion.Evaluador &&
+            p.estado === EstadoPropuestaEvaluador.Aprobado &&
+            p.usuario?.unidadAcademicaId === ua.id,
+        );
+        aprobadosUa.set(ua.id, new Set(aprobadosEnUa.map((p) => p.usuarioId)));
+
+        const disponibles = pool.evaluadores.filter((e) => !existSet.has(e.id));
+        const tomar = (n: number): Usuario[] => {
+          const elegidos: Usuario[] = [];
+          for (let i = 0; i < n && disponibles.length > 0; i++) {
+            elegidos.push(disponibles.splice(this.rng.entero(0, disponibles.length - 1), 1)[0]);
+          }
+          return elegidos;
+        };
+
+        const cupoRestante = Math.max(0, 3 - aprobadosEnUa.length);
+        const aAprobar = tomar(cupoRestante);
+        const propuesto = tomar(1)[0];
+        const aceptada = tomar(1)[0];
+        const declinada = tomar(1)[0];
+
+        for (const evaluador of aAprobar) {
+          evaluadorRows.push(
             this.participacionRepo.create({
               usuarioId: evaluador.id,
               convocatoriaId: conv.id,
@@ -1619,7 +1699,65 @@ export class SeedService {
               asignadoPorId: pool.secretaria.id,
             }),
           );
-          existSet.add(evaluador.id);
+          notifMeta.push({
+            usuarioId: evaluador.id,
+            tipo: TipoNotificacion.RESULTADO_EVALUADOR,
+            mensaje: `Tu propuesta como evaluador en la convocatoria "${conv.nombre}" fue aprobada`,
+            leida: false,
+          });
+          aprobadosUa.get(ua.id)?.add(evaluador.id);
+        }
+
+        if (propuesto) {
+          evaluadorRows.push(
+            this.participacionRepo.create({
+              usuarioId: propuesto.id,
+              convocatoriaId: conv.id,
+              rol: RolEjecucion.Evaluador,
+              estado: EstadoPropuestaEvaluador.Propuesto,
+              asignadoPorId: pool.secretaria.id,
+            }),
+          );
+          notifMeta.push({
+            usuarioId: propuesto.id,
+            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
+            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
+            leida: false,
+          });
+        }
+        if (aceptada) {
+          evaluadorRows.push(
+            this.participacionRepo.create({
+              usuarioId: aceptada.id,
+              convocatoriaId: conv.id,
+              rol: RolEjecucion.Evaluador,
+              estado: EstadoPropuestaEvaluador.Aceptada,
+              asignadoPorId: pool.secretaria.id,
+            }),
+          );
+          notifMeta.push({
+            usuarioId: aceptada.id,
+            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
+            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
+            leida: true,
+          });
+        }
+        if (declinada) {
+          evaluadorRows.push(
+            this.participacionRepo.create({
+              usuarioId: declinada.id,
+              convocatoriaId: conv.id,
+              rol: RolEjecucion.Evaluador,
+              estado: EstadoPropuestaEvaluador.Declinada,
+              asignadoPorId: pool.secretaria.id,
+            }),
+          );
+          notifMeta.push({
+            usuarioId: declinada.id,
+            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
+            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
+            leida: true,
+          });
         }
       }
 
@@ -1628,6 +1766,27 @@ export class SeedService {
         await this.participacionRepo.save(chunk);
         this.progreso.sumar(chunk.length);
       }
+
+      for (let i = 0; i < evaluadorRows.length; i += TAMANIO_LOTE) {
+        const chunk = evaluadorRows.slice(i, i + TAMANIO_LOTE);
+        const guardados = await this.participacionRepo.save(chunk);
+        for (let j = 0; j < guardados.length; j++) {
+          const meta = notifMeta[i + j];
+          if (!meta) continue;
+          await this.notificacionRepo.save(
+            this.notificacionRepo.create({
+              usuarioId: meta.usuarioId,
+              tipo: meta.tipo,
+              participacionId: guardados[j].id,
+              mensaje: meta.mensaje,
+              leida: meta.leida,
+            }),
+          );
+        }
+        this.progreso.sumar(chunk.length);
+      }
+
+      this.aprobadosPorConvUa.set(conv.id, aprobadosUa);
     }
   }
 
@@ -1783,6 +1942,14 @@ export class SeedService {
       const instSet = new Set(instExistentes.map((e) => e.edicionId));
       const cruzadaSet = new Set(cruzadaExistentes.map((e) => `${e.edicionId}::${e.tipo}`));
 
+      const aprobadosPorUa = this.aprobadosPorConvUa.get(conv.id) ?? new Map();
+      const aprobadosDe = (uaId: string): Usuario[] => {
+        const ids = aprobadosPorUa.get(uaId);
+        if (!ids || ids.size === 0) return [];
+        const pool = this.usuariosPorUa.get(uaId);
+        return (pool?.evaluadores ?? []).filter((e) => ids.has(e.id));
+      };
+
       const instRows: EvaluacionInstitucional[] = [];
       const cruzadaRows: EvaluacionCruzada[] = [];
 
@@ -1829,7 +1996,10 @@ export class SeedService {
 
         if (!conCruzadas || !estructuraCruzada || !convConTemplates?.templateEvaluacionCruzadaId) continue;
 
-        const evaluadorPropia = pool.evaluadores[this.rng.entero(0, pool.evaluadores.length - 1)];
+        const candidatosPropia = aprobadosDe(ed.unidadAcademicaId);
+        const evaluadorPropia = candidatosPropia.length > 0
+          ? candidatosPropia[this.rng.entero(0, candidatosPropia.length - 1)]
+          : undefined;
         if (evaluadorPropia && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`)) {
           const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
           cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Propia}`);
@@ -1848,25 +2018,25 @@ export class SeedService {
         }
 
         const uaPar = this.parMap.get(ed.unidadAcademicaId);
-        const poolPar = uaPar ? this.usuariosPorUa.get(uaPar) : undefined;
-        if (poolPar && poolPar.evaluadores.length > 0) {
-          const evaluadorAjena = poolPar.evaluadores[this.rng.entero(0, poolPar.evaluadores.length - 1)];
-          if (!cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`)) {
-            const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
-            cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`);
-            cruzadaRows.push(
-              this.cruzadaEvalRepo.create({
-                convocatoriaId: conv.id,
-                edicionId: ed.id,
-                evaluadorId: evaluadorAjena.id,
-                tipo: TipoEvaluacionCruzada.Ajena,
-                templateId: convConTemplates.templateEvaluacionCruzadaId,
-                estado: EstadoEvaluacion.Confirmada,
-                items: generada.items,
-                observaciones: generada.observaciones,
-              }),
-            );
-          }
+        const candidatosAjena = uaPar ? aprobadosDe(uaPar) : [];
+        const evaluadorAjena = candidatosAjena.length > 0
+          ? candidatosAjena[this.rng.entero(0, candidatosAjena.length - 1)]
+          : undefined;
+        if (evaluadorAjena && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`)) {
+          const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
+          cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`);
+          cruzadaRows.push(
+            this.cruzadaEvalRepo.create({
+              convocatoriaId: conv.id,
+              edicionId: ed.id,
+              evaluadorId: evaluadorAjena.id,
+              tipo: TipoEvaluacionCruzada.Ajena,
+              templateId: convConTemplates.templateEvaluacionCruzadaId,
+              estado: EstadoEvaluacion.Confirmada,
+              items: generada.items,
+              observaciones: generada.observaciones,
+            }),
+          );
         }
       }
 
