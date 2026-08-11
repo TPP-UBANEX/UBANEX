@@ -23,6 +23,7 @@ interface Props {
 }
 
 const TIPOS_CON_OPCIONES = [TipoCampo.Select, TipoCampo.Checkbox]
+const TIPOS_CON_RANGO = [TipoCampo.Numero]
 
 function campoVacio(): CampoFormulario {
   return {
@@ -58,6 +59,11 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
       const actualizado = { ...c, ...cambios }
       if (cambios.tipo && !TIPOS_CON_OPCIONES.includes(cambios.tipo)) {
         actualizado.opciones = undefined
+      }
+      if (cambios.tipo && !TIPOS_CON_RANGO.includes(cambios.tipo)) {
+        actualizado.minimo = undefined
+        actualizado.maximo = undefined
+        actualizado.admiteDecimales = undefined
       }
       return actualizado
     }))
@@ -119,6 +125,22 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
         const opciones = (campo.opciones ?? []).map(o => o.trim()).filter(Boolean)
         if (opciones.length === 0) {
           toast.error(`El campo "${campo.nombre}" debe tener al menos una opción`)
+          return false
+        }
+      }
+      if (campo.tipo === TipoCampo.Numero) {
+        if (!campo.admiteDecimales) {
+          if (campo.minimo !== undefined && !Number.isInteger(campo.minimo)) {
+            toast.error(`El campo "${campo.nombre}" debe tener un mínimo entero`)
+            return false
+          }
+          if (campo.maximo !== undefined && !Number.isInteger(campo.maximo)) {
+            toast.error(`El campo "${campo.nombre}" debe tener un máximo entero`)
+            return false
+          }
+        }
+        if (campo.minimo !== undefined && campo.maximo !== undefined && campo.minimo > campo.maximo) {
+          toast.error(`El campo "${campo.nombre}" tiene un mínimo mayor que el máximo`)
           return false
         }
       }
@@ -290,6 +312,55 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
                         <Plus className="h-3 w-3 mr-1" />Agregar opción
                       </Button>
                     )}
+                  </div>
+                )}
+
+                {TIPOS_CON_RANGO.includes(campo.tipo) && (
+                  <div className="space-y-2 pl-2 border-l-2">
+                    <span className="text-xs text-muted-foreground">Rango (opcional)</span>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs text-muted-foreground">Mínimo</span>
+                        <Input
+                          type="number"
+                          value={campo.minimo ?? ''}
+                          disabled={!editable}
+                          onChange={e => actualizarCampo(campo.id, { minimo: e.target.value === '' ? undefined : Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-xs text-muted-foreground">Máximo</span>
+                        <Input
+                          type="number"
+                          value={campo.maximo ?? ''}
+                          disabled={!editable}
+                          onChange={e => actualizarCampo(campo.id, { maximo: e.target.value === '' ? undefined : Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-xs text-muted-foreground">¿Admite decimales?</span>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={campo.admiteDecimales ? 'default' : 'outline'}
+                            size="sm"
+                            disabled={!editable}
+                            onClick={() => actualizarCampo(campo.id, { admiteDecimales: true })}
+                          >
+                            Sí
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={!campo.admiteDecimales ? 'default' : 'outline'}
+                            size="sm"
+                            disabled={!editable}
+                            onClick={() => actualizarCampo(campo.id, { admiteDecimales: false })}
+                          >
+                            No
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

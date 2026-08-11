@@ -40,8 +40,12 @@ interface SugerirCambioModalProps {
   /** Para campos de texto largo: muestra los valores en textarea en vez de input de una línea. */
   multilinea?: boolean
   maxLongitud?: number
-  /** Tipo del input de "Valor sugerido"; 'date' muestra el date picker nativo. */
-  tipoInput?: 'text' | 'date'
+  /** Tipo del input de "Valor sugerido"; 'date' muestra el date picker nativo, 'number' el input numérico. */
+  tipoInput?: 'text' | 'date' | 'number'
+  /** Límites del input numérico (solo aplican cuando tipoInput es 'number'). */
+  min?: number
+  max?: number
+  step?: number | 'any'
   /** Para campos de geolocalización: reemplaza "Valor sugerido" por el buscador de localidades. */
   geo?: boolean
   onSuccess?: () => void
@@ -59,6 +63,9 @@ export function SugerirCambioModal({
   multilinea = false,
   maxLongitud,
   tipoInput = 'text',
+  min,
+  max,
+  step,
   geo = false,
   onSuccess,
 }: SugerirCambioModalProps) {
@@ -153,6 +160,9 @@ export function SugerirCambioModal({
                 type={tipoInput}
                 value={valorSugerido}
                 maxLength={maxLongitud}
+                min={tipoInput === 'number' ? min : undefined}
+                max={tipoInput === 'number' ? max : undefined}
+                step={tipoInput === 'number' ? step : undefined}
                 onChange={e => setValorSugerido(e.target.value)}
                 placeholder="Nuevo valor propuesto"
               />

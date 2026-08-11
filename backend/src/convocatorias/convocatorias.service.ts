@@ -12,6 +12,7 @@ import { Formulario } from '../formularios/formulario.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
+import { TipoCampo } from '../common/enums/tipo-campo.enum';
 import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
 import { validarCamposFormulario } from '../common/dto/validador-campos-formulario';
 
@@ -150,6 +151,9 @@ export class ConvocatoriasService {
       esObligatorio: campo.esObligatorio,
       orden: index,
       opciones: campo.opciones?.map((o) => o.trim()).filter(Boolean),
+      ...(campo.tipo === TipoCampo.Numero
+        ? { minimo: campo.minimo, maximo: campo.maximo, admiteDecimales: campo.admiteDecimales }
+        : {}),
     }));
 
     let formulario = convocatoria.formulario;

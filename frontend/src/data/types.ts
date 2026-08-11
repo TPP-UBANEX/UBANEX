@@ -357,6 +357,7 @@ export interface Rendicion {
 export enum TipoCampo {
   Texto = 'texto',
   TextoLargo = 'texto_largo',
+  Numero = 'numero',
   Fecha = 'fecha',
   Geolocalizacion = 'geolocalizacion',
   Booleano = 'booleano',
@@ -395,6 +396,9 @@ export interface CampoFormulario {
   esObligatorio: boolean
   orden: number
   opciones?: string[]
+  minimo?: number
+  maximo?: number
+  admiteDecimales?: boolean
 }
 
 export interface Formulario {
@@ -408,6 +412,7 @@ export interface Formulario {
 export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Texto]: 'Texto',
   [TipoCampo.TextoLargo]: 'Texto largo',
+  [TipoCampo.Numero]: 'Número',
   [TipoCampo.Fecha]: 'Fecha',
   [TipoCampo.Geolocalizacion]: 'Ubicación (localidad)',
   [TipoCampo.Booleano]: 'Sí / No',

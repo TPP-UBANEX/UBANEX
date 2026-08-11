@@ -90,6 +90,28 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
         </>
       )}
 
+      {campo.tipo === TipoCampo.Numero && (
+        <>
+          <Input
+            type="number"
+            value={typeof valor === 'string' ? valor : ''}
+            min={campo.minimo}
+            max={campo.maximo}
+            step={campo.admiteDecimales ? 'any' : '1'}
+            onChange={e => onChange(e.target.value)}
+          />
+          {(campo.minimo !== undefined || campo.maximo !== undefined) && (
+            <p className="text-xs text-muted-foreground">
+              {campo.minimo !== undefined && campo.maximo !== undefined
+                ? `Entre ${campo.minimo} y ${campo.maximo}`
+                : campo.minimo !== undefined
+                  ? `Mayor o igual a ${campo.minimo}`
+                  : `Menor o igual a ${campo.maximo}`}
+            </p>
+          )}
+        </>
+      )}
+
       {campo.tipo === TipoCampo.Fecha && (
         <Input
           type="date"

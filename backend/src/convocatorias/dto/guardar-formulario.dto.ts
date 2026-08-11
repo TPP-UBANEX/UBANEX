@@ -1,12 +1,13 @@
 import { Type } from 'class-transformer';
 import {
-  IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsNotEmpty, ValidateNested,
+  IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsNotEmpty, ValidateNested,
 } from 'class-validator';
 import { TipoCampo } from '../../common/enums/tipo-campo.enum';
 
 const TIPOS_CAMPO_HABILITADOS = [
   TipoCampo.Texto,
   TipoCampo.TextoLargo,
+  TipoCampo.Numero,
   TipoCampo.Fecha,
   TipoCampo.Geolocalizacion,
   TipoCampo.Booleano,
@@ -41,6 +42,18 @@ export class CampoFormularioDto {
   @IsArray()
   @IsString({ each: true })
   opciones?: string[];
+
+  @IsOptional()
+  @IsNumber()
+  minimo?: number;
+
+  @IsOptional()
+  @IsNumber()
+  maximo?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  admiteDecimales?: boolean;
 }
 
 export class GuardarFormularioDto {

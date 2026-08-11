@@ -8,4 +8,7 @@ export interface CampoFormulario {
   esObligatorio: boolean;
   orden: number;
   opciones?: string[];
+  minimo?: number;
+  maximo?: number;
+  admiteDecimales?: boolean;
 }

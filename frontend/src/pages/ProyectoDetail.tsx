@@ -110,10 +110,11 @@ export function ProyectoDetail() {
     open: false, campo: '', valorActual: '', label: '', valorSugeridoInicial: '', comentarioInicial: '',
   })
 
-  // Tipo del campo del formulario sobre el que se está sugiriendo (null si es un campo fijo del proyecto).
-  const tipoCampoSugerido = sugerenciaModal.campo.startsWith('datosFormulario.')
-    ? camposFormulario.find(c => c.id === sugerenciaModal.campo.replace('datosFormulario.', ''))?.tipo ?? null
+  // Campo del formulario sobre el que se está sugiriendo (null si es un campo fijo del proyecto).
+  const campoSugerido = sugerenciaModal.campo.startsWith('datosFormulario.')
+    ? camposFormulario.find(c => c.id === sugerenciaModal.campo.replace('datosFormulario.', '')) ?? null
     : null
+  const tipoCampoSugerido = campoSugerido?.tipo ?? null
 
   const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
@@ -958,7 +959,10 @@ export function ProyectoDetail() {
         comentarioInicial={sugerenciaModal.comentarioInicial}
         multilinea={tipoCampoSugerido === TipoCampo.TextoLargo}
         maxLongitud={tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined}
-        tipoInput={tipoCampoSugerido === TipoCampo.Fecha ? 'date' : 'text'}
+        tipoInput={tipoCampoSugerido === TipoCampo.Fecha ? 'date' : tipoCampoSugerido === TipoCampo.Numero ? 'number' : 'text'}
+        min={campoSugerido?.minimo}
+        max={campoSugerido?.maximo}
+        step={campoSugerido?.admiteDecimales ? 'any' : 1}
         geo={tipoCampoSugerido === TipoCampo.Geolocalizacion}
       />
 

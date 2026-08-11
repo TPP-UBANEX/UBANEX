@@ -46,6 +46,36 @@ function validarValorGeolocalizacion(campo: CampoFormulario, valor: unknown): vo
   }
 }
 
+function validarValorNumerico(campo: CampoFormulario, valor: string): void {
+  const num = Number(valor);
+  if (!Number.isFinite(num)) {
+    throw new BadRequestException(`El campo "${campo.nombre}" debe ser un número válido`);
+  }
+  if (!campo.admiteDecimales && !Number.isInteger(num)) {
+    throw new BadRequestException(`El campo "${campo.nombre}" debe ser un número entero`);
+  }
+  if (campo.minimo !== undefined && num < campo.minimo) {
+    if (campo.maximo !== undefined) {
+      throw new BadRequestException(
+        `El campo "${campo.nombre}" debe estar entre ${campo.minimo} y ${campo.maximo}`,
+      );
+    }
+    throw new BadRequestException(
+      `El campo "${campo.nombre}" debe ser mayor o igual a ${campo.minimo}`,
+    );
+  }
+  if (campo.maximo !== undefined && num > campo.maximo) {
+    if (campo.minimo !== undefined) {
+      throw new BadRequestException(
+        `El campo "${campo.nombre}" debe estar entre ${campo.minimo} y ${campo.maximo}`,
+      );
+    }
+    throw new BadRequestException(
+      `El campo "${campo.nombre}" debe ser menor o igual a ${campo.maximo}`,
+    );
+  }
+}
+
 /** Valida el formato de las respuestas segun el tipo de cada campo. */
 export function validarValoresFormulario(
   campos: CampoFormulario[],
@@ -68,6 +98,11 @@ export function validarValoresFormulario(
           `El campo "${campo.nombre}" debe tener una fecha válida (AAAA-MM-DD)`,
         );
       }
+      continue;
+    }
+
+    if (campo.tipo === TipoCampo.Numero) {
+      if (valor !== '') validarValorNumerico(campo, valor);
       continue;
     }
 

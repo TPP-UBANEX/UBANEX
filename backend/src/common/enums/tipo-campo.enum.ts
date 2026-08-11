@@ -1,6 +1,7 @@
 export enum TipoCampo {
   Texto = 'texto',
   TextoLargo = 'texto_largo',
+  Numero = 'numero',
   Fecha = 'fecha',
   Geolocalizacion = 'geolocalizacion',
   Booleano = 'booleano',
