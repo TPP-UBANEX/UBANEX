@@ -1941,8 +1941,8 @@ export class SeedService {
         evaluacionId: guardada.id,
         entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
         usuario: autoridad,
-        descripcionGuardado: `Guardó la evaluación institucional de la edición ${edicionId.slice(0, 8)}...`,
-        descripcionConfirmacion: `Confirmó la evaluación institucional de la edición ${edicionId.slice(0, 8)}...`,
+        descripcionGuardado: 'Guardó la evaluación institucional',
+        descripcionConfirmacion: 'Confirmó la evaluación institucional',
         confirmada: true,
       }));
     };
@@ -1973,8 +1973,8 @@ export class SeedService {
         evaluacionId: guardada.id,
         entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
         usuario: evaluador,
-        descripcionGuardado: `Guardó la evaluación cruzada (${tipo}) de la edición ${edicionId.slice(0, 8)}...`,
-        descripcionConfirmacion: `Confirmó la evaluación cruzada (${tipo}) de la edición ${edicionId.slice(0, 8)}...`,
+        descripcionGuardado: `Guardó la evaluación cruzada (${tipo})`,
+        descripcionConfirmacion: `Confirmó la evaluación cruzada (${tipo})`,
         confirmada: true,
       }));
     };
@@ -2176,8 +2176,8 @@ export class SeedService {
               evaluacionId: guardados[j].id,
               entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
               usuario: meta.usuario,
-              descripcionGuardado: `Guardó la evaluación institucional de la edición ${meta.edicionId.slice(0, 8)}...`,
-              descripcionConfirmacion: `Confirmó la evaluación institucional de la edición ${meta.edicionId.slice(0, 8)}...`,
+              descripcionGuardado: 'Guardó la evaluación institucional',
+              descripcionConfirmacion: 'Confirmó la evaluación institucional',
               confirmada: meta.confirmada,
             }),
           );
@@ -2196,8 +2196,8 @@ export class SeedService {
               evaluacionId: guardados[j].id,
               entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
               usuario: meta.usuario,
-              descripcionGuardado: `Guardó la evaluación cruzada (${meta.tipo}) de la edición ${meta.edicionId.slice(0, 8)}...`,
-              descripcionConfirmacion: `Confirmó la evaluación cruzada (${meta.tipo}) de la edición ${meta.edicionId.slice(0, 8)}...`,
+              descripcionGuardado: `Guardó la evaluación cruzada (${meta.tipo})`,
+              descripcionConfirmacion: `Confirmó la evaluación cruzada (${meta.tipo})`,
               confirmada: true,
             }),
           );

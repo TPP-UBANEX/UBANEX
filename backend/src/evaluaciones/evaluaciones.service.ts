@@ -414,7 +414,7 @@ export class EvaluacionesService {
     await this.auditoria.registrar({
       usuarioId: usuario.id,
       accion: TipoAccionAuditoria.EVALUACION,
-      descripcion: `Guardó la evaluación institucional de la edición ${edicion.id.slice(0, 8)}...`,
+      descripcion: 'Guardó la evaluación institucional',
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
       entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
@@ -437,7 +437,7 @@ export class EvaluacionesService {
       throw new ForbiddenException('Solo una Autoridad de Secretaría puede confirmar la evaluación institucional');
     }
 
-    const { convocatoria, edicion } = await this.validarEdicionParaInstitucional(convocatoriaId, edicionId, usuario);
+    const { convocatoria } = await this.validarEdicionParaInstitucional(convocatoriaId, edicionId, usuario);
 
     const template = convocatoria.templateEvaluacionInstitucional;
     if (!template) {
@@ -461,7 +461,7 @@ export class EvaluacionesService {
     await this.auditoria.registrar({
       usuarioId: usuario.id,
       accion: TipoAccionAuditoria.EVALUACION,
-      descripcion: `Confirmó la evaluación institucional de la edición ${edicion.id.slice(0, 8)}...`,
+      descripcion: 'Confirmó la evaluación institucional',
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
       entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
@@ -726,7 +726,7 @@ export class EvaluacionesService {
     await this.auditoria.registrar({
       usuarioId: usuario.id,
       accion: TipoAccionAuditoria.EVALUACION,
-      descripcion: `Guardó la evaluación cruzada (${tipo}) de la edición ${edicion.id.slice(0, 8)}...`,
+      descripcion: `Guardó la evaluación cruzada (${tipo})`,
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
       entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
@@ -741,7 +741,7 @@ export class EvaluacionesService {
   }
 
   async confirmarCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {
-    const { convocatoria, edicion } = await this.validarEdicionParaCruzada(
+    const { convocatoria } = await this.validarEdicionParaCruzada(
       convocatoriaId,
       edicionId,
       usuario,
@@ -770,7 +770,7 @@ export class EvaluacionesService {
     await this.auditoria.registrar({
       usuarioId: usuario.id,
       accion: TipoAccionAuditoria.EVALUACION,
-      descripcion: `Confirmó la evaluación cruzada (${evaluacion.tipo}) de la edición ${edicion.id.slice(0, 8)}...`,
+      descripcion: `Confirmó la evaluación cruzada (${evaluacion.tipo})`,
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
       entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
@@ -968,7 +968,7 @@ export class EvaluacionesService {
     await this.auditoria.registrar({
       usuarioId: usuario.id,
       accion: TipoAccionAuditoria.EVALUACION,
-      descripcion: `Designó al evaluador ${evaluadorId.slice(0, 8)}... como tercera Unidad Académica de la edición ${edicion.id.slice(0, 8)}...`,
+      descripcion: 'Designó un evaluador como tercera Unidad Académica',
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
       entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
