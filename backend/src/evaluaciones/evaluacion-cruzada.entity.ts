@@ -36,6 +36,13 @@ export class EvaluacionCruzada {
   @Column()
   evaluadorId: string;
 
+  @ManyToOne(() => Usuario, { nullable: true })
+  @JoinColumn({ name: 'actualizadoPorId' })
+  actualizadoPor: Usuario | null;
+
+  @Column({ nullable: true })
+  actualizadoPorId: string | null;
+
   @Column({ type: 'varchar' })
   tipo: TipoEvaluacionCruzada;
 

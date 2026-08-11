@@ -46,6 +46,13 @@ export class EvaluacionInstitucional {
   realizadoPorId: string | null;
 
   @ManyToOne(() => Usuario, { nullable: true })
+  @JoinColumn({ name: 'actualizadoPorId' })
+  actualizadoPor: Usuario | null;
+
+  @Column({ nullable: true })
+  actualizadoPorId: string | null;
+
+  @ManyToOne(() => Usuario, { nullable: true })
   @JoinColumn({ name: 'confirmadoPorId' })
   confirmadoPor: Usuario | null;
 

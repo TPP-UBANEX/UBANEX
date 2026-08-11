@@ -339,6 +339,12 @@ function InstitucionalView({
                 )}
               </CardHeader>
               <CardContent className="space-y-6">
+                {evaluacion && (
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <p>Iniciada por {evaluacion.realizadoPor?.nombreCompleto ?? '-'}</p>
+                    <p>Última edición por {evaluacion.actualizadoPor?.nombreCompleto ?? '-'}</p>
+                  </div>
+                )}
                 {template?.estructura ? (
                   <>
                     {template.estructura.categorias.map((cat) => (
@@ -689,6 +695,12 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
                 )}
               </CardHeader>
               <CardContent className="space-y-6">
+                {evaluacion && (
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <p>Iniciada por {evaluacion.evaluador?.nombreCompleto ?? '-'}</p>
+                    <p>Última edición por {evaluacion.actualizadoPor?.nombreCompleto ?? '-'}</p>
+                  </div>
+                )}
                 {template?.estructura ? (
                   <>
                     {template.estructura.categorias.map((cat) => {

@@ -338,7 +338,7 @@ export class EvaluacionesService {
 
     const evaluacion = await this.institucionalRepo.findOne({
       where: { edicionId },
-      relations: { realizadoPor: true, confirmadoPor: true },
+      relations: { realizadoPor: true, actualizadoPor: true, confirmadoPor: true },
     });
 
     return {
@@ -381,7 +381,16 @@ export class EvaluacionesService {
     if (dto.categorias !== undefined) evaluacion.categorias = dto.categorias;
     if (dto.checklist !== undefined) evaluacion.checklist = dto.checklist;
     if (dto.observaciones !== undefined) evaluacion.observaciones = dto.observaciones;
+    evaluacion.actualizadoPorId = usuario.id;
     const guardado = await this.institucionalRepo.save(evaluacion);
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EVALUACION,
+      descripcion: `Guardó la evaluación institucional de la edición ${edicion.id.slice(0, 8)}...`,
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+    });
 
     return {
       evaluacion: guardado,
@@ -590,7 +599,7 @@ export class EvaluacionesService {
 
     const evaluacion = await this.cruzadaRepo.findOne({
       where: { edicionId, evaluadorId: usuario.id },
-      relations: { edicion: { proyecto: true } },
+      relations: { edicion: { proyecto: true }, evaluador: true, actualizadoPor: true },
     });
 
     return { evaluacion, template };
@@ -648,12 +657,22 @@ export class EvaluacionesService {
         tipo,
         templateId: template.id,
         estado: EstadoEvaluacion.Borrador,
+        actualizadoPorId: usuario.id,
       });
     }
 
     if (dto.items !== undefined) evaluacion.items = dto.items;
     if (dto.observaciones !== undefined) evaluacion.observaciones = dto.observaciones;
+    evaluacion.actualizadoPorId = usuario.id;
     const guardado = await this.cruzadaRepo.save(evaluacion);
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EVALUACION,
+      descripcion: `Guardó la evaluación cruzada (${tipo}) de la edición ${edicion.id.slice(0, 8)}...`,
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+    });
 
     return {
       evaluacion: guardado,

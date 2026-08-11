@@ -438,8 +438,10 @@ export interface EvaluacionInstitucional {
   checklist: Record<string, boolean> | null
   observaciones: string | null
   realizadoPor?: Usuario
+  actualizadoPor?: Usuario
   confirmadoPor?: Usuario
   realizadoPorId?: string
+  actualizadoPorId?: string
   confirmadoPorId?: string
 }
 
@@ -454,6 +456,8 @@ export interface EvaluacionCruzada {
   estado: EstadoEvaluacion
   items: Record<string, number> | null
   observaciones: string | null
+  actualizadoPor?: Usuario
+  actualizadoPorId?: string
 }
 
 export interface EdicionEvaluableInstitucional {
