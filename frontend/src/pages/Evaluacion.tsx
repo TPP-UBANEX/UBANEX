@@ -39,6 +39,7 @@ import type {
   EvaluacionInstitucional,
   EstructuraTemplateInstitucional,
   EstructuraTemplateCruzada,
+  HistorialEvaluacion,
   MonitoreoEvaluacion,
   TemplateEvaluacionInstitucional,
   TemplateEvaluacionCruzada,
@@ -66,6 +67,36 @@ const esRectorado = (u: Usuario | null) =>
   u?.roles.some(
     (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   ) ?? false
+
+const formatFecha = (fecha: string) =>
+  new Date(fecha).toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+
+function HistorialCard({ historial }: { historial: HistorialEvaluacion[] }) {
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <h3 className="text-sm font-semibold border-b pb-1">Historial de cambios</h3>
+      {historial.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Sin actividad registrada todavía.</p>
+      ) : (
+        <ol className="space-y-2">
+          {historial.map((h, i) => (
+            <li key={i} className="flex items-start justify-between gap-3 text-xs">
+              <div className="flex-1">
+                <p className="font-medium">{h.descripcion}</p>
+                <p className="text-muted-foreground">por {h.usuarioNombre}</p>
+              </div>
+              <span className="text-muted-foreground whitespace-nowrap">{formatFecha(h.fecha)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  )
+}
 
 export function Evaluacion() {
   const { user } = useAuth()
@@ -155,6 +186,7 @@ function InstitucionalView({
   const [edicionSeleccionada, setEdicionSeleccionada] = useState<Edicion | null>(null)
   const [template, setTemplate] = useState<TemplateEvaluacionInstitucional | null>(null)
   const [evaluacion, setEvaluacion] = useState<EvaluacionInstitucional | null>(null)
+  const [historial, setHistorial] = useState<HistorialEvaluacion[]>([])
   const [respuestas, setRespuestas] = useState<RespuestaCategoriasInst>({})
   const [checklist, setChecklist] = useState<Record<string, boolean>>({})
   const [observaciones, setObservaciones] = useState('')
@@ -187,6 +219,7 @@ function InstitucionalView({
     setEdicionId(id)
     setTemplate(null)
     setEvaluacion(null)
+    setHistorial([])
     setEdicionSeleccionada(items.find((i) => i.edicion.id === id)?.edicion ?? null)
     const { evaluacion, template } = await api.evaluaciones.institucionales.obtener(
       convocatoriaId,
@@ -196,6 +229,10 @@ function InstitucionalView({
     setEvaluacion(evaluacion)
     initRespuestas(template?.estructura ?? null, evaluacion)
     setObservaciones(evaluacion?.observaciones ?? '')
+    api.evaluaciones.institucionales
+      .historial(convocatoriaId, id)
+      .then(setHistorial)
+      .catch(() => setHistorial([]))
   }
 
   const initRespuestas = (
@@ -345,6 +382,7 @@ function InstitucionalView({
                     <p>Última edición por {evaluacion.actualizadoPor?.nombreCompleto ?? '-'}</p>
                   </div>
                 )}
+                <HistorialCard historial={historial} />
                 {template?.estructura ? (
                   <>
                     {template.estructura.categorias.map((cat) => (
@@ -514,6 +552,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
   const [tipo, setTipo] = useState<TipoEvaluacionCruzada | null>(null)
   const [template, setTemplate] = useState<TemplateEvaluacionCruzada | null>(null)
   const [evaluacion, setEvaluacion] = useState<EvaluacionCruzada | null>(null)
+  const [historial, setHistorial] = useState<HistorialEvaluacion[]>([])
   const [puntajes, setPuntajes] = useState<Record<string, number | null>>({})
   const [observaciones, setObservaciones] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -545,6 +584,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
     setEdicionId(id)
     setTemplate(null)
     setEvaluacion(null)
+    setHistorial([])
     setEdicionSeleccionada(items.find((i) => i.edicion.id === id)?.edicion ?? null)
     const { evaluacion, template } = await api.evaluaciones.cruzadas.obtener(convocatoriaId, id)
     setTemplate(template)
@@ -552,6 +592,10 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
     setTipo(evaluacion?.tipo ?? null)
     initPuntajes(template?.estructura ?? null, evaluacion)
     setObservaciones(evaluacion?.observaciones ?? '')
+    api.evaluaciones.cruzadas
+      .historial(convocatoriaId, id)
+      .then(setHistorial)
+      .catch(() => setHistorial([]))
   }
 
   const initPuntajes = (
@@ -701,6 +745,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
                     <p>Última edición por {evaluacion.actualizadoPor?.nombreCompleto ?? '-'}</p>
                   </div>
                 )}
+                <HistorialCard historial={historial} />
                 {template?.estructura ? (
                   <>
                     {template.estructura.categorias.map((cat) => {

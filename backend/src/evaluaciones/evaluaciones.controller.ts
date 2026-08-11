@@ -46,6 +46,16 @@ export class EvaluacionesController {
     return this.service.obtenerInstitucional(convocatoriaId, edicionId, usuario);
   }
 
+  @Get('institucionales/:edicionId/historial')
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
+  historialInstitucional(
+    @Param('edicionId') edicionId: string,
+    @Query('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.historialInstitucional(convocatoriaId, edicionId, usuario);
+  }
+
   @Put('institucionales/:edicionId')
   @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
   guardarInstitucional(
@@ -82,6 +92,15 @@ export class EvaluacionesController {
     @CurrentUser() usuario: Usuario,
   ) {
     return this.service.obtenerCruzada(convocatoriaId, edicionId, usuario);
+  }
+
+  @Get('cruzadas/:edicionId/historial')
+  historialCruzada(
+    @Param('edicionId') edicionId: string,
+    @Query('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.historialCruzada(convocatoriaId, edicionId, usuario);
   }
 
   @Put('cruzadas/:edicionId')

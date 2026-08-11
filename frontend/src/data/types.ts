@@ -471,6 +471,14 @@ export interface EdicionEvaluableCruzada {
   evaluacion: EvaluacionCruzada | null
 }
 
+export interface HistorialEvaluacion {
+  fecha: string
+  accion: string
+  descripcion: string
+  usuarioId: string
+  usuarioNombre: string
+}
+
 export interface MonitoreoEvaluacion {
   convocatoria: Convocatoria
   meta: PaginationMeta

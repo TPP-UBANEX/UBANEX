@@ -192,6 +192,8 @@ export const api = {
         request<{ evaluacion: import('@/data/types').EvaluacionInstitucional; template: import('@/data/types').TemplateEvaluacionInstitucional | null }>('PUT', `/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`, data),
       confirmar: (convocatoriaId: string, edicionId: string) =>
         post<import('@/data/types').EvaluacionInstitucional>(`/evaluaciones/institucionales/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
+      historial: (convocatoriaId: string, edicionId: string) =>
+        get<import('@/data/types').HistorialEvaluacion[]>(`/evaluaciones/institucionales/${edicionId}/historial?convocatoriaId=${convocatoriaId}`),
     },
     cruzadas: {
       disponibles: (convocatoriaId: string, params?: { page?: number; limit?: number }) =>
@@ -204,6 +206,8 @@ export const api = {
         post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
       designarTercera: (convocatoriaId: string, edicionId: string, evaluadorId: string) =>
         post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/designar-tercera?convocatoriaId=${convocatoriaId}`, { evaluadorId }),
+      historial: (convocatoriaId: string, edicionId: string) =>
+        get<import('@/data/types').HistorialEvaluacion[]>(`/evaluaciones/cruzadas/${edicionId}/historial?convocatoriaId=${convocatoriaId}`),
     },
   },
   templatesEvaluacion: {

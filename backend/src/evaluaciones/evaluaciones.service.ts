@@ -21,6 +21,7 @@ import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
+import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import { validarRespuestasInstitucionales, validarRespuestasCruzadas } from './validar-respuestas-evaluacion';
 import { ListarEvaluacionesDto } from './dto/listar-evaluaciones.dto';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
@@ -347,6 +348,32 @@ export class EvaluacionesService {
     };
   }
 
+  async historialInstitucional(
+    convocatoriaId: string,
+    edicionId: string,
+    usuario: Usuario,
+  ) {
+    await this.validarEdicionParaInstitucional(convocatoriaId, edicionId, usuario);
+
+    const evaluacion = await this.institucionalRepo.findOne({
+      where: { edicionId },
+      select: { id: true },
+    });
+    if (!evaluacion) return [];
+
+    const registros = await this.auditoria.listarPorEntidad(
+      TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
+      evaluacion.id,
+    );
+    return registros.map((r) => ({
+      fecha: r.fecha,
+      accion: r.accion,
+      descripcion: r.descripcion,
+      usuarioId: r.usuarioId,
+      usuarioNombre: r.usuario?.nombreCompleto ?? r.responsableNombre,
+    }));
+  }
+
   async guardarInstitucional(
     convocatoriaId: string,
     edicionId: string,
@@ -390,6 +417,8 @@ export class EvaluacionesService {
       descripcion: `Guardó la evaluación institucional de la edición ${edicion.id.slice(0, 8)}...`,
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
+      entidadId: guardado.id,
     });
 
     return {
@@ -435,6 +464,8 @@ export class EvaluacionesService {
       descripcion: `Confirmó la evaluación institucional de la edición ${edicion.id.slice(0, 8)}...`,
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
+      entidadId: guardado.id,
     });
 
     return guardado;
@@ -605,6 +636,32 @@ export class EvaluacionesService {
     return { evaluacion, template };
   }
 
+  async historialCruzada(
+    convocatoriaId: string,
+    edicionId: string,
+    usuario: Usuario,
+  ) {
+    await this.validarEdicionParaCruzada(convocatoriaId, edicionId, usuario);
+
+    const evaluacion = await this.cruzadaRepo.findOne({
+      where: { edicionId, evaluadorId: usuario.id },
+      select: { id: true },
+    });
+    if (!evaluacion) return [];
+
+    const registros = await this.auditoria.listarPorEntidad(
+      TipoEntidadAuditoria.EVALUACION_CRUZADA,
+      evaluacion.id,
+    );
+    return registros.map((r) => ({
+      fecha: r.fecha,
+      accion: r.accion,
+      descripcion: r.descripcion,
+      usuarioId: r.usuarioId,
+      usuarioNombre: r.usuario?.nombreCompleto ?? r.responsableNombre,
+    }));
+  }
+
   async guardarCruzada(
     convocatoriaId: string,
     edicionId: string,
@@ -672,6 +729,8 @@ export class EvaluacionesService {
       descripcion: `Guardó la evaluación cruzada (${tipo}) de la edición ${edicion.id.slice(0, 8)}...`,
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
+      entidadId: guardado.id,
     });
 
     return {
@@ -714,6 +773,8 @@ export class EvaluacionesService {
       descripcion: `Confirmó la evaluación cruzada (${evaluacion.tipo}) de la edición ${edicion.id.slice(0, 8)}...`,
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
+      entidadId: guardado.id,
     });
 
     return guardado;
@@ -910,6 +971,8 @@ export class EvaluacionesService {
       descripcion: `Designó al evaluador ${evaluadorId.slice(0, 8)}... como tercera Unidad Académica de la edición ${edicion.id.slice(0, 8)}...`,
       responsableId: usuario.id,
       responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
+      entidadId: evaluacion.id,
     });
 
     return evaluacion;
