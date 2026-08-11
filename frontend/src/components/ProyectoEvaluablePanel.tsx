@@ -38,7 +38,11 @@ export function ProyectoEvaluablePanel({
             </div>
             <div>
               <span className="text-muted-foreground">Unidad Académica:</span>{' '}
-              {edicion.unidadAcademica?.nombre || '-'}
+              {edicion.proyecto?.esInterfacultad &&
+              edicion.proyecto.unidadAcademicaAdicionalId !== edicion.unidadAcademicaId &&
+              edicion.proyecto.unidadAcademicaAdicional
+                ? `${edicion.unidadAcademica?.nombre} y ${edicion.proyecto.unidadAcademicaAdicional.nombre}`
+                : edicion.unidadAcademica?.nombre || '-'}
             </div>
             <div>
               <span className="text-muted-foreground">Creado por:</span>{' '}

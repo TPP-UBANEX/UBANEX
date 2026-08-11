@@ -309,7 +309,7 @@ export class EvaluacionesService {
         unidadAcademicaId: usuario.unidadAcademicaId,
         estado: EstadoEdicion.EnEvaluacion,
       },
-      relations: { proyecto: true, unidadAcademica: true, creadoPor: true },
+      relations: { proyecto: { unidadAcademicaAdicional: true }, unidadAcademica: true, creadoPor: true },
       order: { actualizadoEn: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -572,7 +572,7 @@ export class EvaluacionesService {
 
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion },
-      relations: { proyecto: true, unidadAcademica: true, creadoPor: true },
+      relations: { proyecto: { unidadAcademicaAdicional: true }, unidadAcademica: true, creadoPor: true },
       order: { actualizadoEn: 'DESC' },
     });
 
