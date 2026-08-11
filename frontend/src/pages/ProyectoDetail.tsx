@@ -1198,7 +1198,7 @@ function renderPresupuesto(
   return (
     <div className="space-y-4">
       {rubros.map((rubro, rubroIdx) => (
-        <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3">
+        <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3 bg-muted/30">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
             <div className="flex items-center gap-2">

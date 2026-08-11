@@ -191,7 +191,7 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
         ) : (
           <div className="space-y-3">
             {campos.map((campo, index) => (
-              <div key={campo.id} className="border rounded-lg p-4 space-y-3">
+              <div key={campo.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
                 <div className="flex items-start gap-2">
                   <div className="flex-[2] space-y-1">
                     <span className="text-xs text-muted-foreground">Etiqueta</span>
