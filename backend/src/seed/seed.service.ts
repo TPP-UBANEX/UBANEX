@@ -109,6 +109,10 @@ class Progreso {
 
 const TAMANIO_LOTE = 300;
 
+// Piso de Rng.proyectosPorUa(): a partir de esta cantidad de ediciones se
+// considera que una unidad académica ya fue sembrada para esa convocatoria.
+const PROYECTOS_MASIVOS_MINIMO = 20;
+
 @Injectable()
 export class SeedService {
   private readonly usuarioRepo: Repository<Usuario>;
@@ -1003,7 +1007,11 @@ export class SeedService {
         creados.push(existe);
       }
     }
-    this.formularioDefault = creados.find((f) => f.esDefault)!;
+    // Se busca por nombre y no por esDefault: la app mueve ese flag a otro
+    // formulario cuando se marca uno nuevo como default desde la UI, y el seed
+    // igual necesita su formulario estándar para las copias por convocatoria.
+    const nombreEstandar = FORMULARIOS_SEED.find((f) => f.esDefault)!.nombre;
+    this.formularioDefault = creados.find((f) => f.nombre === nombreEstandar)!;
     if (this.formularioDefault.campos && this.formularioDefault.campos.length > 0) {
       this.camposFormularioEstandar = this.formularioDefault.campos;
     }
@@ -1455,11 +1463,21 @@ export class SeedService {
         relations: { proyecto: true },
       });
       const nombresExistentes = new Set(edicionesExistentes.map((e) => e.proyecto.nombre));
+      const edicionesPorUa = new Map<string, number>();
+      for (const e of edicionesExistentes) {
+        edicionesPorUa.set(e.unidadAcademicaId, (edicionesPorUa.get(e.unidadAcademicaId) ?? 0) + 1);
+      }
 
       for (const ua of this.uas) {
         const pool = this.usuariosPorUa.get(ua.id);
         if (!pool) continue;
         const cantidad = this.rng.proyectosPorUa();
+
+        // Si la UA ya tiene al menos PROYECTOS_MASIVOS_MINIMO ediciones en esta
+        // convocatoria, el año ya fue sembrado y se saltea: el cupo se sortea en
+        // cada arranque, así que sin este corte cada seed agregaría otra tanda.
+        // Los proyectos canónicos son un puñado y nunca llegan a ese piso.
+        if ((edicionesPorUa.get(ua.id) ?? 0) >= PROYECTOS_MASIVOS_MINIMO) continue;
 
         const specs: EdicionMasiva[] = [];
         const proyectoEnts: Proyecto[] = [];
@@ -1747,9 +1765,22 @@ export class SeedService {
 
         const cupoRestante = Math.max(0, 3 - aprobadosEnUa.length);
         const aAprobar = tomar(cupoRestante);
-        const propuesto = tomar(1)[0];
-        const aceptada = tomar(1)[0];
-        const declinada = tomar(1)[0];
+        // Igual que el cupo de aprobados: se crea uno por estado sólo si la UA
+        // todavía no tiene ninguno, para no sumar una tanda en cada arranque.
+        const yaTieneEstado = (estado: EstadoPropuestaEvaluador): boolean =>
+          existentes.some(
+            (p) =>
+              p.rol === RolEjecucion.Evaluador &&
+              p.estado === estado &&
+              p.usuario?.unidadAcademicaId === ua.id,
+          );
+        const propuesto = yaTieneEstado(EstadoPropuestaEvaluador.Propuesto)
+          ? undefined
+          : tomar(1)[0];
+        const aceptada = yaTieneEstado(EstadoPropuestaEvaluador.Aceptada) ? undefined : tomar(1)[0];
+        const declinada = yaTieneEstado(EstadoPropuestaEvaluador.Declinada)
+          ? undefined
+          : tomar(1)[0];
 
         for (const evaluador of aAprobar) {
           evaluadorRows.push(
@@ -2066,6 +2097,11 @@ export class SeedService {
       for (const ed of ediciones) {
         const pool = this.usuariosPorUa.get(ed.unidadAcademicaId);
         if (!pool) continue;
+
+        // La edición ya fue sembrada en una corrida anterior: se deja como está.
+        // conCruzadas se sortea, así que volver a evaluarla sumaría cruzadas
+        // nuevas en cada arranque sobre ediciones que ya tenían su evaluación.
+        if (instSet.has(ed.id)) continue;
 
         let instEstado: EstadoEvaluacion;
         let conCruzadas: boolean;

@@ -75,6 +75,12 @@ UBANEX/
 ## Comandos
 
 ```bash
+# Docker (flujo de desarrollo habitual, desde la raíz)
+make dev          # Levanta db + backend + frontend con logs
+make seed         # Igual que dev, forzando el seed
+make reset-seed   # Borra volúmenes y levanta desde cero con el seed completo
+make help         # Lista todos los targets
+
 # Backend
 cd backend && npm run start:dev   # Desarrollo (hot reload)
 cd backend && npm run build        # Build
@@ -87,6 +93,10 @@ cd frontend && npm run build       # Build
 cd frontend && npm run lint        # ESLint
 cd frontend && npm run format      # Prettier
 ```
+
+El seed (`backend/src/seed/`) corre al iniciar el backend sólo si `UBANEX_SEED=true`.
+En Docker `docker-compose.yml` lo activa por defecto; para saltearlo, `UBANEX_SEED=false make dev`
+o fijar la variable en un `.env` en la raíz del repo. Es idempotente: no duplica datos.
 
 ## Lo que NO hacer
 - No modificar `docs/project_context.md` (documentación de requerimientos).
