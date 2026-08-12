@@ -162,8 +162,11 @@ export const api = {
   formularios: {
     list: () => get<import('@/data/types').Formulario[]>('/formularios'),
     get: (id: string) => get<import('@/data/types').Formulario>(`/formularios/${id}`),
-    crear: (data: { nombre: string; esDefault?: boolean }) =>
+    crear: (data: { nombre: string; esDefault?: boolean; campos?: import('@/data/types').CampoFormulario[] }) =>
       post<import('@/data/types').Formulario>('/formularios', data),
+    actualizar: (id: string, data: { nombre?: string; esDefault?: boolean; campos?: import('@/data/types').CampoFormulario[] }) =>
+      patch<import('@/data/types').Formulario>(`/formularios/${id}`, data),
+    eliminar: (id: string) => del(`/formularios/${id}`),
   },
   sugerencias: {
     listar: (edicionId: string) =>

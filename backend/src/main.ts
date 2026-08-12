@@ -780,16 +780,9 @@ async function bootstrap() {
     },
   ];
 
+  // Las plantillas se administran desde Rectorado (/plantillas-formulario); acá solo va la base.
   const seedFormularios = [
     { nombre: 'Formulario estándar UBANEX', esDefault: true, campos: camposFormularioEstandar },
-    { nombre: 'Formulario proyectos de investigación', esDefault: false },
-    { nombre: 'Formulario proyectos de extensión', esDefault: false },
-    { nombre: 'Formulario desarrollo tecnológico', esDefault: false },
-    { nombre: 'Formulario voluntariado universitario', esDefault: false },
-    { nombre: 'Formulario prácticas socioeducativas', esDefault: false },
-    { nombre: 'Formulario cooperación internacional', esDefault: false },
-    { nombre: 'Formulario emprendimientos universitarios', esDefault: false },
-    { nombre: 'Formulario arte y cultura', esDefault: false },
   ];
   const formulariosCreados: Formulario[] = [];
   for (const f of seedFormularios) {

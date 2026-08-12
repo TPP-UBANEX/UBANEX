@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ClipboardList,
   UserCheck,
+  LayoutTemplate,
   // CalendarCheck,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
@@ -36,6 +37,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const esSecretaria = user?.roles.some(
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+  )
+  const esRectorado = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   )
   const esGestion = user?.roles.some(
     r =>
@@ -102,6 +106,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               >
                 <UserCheck className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="text-sm">Validación Docente</span>}
+              </Button>
+            )}
+            {esRectorado && (
+              <Button
+                key="/plantillas-formulario"
+                variant={location.pathname.startsWith('/plantillas-formulario') ? 'secondary' : 'ghost'}
+                className={cn(
+                  'w-full justify-start gap-3',
+                  collapsed && 'justify-center px-2',
+                )}
+                onClick={() => navigate('/plantillas-formulario')}
+              >
+                <LayoutTemplate className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="text-sm">Plantillas</span>}
               </Button>
             )}
             <Button

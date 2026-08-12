@@ -27,6 +27,8 @@ function tituloSeccion(pathname: string, search: string, userId?: string): strin
     return id === userId ? 'Mi Perfil' : 'Usuario'
   }
   if (pathname === '/validacion-docente') return 'Validación de Docentes'
+  if (pathname === '/plantillas-formulario') return 'Plantillas de formulario'
+  if (pathname.startsWith('/plantillas-formulario/')) return 'Plantilla de formulario'
   return 'UBANEX'
 }
 
