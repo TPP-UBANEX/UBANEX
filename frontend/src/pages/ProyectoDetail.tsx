@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +37,7 @@ import {
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
+import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import {
   CampoFormularioInput,
   EtiquetaCampoFormulario,
@@ -171,13 +172,13 @@ export function ProyectoDetail() {
     return ua ? `${d.usuario.nombreCompleto} (${ua})` : d.usuario.nombreCompleto
   }
 
-  const motivoEnvio = !esDocenteValidado
+  const motivoEnvio: ReactNode = !esDocenteValidado
     ? 'Tu usuario no está validado'
     : !directoresCompletos
       ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
       : camposObligatoriosFaltantes.length > 0
-        ? `Falta completar lo siguiente: ${camposObligatoriosFaltantes.join(', ')}`
-        : ''
+        ? <ListaCamposFaltantes titulo="Falta completar lo siguiente:" campos={camposObligatoriosFaltantes} />
+        : null
 
   const cargarDatos = async () => {
     if (!id) return
@@ -624,8 +625,8 @@ export function ProyectoDetail() {
                       </span>
                     </TooltipTrigger>
                     {motivoEnvio && (
-                      <TooltipContent>
-                        <p>{motivoEnvio}</p>
+                      <TooltipContent className="max-w-xs">
+                        {motivoEnvio}
                       </TooltipContent>
                     )}
                   </Tooltip>
@@ -767,9 +768,11 @@ export function ProyectoDetail() {
           ) : (
             <div className="space-y-4">
               {esPropietario && edicion?.estado === EstadoEdicion.Borrador && camposObligatoriosFaltantes.length > 0 && (
-                <div className="text-sm text-destructive bg-destructive/10 rounded-md p-3">
-                  Falta completar lo siguiente para poder enviar: {camposObligatoriosFaltantes.join(', ')}.
-                </div>
+                <ListaCamposFaltantes
+                  titulo="Falta completar lo siguiente para poder enviar:"
+                  campos={camposObligatoriosFaltantes}
+                  className="text-destructive bg-destructive/10 rounded-md p-3"
+                />
               )}
               <Card>
                 <CardHeader><CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle></CardHeader>
