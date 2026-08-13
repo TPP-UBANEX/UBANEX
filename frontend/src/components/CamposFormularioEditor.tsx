@@ -7,16 +7,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { TipoCampo, tipoCampoLabels } from '@/data/types'
+import { ROLES_USUARIO_BUSCABLES, TipoCampo, tipoCampoLabels } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
 import { tipoCampoIconos } from '@/lib/tipo-campo-iconos'
-import { OpcionesCampoEditor, RangoNumericoEditor } from '@/components/ConfigTipoCampoEditor'
+import { OpcionesCampoEditor, RangoNumericoEditor, RolesUsuarioEditor } from '@/components/ConfigTipoCampoEditor'
 import { ColumnasTablaEditor, columnaVacia } from '@/components/ColumnasTablaEditor'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 const TIPOS_CON_OPCIONES = [TipoCampo.Select, TipoCampo.Checkbox]
 const TIPOS_CON_RANGO = [TipoCampo.Numero]
+const TIPOS_CON_ROLES_USUARIO = [TipoCampo.Usuario]
 
 export function campoVacio(): CampoFormulario {
   return {
@@ -59,6 +60,10 @@ export function validarCampos(campos: CampoFormulario[]): boolean {
         return false
       }
     }
+    if (campo.tipo === TipoCampo.Usuario && (campo.rolesUsuario ?? []).length === 0) {
+      toast.error(`El campo "${campo.nombre}" debe buscar al menos un tipo de usuario`)
+      return false
+    }
     if (campo.tipo === TipoCampo.Tabla) {
       const columnas = campo.columnas ?? []
       if (columnas.length === 0) {
@@ -76,6 +81,10 @@ export function validarCampos(campos: CampoFormulario[]): boolean {
             toast.error(`La columna "${columna.nombre}" de "${campo.nombre}" debe tener al menos una opción`)
             return false
           }
+        }
+        if (columna.tipo === TipoCampo.Usuario && (columna.rolesUsuario ?? []).length === 0) {
+          toast.error(`La columna "${columna.nombre}" de "${campo.nombre}" debe buscar al menos un tipo de usuario`)
+          return false
         }
       }
       const nombresColumnas = columnas.map(c => c.nombre.trim())
@@ -120,6 +129,12 @@ export function CamposFormularioEditor({
         actualizado.minimo = undefined
         actualizado.maximo = undefined
         actualizado.admiteDecimales = undefined
+      }
+      if (cambios.tipo && !TIPOS_CON_ROLES_USUARIO.includes(cambios.tipo)) {
+        actualizado.rolesUsuario = undefined
+      }
+      if (cambios.tipo === TipoCampo.Usuario && !c.rolesUsuario?.length) {
+        actualizado.rolesUsuario = [...ROLES_USUARIO_BUSCABLES]
       }
       if (cambios.tipo === TipoCampo.Seccion) {
         actualizado.esObligatorio = false
@@ -266,6 +281,14 @@ export function CamposFormularioEditor({
                   admiteDecimales={campo.admiteDecimales}
                   editable={editable}
                   onChange={cambios => actualizarCampo(campo.id, cambios)}
+                />
+              )}
+
+              {TIPOS_CON_ROLES_USUARIO.includes(campo.tipo) && (
+                <RolesUsuarioEditor
+                  rolesUsuario={campo.rolesUsuario}
+                  editable={editable}
+                  onChange={rolesUsuario => actualizarCampo(campo.id, { rolesUsuario })}
                 />
               )}
 

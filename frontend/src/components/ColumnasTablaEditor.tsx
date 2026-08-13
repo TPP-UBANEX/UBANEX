@@ -7,14 +7,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { TIPOS_COLUMNA_TABLA, TipoCampo, tipoCampoLabels } from '@/data/types'
+import { ROLES_USUARIO_BUSCABLES, TIPOS_COLUMNA_TABLA, TipoCampo, tipoCampoLabels } from '@/data/types'
 import type { CampoFormulario, ColumnaTabla } from '@/data/types'
 import { tipoCampoIconos } from '@/lib/tipo-campo-iconos'
-import { OpcionesCampoEditor, RangoNumericoEditor } from '@/components/ConfigTipoCampoEditor'
+import { OpcionesCampoEditor, RangoNumericoEditor, RolesUsuarioEditor } from '@/components/ConfigTipoCampoEditor'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 
 const TIPOS_CON_OPCIONES = [TipoCampo.Select, TipoCampo.Checkbox]
 const TIPOS_CON_RANGO = [TipoCampo.Numero]
+const TIPOS_CON_ROLES_USUARIO = [TipoCampo.Usuario]
 
 export function columnaVacia(): ColumnaTabla {
   return {
@@ -48,6 +49,12 @@ export function ColumnasTablaEditor({ campo, editable, onChange }: Props) {
         actualizada.minimo = undefined
         actualizada.maximo = undefined
         actualizada.admiteDecimales = undefined
+      }
+      if (cambios.tipo && !TIPOS_CON_ROLES_USUARIO.includes(cambios.tipo)) {
+        actualizada.rolesUsuario = undefined
+      }
+      if (cambios.tipo === TipoCampo.Usuario && !c.rolesUsuario?.length) {
+        actualizada.rolesUsuario = [...ROLES_USUARIO_BUSCABLES]
       }
       return actualizada
     }))
@@ -157,6 +164,14 @@ export function ColumnasTablaEditor({ campo, editable, onChange }: Props) {
                 admiteDecimales={columna.admiteDecimales}
                 editable={editable}
                 onChange={cambios => actualizarColumna(columna.id, cambios)}
+              />
+            )}
+
+            {TIPOS_CON_ROLES_USUARIO.includes(columna.tipo) && (
+              <RolesUsuarioEditor
+                rolesUsuario={columna.rolesUsuario}
+                editable={editable}
+                onChange={rolesUsuario => actualizarColumna(columna.id, { rolesUsuario })}
               />
             )}
           </div>
