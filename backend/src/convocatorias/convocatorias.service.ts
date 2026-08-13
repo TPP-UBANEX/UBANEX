@@ -320,7 +320,7 @@ export class ConvocatoriasService {
 
     if (convocatoria.estado !== EstadoConvocatoria.Configuracion) {
       throw new BadRequestException(
-        'El template de evaluación institucional solo puede editarse mientras la convocatoria está en etapa de configuración',
+        'El formulario de evaluación institucional solo puede editarse mientras la convocatoria está en etapa de configuración',
       );
     }
 
@@ -381,7 +381,7 @@ export class ConvocatoriasService {
 
     if (convocatoria.estado !== EstadoConvocatoria.Configuracion) {
       throw new BadRequestException(
-        'El template de evaluación cruzada solo puede editarse mientras la convocatoria está en etapa de configuración',
+        'El formulario de evaluación cruzada solo puede editarse mientras la convocatoria está en etapa de configuración',
       );
     }
 

@@ -31,7 +31,7 @@ export class TemplatesEvaluacionService {
   async obtenerInstitucional(id: string): Promise<TemplateEvaluacionInstitucional> {
     const template = await this.institucionalRepo.findOne({ where: { id } });
     if (!template) {
-      throw new NotFoundException('Template de evaluación institucional no encontrado');
+      throw new NotFoundException('Plantilla de evaluación institucional no encontrada');
     }
     return template;
   }
@@ -88,7 +88,7 @@ export class TemplatesEvaluacionService {
   async obtenerCruzada(id: string): Promise<TemplateEvaluacionCruzada> {
     const template = await this.cruzadaRepo.findOne({ where: { id } });
     if (!template) {
-      throw new NotFoundException('Template de evaluación cruzada no encontrado');
+      throw new NotFoundException('Plantilla de evaluación cruzada no encontrada');
     }
     return template;
   }

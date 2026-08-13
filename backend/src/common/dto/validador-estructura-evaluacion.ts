@@ -40,7 +40,7 @@ export function validarEstructuraInstitucional(
   estructura: EstructuraTemplateInstitucional | undefined,
 ): void {
   if (estructura === undefined || estructura === null) return;
-  campoRequerido(estructura.categorias, 'la estructura del template institucional');
+  campoRequerido(estructura.categorias, 'la estructura de la evaluación institucional');
 
   for (const categoria of estructura.categorias) {
     textoNoVacio(categoria.nombre, 'las categorías');
@@ -72,7 +72,7 @@ export function validarEstructuraCruzada(
   estructura: EstructuraTemplateCruzada | undefined,
 ): void {
   if (estructura === undefined || estructura === null) return;
-  campoRequerido(estructura.categorias, 'la estructura del template cruzado');
+  campoRequerido(estructura.categorias, 'la estructura de la evaluación cruzada');
 
   for (const categoria of estructura.categorias) {
     textoNoVacio(categoria.nombre, 'las categorías');

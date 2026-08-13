@@ -25,7 +25,7 @@ export function validarRespuestasInstitucionales(
     for (const [id, resp] of Object.entries(categorias)) {
       const sub = subPorId.get(id);
       if (!sub) {
-        throw new BadRequestException(`La subcategoría ${id} no pertenece al template de evaluación`);
+        throw new BadRequestException(`La subcategoría ${id} no pertenece al formulario de evaluación`);
       }
       const r = resp as { valor?: unknown; fundamentacion?: unknown };
       if (sub.tipoValor === 'numerico') {
@@ -57,7 +57,7 @@ export function validarRespuestasInstitucionales(
     const idsChecklist = new Set((template?.checklist ?? []).map(item => item.id));
     for (const [id, valor] of Object.entries(checklist)) {
       if (!idsChecklist.has(id)) {
-        throw new BadRequestException(`El ítem de checklist ${id} no pertenece al template`);
+        throw new BadRequestException(`El ítem de checklist ${id} no pertenece al formulario de evaluación`);
       }
       if (typeof valor !== 'boolean') {
         throw new BadRequestException('Los ítems del checklist se responden con Sí o No');
@@ -83,7 +83,7 @@ export function validarRespuestasCruzadas(
     for (const [id, valor] of Object.entries(items)) {
       const maximo = maxPorItem.get(id);
       if (maximo === undefined) {
-        throw new BadRequestException(`El ítem ${id} no pertenece al template de evaluación`);
+        throw new BadRequestException(`El ítem ${id} no pertenece al formulario de evaluación`);
       }
       if (typeof valor !== 'number' || !Number.isFinite(valor)) {
         throw new BadRequestException(`"${nombrePorItem.get(id)}" debe tener un puntaje numérico`);

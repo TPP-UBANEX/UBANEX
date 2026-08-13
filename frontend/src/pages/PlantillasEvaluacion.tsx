@@ -74,7 +74,7 @@ export function PlantillasEvaluacion() {
 
   const guardarInstitucional = async () => {
     if (!dialogInst.nombre.trim()) {
-      toast.error('El template debe tener un nombre')
+      toast.error('La plantilla debe tener un nombre')
       return
     }
     setGuardando(true)
@@ -86,15 +86,15 @@ export function PlantillasEvaluacion() {
       }
       if (dialogInst.id) {
         await api.templatesEvaluacion.institucionales.actualizar(dialogInst.id, dto)
-        toast.success('Template institucional actualizado')
+        toast.success('Plantilla institucional actualizada')
       } else {
         await api.templatesEvaluacion.institucionales.crear(dto)
-        toast.success('Template institucional creado')
+        toast.success('Plantilla institucional creada')
       }
       setDialogInst(dialogInstVacio)
       await cargar()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar el template')
+      toast.error(err instanceof Error ? err.message : 'Error al guardar la plantilla')
     } finally {
       setGuardando(false)
     }
@@ -102,7 +102,7 @@ export function PlantillasEvaluacion() {
 
   const guardarCruzada = async () => {
     if (!dialogCruzada.nombre.trim()) {
-      toast.error('El template debe tener un nombre')
+      toast.error('La plantilla debe tener un nombre')
       return
     }
     setGuardando(true)
@@ -114,39 +114,39 @@ export function PlantillasEvaluacion() {
       }
       if (dialogCruzada.id) {
         await api.templatesEvaluacion.cruzadas.actualizar(dialogCruzada.id, dto)
-        toast.success('Template cruzada actualizado')
+        toast.success('Plantilla cruzada actualizada')
       } else {
         await api.templatesEvaluacion.cruzadas.crear(dto)
-        toast.success('Template cruzada creado')
+        toast.success('Plantilla cruzada creada')
       }
       setDialogCruzada(dialogCruzadaVacio)
       await cargar()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar el template')
+      toast.error(err instanceof Error ? err.message : 'Error al guardar la plantilla')
     } finally {
       setGuardando(false)
     }
   }
 
   const eliminarInstitucional = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar el template "${nombre}"?`)) return
+    if (!confirm(`¿Eliminar la plantilla "${nombre}"?`)) return
     try {
       await api.templatesEvaluacion.institucionales.eliminar(id)
-      toast.success('Template eliminado')
+      toast.success('Plantilla eliminada')
       await cargar()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar el template')
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar la plantilla')
     }
   }
 
   const eliminarCruzada = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar el template "${nombre}"?`)) return
+    if (!confirm(`¿Eliminar la plantilla "${nombre}"?`)) return
     try {
       await api.templatesEvaluacion.cruzadas.eliminar(id)
-      toast.success('Template eliminado')
+      toast.success('Plantilla eliminada')
       await cargar()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar el template')
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar la plantilla')
     }
   }
 
@@ -166,15 +166,15 @@ export function PlantillasEvaluacion() {
           <TabsContent value="institucional" className="mt-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Templates de evaluación institucional</CardTitle>
+                <CardTitle className="text-sm font-medium">Plantillas de evaluación institucional</CardTitle>
                 <Button size="sm" onClick={abrirNuevaInst}>
-                  <Plus className="h-4 w-4 mr-2" />Nuevo template
+                  <Plus className="h-4 w-4 mr-2" />Nueva plantilla
                 </Button>
               </CardHeader>
               <CardContent>
                 {institucionales.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    Todavía no hay templates institucionales.
+                    Todavía no hay plantillas institucionales.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -206,15 +206,15 @@ export function PlantillasEvaluacion() {
           <TabsContent value="cruzada" className="mt-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Templates de evaluación cruzada</CardTitle>
+                <CardTitle className="text-sm font-medium">Plantillas de evaluación cruzada</CardTitle>
                 <Button size="sm" onClick={abrirNuevaCruzada}>
-                  <Plus className="h-4 w-4 mr-2" />Nuevo template
+                  <Plus className="h-4 w-4 mr-2" />Nueva plantilla
                 </Button>
               </CardHeader>
               <CardContent>
                 {cruzadas.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    Todavía no hay templates de evaluación cruzada.
+                    Todavía no hay plantillas de evaluación cruzada.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -250,7 +250,7 @@ export function PlantillasEvaluacion() {
           <DialogHeader>
             <DialogTitle>
               <ClipboardCheck className="h-4 w-4 mr-2 inline" />
-              {dialogInst.id ? 'Editar template institucional' : 'Nuevo template institucional'}
+              {dialogInst.id ? 'Editar plantilla institucional' : 'Nueva plantilla institucional'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -259,7 +259,7 @@ export function PlantillasEvaluacion() {
               <Input
                 value={dialogInst.nombre}
                 onChange={e => setDialogInst(d => ({ ...d, nombre: e.target.value }))}
-                placeholder="Ej: Template institucional estándar"
+                placeholder="Ej: Plantilla institucional estándar"
               />
             </div>
             <TemplateInstitucionalBuilder
@@ -267,7 +267,7 @@ export function PlantillasEvaluacion() {
               onChange={estructura => setDialogInst(d => ({ ...d, estructura }))}
             />
             <div className="flex items-center justify-between">
-              <span className="text-sm">Establecer como template por defecto</span>
+              <span className="text-sm">Establecer como plantilla por defecto</span>
               <Button
                 type="button"
                 variant={dialogInst.esDefault ? 'default' : 'outline'}
@@ -293,7 +293,7 @@ export function PlantillasEvaluacion() {
           <DialogHeader>
             <DialogTitle>
               <ClipboardCheck className="h-4 w-4 mr-2 inline" />
-              {dialogCruzada.id ? 'Editar template de evaluación cruzada' : 'Nuevo template de evaluación cruzada'}
+              {dialogCruzada.id ? 'Editar plantilla de evaluación cruzada' : 'Nueva plantilla de evaluación cruzada'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -302,7 +302,7 @@ export function PlantillasEvaluacion() {
               <Input
                 value={dialogCruzada.nombre}
                 onChange={e => setDialogCruzada(d => ({ ...d, nombre: e.target.value }))}
-                placeholder="Ej: Template cruzada estándar"
+                placeholder="Ej: Plantilla cruzada estándar"
               />
             </div>
             <TemplateCruzadaBuilder
@@ -310,7 +310,7 @@ export function PlantillasEvaluacion() {
               onChange={estructura => setDialogCruzada(d => ({ ...d, estructura }))}
             />
             <div className="flex items-center justify-between">
-              <span className="text-sm">Establecer como template por defecto</span>
+              <span className="text-sm">Establecer como plantilla por defecto</span>
               <Button
                 type="button"
                 variant={dialogCruzada.esDefault ? 'default' : 'outline'}

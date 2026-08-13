@@ -589,7 +589,7 @@ function InstitucionalView({
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    La convocatoria no tiene configurado el template de evaluación institucional.
+                    La convocatoria no tiene configurado el formulario de evaluación institucional.
                   </p>
                 )}
               </CardContent>
@@ -935,7 +935,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    La convocatoria no tiene configurado el template de evaluación cruzada.
+                    La convocatoria no tiene configurado el formulario de evaluación cruzada.
                   </p>
                 )}
               </CardContent>

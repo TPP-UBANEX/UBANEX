@@ -417,7 +417,7 @@ export class EvaluacionesService {
     const template = convocatoria.templateEvaluacionInstitucional;
     if (!template) {
       throw new BadRequestException(
-        'La convocatoria no tiene configurado el template de evaluación institucional',
+        'La convocatoria no tiene configurado el formulario de evaluación institucional',
       );
     }
 
@@ -474,7 +474,7 @@ export class EvaluacionesService {
     const template = convocatoria.templateEvaluacionInstitucional;
     if (!template) {
       throw new BadRequestException(
-        'La convocatoria no tiene configurado el template de evaluación institucional',
+        'La convocatoria no tiene configurado el formulario de evaluación institucional',
       );
     }
 
@@ -673,7 +673,7 @@ export class EvaluacionesService {
     const template = convocatoria.templateEvaluacionCruzada;
     if (!template) {
       throw new BadRequestException(
-        'La convocatoria no tiene configurado el template de evaluación cruzada',
+        'La convocatoria no tiene configurado el formulario de evaluación cruzada',
       );
     }
 
@@ -726,7 +726,7 @@ export class EvaluacionesService {
     const template = convocatoria.templateEvaluacionCruzada;
     if (!template) {
       throw new BadRequestException(
-        'La convocatoria no tiene configurado el template de evaluación cruzada',
+        'La convocatoria no tiene configurado el formulario de evaluación cruzada',
       );
     }
 
@@ -799,7 +799,7 @@ export class EvaluacionesService {
     const template = convocatoria.templateEvaluacionCruzada;
     if (!template) {
       throw new BadRequestException(
-        'La convocatoria no tiene configurado el template de evaluación cruzada',
+        'La convocatoria no tiene configurado el formulario de evaluación cruzada',
       );
     }
 
@@ -974,7 +974,7 @@ export class EvaluacionesService {
     }
     if (!convocatoria.templateEvaluacionCruzada) {
       throw new BadRequestException(
-        'La convocatoria no tiene configurado el template de evaluación cruzada',
+        'La convocatoria no tiene configurado el formulario de evaluación cruzada',
       );
     }
 

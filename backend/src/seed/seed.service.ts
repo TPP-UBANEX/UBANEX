@@ -237,7 +237,7 @@ export class SeedService {
     console.log('\n=== SEED: Formularios ===');
     await this.seedFormularios();
 
-    console.log('\n=== SEED: Templates de evaluación ===');
+    console.log('\n=== SEED: Plantillas de evaluación ===');
     await this.seedTemplates();
 
     console.log('\n=== SEED: Convocatorias ===');
@@ -1017,27 +1017,37 @@ export class SeedService {
     }
   }
 
-  // ─────────────────── Templates de evaluación ───────────────────
+  // ─────────────────── Plantillas de evaluación ───────────────────
 
   private async seedTemplates(): Promise<void> {
+    const nombreInst = 'Plantilla institucional UBANEX';
     const existenteInst = await this.templateInstRepo.findOne({ where: { esDefault: true } });
+    if (existenteInst && existenteInst.nombre !== nombreInst) {
+      existenteInst.nombre = nombreInst;
+      await this.templateInstRepo.save(existenteInst);
+    }
     this.templateInst =
       existenteInst ??
       (await this.templateInstRepo.save(
         this.templateInstRepo.create({
-          nombre: 'Template institucional UBANEX',
+          nombre: nombreInst,
           esDefault: true,
           esPlantilla: true,
           estructura: TEMPLATE_INSTITUCIONAL_DEFAULT,
         }),
       ));
 
+    const nombreCruzada = 'Plantilla cruzada UBANEX';
     const existenteCruzada = await this.templateCruzadaRepo.findOne({ where: { esDefault: true } });
+    if (existenteCruzada && existenteCruzada.nombre !== nombreCruzada) {
+      existenteCruzada.nombre = nombreCruzada;
+      await this.templateCruzadaRepo.save(existenteCruzada);
+    }
     this.templateCruzada =
       existenteCruzada ??
       (await this.templateCruzadaRepo.save(
         this.templateCruzadaRepo.create({
-          nombre: 'Template cruzada UBANEX',
+          nombre: nombreCruzada,
           esDefault: true,
           esPlantilla: true,
           estructura: TEMPLATE_CRUZADA_DEFAULT,
@@ -1109,7 +1119,7 @@ export class SeedService {
         );
         conv.templateEvaluacionInstitucionalId = copia.id;
         conv.templateEvaluacionInstitucional = copia;
-        console.log(`  ${conv.nombre} — template institucional congelado (copia privada)`);
+        console.log(`  ${conv.nombre} — formulario institucional congelado (copia privada)`);
       } else {
         conv.templateEvaluacionInstitucionalId = this.templateInst.id;
         conv.templateEvaluacionInstitucional = this.templateInst;
@@ -1119,7 +1129,7 @@ export class SeedService {
       if (congelada) {
         inst.esPlantilla = false;
         await this.templateInstRepo.save(inst);
-        console.log(`  ${conv.nombre} — template institucional tomado como propio (privado)`);
+        console.log(`  ${conv.nombre} — formulario institucional tomado como propio (privado)`);
       } else {
         const enUso = await this.institucionalEvalRepo.count({ where: { templateId: inst.id } });
         if (enUso === 0) {
@@ -1142,7 +1152,7 @@ export class SeedService {
       conv.templateEvaluacionInstitucionalId = copia.id;
       conv.templateEvaluacionInstitucional = copia;
       huboCambios = true;
-      console.log(`  ${conv.nombre} — template institucional congelado (copia privada)`);
+      console.log(`  ${conv.nombre} — formulario institucional congelado (copia privada)`);
     }
 
     const cruzada = conv.templateEvaluacionCruzada;
@@ -1158,7 +1168,7 @@ export class SeedService {
         );
         conv.templateEvaluacionCruzadaId = copia.id;
         conv.templateEvaluacionCruzada = copia;
-        console.log(`  ${conv.nombre} — template cruzada congelado (copia privada)`);
+        console.log(`  ${conv.nombre} — formulario cruzada congelado (copia privada)`);
       } else {
         conv.templateEvaluacionCruzadaId = this.templateCruzada.id;
         conv.templateEvaluacionCruzada = this.templateCruzada;
@@ -1168,7 +1178,7 @@ export class SeedService {
       if (congelada) {
         cruzada.esPlantilla = false;
         await this.templateCruzadaRepo.save(cruzada);
-        console.log(`  ${conv.nombre} — template cruzada tomado como propio (privado)`);
+        console.log(`  ${conv.nombre} — formulario cruzada tomado como propio (privado)`);
       } else {
         const enUso = await this.cruzadaEvalRepo.count({ where: { templateId: cruzada.id } });
         if (enUso === 0) {
@@ -1191,13 +1201,13 @@ export class SeedService {
       conv.templateEvaluacionCruzadaId = copia.id;
       conv.templateEvaluacionCruzada = copia;
       huboCambios = true;
-      console.log(`  ${conv.nombre} — template cruzada congelado (copia privada)`);
+      console.log(`  ${conv.nombre} — formulario cruzada congelado (copia privada)`);
     }
 
     if (huboCambios) {
       await this.convocatoriaRepo.save(conv);
     }
-    console.log(`  ${conv.nombre} — templates de evaluación asociados`);
+    console.log(`  ${conv.nombre} — formularios de evaluación asociados`);
   }
 
   private async seedConvocatorias(): Promise<void> {

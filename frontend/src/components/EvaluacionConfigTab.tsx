@@ -94,9 +94,9 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
     setGuardandoInst(true)
     try {
       await api.convocatorias.templateInstitucional.guardar(convocatoriaId, instEstructura)
-      toast.success('Template institucional guardado')
+      toast.success('Formulario de evaluación institucional guardado')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar el template')
+      toast.error(err instanceof Error ? err.message : 'Error al guardar el formulario de evaluación')
     } finally {
       setGuardandoInst(false)
     }
@@ -106,9 +106,9 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
     setGuardandoCruzada(true)
     try {
       await api.convocatorias.templateCruzada.guardar(convocatoriaId, cruzadaEstructura)
-      toast.success('Template de evaluación cruzada guardado')
+      toast.success('Formulario de evaluación cruzada guardado')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar el template')
+      toast.error(err instanceof Error ? err.message : 'Error al guardar el formulario de evaluación')
     } finally {
       setGuardandoCruzada(false)
     }
@@ -134,14 +134,14 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
     <div className="space-y-6">
       {!editable && (
         <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">
-          Los templates quedaron congelados al salir de la etapa de configuración. Solo pueden consultarse.
+          Los formularios de evaluación quedaron congelados al salir de la etapa de configuración. Solo pueden consultarse.
         </p>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Template institucional</CardTitle>
+            <CardTitle className="text-sm font-medium">Formulario de evaluación institucional</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {plantillasInst.length > 0 && editable && (
@@ -167,7 +167,7 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
             {editable && (
               <Button onClick={guardarInst} disabled={guardandoInst}>
                 {guardandoInst && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Guardar template institucional
+                Guardar formulario de evaluación institucional
               </Button>
             )}
           </CardContent>
@@ -175,7 +175,7 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Template de evaluación cruzada</CardTitle>
+            <CardTitle className="text-sm font-medium">Formulario de evaluación cruzada</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {plantillasCruzada.length > 0 && editable && (
@@ -201,7 +201,7 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
             {editable && (
               <Button onClick={guardarCruzada} disabled={guardandoCruzada}>
                 {guardandoCruzada && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Guardar template cruzada
+                Guardar formulario de evaluación cruzada
               </Button>
             )}
           </CardContent>
