@@ -409,10 +409,24 @@ export class ProyectosService {
 
     const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
       where: { id: edicion.convocatoriaId },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+      },
     });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
     if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
       throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    if (!convocatoria.templateEvaluacionInstitucional) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el formulario de evaluación institucional',
+      );
+    }
+    if (!convocatoria.templateEvaluacionCruzada) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el formulario de evaluación cruzada',
+      );
     }
 
     if (edicion.estado !== EstadoEdicion.Presentado && edicion.estado !== EstadoEdicion.PendienteDeCambios) {
