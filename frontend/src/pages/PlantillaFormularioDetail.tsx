@@ -121,7 +121,7 @@ export function PlantillaFormularioDetail() {
             <Input value={nombre} onChange={e => setNombre(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">¿Es la plantilla sugerida?</span>
+            <span className="text-xs text-muted-foreground">¿Es la plantilla default?</span>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -141,7 +141,7 @@ export function PlantillaFormularioDetail() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Solo puede haber una sugerida: si marcás esta, se desmarca la anterior.
+              Solo puede haber una default: si marcás esta, se desmarca la anterior.
             </p>
           </div>
         </CardContent>

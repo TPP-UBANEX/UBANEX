@@ -119,7 +119,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 onClick={() => navigate('/plantillas-formulario')}
               >
                 <LayoutTemplate className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="text-sm">Plantillas</span>}
+                {!collapsed && <span className="text-sm">Plantillas presentación</span>}
               </Button>
             )}
             <Button

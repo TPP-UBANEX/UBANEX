@@ -70,7 +70,7 @@ export function PlantillasFormulario() {
   const marcarDefault = async (plantilla: Formulario) => {
     try {
       await api.formularios.actualizar(plantilla.id, { esDefault: true })
-      toast.success(`"${plantilla.nombre}" es la nueva plantilla sugerida`)
+      toast.success(`"${plantilla.nombre}" es la nueva plantilla default`)
       await cargar()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al marcar la plantilla')
@@ -96,9 +96,9 @@ export function PlantillasFormulario() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Plantillas de formulario</h2>
+          <h2 className="text-lg font-semibold">Plantillas para formularios de presentación</h2>
           <p className="text-sm text-muted-foreground">
-            Formularios de presentación reutilizables que se pueden importar al configurar una convocatoria.
+            Acá podés crear formularios de presentación que luego te sirven como plantillas para el momento de configurar una convocatoria.
           </p>
         </div>
         <Dialog open={nuevaOpen} onOpenChange={setNuevaOpen}>
@@ -124,7 +124,7 @@ export function PlantillasFormulario() {
                 />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium">¿Es la plantilla sugerida?</p>
+                <p className="text-sm font-medium">¿Es la plantilla default?</p>
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -144,7 +144,7 @@ export function PlantillasFormulario() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Solo puede haber una sugerida: si marcás esta, se desmarca la anterior.
+                  Solo puede haber una default: si marcás esta, se desmarca la anterior.
                 </p>
               </div>
             </div>
@@ -173,7 +173,7 @@ export function PlantillasFormulario() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Campos</TableHead>
-                  <TableHead>Sugerida</TableHead>
+                  <TableHead>Default</TableHead>
                   <TableHead className="w-32 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -187,14 +187,14 @@ export function PlantillasFormulario() {
                     <TableCell className="font-medium">{p.nombre}</TableCell>
                     <TableCell className="text-muted-foreground">{p.campos?.length ?? 0}</TableCell>
                     <TableCell>
-                      {p.esDefault && <Badge variant="secondary">Sugerida</Badge>}
+                      {p.esDefault && <Badge variant="secondary">Default</Badge>}
                     </TableCell>
                     <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       {!p.esDefault && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Marcar como sugerida"
+                          title="Marcar como default"
                           onClick={() => marcarDefault(p)}
                         >
                           <Star className="h-4 w-4" />
