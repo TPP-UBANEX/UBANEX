@@ -41,9 +41,10 @@ import {
   CampoFormularioInput,
   EtiquetaCampoFormulario,
   TextoLargoColapsable,
-  campoFormularioVacio,
+  camposIncompletosParaEnvio,
   formatearValorCampoFormulario,
 } from '@/components/CampoFormularioInput'
+import { TablaCampoFormulario } from '@/components/TablaCampoFormulario'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -146,8 +147,8 @@ export function ProyectoDetail() {
     d => d.rol === RolEjecucion.DirectorDeProyecto,
   ).length >= 2
   const directoresCompletos = tieneDirectorPrincipal && tieneSegundoDirector
-  const camposObligatoriosFaltantes = camposFormulario.filter(
-    c => c.esObligatorio && campoFormularioVacio(c, edicion?.datosFormulario?.[c.id]),
+  const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
+    camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos && camposObligatoriosFaltantes.length === 0
   const esDocente = user?.roles.includes(RolUsuario.Docente)
@@ -175,7 +176,7 @@ export function ProyectoDetail() {
     : !directoresCompletos
       ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
       : camposObligatoriosFaltantes.length > 0
-        ? `Faltan completar campos obligatorios: ${camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}`
+        ? `Falta completar lo siguiente: ${camposObligatoriosFaltantes.join(', ')}`
         : ''
 
   const cargarDatos = async () => {
@@ -546,11 +547,13 @@ export function ProyectoDetail() {
     <>
       {campos.map(campo => {
         const valorFormateado = formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])
-        // Los campos de texto largo ocupan las dos columnas, en su posición según el orden definido.
+        // Los campos de texto largo y tabla ocupan las dos columnas, en su posición según el orden definido.
         const esTextoLargo = campo.tipo === TipoCampo.TextoLargo
+        const esTabla = campo.tipo === TipoCampo.Tabla
+        const anchoCompleto = esTextoLargo || esTabla
         return (
-          <div key={campo.id} className={esTextoLargo ? 'col-span-2 space-y-1' : undefined}>
-            {esTextoLargo ? (
+          <div key={campo.id} className={anchoCompleto ? 'col-span-2 space-y-1' : undefined}>
+            {anchoCompleto ? (
               <p className="text-muted-foreground">
                 <EtiquetaCampoFormulario campo={campo} />:
               </p>
@@ -567,12 +570,14 @@ export function ProyectoDetail() {
               label={campo.nombre}
               activo={modoSugerencia}
               onClick={handleSugerirClick}
-              display={esTextoLargo ? 'flex' : 'inline-flex'}
-              className={esTextoLargo ? 'w-full items-start' : undefined}
+              display={anchoCompleto ? 'flex' : 'inline-flex'}
+              className={anchoCompleto ? 'w-full items-start' : undefined}
             >
-              {esTextoLargo
-                ? <TextoLargoColapsable texto={valorFormateado} />
-                : valorFormateado}
+              {esTabla
+                ? <TablaCampoFormulario campo={campo} valor={edicion?.datosFormulario?.[campo.id]} />
+                : esTextoLargo
+                  ? <TextoLargoColapsable texto={valorFormateado} />
+                  : valorFormateado}
             </CampoSugerible>
           </div>
         )
@@ -763,7 +768,7 @@ export function ProyectoDetail() {
             <div className="space-y-4">
               {esPropietario && edicion?.estado === EstadoEdicion.Borrador && camposObligatoriosFaltantes.length > 0 && (
                 <div className="text-sm text-destructive bg-destructive/10 rounded-md p-3">
-                  Faltan completar {camposObligatoriosFaltantes.length === 1 ? '1 campo obligatorio' : `${camposObligatoriosFaltantes.length} campos obligatorios`} para poder enviar: {camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}.
+                  Falta completar lo siguiente para poder enviar: {camposObligatoriosFaltantes.join(', ')}.
                 </div>
               )}
               <Card>
@@ -1015,13 +1020,14 @@ export function ProyectoDetail() {
         edicionId={edicion?.id ?? ''}
         valorSugeridoInicial={sugerenciaModal.valorSugeridoInicial}
         comentarioInicial={sugerenciaModal.comentarioInicial}
-        multilinea={tipoCampoSugerido === TipoCampo.TextoLargo}
+        multilinea={tipoCampoSugerido === TipoCampo.TextoLargo || tipoCampoSugerido === TipoCampo.Tabla}
         maxLongitud={tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined}
         tipoInput={tipoCampoSugerido === TipoCampo.Fecha ? 'date' : tipoCampoSugerido === TipoCampo.Numero ? 'number' : 'text'}
         min={campoSugerido?.minimo}
         max={campoSugerido?.maximo}
         step={campoSugerido?.admiteDecimales ? 'any' : 1}
         geo={tipoCampoSugerido === TipoCampo.Geolocalizacion}
+        soloComentario={tipoCampoSugerido === TipoCampo.Tabla}
       />
 
       {edicion && (
