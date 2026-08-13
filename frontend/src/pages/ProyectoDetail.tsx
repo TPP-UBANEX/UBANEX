@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -77,6 +77,7 @@ export function ProyectoDetail() {
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
+  const [iniciandoEvaluacion, setIniciandoEvaluacion] = useState(false)
 
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
@@ -669,9 +670,25 @@ export function ProyectoDetail() {
               <X className="h-4 w-4 mr-2" />Cancelar sugerencia
             </Button>
           )}
-          {!editando && esSecretaria && edicion?.estado === EstadoEdicion.Presentado && (
+          {!editando && esSecretariaMismaUA && edicion?.estado === EstadoEdicion.Presentado && edicion.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
             <>
-              <Button onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
+              <Button
+                onClick={async () => {
+                  if (!id || !edicion?.id) return
+                  try {
+                    setIniciandoEvaluacion(true)
+                    await api.proyectos.iniciarEvaluacion(id, edicion.id)
+                    toast.success('Evaluación iniciada')
+                    cargarDatos()
+                  } catch {
+                    toast.error('No se pudo iniciar la evaluación')
+                  } finally {
+                    setIniciandoEvaluacion(false)
+                  }
+                }}
+                disabled={iniciandoEvaluacion}
+              >
+                {iniciandoEvaluacion ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Iniciar evaluación
               </Button>
             </>

@@ -61,6 +61,15 @@ export class ProyectosController {
     return this.service.enviarEdicion(id, edicionId, usuario);
   }
 
+  @Post(':id/ediciones/:edicionId/iniciar-evaluacion')
+  iniciarEvaluacion(
+    @Param('id') id: string,
+    @Param('edicionId') edicionId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.iniciarEvaluacion(id, edicionId, usuario);
+  }
+
   @Delete(':id/ediciones/:edicionId')
   eliminarEdicion(
     @Param('id') id: string,

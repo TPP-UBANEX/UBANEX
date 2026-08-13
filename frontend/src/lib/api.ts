@@ -183,6 +183,8 @@ export const api = {
       patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}`, data),
     enviarEdicion: (id: string, edicionId: string) =>
       post<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/enviar`, {}),
+    iniciarEvaluacion: (id: string, edicionId: string) =>
+      post<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/iniciar-evaluacion`, {}),
     eliminarEdicion: (id: string, edicionId: string) =>
       del(`/proyectos/${id}/ediciones/${edicionId}`),
   },

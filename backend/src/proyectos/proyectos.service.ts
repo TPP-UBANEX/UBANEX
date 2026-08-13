@@ -391,4 +391,39 @@ export class ProyectosService {
     await this.participacionRepo.delete({ edicionId });
     return { message: 'Edición eliminada' };
   }
+
+  async iniciarEvaluacion(proyectoId: string, edicionId: string, usuario: Usuario) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+
+    const esRectorado = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado].includes(r),
+    );
+    const esSecretariaMismaUA = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+    ) && usuario.unidadAcademicaId === edicion.unidadAcademicaId;
+    if (!esRectorado && !esSecretariaMismaUA) {
+      throw new ForbiddenException(
+        'Solo la Secretaría de la Unidad Académica del proyecto o el Rectorado pueden iniciar la evaluación',
+      );
+    }
+
+    const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
+      where: { id: edicion.convocatoriaId },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+
+    if (edicion.estado !== EstadoEdicion.Presentado && edicion.estado !== EstadoEdicion.PendienteDeCambios) {
+      throw new BadRequestException(
+        `No se puede iniciar la evaluación de una edición en estado ${edicion.estado}`,
+      );
+    }
+
+    edicion.estado = EstadoEdicion.EnEvaluacion;
+    await this.edicionRepo.save(edicion);
+
+    return this.obtenerProyecto(proyectoId);
+  }
 }
