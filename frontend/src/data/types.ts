@@ -365,7 +365,12 @@ export enum TipoCampo {
   Select = 'select',
   Archivo = 'archivo',
   Seccion = 'seccion',
+  Tabla = 'tabla',
 }
+
+// Espejo de backend/src/common/dto/campo-formulario.dto.ts
+export const TIPOS_COLUMNA_TABLA = Object.values(TipoCampo)
+  .filter(t => t !== TipoCampo.Seccion && t !== TipoCampo.Tabla && t !== TipoCampo.Archivo)
 
 export interface Localidad {
   id: string
@@ -389,6 +394,17 @@ export const MAX_LONGITUD_POR_TIPO: Partial<Record<TipoCampo, number>> = {
   [TipoCampo.TextoLargo]: 10000,
 }
 
+export interface ColumnaTabla {
+  id: string
+  tipo: TipoCampo
+  nombre: string
+  esObligatorio: boolean
+  opciones?: string[]
+  minimo?: number
+  maximo?: number
+  admiteDecimales?: boolean
+}
+
 export interface CampoFormulario {
   id: string
   tipo: TipoCampo
@@ -400,6 +416,9 @@ export interface CampoFormulario {
   minimo?: number
   maximo?: number
   admiteDecimales?: boolean
+  columnas?: ColumnaTabla[]
+  filasMinimas?: number
+  filasMaximas?: number
 }
 
 export interface Formulario {
@@ -421,6 +440,7 @@ export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Select]: 'Selección (única)',
   [TipoCampo.Archivo]: 'Archivo',
   [TipoCampo.Seccion]: 'Sección',
+  [TipoCampo.Tabla]: 'Tabla',
 }
 
 export interface Emparejamiento {

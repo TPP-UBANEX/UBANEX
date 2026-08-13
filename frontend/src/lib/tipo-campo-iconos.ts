@@ -1,4 +1,4 @@
-import { AlignLeft, Calendar, CircleDot, Folder, Hash, ListChecks, MapPin, Paperclip, ToggleLeft, Type } from 'lucide-react'
+import { AlignLeft, Calendar, CircleDot, Folder, Hash, ListChecks, MapPin, Paperclip, Table2, ToggleLeft, Type } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { TipoCampo } from '@/data/types'
 
@@ -17,4 +17,5 @@ export const tipoCampoIconos: Record<TipoCampo, IconoTipoCampo> = {
   [TipoCampo.Select]: CircleDot,
   [TipoCampo.Seccion]: Folder,
   [TipoCampo.Archivo]: Paperclip,
+  [TipoCampo.Tabla]: Table2,
 }
