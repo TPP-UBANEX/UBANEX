@@ -28,6 +28,18 @@ function validarDefinicionCampo(campo: CampoFormularioDto | ColumnaTablaDto): vo
     );
   }
 
+  const esUsuario = campo.tipo === TipoCampo.Usuario;
+  if (esUsuario && (campo.rolesUsuario ?? []).length === 0) {
+    throw new BadRequestException(
+      `El campo "${campo.nombre}" debe buscar al menos un tipo de usuario`,
+    );
+  }
+  if (!esUsuario && (campo.rolesUsuario?.length ?? 0) > 0) {
+    throw new BadRequestException(
+      `El campo "${campo.nombre}" no puede tener configuración de usuarios para su tipo`,
+    );
+  }
+
   const esNumero = campo.tipo === TipoCampo.Numero;
   if (!esNumero && (campo.minimo !== undefined || campo.maximo !== undefined || campo.admiteDecimales !== undefined)) {
     throw new BadRequestException(

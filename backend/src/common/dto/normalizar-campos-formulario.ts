@@ -13,6 +13,9 @@ function normalizarColumnaTabla(columna: ColumnaTablaDto): ColumnaTabla {
     ...(columna.tipo === TipoCampo.Numero
       ? { minimo: columna.minimo, maximo: columna.maximo, admiteDecimales: columna.admiteDecimales }
       : {}),
+    ...(columna.tipo === TipoCampo.Usuario
+      ? { rolesUsuario: [...new Set(columna.rolesUsuario ?? [])] }
+      : {}),
   };
 }
 
@@ -40,6 +43,9 @@ export function normalizarCamposFormulario(
         filasMinimas: campo.filasMinimas,
         filasMaximas: campo.filasMaximas,
       }
+      : {}),
+    ...(campo.tipo === TipoCampo.Usuario
+      ? { rolesUsuario: [...new Set(campo.rolesUsuario ?? [])] }
       : {}),
   }));
 }

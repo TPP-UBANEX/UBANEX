@@ -106,3 +106,146 @@ describe('camposIncompletosParaEnvio — tabla', () => {
     expect(motivos).toEqual([]);
   });
 });
+
+function campoGeo(overrides: Partial<CampoFormulario> = {}): CampoFormulario {
+  return {
+    id: 'ubicacion',
+    tipo: TipoCampo.Geolocalizacion,
+    nombre: 'Ubicación',
+    esObligatorio: false,
+    orden: 0,
+    ...overrides,
+  };
+}
+
+describe('validarValoresFormulario — geolocalizacion', () => {
+  it('rechaza un valor que no es objeto', () => {
+    expect(() => validarValoresFormulario([campoGeo()], { ubicacion: 'CABA' }))
+      .toThrow(BadRequestException);
+  });
+
+  it('rechaza un objeto sin nombre', () => {
+    expect(() => validarValoresFormulario([campoGeo()], { ubicacion: { lat: 1, lon: 2 } }))
+      .toThrow(BadRequestException);
+  });
+
+  it('rechaza coordenadas invalidas', () => {
+    expect(() => validarValoresFormulario([campoGeo()], { ubicacion: { nombre: 'CABA', lat: 'no-numero' } }))
+      .toThrow(BadRequestException);
+  });
+
+  it('acepta texto libre sin coordenadas', () => {
+    expect(() => validarValoresFormulario([campoGeo()], { ubicacion: { nombre: 'Un lugar cualquiera' } }))
+      .not.toThrow();
+  });
+
+  it('acepta el objeto completo devuelto por Georef', () => {
+    expect(() => validarValoresFormulario([campoGeo()], {
+      ubicacion: { id: '06427010', nombre: 'La Plata, Buenos Aires', provincia: 'Buenos Aires', lat: -34.9, lon: -57.9 },
+    })).not.toThrow();
+  });
+});
+
+describe('camposIncompletosParaEnvio — geolocalizacion', () => {
+  it('reporta un campo obligatorio sin nombre cargado', () => {
+    const campo = campoGeo({ esObligatorio: true });
+    const motivos = camposIncompletosParaEnvio([campo], { ubicacion: { nombre: '  ' } });
+    expect(motivos).toEqual(['Ubicación']);
+  });
+
+  it('no reporta cuando el campo obligatorio tiene un nombre cargado', () => {
+    const campo = campoGeo({ esObligatorio: true });
+    const motivos = camposIncompletosParaEnvio([campo], { ubicacion: { nombre: 'CABA' } });
+    expect(motivos).toEqual([]);
+  });
+});
+
+function campoUsuario(overrides: Partial<CampoFormulario> = {}): CampoFormulario {
+  return {
+    id: 'director',
+    tipo: TipoCampo.Usuario,
+    nombre: 'Director',
+    esObligatorio: false,
+    orden: 0,
+    ...overrides,
+  };
+}
+
+describe('validarValoresFormulario — usuario', () => {
+  it('rechaza un valor string', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], { director: 'Juan Perez' }))
+      .toThrow(BadRequestException);
+  });
+
+  it('rechaza un array', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], { director: [] }))
+      .toThrow(BadRequestException);
+  });
+
+  it('rechaza un objeto sin nombre', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], { director: {} }))
+      .toThrow(BadRequestException);
+  });
+
+  it('rechaza un nombre vacío', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], { director: { nombre: '   ' } }))
+      .toThrow(BadRequestException);
+  });
+
+  it('rechaza un nombre de más de 255 caracteres', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], { director: { nombre: 'a'.repeat(256) } }))
+      .toThrow(BadRequestException);
+  });
+
+  it('rechaza un email invalido', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], {
+      director: { nombre: 'Juan Perez', email: 'no-es-mail' },
+    })).toThrow(BadRequestException);
+  });
+
+  it('rechaza un id que no es string', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], {
+      director: { nombre: 'Juan Perez', id: 123 },
+    })).toThrow(BadRequestException);
+  });
+
+  it('acepta texto libre sin id ni email', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], { director: { nombre: 'Juan Perez' } }))
+      .not.toThrow();
+  });
+
+  it('acepta un usuario encontrado por búsqueda', () => {
+    expect(() => validarValoresFormulario([campoUsuario()], {
+      director: { id: 'u1', nombre: 'Juan Perez', email: 'juan@uba.ar' },
+    })).not.toThrow();
+  });
+
+  it('valida una celda usuario dentro de una tabla', () => {
+    const campo = campoTabla({
+      columnas: [
+        { id: 'docente', tipo: TipoCampo.Usuario, nombre: 'Docente', esObligatorio: false, rolesUsuario: [] },
+      ],
+    });
+    expect(() => validarValoresFormulario([campo], {
+      cronograma: [{ docente: { nombre: '' } }],
+    })).toThrow(BadRequestException);
+
+    expect(() => validarValoresFormulario([campo], {
+      cronograma: [{ docente: { nombre: 'Juan Perez' } }],
+    })).not.toThrow();
+  });
+});
+
+describe('camposIncompletosParaEnvio — usuario', () => {
+  it('reporta un campo obligatorio sin nombre cargado', () => {
+    const campo = campoUsuario({ esObligatorio: true });
+    const motivos = camposIncompletosParaEnvio([campo], { director: { nombre: ' ' } });
+    expect(motivos).toEqual(['Director']);
+  });
+
+  it('no reporta cuando el campo obligatorio tiene un nombre cargado', () => {
+    const campo = campoUsuario({ esObligatorio: true });
+    const motivos = camposIncompletosParaEnvio([campo], { director: { nombre: 'Juan Perez' } });
+    expect(motivos).toEqual([]);
+  });
+});

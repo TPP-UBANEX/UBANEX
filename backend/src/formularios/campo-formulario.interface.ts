@@ -1,4 +1,5 @@
 import { TipoCampo } from '../common/enums/tipo-campo.enum';
+import { RolUsuario } from '../common/enums/rol-usuario.enum';
 
 export interface ColumnaTabla {
   id: string;
@@ -9,6 +10,7 @@ export interface ColumnaTabla {
   minimo?: number;
   maximo?: number;
   admiteDecimales?: boolean;
+  rolesUsuario?: RolUsuario[];
 }
 
 export interface CampoFormulario {
@@ -25,4 +27,5 @@ export interface CampoFormulario {
   columnas?: ColumnaTabla[];
   filasMinimas?: number;
   filasMaximas?: number;
+  rolesUsuario?: RolUsuario[];
 }

@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { validarCamposFormulario } from './validador-campos-formulario';
 import { CampoFormularioDto } from './campo-formulario.dto';
 import { TipoCampo } from '../enums/tipo-campo.enum';
+import { RolUsuario } from '../enums/rol-usuario.enum';
 
 function campo(overrides: Partial<CampoFormularioDto> = {}): CampoFormularioDto {
   return {
@@ -97,6 +98,54 @@ describe('validarCamposFormulario — tabla', () => {
         ],
         filasMinimas: 2,
         filasMaximas: 6,
+      }),
+    ])).not.toThrow();
+  });
+});
+
+describe('validarCamposFormulario — usuario', () => {
+  it('rechaza un campo usuario sin rolesUsuario', () => {
+    expect(() => validarCamposFormulario([
+      campo({ tipo: TipoCampo.Usuario, nombre: 'Director' }),
+    ])).toThrow(BadRequestException);
+  });
+
+  it('rechaza un campo usuario con rolesUsuario vacío', () => {
+    expect(() => validarCamposFormulario([
+      campo({ tipo: TipoCampo.Usuario, nombre: 'Director', rolesUsuario: [] }),
+    ])).toThrow(BadRequestException);
+  });
+
+  it('rechaza rolesUsuario en un campo de otro tipo', () => {
+    expect(() => validarCamposFormulario([
+      campo({ tipo: TipoCampo.Texto, nombre: 'Nombre', rolesUsuario: [RolUsuario.Docente] }),
+    ])).toThrow(BadRequestException);
+  });
+
+  it('rechaza una columna de tabla usuario sin rolesUsuario', () => {
+    expect(() => validarCamposFormulario([
+      campo({
+        tipo: TipoCampo.Tabla,
+        nombre: 'Participantes',
+        columnas: [{ tipo: TipoCampo.Usuario, nombre: 'Docente', esObligatorio: false }],
+      }),
+    ])).toThrow(BadRequestException);
+  });
+
+  it('acepta un campo usuario valido', () => {
+    expect(() => validarCamposFormulario([
+      campo({ tipo: TipoCampo.Usuario, nombre: 'Director', rolesUsuario: [RolUsuario.Docente] }),
+    ])).not.toThrow();
+  });
+
+  it('acepta una tabla con columna usuario valida', () => {
+    expect(() => validarCamposFormulario([
+      campo({
+        tipo: TipoCampo.Tabla,
+        nombre: 'Participantes',
+        columnas: [
+          { tipo: TipoCampo.Usuario, nombre: 'Docente', esObligatorio: true, rolesUsuario: [RolUsuario.Docente] },
+        ],
       }),
     ])).not.toThrow();
   });

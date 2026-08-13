@@ -3,6 +3,10 @@ import { CampoFormulario, ColumnaTabla } from './campo-formulario.interface';
 import { MAX_LONGITUD_POR_TIPO, TipoCampo } from '../common/enums/tipo-campo.enum';
 
 const MAX_LONGITUD_NOMBRE_LOCALIDAD = 255;
+const MAX_LONGITUD_NOMBRE_USUARIO = 255;
+const MAX_LONGITUD_EMAIL_USUARIO = 255;
+const MAX_LONGITUD_ID_USUARIO = 64;
+const FORMATO_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function filaVacia(columnas: ColumnaTabla[], fila: Record<string, unknown>): boolean {
   return columnas.every((columna) => campoFormularioVacio(columna, fila[columna.id]));
@@ -11,7 +15,7 @@ function filaVacia(columnas: ColumnaTabla[], fila: Record<string, unknown>): boo
 export function campoFormularioVacio(campo: CampoFormulario | ColumnaTabla, valor: unknown): boolean {
   if (valor == null) return true;
   if (campo.tipo === TipoCampo.Checkbox) return !Array.isArray(valor) || valor.length === 0;
-  if (campo.tipo === TipoCampo.Geolocalizacion) {
+  if (campo.tipo === TipoCampo.Geolocalizacion || campo.tipo === TipoCampo.Usuario) {
     return typeof valor !== 'object' || Array.isArray(valor) || !(valor as { nombre?: unknown }).nombre
       || String((valor as { nombre: unknown }).nombre).trim() === '';
   }
@@ -55,6 +59,32 @@ function validarValorGeolocalizacion(campo: CampoFormulario | ColumnaTabla, valo
   }
 }
 
+/** Valida el objeto { nombre, id?, email? } que guarda un campo de usuario. */
+function validarValorUsuario(campo: CampoFormulario | ColumnaTabla, valor: unknown): void {
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) {
+    throw new BadRequestException(`El campo "${campo.nombre}" tiene un valor inválido`);
+  }
+  const v = valor as { nombre?: unknown; id?: unknown; email?: unknown };
+
+  if (typeof v.nombre !== 'string' || v.nombre.trim() === '' || v.nombre.length > MAX_LONGITUD_NOMBRE_USUARIO) {
+    throw new BadRequestException(
+      `El campo "${campo.nombre}" debe tener un nombre de hasta ${MAX_LONGITUD_NOMBRE_USUARIO} caracteres`,
+    );
+  }
+  if (
+    v.id !== undefined
+    && (typeof v.id !== 'string' || v.id.trim() === '' || v.id.length > MAX_LONGITUD_ID_USUARIO)
+  ) {
+    throw new BadRequestException(`El campo "${campo.nombre}" tiene un usuario inválido`);
+  }
+  if (
+    v.email !== undefined
+    && (typeof v.email !== 'string' || v.email.length > MAX_LONGITUD_EMAIL_USUARIO || !FORMATO_EMAIL.test(v.email))
+  ) {
+    throw new BadRequestException(`El campo "${campo.nombre}" tiene un email inválido`);
+  }
+}
+
 function validarValorNumerico(campo: CampoFormulario | ColumnaTabla, valor: string): void {
   const num = Number(valor);
   if (!Number.isFinite(num)) {
@@ -89,6 +119,11 @@ function validarValorNumerico(campo: CampoFormulario | ColumnaTabla, valor: stri
 function validarValorSegunTipo(campo: CampoFormulario | ColumnaTabla, valor: unknown): void {
   if (campo.tipo === TipoCampo.Geolocalizacion) {
     validarValorGeolocalizacion(campo, valor);
+    return;
+  }
+
+  if (campo.tipo === TipoCampo.Usuario) {
+    validarValorUsuario(campo, valor);
     return;
   }
 

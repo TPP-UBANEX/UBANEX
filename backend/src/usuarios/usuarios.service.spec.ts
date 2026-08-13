@@ -3,6 +3,8 @@ import { Repository } from 'typeorm';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { UsuariosService } from './usuarios.service';
 import { Usuario } from './usuario.entity';
+import { Carrera } from '../carreras/carrera.entity';
+import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
@@ -15,14 +17,19 @@ describe('UsuariosService', () => {
   const save = jest.fn<(entity: unknown) => Promise<Usuario>>();
   const update = jest.fn<() => Promise<unknown>>();
   const count = jest.fn<() => Promise<number>>();
+  const getMany = jest.fn<() => Promise<Usuario[]>>();
   const andWhere = jest.fn<(condition: string, params?: unknown) => unknown>();
   const qb = {
+    select: jest.fn(() => qb),
     where: jest.fn(() => qb),
     andWhere: jest.fn((condition: string, params?: unknown) => {
       andWhere(condition, params)
       return qb
     }),
+    orderBy: jest.fn(() => qb),
+    take: jest.fn(() => qb),
     getCount: jest.fn(() => count()),
+    getMany: jest.fn(() => getMany()),
   };
   const createQueryBuilder = jest.fn(() => qb);
 
@@ -35,19 +42,23 @@ describe('UsuariosService', () => {
     createQueryBuilder,
   } as unknown as Repository<Usuario>;
 
+  const carreraRepo = {} as unknown as Repository<Carrera>;
+  const unidadAcademicaRepo = {} as unknown as Repository<UnidadAcademica>;
+
   const auditoria = {
     registrar: jest.fn<() => Promise<unknown>>(),
   } as unknown as AuditoriaService;
 
   const mail = {} as unknown as MailService;
 
-  const service = new UsuariosService(repo, auditoria, mail);
+  const service = new UsuariosService(repo, carreraRepo, unidadAcademicaRepo, auditoria, mail);
 
   beforeEach(() => {
     jest.clearAllMocks();
     create.mockImplementation((data: unknown) => ({ ...(data as object) }) as Usuario);
     save.mockImplementation(async (entity: unknown) => entity as Usuario);
     count.mockResolvedValue(0);
+    getMany.mockResolvedValue([]);
   });
 
   describe('crear', () => {
@@ -196,6 +207,59 @@ describe('UsuariosService', () => {
       await expect(service.actualizar('docente-1', dto, rectorado))
         .rejects.toBeInstanceOf(BadRequestException);
       expect(save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('buscarParaFormulario', () => {
+    const docente = {
+      id: 'docente-1',
+      roles: [RolUsuario.Docente],
+      unidadAcademicaId: 'ua-derecho',
+    } as unknown as Usuario;
+
+    const rectorado = {
+      id: 'rectorado-1',
+      roles: [RolUsuario.AutoridadDeRectorado],
+    } as unknown as Usuario;
+
+    it('devuelve vacío sin tocar el repo si el texto es muy corto', async () => {
+      const resultado = await service.buscarParaFormulario({ q: 'pe' }, docente);
+
+      expect(resultado).toEqual([]);
+      expect(createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('filtra por la unidad académica de un docente', async () => {
+      await service.buscarParaFormulario({ q: 'perez' }, docente);
+
+      expect(andWhere).toHaveBeenCalledWith('usuario.unidadAcademicaId = :uaId', { uaId: 'ua-derecho' });
+    });
+
+    it('no filtra por unidad académica cuando busca Rectorado', async () => {
+      await service.buscarParaFormulario({ q: 'perez' }, rectorado);
+
+      expect(andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining('unidadAcademicaId'),
+        expect.anything(),
+      );
+    });
+
+    it('exige todos los términos del texto buscado (soporta orden invertido)', async () => {
+      await service.buscarParaFormulario({ q: 'perez juan' }, rectorado);
+
+      expect(andWhere).toHaveBeenCalledWith('usuario.nombreCompleto ILIKE :termino0', { termino0: '%perez%' });
+      expect(andWhere).toHaveBeenCalledWith('usuario.nombreCompleto ILIKE :termino1', { termino1: '%juan%' });
+    });
+
+    it('no incluye el password en el resultado', async () => {
+      getMany.mockResolvedValue([
+        { id: 'u1', nombreCompleto: 'Juan Perez', email: 'juan@uba.ar', password: 'hash-secreto' } as Usuario,
+      ]);
+
+      const resultado = await service.buscarParaFormulario({ q: 'perez' }, rectorado);
+
+      expect(resultado).toEqual([{ id: 'u1', nombre: 'Juan Perez', email: 'juan@uba.ar' }]);
+      expect(JSON.stringify(resultado)).not.toContain('hash-secreto');
     });
   });
 });

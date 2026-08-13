@@ -4,6 +4,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoCampo } from '../enums/tipo-campo.enum';
+import { RolUsuario, ROLES_USUARIO_BUSCABLES } from '../enums/rol-usuario.enum';
 
 export const TIPOS_CAMPO_HABILITADOS = [
   TipoCampo.Texto,
@@ -16,6 +17,7 @@ export const TIPOS_CAMPO_HABILITADOS = [
   TipoCampo.Select,
   TipoCampo.Seccion,
   TipoCampo.Tabla,
+  TipoCampo.Usuario,
 ];
 
 export const TIPOS_COLUMNA_TABLA: TipoCampo[] = TIPOS_CAMPO_HABILITADOS
@@ -52,6 +54,11 @@ export class ColumnaTablaDto {
   @IsOptional()
   @IsBoolean()
   admiteDecimales?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(ROLES_USUARIO_BUSCABLES, { each: true })
+  rolesUsuario?: RolUsuario[];
 }
 
 export class CampoFormularioDto {
@@ -109,4 +116,9 @@ export class CampoFormularioDto {
   @IsInt()
   @Min(1)
   filasMaximas?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(ROLES_USUARIO_BUSCABLES, { each: true })
+  rolesUsuario?: RolUsuario[];
 }
