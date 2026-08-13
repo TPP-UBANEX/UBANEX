@@ -10,7 +10,9 @@ import {
 import { TipoCampo, tipoCampoLabels } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
 import { tipoCampoIconos } from '@/lib/tipo-campo-iconos'
-import { ArrowDown, ArrowUp, Plus, Trash2, X } from 'lucide-react'
+import { OpcionesCampoEditor, RangoNumericoEditor } from '@/components/ConfigTipoCampoEditor'
+import { ColumnasTablaEditor, columnaVacia } from '@/components/ColumnasTablaEditor'
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 const TIPOS_CON_OPCIONES = [TipoCampo.Select, TipoCampo.Checkbox]
@@ -57,6 +59,35 @@ export function validarCampos(campos: CampoFormulario[]): boolean {
         return false
       }
     }
+    if (campo.tipo === TipoCampo.Tabla) {
+      const columnas = campo.columnas ?? []
+      if (columnas.length === 0) {
+        toast.error(`El campo "${campo.nombre}" debe tener al menos una columna`)
+        return false
+      }
+      for (const columna of columnas) {
+        if (!columna.nombre.trim()) {
+          toast.error(`El campo "${campo.nombre}" tiene una columna sin etiqueta`)
+          return false
+        }
+        if (TIPOS_CON_OPCIONES.includes(columna.tipo)) {
+          const opciones = (columna.opciones ?? []).map(o => o.trim()).filter(Boolean)
+          if (opciones.length === 0) {
+            toast.error(`La columna "${columna.nombre}" de "${campo.nombre}" debe tener al menos una opción`)
+            return false
+          }
+        }
+      }
+      const nombresColumnas = columnas.map(c => c.nombre.trim())
+      if (new Set(nombresColumnas).size !== nombresColumnas.length) {
+        toast.error(`El campo "${campo.nombre}" tiene columnas con nombres duplicados`)
+        return false
+      }
+      if (campo.filasMinimas !== undefined && campo.filasMaximas !== undefined && campo.filasMinimas > campo.filasMaximas) {
+        toast.error(`El campo "${campo.nombre}" tiene una cantidad mínima de filas mayor que la máxima`)
+        return false
+      }
+    }
   }
   return true
 }
@@ -93,6 +124,14 @@ export function CamposFormularioEditor({
       if (cambios.tipo === TipoCampo.Seccion) {
         actualizado.esObligatorio = false
       }
+      if (cambios.tipo === TipoCampo.Tabla && !c.columnas?.length) {
+        actualizado.columnas = [columnaVacia()]
+      }
+      if (cambios.tipo && cambios.tipo !== TipoCampo.Tabla) {
+        actualizado.columnas = undefined
+        actualizado.filasMinimas = undefined
+        actualizado.filasMaximas = undefined
+      }
       return actualizado
     }))
   }
@@ -112,28 +151,6 @@ export function CamposFormularioEditor({
     const [campo] = copia.splice(index, 1)
     copia.splice(destino, 0, campo)
     onChange(copia)
-  }
-
-  const agregarOpcion = (id: string) => {
-    onChange(campos.map(c =>
-      c.id === id ? { ...c, opciones: [...(c.opciones ?? []), ''] } : c,
-    ))
-  }
-
-  const actualizarOpcion = (id: string, opcionIdx: number, valor: string) => {
-    onChange(campos.map(c => {
-      if (c.id !== id) return c
-      const opciones = [...(c.opciones ?? [])]
-      opciones[opcionIdx] = valor
-      return { ...c, opciones }
-    }))
-  }
-
-  const eliminarOpcion = (id: string, opcionIdx: number) => {
-    onChange(campos.map(c => {
-      if (c.id !== id) return c
-      return { ...c, opciones: (c.opciones ?? []).filter((_, i) => i !== opcionIdx) }
-    }))
   }
 
   return (
@@ -235,78 +252,29 @@ export function CamposFormularioEditor({
               </div>
 
               {TIPOS_CON_OPCIONES.includes(campo.tipo) && (
-                <div className="space-y-2 pl-2 border-l-2">
-                  <span className="text-xs text-muted-foreground">Opciones</span>
-                  {(campo.opciones ?? []).map((opcion, opcionIdx) => (
-                    <div key={opcionIdx} className="flex items-center gap-2">
-                      <Input
-                        value={opcion}
-                        disabled={!editable}
-                        onChange={e => actualizarOpcion(campo.id, opcionIdx, e.target.value)}
-                        placeholder={`Opción ${opcionIdx + 1}`}
-                      />
-                      {editable && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => eliminarOpcion(campo.id, opcionIdx)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  {editable && (
-                    <Button type="button" variant="outline" size="sm" onClick={() => agregarOpcion(campo.id)}>
-                      <Plus className="h-3 w-3 mr-1" />Agregar opción
-                    </Button>
-                  )}
-                </div>
+                <OpcionesCampoEditor
+                  opciones={campo.opciones}
+                  editable={editable}
+                  onChange={opciones => actualizarCampo(campo.id, { opciones })}
+                />
               )}
 
               {TIPOS_CON_RANGO.includes(campo.tipo) && (
-                <div className="space-y-2 pl-2 border-l-2">
-                  <span className="text-xs text-muted-foreground">Rango (opcional)</span>
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1 space-y-1">
-                      <span className="text-xs text-muted-foreground">Mínimo</span>
-                      <Input
-                        type="number"
-                        value={campo.minimo ?? ''}
-                        disabled={!editable}
-                        onChange={e => actualizarCampo(campo.id, { minimo: e.target.value === '' ? undefined : Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <span className="text-xs text-muted-foreground">Máximo</span>
-                      <Input
-                        type="number"
-                        value={campo.maximo ?? ''}
-                        disabled={!editable}
-                        onChange={e => actualizarCampo(campo.id, { maximo: e.target.value === '' ? undefined : Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground">¿Admite decimales?</span>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant={campo.admiteDecimales ? 'default' : 'outline'}
-                          size="sm"
-                          disabled={!editable}
-                          onClick={() => actualizarCampo(campo.id, { admiteDecimales: true })}
-                        >
-                          Sí
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={!campo.admiteDecimales ? 'default' : 'outline'}
-                          size="sm"
-                          disabled={!editable}
-                          onClick={() => actualizarCampo(campo.id, { admiteDecimales: false })}
-                        >
-                          No
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <RangoNumericoEditor
+                  minimo={campo.minimo}
+                  maximo={campo.maximo}
+                  admiteDecimales={campo.admiteDecimales}
+                  editable={editable}
+                  onChange={cambios => actualizarCampo(campo.id, cambios)}
+                />
+              )}
+
+              {campo.tipo === TipoCampo.Tabla && (
+                <ColumnasTablaEditor
+                  campo={campo}
+                  editable={editable}
+                  onChange={cambios => actualizarCampo(campo.id, cambios)}
+                />
               )}
             </div>
           )

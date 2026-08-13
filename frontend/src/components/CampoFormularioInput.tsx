@@ -10,8 +10,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { MAX_LONGITUD_POR_TIPO, TipoCampo } from '@/data/types'
-import type { CampoFormulario, ValorGeolocalizacion } from '@/data/types'
+import type { CampoFormulario, ColumnaTabla, ValorGeolocalizacion } from '@/data/types'
 import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
+import { TablaCampoFormulario } from '@/components/TablaCampoFormulario'
 
 export function EtiquetaCampoFormulario({ campo }: { campo: Pick<CampoFormulario, 'nombre' | 'esObligatorio'> }) {
   return (
@@ -22,12 +23,21 @@ export function EtiquetaCampoFormulario({ campo }: { campo: Pick<CampoFormulario
   )
 }
 
-export function campoFormularioVacio(campo: CampoFormulario, valor: unknown): boolean {
+function filaVacia(columnas: ColumnaTabla[], fila: Record<string, unknown>): boolean {
+  return columnas.every(columna => campoFormularioVacio(columna, fila[columna.id]))
+}
+
+export function campoFormularioVacio(campo: CampoFormulario | ColumnaTabla, valor: unknown): boolean {
   if (valor == null) return true
   if (campo.tipo === TipoCampo.Checkbox) return !Array.isArray(valor) || valor.length === 0
   if (campo.tipo === TipoCampo.Geolocalizacion) {
     const nombre = (valor as Partial<ValorGeolocalizacion>)?.nombre
     return typeof nombre !== 'string' || nombre.trim() === ''
+  }
+  if (campo.tipo === TipoCampo.Tabla) {
+    const columnas = (campo as CampoFormulario).columnas ?? []
+    return !Array.isArray(valor) || valor.length === 0
+      || valor.every(fila => filaVacia(columnas, (fila ?? {}) as Record<string, unknown>))
   }
   if (typeof valor === 'string') return valor.trim() === ''
   return false
@@ -39,35 +49,37 @@ export function formatearFechaISO(valor: string): string {
   return anio && mes && dia ? `${dia}/${mes}/${anio}` : valor
 }
 
-export function formatearValorCampoFormulario(campo: CampoFormulario, valor: unknown): string {
+export function formatearValorCampoFormulario(campo: CampoFormulario | ColumnaTabla, valor: unknown): string {
   if (campoFormularioVacio(campo, valor)) return '-'
   if (campo.tipo === TipoCampo.Booleano) return valor === true ? 'Sí' : 'No'
   if (campo.tipo === TipoCampo.Checkbox) return (valor as string[]).join(', ')
   if (campo.tipo === TipoCampo.Fecha) return formatearFechaISO(String(valor))
   if (campo.tipo === TipoCampo.Geolocalizacion) return (valor as ValorGeolocalizacion).nombre
+  if (campo.tipo === TipoCampo.Tabla) {
+    const columnas = (campo as CampoFormulario).columnas ?? []
+    const filas = (valor as Record<string, unknown>[]).filter(fila => !filaVacia(columnas, fila ?? {}))
+    return filas
+      .map(fila => columnas.map(c => `${c.nombre}: ${formatearValorCampoFormulario(c, fila[c.id])}`).join(' · '))
+      .join('\n')
+  }
   return String(valor)
 }
 
-interface Props {
-  campo: CampoFormulario
+/** El subconjunto de un campo/columna necesario para resolver qué control de entrada mostrar. */
+type CampoControlable = Pick<CampoFormulario, 'tipo' | 'opciones' | 'minimo' | 'maximo' | 'admiteDecimales'>
+
+interface ControlProps {
+  campo: CampoControlable
   valor: unknown
   onChange: (valor: unknown) => void
+  /** Uso dentro de una celda de tabla: controles más chicos, sin contador ni leyenda de rango. */
+  compacto?: boolean
 }
 
-export function CampoFormularioInput({ campo, valor, onChange }: Props) {
-  if (campo.tipo === TipoCampo.Archivo || campo.tipo === TipoCampo.Seccion) return null
-
-  const faltaCompletar = campo.esObligatorio && campoFormularioVacio(campo, valor)
-
+/** El control de entrada correspondiente a un tipo de campo, sin etiqueta ni texto de ayuda. */
+export function ControlCampoFormulario({ campo, valor, onChange, compacto = false }: ControlProps) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">
-        <EtiquetaCampoFormulario campo={campo} />
-      </p>
-      {campo.textoAyuda && (
-        <p className="text-xs text-muted-foreground">{campo.textoAyuda}</p>
-      )}
-
+    <>
       {campo.tipo === TipoCampo.Texto && (
         <Input
           value={typeof valor === 'string' ? valor : ''}
@@ -79,14 +91,16 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
       {campo.tipo === TipoCampo.TextoLargo && (
         <>
           <Textarea
-            rows={10}
+            rows={compacto ? 2 : 10}
             value={typeof valor === 'string' ? valor : ''}
             maxLength={MAX_LONGITUD_POR_TIPO[TipoCampo.TextoLargo]}
             onChange={e => onChange(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground text-right">
-            {(typeof valor === 'string' ? valor.length : 0).toLocaleString('es-AR')} / {MAX_LONGITUD_POR_TIPO[TipoCampo.TextoLargo]!.toLocaleString('es-AR')}
-          </p>
+          {!compacto && (
+            <p className="text-xs text-muted-foreground text-right">
+              {(typeof valor === 'string' ? valor.length : 0).toLocaleString('es-AR')} / {MAX_LONGITUD_POR_TIPO[TipoCampo.TextoLargo]!.toLocaleString('es-AR')}
+            </p>
+          )}
         </>
       )}
 
@@ -100,7 +114,7 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
             step={campo.admiteDecimales ? 'any' : '1'}
             onChange={e => onChange(e.target.value)}
           />
-          {(campo.minimo !== undefined || campo.maximo !== undefined) && (
+          {!compacto && (campo.minimo !== undefined || campo.maximo !== undefined) && (
             <p className="text-xs text-muted-foreground">
               {campo.minimo !== undefined && campo.maximo !== undefined
                 ? `Entre ${campo.minimo} y ${campo.maximo}`
@@ -170,12 +184,94 @@ export function CampoFormularioInput({ campo, valor, onChange }: Props) {
           })}
         </div>
       )}
+    </>
+  )
+}
+
+interface Props {
+  campo: CampoFormulario
+  valor: unknown
+  onChange: (valor: unknown) => void
+}
+
+export function CampoFormularioInput({ campo, valor, onChange }: Props) {
+  if (campo.tipo === TipoCampo.Archivo || campo.tipo === TipoCampo.Seccion) return null
+
+  const faltaCompletar = campo.esObligatorio && campoFormularioVacio(campo, valor)
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">
+        <EtiquetaCampoFormulario campo={campo} />
+      </p>
+      {campo.textoAyuda && (
+        <p className="text-xs text-muted-foreground">{campo.textoAyuda}</p>
+      )}
+
+      {campo.tipo === TipoCampo.Tabla ? (
+        <TablaCampoFormulario campo={campo} valor={valor} onChange={onChange} />
+      ) : (
+        <ControlCampoFormulario campo={campo} valor={valor} onChange={onChange} />
+      )}
 
       {faltaCompletar && (
         <p className="text-xs text-muted-foreground">Falta completar</p>
       )}
     </div>
   )
+}
+
+/**
+ * Espejo de backend/src/formularios/campo-formulario.util.ts#camposIncompletosParaEnvio.
+ * Describe, en texto legible, qué falta completar del formulario para poder enviar la edición.
+ */
+export function camposIncompletosParaEnvio(
+  campos: CampoFormulario[],
+  datos: Record<string, unknown>,
+): string[] {
+  const motivos: string[] = []
+
+  for (const campo of campos) {
+    if (campo.tipo === TipoCampo.Seccion) continue
+    const valor = datos[campo.id]
+
+    if (campo.tipo === TipoCampo.Tabla) {
+      const columnas = campo.columnas ?? []
+      const filas = (Array.isArray(valor) ? valor : [])
+        .map(fila => (fila ?? {}) as Record<string, unknown>)
+        .filter(fila => !filaVacia(columnas, fila))
+
+      if (campo.esObligatorio && filas.length === 0) {
+        motivos.push(
+          campo.filasMinimas && campo.filasMinimas > 1
+            ? `"${campo.nombre}" debe tener al menos ${campo.filasMinimas} filas`
+            : `"${campo.nombre}" debe tener al menos una fila`,
+        )
+        continue
+      }
+      if (
+        campo.filasMinimas !== undefined
+        && (campo.esObligatorio || filas.length > 0)
+        && filas.length < campo.filasMinimas
+      ) {
+        motivos.push(`"${campo.nombre}" debe tener al menos ${campo.filasMinimas} filas`)
+      }
+      filas.forEach((fila, index) => {
+        columnas
+          .filter(columna => columna.esObligatorio && campoFormularioVacio(columna, fila[columna.id]))
+          .forEach(columna => {
+            motivos.push(`"${campo.nombre}": a la fila ${index + 1} le falta "${columna.nombre}"`)
+          })
+      })
+      continue
+    }
+
+    if (campo.esObligatorio && campoFormularioVacio(campo, valor)) {
+      motivos.push(campo.nombre)
+    }
+  }
+
+  return motivos
 }
 
 /** Muestra un texto largo respetando saltos de línea, truncado a 5 líneas con "Ver más". */
