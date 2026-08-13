@@ -9,6 +9,7 @@ export enum TipoCampo {
   Select = 'select',
   Archivo = 'archivo',
   Seccion = 'seccion',
+  Tabla = 'tabla',
 }
 
 export const MAX_LONGITUD_POR_TIPO: Partial<Record<TipoCampo, number>> = {
