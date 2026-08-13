@@ -14,7 +14,7 @@ import {
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { SugerenciaCambio, CampoFormulario } from '@/data/types'
-import { estadoBadge, EstadoSugerencia, TipoCampo } from '@/data/types'
+import { estadoBadge, EstadoSugerencia, TipoCampo, TIPOS_VALOR_OBJETO } from '@/data/types'
 import { formatearFechaISO } from '@/components/CampoFormularioInput'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
@@ -105,8 +105,8 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
 
   const tipoCampoFormulario = (campo: string): TipoCampo | null => campoFormularioDe(campo)?.tipo ?? null
 
-  // Un valor sugerido de geolocalización viaja serializado; si no es JSON válido se muestra tal cual (texto libre).
-  const nombreValorGeo = (valor: string): string => {
+  // Un valor sugerido de geolocalización/usuario viaja serializado; si no es JSON válido se muestra tal cual (texto libre).
+  const nombreValorObjeto = (valor: string): string => {
     try {
       const parsed = JSON.parse(valor)
       if (parsed && typeof parsed === 'object' && typeof parsed.nombre === 'string') return parsed.nombre
@@ -139,7 +139,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     const mostrar = (valor: string | null) => {
       if (valor == null) return '(sin valor)'
       if (tipo === TipoCampo.Fecha) return formatearFechaISO(valor)
-      if (tipo === TipoCampo.Geolocalizacion) return nombreValorGeo(valor)
+      if (tipo && TIPOS_VALOR_OBJETO.includes(tipo)) return nombreValorObjeto(valor)
       if (tipo === TipoCampo.Tabla) return nombreValorTabla(valor, campoFormulario)
       return valor
     }

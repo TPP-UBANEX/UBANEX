@@ -12,12 +12,14 @@ import {
 } from '@/components/ui/dialog'
 import { api } from '@/lib/api'
 import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
-import type { ValorGeolocalizacion } from '@/data/types'
+import { UsuarioAutocomplete } from '@/components/UsuarioAutocomplete'
+import { TipoCampo } from '@/data/types'
+import type { RolUsuario, ValorGeolocalizacion, ValorUsuario } from '@/data/types'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-/** El valor sugerido de un campo geo viaja serializado; si no es JSON valido se trata como texto libre. */
-function parsearValorGeo(valor: string): ValorGeolocalizacion | null {
+/** El valor sugerido de un campo geo/usuario viaja serializado; si no es JSON valido se trata como texto libre. */
+function parsearValorObjeto(valor: string): ValorGeolocalizacion | ValorUsuario | null {
   if (!valor.trim()) return null
   try {
     const parsed = JSON.parse(valor)
@@ -46,8 +48,10 @@ interface SugerirCambioModalProps {
   min?: number
   max?: number
   step?: number | 'any'
-  /** Para campos de geolocalización: reemplaza "Valor sugerido" por el buscador de localidades. */
-  geo?: boolean
+  /** Para campos cuyo valor es un objeto: reemplaza "Valor sugerido" por el buscador correspondiente. */
+  tipoObjeto?: TipoCampo.Geolocalizacion | TipoCampo.Usuario | null
+  /** Roles configurados cuando tipoObjeto es Usuario. */
+  rolesUsuario?: RolUsuario[]
   /** Para campos de tabla: oculta "Valor sugerido", la sugerencia queda como un comentario global sobre el campo. */
   soloComentario?: boolean
   onSuccess?: () => void
@@ -68,12 +72,13 @@ export function SugerirCambioModal({
   min,
   max,
   step,
-  geo = false,
+  tipoObjeto = null,
+  rolesUsuario,
   soloComentario = false,
   onSuccess,
 }: SugerirCambioModalProps) {
   const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
-  const [valorGeoSugerido, setValorGeoSugerido] = useState<ValorGeolocalizacion | null>(null)
+  const [valorObjetoSugerido, setValorObjetoSugerido] = useState<ValorGeolocalizacion | ValorUsuario | null>(null)
   const [comentario, setComentario] = useState(comentarioInicial)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -82,12 +87,12 @@ export function SugerirCambioModal({
   useEffect(() => {
     if (open) {
       setValorSugerido(valorSugeridoInicial)
-      setValorGeoSugerido(geo ? parsearValorGeo(valorSugeridoInicial) : null)
+      setValorObjetoSugerido(tipoObjeto ? parsearValorObjeto(valorSugeridoInicial) : null)
       setComentario(comentarioInicial)
       setError('')
       setConfirmar(false)
     }
-  }, [open, valorSugeridoInicial, comentarioInicial, geo])
+  }, [open, valorSugeridoInicial, comentarioInicial, tipoObjeto])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,8 +109,8 @@ export function SugerirCambioModal({
     try {
       const valorAEnviar = soloComentario
         ? undefined
-        : geo
-          ? (valorGeoSugerido?.nombre.trim() ? JSON.stringify(valorGeoSugerido) : undefined)
+        : tipoObjeto
+          ? (valorObjetoSugerido?.nombre.trim() ? JSON.stringify(valorObjetoSugerido) : undefined)
           : (valorSugerido.trim() || undefined)
       await api.sugerencias.crear(edicionId, {
         campo,
@@ -153,8 +158,17 @@ export function SugerirCambioModal({
               <p className="text-sm font-medium">
                 Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
               </p>
-              {geo ? (
-                <LocalidadAutocomplete value={valorGeoSugerido} onChange={setValorGeoSugerido} />
+              {tipoObjeto === TipoCampo.Geolocalizacion ? (
+                <LocalidadAutocomplete
+                  value={valorObjetoSugerido as ValorGeolocalizacion | null}
+                  onChange={setValorObjetoSugerido}
+                />
+              ) : tipoObjeto === TipoCampo.Usuario ? (
+                <UsuarioAutocomplete
+                  value={valorObjetoSugerido as ValorUsuario | null}
+                  roles={rolesUsuario}
+                  onChange={setValorObjetoSugerido}
+                />
               ) : multilinea ? (
                 <Textarea
                   rows={8}

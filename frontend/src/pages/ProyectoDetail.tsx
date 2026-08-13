@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -1026,7 +1026,10 @@ export function ProyectoDetail() {
         min={campoSugerido?.minimo}
         max={campoSugerido?.maximo}
         step={campoSugerido?.admiteDecimales ? 'any' : 1}
-        geo={tipoCampoSugerido === TipoCampo.Geolocalizacion}
+        tipoObjeto={tipoCampoSugerido && TIPOS_VALOR_OBJETO.includes(tipoCampoSugerido)
+          ? (tipoCampoSugerido as TipoCampo.Geolocalizacion | TipoCampo.Usuario)
+          : null}
+        rolesUsuario={campoSugerido?.rolesUsuario}
         soloComentario={tipoCampoSugerido === TipoCampo.Tabla}
       />
 

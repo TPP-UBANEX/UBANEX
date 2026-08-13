@@ -19,7 +19,7 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
-import { TipoCampo } from '../common/enums/tipo-campo.enum';
+import { TipoCampo, TIPOS_VALOR_OBJETO } from '../common/enums/tipo-campo.enum';
 
 @Injectable()
 export class SugerenciasService {
@@ -268,9 +268,9 @@ export class SugerenciasService {
     }
   }
 
-  /** Intenta interpretar el valor sugerido como el objeto { nombre, ... } de un campo de geolocalizacion.
-   *  Si no es JSON valido (se sugirio como texto libre), lo trata como el nombre de la localidad. */
-  private parsearValorGeo(valor: string): unknown {
+  /** Intenta interpretar el valor sugerido como el objeto { nombre, ... } de un campo de geolocalizacion o usuario.
+   *  Si no es JSON valido (se sugirio como texto libre), lo trata como el nombre. */
+  private parsearValorObjeto(valor: string): unknown {
     try {
       const parsed: unknown = JSON.parse(valor);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
@@ -278,6 +278,11 @@ export class SugerenciasService {
       // no era JSON: se interpreta como texto libre
     }
     return { nombre: valor };
+  }
+
+  /** Los campos cuyo valor es un objeto viajan serializados por la columna text de la sugerencia. */
+  private valorParaCampo(tipo: TipoCampo | undefined, valorSugerido: string): unknown {
+    return tipo && TIPOS_VALOR_OBJETO.includes(tipo) ? this.parsearValorObjeto(valorSugerido) : valorSugerido;
   }
 
   private async aplicarCambio(edicion: Edicion, campo: string, valorSugerido: string | null) {
@@ -310,9 +315,7 @@ export class SugerenciasService {
           const campoId = campo.replace('datosFormulario.', '');
           const campoFormulario = (await this.obtenerCamposFormulario(edicion.convocatoriaId))
             .find(c => c.id === campoId);
-          const valor = campoFormulario?.tipo === TipoCampo.Geolocalizacion
-            ? this.parsearValorGeo(valorSugerido)
-            : valorSugerido;
+          const valor = this.valorParaCampo(campoFormulario?.tipo, valorSugerido);
           this.aplicarCambioJson(edicion, 'datosFormulario', campoId, valor);
           await this.edicionRepo.save(edicion);
         }
@@ -409,9 +412,7 @@ export class SugerenciasService {
       throw new BadRequestException('Sobre una tabla solo se puede dejar un comentario, no un valor sugerido');
     }
 
-    const valor = campoFormulario.tipo === TipoCampo.Geolocalizacion
-      ? this.parsearValorGeo(valorSugerido)
-      : valorSugerido;
+    const valor = this.valorParaCampo(campoFormulario.tipo, valorSugerido);
     validarValoresFormulario([campoFormulario], { [campoId]: valor });
   }
 
