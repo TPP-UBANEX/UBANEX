@@ -16,7 +16,7 @@ import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
-import { campoFormularioVacio, validarValoresFormulario } from '../formularios/campo-formulario.util';
+import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 
 @Injectable()
@@ -221,12 +221,10 @@ export class ProyectosService {
 
     const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
     const datosFormulario = (edicion.datosFormulario as Record<string, unknown> | null) ?? {};
-    const camposObligatoriosFaltantes = campos
-      .filter(c => c.esObligatorio)
-      .filter(c => campoFormularioVacio(c, datosFormulario[c.id]));
-    if (camposObligatoriosFaltantes.length > 0) {
+    const camposIncompletos = camposIncompletosParaEnvio(campos, datosFormulario);
+    if (camposIncompletos.length > 0) {
       motivos.push(
-        `Faltan completar campos obligatorios: ${camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}`,
+        `Faltan completar campos obligatorios: ${camposIncompletos.join(', ')}`,
       );
     }
 
