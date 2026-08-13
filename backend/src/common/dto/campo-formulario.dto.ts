@@ -18,7 +18,7 @@ export const TIPOS_CAMPO_HABILITADOS = [
   TipoCampo.Tabla,
 ];
 
-export const TIPOS_COLUMNA_TABLA = TIPOS_CAMPO_HABILITADOS
+export const TIPOS_COLUMNA_TABLA: TipoCampo[] = TIPOS_CAMPO_HABILITADOS
   .filter((t) => t !== TipoCampo.Seccion && t !== TipoCampo.Tabla);
 
 export class ColumnaTablaDto {
