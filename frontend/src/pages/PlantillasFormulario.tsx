@@ -95,12 +95,9 @@ export function PlantillasFormulario() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Plantillas para formularios de presentación</h2>
-          <p className="text-sm text-muted-foreground">
-            Acá podés crear formularios de presentación que luego te sirven como plantillas para el momento de configurar una convocatoria.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Acá podés crear formularios de presentación que luego te sirven como plantillas para el momento de configurar una convocatoria.
+        </p>
         <Dialog open={nuevaOpen} onOpenChange={setNuevaOpen}>
           <DialogTrigger asChild>
             <Button>
