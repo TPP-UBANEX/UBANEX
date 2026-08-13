@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsObject } from 'class-validator';
+import { IsOptional, IsString, IsObject, MaxLength } from 'class-validator';
 
 export class GuardarEvaluacionCruzadaDto {
   @IsOptional()
@@ -7,5 +7,6 @@ export class GuardarEvaluacionCruzadaDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   observaciones?: string;
 }

@@ -44,9 +44,10 @@ import type {
   TemplateEvaluacionInstitucional,
   TemplateEvaluacionCruzada,
   Usuario,
+  UnidadAcademica,
   PaginationMeta,
 } from '@/data/types'
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { ProyectoEvaluablePanel } from '@/components/ProyectoEvaluablePanel'
 import type { CampoFormulario } from '@/data/types'
@@ -182,6 +183,9 @@ function InstitucionalView({
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todas')
   const [edicionId, setEdicionId] = useState<string | null>(null)
   const [edicionSeleccionada, setEdicionSeleccionada] = useState<Edicion | null>(null)
   const [template, setTemplate] = useState<TemplateEvaluacionInstitucional | null>(null)
@@ -197,7 +201,12 @@ function InstitucionalView({
   const cargarLista = () => {
     setLoading(true)
     api.evaluaciones.institucionales
-      .listar(convocatoriaId, { page, limit: 10 })
+      .listar(convocatoriaId, {
+        page,
+        limit: 10,
+        search: debouncedSearch || undefined,
+        estado: filtroEstado !== 'todas' ? filtroEstado : undefined,
+      })
       .then((res) => {
         setItems(res.data)
         setMeta(res.meta)
@@ -206,7 +215,20 @@ function InstitucionalView({
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargarLista() }, [convocatoriaId, page])
+  useEffect(() => { cargarLista() }, [convocatoriaId, page, debouncedSearch, filtroEstado])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const cambiarEstado = (v: string) => {
+    setFiltroEstado(v)
+    setPage(1)
+  }
 
   useEffect(() => {
     api.convocatorias.formulario
@@ -291,6 +313,16 @@ function InstitucionalView({
     if (!edicionId) return
     setConfirmando(true)
     try {
+      const categorias = Object.fromEntries(
+        Object.entries(respuestas)
+          .filter(([, r]) => r.valor !== null)
+          .map(([id, r]) => [id, { valor: r.valor!, fundamentacion: r.fundamentacion }]),
+      )
+      await api.evaluaciones.institucionales.guardar(convocatoriaId, edicionId, {
+        categorias,
+        checklist,
+        observaciones,
+      })
       await api.evaluaciones.institucionales.confirmar(convocatoriaId, edicionId)
       toast.success('Evaluación institucional confirmada')
       await seleccionar(edicionId)
@@ -301,16 +333,41 @@ function InstitucionalView({
     }
   }
 
-  if (loading) return <Skeleton className="h-64 w-full" />
-
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={filtroEstado} onValueChange={cambiarEstado}>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todos los estados</SelectItem>
+            <SelectItem value="sin_evaluar">Sin evaluar</SelectItem>
+            <SelectItem value="borrador">Borrador</SelectItem>
+            <SelectItem value="confirmada">Confirmada</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium">Proyectos de mi Unidad Académica</CardTitle>
+          {meta && (
+            <span className="text-xs text-muted-foreground">
+              {meta.total} proyecto{meta.total !== 1 ? 's' : ''} &middot; p&aacute;gina {meta.page} de {meta.totalPages || 1}
+            </span>
+          )}
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {loading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No hay ediciones en evaluación de tu Unidad Académica.
             </p>
@@ -501,11 +558,15 @@ function InstitucionalView({
                     )}
 
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
+                        <span className="text-xs text-muted-foreground">{observaciones.length}/500</span>
+                      </div>
                       <Textarea
                         className="min-h-[80px]"
                         disabled={confirmada}
                         value={observaciones}
+                        maxLength={500}
                         onChange={(e) => setObservaciones(e.target.value)}
                         placeholder="Observaciones generales de la evaluación..."
                       />
@@ -547,6 +608,9 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todas')
   const [edicionId, setEdicionId] = useState<string | null>(null)
   const [edicionSeleccionada, setEdicionSeleccionada] = useState<Edicion | null>(null)
   const [tipo, setTipo] = useState<TipoEvaluacionCruzada | null>(null)
@@ -562,7 +626,12 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
   const cargarDisponibles = () => {
     setLoading(true)
     api.evaluaciones.cruzadas
-      .disponibles(convocatoriaId, { page, limit: 10 })
+      .disponibles(convocatoriaId, {
+        page,
+        limit: 10,
+        search: debouncedSearch || undefined,
+        estado: filtroEstado !== 'todas' ? filtroEstado : undefined,
+      })
       .then((res) => {
         setItems(res.data)
         setMeta(res.meta)
@@ -571,7 +640,20 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargarDisponibles() }, [convocatoriaId, page])
+  useEffect(() => { cargarDisponibles() }, [convocatoriaId, page, debouncedSearch, filtroEstado])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const cambiarEstado = (v: string) => {
+    setFiltroEstado(v)
+    setPage(1)
+  }
 
   useEffect(() => {
     api.convocatorias.formulario
@@ -640,6 +722,12 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
     if (!edicionId) return
     setConfirmando(true)
     try {
+      const items = Object.fromEntries(
+        Object.entries(puntajes)
+          .filter(([, v]) => v !== null)
+          .map(([id, v]) => [id, v!]),
+      )
+      await api.evaluaciones.cruzadas.guardar(convocatoriaId, edicionId, { items, observaciones })
       await api.evaluaciones.cruzadas.confirmar(convocatoriaId, edicionId)
       toast.success('Evaluación cruzada confirmada')
       await seleccionar(edicionId)
@@ -656,16 +744,41 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
     ? sumaItems((template.estructura?.categorias ?? []).flatMap((c) => c.items.map((i) => i.id)))
     : 0
 
-  if (loading) return <Skeleton className="h-64 w-full" />
-
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={filtroEstado} onValueChange={cambiarEstado}>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todos los estados</SelectItem>
+            <SelectItem value="sin_evaluar">Sin evaluar</SelectItem>
+            <SelectItem value="borrador">Borrador</SelectItem>
+            <SelectItem value="confirmada">Confirmada</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium">Evaluaciones disponibles</CardTitle>
+          {meta && (
+            <span className="text-xs text-muted-foreground">
+              {meta.total} proyecto{meta.total !== 1 ? 's' : ''} &middot; p&aacute;gina {meta.page} de {meta.totalPages || 1}
+            </span>
+          )}
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {loading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No hay ediciones disponibles para evaluar.
             </p>
@@ -793,11 +906,15 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
                     </div>
 
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
+                        <span className="text-xs text-muted-foreground">{observaciones.length}/500</span>
+                      </div>
                       <Textarea
                         className="min-h-[80px]"
                         disabled={confirmada}
                         value={observaciones}
+                        maxLength={500}
                         onChange={(e) => setObservaciones(e.target.value)}
                         placeholder="Observaciones de la evaluación..."
                       />
@@ -836,25 +953,79 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
   const [data, setData] = useState<MonitoreoEvaluacion | null>(null)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [unidadAcademicaId, setUnidadAcademicaId] = useState('')
+  const [uas, setUas] = useState<UnidadAcademica[]>([])
+
+  useEffect(() => {
+    api.unidadesAcademicas.list().then(setUas).catch(() => setUas([]))
+  }, [])
 
   useEffect(() => {
     setLoading(true)
     api.evaluaciones
-      .monitoreo(convocatoriaId, { page, limit: 10 })
+      .monitoreo(convocatoriaId, {
+        page,
+        limit: 10,
+        search: debouncedSearch || undefined,
+        unidadAcademicaId: unidadAcademicaId || undefined,
+      })
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [convocatoriaId, page])
+  }, [convocatoriaId, page, debouncedSearch, unidadAcademicaId])
 
-  if (loading) return <Skeleton className="h-64 w-full" />
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const cambiarUa = (v: string) => {
+    setUnidadAcademicaId(v)
+    setPage(1)
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Estado de evaluación por edición</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={unidadAcademicaId} onValueChange={cambiarUa}>
+          <SelectTrigger className="w-56"><SelectValue placeholder="Todas las UAs" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todas las UAs</SelectItem>
+            {uas.map((ua) => (
+              <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium">Estado de evaluación por edición</CardTitle>
+          {data?.meta && (
+            <span className="text-xs text-muted-foreground">
+              {data.meta.total} edicion{data.meta.total !== 1 ? 'es' : ''} &middot; p&aacute;gina {data.meta.page} de {data.meta.totalPages || 1}
+            </span>
+          )}
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+          <>
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Proyecto</TableHead>
@@ -913,15 +1084,18 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
-        {(data?.ediciones.length ?? 0) === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            Esta convocatoria no tiene ediciones.
-          </p>
-        )}
-        <Paginador meta={data?.meta ?? null} page={page} onPage={setPage} />
+          </Table>
+          {(data?.ediciones.length ?? 0) === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No se encontraron ediciones
+            </p>
+          )}
+          <Paginador meta={data?.meta ?? null} page={page} onPage={setPage} />
+          </>
+          )}
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   )
 }
 

@@ -182,6 +182,15 @@ export class ConvocatoriasService {
     const convocatoria = await this.repo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
+    if (
+      convocatoria.estado !== EstadoConvocatoria.Configuracion &&
+      convocatoria.estado !== EstadoConvocatoria.Presentacion
+    ) {
+      throw new BadRequestException(
+        'El emparejamiento solo puede modificarse durante la configuración o la presentación',
+      );
+    }
+
     const todasLasUAs = await this.uaRepo.find();
     const idsValidos = new Set(todasLasUAs.map(ua => ua.id));
     const uasUsadas = new Map<string, string>();

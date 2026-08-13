@@ -61,13 +61,27 @@ export class EvaluacionesService {
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
-    const [ediciones, total] = await this.edicionRepo.findAndCount({
-      where: { convocatoriaId },
-      relations: { proyecto: true, unidadAcademica: true },
-      order: { actualizadoEn: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const query = this.edicionRepo
+      .createQueryBuilder('edicion')
+      .leftJoinAndSelect('edicion.proyecto', 'proyecto')
+      .leftJoinAndSelect('edicion.unidadAcademica', 'unidadAcademica')
+      .where('edicion.convocatoriaId = :convocatoriaId', { convocatoriaId })
+      .andWhere('edicion.eliminadoEn IS NULL')
+      .orderBy('edicion.actualizadoEn', 'DESC');
+
+    if (dto.search) {
+      query.andWhere('proyecto.nombre ILIKE :search', { search: `%${dto.search}%` });
+    }
+    if (dto.unidadAcademicaId) {
+      query.andWhere('edicion.unidadAcademicaId = :unidadAcademicaId', {
+        unidadAcademicaId: dto.unidadAcademicaId,
+      });
+    }
+
+    const [ediciones, total] = await query
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
     const institucionales = await this.institucionalRepo.find({
       where: { convocatoriaId },
       relations: { realizadoPor: true, confirmadoPor: true },
@@ -303,7 +317,7 @@ export class EvaluacionesService {
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
-    const [ediciones, total] = await this.edicionRepo.findAndCount({
+    const ediciones = await this.edicionRepo.find({
       where: {
         convocatoriaId,
         unidadAcademicaId: usuario.unidadAcademicaId,
@@ -311,8 +325,6 @@ export class EvaluacionesService {
       },
       relations: { proyecto: { unidadAcademicaAdicional: true }, unidadAcademica: true, creadoPor: true },
       order: { actualizadoEn: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
     });
 
     const evaluaciones = await this.institucionalRepo.find({
@@ -321,11 +333,31 @@ export class EvaluacionesService {
     });
     const evaluacionPorEdicion = new Map(evaluaciones.map(e => [e.edicionId, e]));
 
+    let items: Array<{ edicion: Edicion; evaluacion: EvaluacionInstitucional | null }> = ediciones.map(ed => ({
+      edicion: ed,
+      evaluacion: evaluacionPorEdicion.get(ed.id) ?? null,
+    }));
+
+    if (dto.search) {
+      const termino = dto.search.toLowerCase();
+      items = items.filter(i =>
+        (i.edicion.proyecto?.nombre ?? '').toLowerCase().includes(termino),
+      );
+    }
+    if (dto.estado) {
+      items = items.filter(i => {
+        if (dto.estado === 'sin_evaluar') return i.evaluacion === null;
+        if (dto.estado === 'borrador') return i.evaluacion?.estado === EstadoEvaluacion.Borrador;
+        if (dto.estado === 'confirmada') return i.evaluacion?.estado === EstadoEvaluacion.Confirmada;
+        return true;
+      });
+    }
+
+    const total = items.length;
+    const pagina = items.slice((page - 1) * limit, page * limit);
+
     return {
-      data: ediciones.map(ed => ({
-        edicion: ed,
-        evaluacion: evaluacionPorEdicion.get(ed.id) ?? null,
-      })),
+      data: pagina,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -609,8 +641,25 @@ export class EvaluacionesService {
       }
     }
 
-    const total = resultado.length;
-    const pagina = resultado.slice((page - 1) * limit, page * limit);
+    let filtradas = resultado;
+
+    if (dto.search) {
+      const termino = dto.search.toLowerCase();
+      filtradas = filtradas.filter(r =>
+        (r.edicion.proyecto?.nombre ?? '').toLowerCase().includes(termino),
+      );
+    }
+    if (dto.estado) {
+      filtradas = filtradas.filter(r => {
+        if (dto.estado === 'sin_evaluar') return r.evaluacion === null;
+        if (dto.estado === 'borrador') return r.evaluacion?.estado === EstadoEvaluacion.Borrador;
+        if (dto.estado === 'confirmada') return r.evaluacion?.estado === EstadoEvaluacion.Confirmada;
+        return true;
+      });
+    }
+
+    const total = filtradas.length;
+    const pagina = filtradas.slice((page - 1) * limit, page * limit);
 
     return {
       data: pagina,
