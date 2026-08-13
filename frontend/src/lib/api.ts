@@ -18,6 +18,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     method,
     headers: authHeaders(),
     body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
   })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
@@ -122,7 +123,15 @@ export const api = {
       get<import('@/data/types').ParticipacionConvocatoria[]>('/participaciones-convocatoria/mias'),
   },
   convocatorias: {
-    list: () => get<import('@/data/types').Convocatoria[]>('/convocatorias'),
+    list: (params?: { page?: number; limit?: number; search?: string; estado?: string; fase?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== ''),
+        ) as Record<string, string>,
+      ).toString() : ''
+      return get<import('@/data/types').PaginatedResponse<import('@/data/types').Convocatoria>>(`/convocatorias${qs}`)
+    },
+    todas: () => get<import('@/data/types').Convocatoria[]>('/convocatorias/todas'),
     get: (id: string) => get<import('@/data/types').Convocatoria>(`/convocatorias/${id}`),
     crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
       post<import('@/data/types').Convocatoria>('/convocatorias', data),
@@ -141,11 +150,31 @@ export const api = {
       guardar: (convocatoriaId: string, campos: import('@/data/types').CampoFormulario[]) =>
         request<import('@/data/types').Formulario>('PUT', `/convocatorias/${convocatoriaId}/formulario`, { campos }),
     },
+    templateInstitucional: {
+      get: (convocatoriaId: string) =>
+        get<import('@/data/types').TemplateEvaluacionInstitucional>(`/convocatorias/${convocatoriaId}/template-evaluacion-institucional`),
+      guardar: (convocatoriaId: string, estructura: import('@/data/types').EstructuraTemplateInstitucional | null) =>
+        request<import('@/data/types').TemplateEvaluacionInstitucional>('PUT', `/convocatorias/${convocatoriaId}/template-evaluacion-institucional`, { estructura }),
+    },
+    templateCruzada: {
+      get: (convocatoriaId: string) =>
+        get<import('@/data/types').TemplateEvaluacionCruzada>(`/convocatorias/${convocatoriaId}/template-evaluacion-cruzada`),
+      guardar: (convocatoriaId: string, estructura: import('@/data/types').EstructuraTemplateCruzada | null) =>
+        request<import('@/data/types').TemplateEvaluacionCruzada>('PUT', `/convocatorias/${convocatoriaId}/template-evaluacion-cruzada`, { estructura }),
+    },
   },
   proyectos: {
-    list: (params?: Record<string, string>) => {
-      const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-      return get<import('@/data/types').Edicion[]>(`/proyectos${qs}`)
+    list: (params?: { page?: number; limit?: number; search?: string; estado?: string; convocatoriaId?: string; anio?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== ''),
+        ) as Record<string, string>,
+      ).toString() : ''
+      return get<import('@/data/types').PaginatedResponse<import('@/data/types').Edicion>>(`/proyectos${qs}`)
+    },
+    todas: (params?: { convocatoriaId?: string }) => {
+      const qs = params?.convocatoriaId ? `?convocatoriaId=${encodeURIComponent(params.convocatoriaId)}` : ''
+      return get<import('@/data/types').Edicion[]>(`/proyectos/todas${qs}`)
     },
     get: (id: string) => get<import('@/data/types').Proyecto>(`/proyectos/${id}`),
     crear: (data: import('@/data/types').CrearProyectoDto) =>
@@ -158,9 +187,55 @@ export const api = {
       del(`/proyectos/${id}/ediciones/${edicionId}`),
   },
   evaluaciones: {
-    list: (proyectoId?: string) => {
-      const qs = proyectoId ? `?proyectoId=${proyectoId}` : ''
-      return get<import('@/data/types').Evaluacion[]>(`/evaluaciones${qs}`)
+    monitoreo: (convocatoriaId: string, params?: { page?: number; limit?: number; search?: string; estado?: string; unidadAcademicaId?: string }) =>
+      get<import('@/data/types').MonitoreoEvaluacion>(`/evaluaciones?convocatoriaId=${encodeURIComponent(convocatoriaId)}${params?.page ? `&page=${params.page}` : ''}${params?.limit ? `&limit=${params.limit}` : ''}${params?.search ? `&search=${encodeURIComponent(params.search)}` : ''}${params?.estado ? `&estado=${params.estado}` : ''}${params?.unidadAcademicaId ? `&unidadAcademicaId=${params.unidadAcademicaId}` : ''}`),
+    edicion: (edicionId: string) =>
+      get<import('@/data/types').EvaluacionEdicionDetalle>(`/evaluaciones/edicion/${edicionId}`),
+    institucionales: {
+      listar: (convocatoriaId: string, params?: { page?: number; limit?: number; search?: string; estado?: string }) =>
+        get<import('@/data/types').PaginatedResponse<import('@/data/types').EdicionEvaluableInstitucional>>(`/evaluaciones/institucionales?convocatoriaId=${encodeURIComponent(convocatoriaId)}${params?.page ? `&page=${params.page}` : ''}${params?.limit ? `&limit=${params.limit}` : ''}${params?.search ? `&search=${encodeURIComponent(params.search)}` : ''}${params?.estado ? `&estado=${params.estado}` : ''}`),
+      obtener: (convocatoriaId: string, edicionId: string) =>
+        get<{ evaluacion: import('@/data/types').EvaluacionInstitucional | null; template: import('@/data/types').TemplateEvaluacionInstitucional | null }>(`/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`),
+      guardar: (convocatoriaId: string, edicionId: string, data: import('@/data/types').GuardarEvaluacionInstitucionalDto) =>
+        request<{ evaluacion: import('@/data/types').EvaluacionInstitucional; template: import('@/data/types').TemplateEvaluacionInstitucional | null }>('PUT', `/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`, data),
+      confirmar: (convocatoriaId: string, edicionId: string) =>
+        post<import('@/data/types').EvaluacionInstitucional>(`/evaluaciones/institucionales/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
+      historial: (convocatoriaId: string, edicionId: string) =>
+        get<import('@/data/types').HistorialEvaluacion[]>(`/evaluaciones/institucionales/${edicionId}/historial?convocatoriaId=${convocatoriaId}`),
+    },
+    cruzadas: {
+      disponibles: (convocatoriaId: string, params?: { page?: number; limit?: number; search?: string; estado?: string }) =>
+        get<import('@/data/types').PaginatedResponse<import('@/data/types').EdicionEvaluableCruzada>>(`/evaluaciones/cruzadas/disponibles?convocatoriaId=${encodeURIComponent(convocatoriaId)}${params?.page ? `&page=${params.page}` : ''}${params?.limit ? `&limit=${params.limit}` : ''}${params?.search ? `&search=${encodeURIComponent(params.search)}` : ''}${params?.estado ? `&estado=${params.estado}` : ''}`),
+      obtener: (convocatoriaId: string, edicionId: string) =>
+        get<{ evaluacion: import('@/data/types').EvaluacionCruzada | null; template: import('@/data/types').TemplateEvaluacionCruzada | null }>(`/evaluaciones/cruzadas/${edicionId}?convocatoriaId=${convocatoriaId}`),
+      guardar: (convocatoriaId: string, edicionId: string, data: import('@/data/types').GuardarEvaluacionCruzadaDto) =>
+        request<{ evaluacion: import('@/data/types').EvaluacionCruzada; template: import('@/data/types').TemplateEvaluacionCruzada | null }>('PUT', `/evaluaciones/cruzadas/${edicionId}?convocatoriaId=${convocatoriaId}`, data),
+      confirmar: (convocatoriaId: string, edicionId: string) =>
+        post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
+      designarTercera: (convocatoriaId: string, edicionId: string, evaluadorId: string) =>
+        post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/designar-tercera?convocatoriaId=${convocatoriaId}`, { evaluadorId }),
+      historial: (convocatoriaId: string, edicionId: string) =>
+        get<import('@/data/types').HistorialEvaluacion[]>(`/evaluaciones/cruzadas/${edicionId}/historial?convocatoriaId=${convocatoriaId}`),
+    },
+  },
+  templatesEvaluacion: {
+    institucionales: {
+      list: () => get<import('@/data/types').TemplateEvaluacionInstitucional[]>('/templates-evaluacion-institucional'),
+      get: (id: string) => get<import('@/data/types').TemplateEvaluacionInstitucional>(`/templates-evaluacion-institucional/${id}`),
+      crear: (data: import('@/data/types').GuardarTemplateInstitucionalDto) =>
+        post<import('@/data/types').TemplateEvaluacionInstitucional>('/templates-evaluacion-institucional', data),
+      actualizar: (id: string, data: Partial<import('@/data/types').GuardarTemplateInstitucionalDto>) =>
+        patch<import('@/data/types').TemplateEvaluacionInstitucional>(`/templates-evaluacion-institucional/${id}`, data),
+      eliminar: (id: string) => del(`/templates-evaluacion-institucional/${id}`),
+    },
+    cruzadas: {
+      list: () => get<import('@/data/types').TemplateEvaluacionCruzada[]>('/templates-evaluacion-cruzada'),
+      get: (id: string) => get<import('@/data/types').TemplateEvaluacionCruzada>(`/templates-evaluacion-cruzada/${id}`),
+      crear: (data: import('@/data/types').GuardarTemplateCruzadaDto) =>
+        post<import('@/data/types').TemplateEvaluacionCruzada>('/templates-evaluacion-cruzada', data),
+      actualizar: (id: string, data: Partial<import('@/data/types').GuardarTemplateCruzadaDto>) =>
+        patch<import('@/data/types').TemplateEvaluacionCruzada>(`/templates-evaluacion-cruzada/${id}`, data),
+      eliminar: (id: string) => del(`/templates-evaluacion-cruzada/${id}`),
     },
   },
   formularios: {

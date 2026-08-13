@@ -81,7 +81,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
       const [parts, usersRes, ediciones] = await Promise.all([
         api.participaciones.listar(convocatoriaId),
         api.usuarios.list({ rol: RolUsuario.Docente, limit: 100 }),
-        api.proyectos.list({ convocatoriaId }),
+        api.proyectos.todas({ convocatoriaId }),
       ])
       setParticipaciones(parts)
       const idsConProyecto = new Set(ediciones.map(e => e.creadoPorId))

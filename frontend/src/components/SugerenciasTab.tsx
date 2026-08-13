@@ -103,8 +103,6 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return camposFormulario.find(c => c.id === campo.slice(16)) ?? null
   }
 
-  const tipoCampoFormulario = (campo: string): TipoCampo | null => campoFormularioDe(campo)?.tipo ?? null
-
   // Un valor sugerido de geolocalización/usuario viaja serializado; si no es JSON válido se muestra tal cual (texto libre).
   const nombreValorObjeto = (valor: string): string => {
     try {

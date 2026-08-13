@@ -16,6 +16,8 @@ import { FormulariosModule } from './formularios/formularios.module';
 import { ParticipacionesConvocatoriaModule } from './participaciones-convocatoria/participaciones-convocatoria.module';
 import { SugerenciasModule } from './sugerencias/sugerencias.module';
 import { GeoModule } from './geo/geo.module';
+import { TemplatesEvaluacionModule } from './templates-evaluacion/templates-evaluacion.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { GeoModule } from './geo/geo.module';
     ParticipacionesConvocatoriaModule,
     SugerenciasModule,
     GeoModule,
+    TemplatesEvaluacionModule,
+    SeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],

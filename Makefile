@@ -1,4 +1,4 @@
-.PHONY: dev backend db-only shell-backend shell-frontend rebuild reset clean logs logs-backend logs-frontend npm-install
+.PHONY: dev backend db-only shell-backend shell-frontend rebuild reset reset-seed seed clean logs logs-backend logs-frontend npm-install
 
 dev:  ## Levanta todo (db + backend + frontend) con logs
 	docker compose up
@@ -24,6 +24,13 @@ rebuild:  ## Reconstruye imágenes desde cero (cuando cambian dependencias)
 reset:  ## Borra volúmenes (DB + node_modules) y reconstruye desde cero
 	docker compose down -v
 	docker compose up --build
+
+seed:  ## Levanta todo forzando el seed (idempotente, no borra datos)
+	UBANEX_SEED=true docker compose up
+
+reset-seed:  ## Borra volúmenes y levanta desde cero con el seed completo
+	docker compose down -v
+	UBANEX_SEED=true docker compose up --build
 
 clean:  ## Libera espacio: elimina contenedores, imágenes y caché no usados
 	docker compose down -v 2>/dev/null; docker system prune -af --volumes

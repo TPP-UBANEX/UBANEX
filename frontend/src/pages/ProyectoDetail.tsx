@@ -38,6 +38,7 @@ import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
+import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import {
   CampoFormularioInput,
   EtiquetaCampoFormulario,
@@ -85,7 +86,6 @@ export function ProyectoDetail() {
   const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
   const tabs = useMemo(
     () => ['info', ...seccionesExtra.map(s => `seccion-${s.id}`), ...TABS_FIJAS_POST],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [seccionesExtra],
   )
   const [tabActivo, setTabActivo] = useState<string>(() => {
@@ -99,7 +99,6 @@ export function ProyectoDetail() {
     } else if (!tabs.includes(tabActivo)) {
       setTabActivo('info')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, tabs])
 
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
@@ -967,16 +966,7 @@ export function ProyectoDetail() {
         </TabsContent>
 
         <TabsContent value="evaluaciones" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium">Evaluaciones</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {edicion?.estado === EstadoEdicion.Borrador || edicion?.estado === EstadoEdicion.Presentado
-                  ? 'El proyecto aún no está en etapa de evaluación.'
-                  : 'Módulo de evaluaciones próximamente.'}
-              </p>
-            </CardContent>
-          </Card>
+          <EvaluacionesProyectoTab edicionId={edicion?.id} estado={edicion?.estado} />
         </TabsContent>
 
         <TabsContent value="rendiciones" className="mt-4">

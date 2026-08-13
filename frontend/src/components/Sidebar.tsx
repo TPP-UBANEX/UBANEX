@@ -11,6 +11,7 @@ import {
   ClipboardList,
   UserCheck,
   LayoutTemplate,
+  Library,
   // CalendarCheck,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
@@ -120,6 +121,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               >
                 <LayoutTemplate className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="text-sm">Plantillas presentación</span>}
+              </Button>
+            )}
+            {esRectorado && (
+              <Button
+                key="/plantillas-evaluacion"
+                variant={location.pathname === '/plantillas-evaluacion' ? 'secondary' : 'ghost'}
+                className={cn(
+                  'w-full justify-start gap-3',
+                  collapsed && 'justify-center px-2',
+                )}
+                onClick={() => navigate('/plantillas-evaluacion')}
+              >
+                <Library className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="text-sm">Plantillas de Evaluación</span>}
               </Button>
             )}
             <Button

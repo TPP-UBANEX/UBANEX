@@ -1,10 +1,11 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn,
+  Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index,
 } from 'typeorm';
 import { Usuario } from '../usuarios/usuario.entity';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 
 @Entity()
+@Index(['entidad', 'entidadId'])
 export class Auditoria {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -29,6 +30,12 @@ export class Auditoria {
 
   @Column({ nullable: true, type: 'text' })
   motivo: string | null;
+
+  @Column({ nullable: true, type: 'varchar' })
+  entidad: string | null;
+
+  @Column({ nullable: true, type: 'varchar' })
+  entidadId: string | null;
 
   @ManyToOne(() => Usuario)
   @JoinColumn({ name: 'usuarioId' })

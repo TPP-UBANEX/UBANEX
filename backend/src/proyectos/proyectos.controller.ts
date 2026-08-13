@@ -5,6 +5,7 @@ import {
 import { ProyectosService } from './proyectos.service';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
+import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -24,11 +25,16 @@ export class ProyectosController {
   }
 
   @Get()
-  listar(
+  listar(@CurrentUser() usuario: Usuario, @Query() dto: ListarProyectosDto) {
+    return this.service.listar(usuario, dto);
+  }
+
+  @Get('todas')
+  listarTodas(
     @CurrentUser() usuario: Usuario,
     @Query('convocatoriaId') convocatoriaId?: string,
   ) {
-    return this.service.listar(usuario, convocatoriaId);
+    return this.service.listarTodas(usuario, convocatoriaId);
   }
 
   @Get(':id')

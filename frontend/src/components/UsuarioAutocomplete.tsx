@@ -51,7 +51,6 @@ export function UsuarioAutocomplete({ value, onChange, roles, disabled }: Props)
       }
     }, 300)
     return () => clearTimeout(timeout)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texto, claveRoles])
 
   useEffect(() => {

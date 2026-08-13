@@ -28,6 +28,10 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/ubanex
       PORT: 3000
+      # El seed es idempotente: en el entorno Docker de desarrollo corre por
+      # defecto. Para saltearlo: UBANEX_SEED=false make dev, o fijarlo en un
+      # .env en la raiz del repo (gitignoreado).
+      UBANEX_SEED: ${UBANEX_SEED:-true}
     volumes:
       - ./backend:/app
       - /app/node_modules
