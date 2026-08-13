@@ -778,6 +778,20 @@ async function bootstrap() {
       orden: 3,
       opciones: ['Niños y adolescentes', 'Adultos mayores', 'Personas con discapacidad', 'Comunidad general'],
     },
+    {
+      id: crypto.randomUUID(),
+      tipo: TipoCampo.Tabla,
+      nombre: 'Cronograma de actividades',
+      textoAyuda: 'Detallá las actividades previstas para el proyecto',
+      esObligatorio: true,
+      orden: 4,
+      columnas: [
+        { id: crypto.randomUUID(), tipo: TipoCampo.Texto, nombre: 'Actividad', esObligatorio: true },
+        { id: crypto.randomUUID(), tipo: TipoCampo.Fecha, nombre: 'Fecha', esObligatorio: true },
+        { id: crypto.randomUUID(), tipo: TipoCampo.Texto, nombre: 'Responsable', esObligatorio: false },
+      ],
+      filasMinimas: 1,
+    },
   ];
 
   // Las plantillas se administran desde Rectorado (/plantillas-formulario); acá solo va la base.
