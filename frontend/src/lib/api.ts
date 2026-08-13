@@ -73,6 +73,10 @@ export const api = {
     eliminar: (id: string) => del(`/usuarios/${id}`),
     resetPassword: (id: string) => post<{ message: string }>(`/usuarios/${id}/reset-password`, {}),
     auditoria: (id: string) => get<import('@/data/types').Auditoria[]>(`/usuarios/${id}/auditoria`),
+    buscar: (q: string, roles?: import('@/data/types').RolUsuario[]) =>
+      get<import('@/data/types').UsuarioSugerido[]>(
+        `/usuarios/buscar?q=${encodeURIComponent(q)}${roles?.length ? `&roles=${roles.join(',')}` : ''}`,
+      ),
   },
   geo: {
     localidades: (q: string) =>

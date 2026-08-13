@@ -10,8 +10,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { MAX_LONGITUD_POR_TIPO, TipoCampo } from '@/data/types'
-import type { CampoFormulario, ColumnaTabla, ValorGeolocalizacion } from '@/data/types'
+import type { CampoFormulario, ColumnaTabla, ValorGeolocalizacion, ValorUsuario } from '@/data/types'
 import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
+import { UsuarioAutocomplete } from '@/components/UsuarioAutocomplete'
 import { TablaCampoFormulario } from '@/components/TablaCampoFormulario'
 
 export function EtiquetaCampoFormulario({ campo }: { campo: Pick<CampoFormulario, 'nombre' | 'esObligatorio'> }) {
@@ -30,8 +31,8 @@ function filaVacia(columnas: ColumnaTabla[], fila: Record<string, unknown>): boo
 export function campoFormularioVacio(campo: CampoFormulario | ColumnaTabla, valor: unknown): boolean {
   if (valor == null) return true
   if (campo.tipo === TipoCampo.Checkbox) return !Array.isArray(valor) || valor.length === 0
-  if (campo.tipo === TipoCampo.Geolocalizacion) {
-    const nombre = (valor as Partial<ValorGeolocalizacion>)?.nombre
+  if (campo.tipo === TipoCampo.Geolocalizacion || campo.tipo === TipoCampo.Usuario) {
+    const nombre = (valor as Partial<ValorGeolocalizacion | ValorUsuario>)?.nombre
     return typeof nombre !== 'string' || nombre.trim() === ''
   }
   if (campo.tipo === TipoCampo.Tabla) {
@@ -55,6 +56,10 @@ export function formatearValorCampoFormulario(campo: CampoFormulario | ColumnaTa
   if (campo.tipo === TipoCampo.Checkbox) return (valor as string[]).join(', ')
   if (campo.tipo === TipoCampo.Fecha) return formatearFechaISO(String(valor))
   if (campo.tipo === TipoCampo.Geolocalizacion) return (valor as ValorGeolocalizacion).nombre
+  if (campo.tipo === TipoCampo.Usuario) {
+    const v = valor as ValorUsuario
+    return v.email ? `${v.nombre} (${v.email})` : v.nombre
+  }
   if (campo.tipo === TipoCampo.Tabla) {
     const columnas = (campo as CampoFormulario).columnas ?? []
     const filas = (valor as Record<string, unknown>[]).filter(fila => !filaVacia(columnas, fila ?? {}))
@@ -66,7 +71,7 @@ export function formatearValorCampoFormulario(campo: CampoFormulario | ColumnaTa
 }
 
 /** El subconjunto de un campo/columna necesario para resolver qué control de entrada mostrar. */
-type CampoControlable = Pick<CampoFormulario, 'tipo' | 'opciones' | 'minimo' | 'maximo' | 'admiteDecimales'>
+type CampoControlable = Pick<CampoFormulario, 'tipo' | 'opciones' | 'minimo' | 'maximo' | 'admiteDecimales' | 'rolesUsuario'>
 
 interface ControlProps {
   campo: CampoControlable
@@ -137,6 +142,14 @@ export function ControlCampoFormulario({ campo, valor, onChange, compacto = fals
       {campo.tipo === TipoCampo.Geolocalizacion && (
         <LocalidadAutocomplete
           value={valor as ValorGeolocalizacion | null}
+          onChange={onChange}
+        />
+      )}
+
+      {campo.tipo === TipoCampo.Usuario && (
+        <UsuarioAutocomplete
+          value={valor as ValorUsuario | null}
+          roles={campo.rolesUsuario}
           onChange={onChange}
         />
       )}
