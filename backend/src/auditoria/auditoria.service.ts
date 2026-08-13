@@ -20,9 +20,19 @@ export class AuditoriaService {
     responsableId: string;
     responsableNombre: string;
     motivo?: string;
+    entidad?: string;
+    entidadId?: string;
   }): Promise<Auditoria> {
     const entity = this.repo.create(params);
     return this.repo.save(entity);
+  }
+
+  listarPorEntidad(entidad: string, entidadId: string): Promise<Auditoria[]> {
+    return this.repo.find({
+      where: { entidad, entidadId },
+      relations: { usuario: true },
+      order: { fecha: 'ASC' },
+    });
   }
 
   listarPorUsuario(usuarioId: string, usuarioLogueado: Usuario): Promise<Auditoria[]> {

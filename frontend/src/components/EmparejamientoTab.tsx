@@ -26,9 +26,10 @@ import { Loader2 } from 'lucide-react'
 
 interface Props {
   convocatoriaId: string
+  bloqueado?: boolean
 }
 
-export function EmparejamientoTab({ convocatoriaId }: Props) {
+export function EmparejamientoTab({ convocatoriaId, bloqueado = false }: Props) {
   const [uas, setUas] = useState<UnidadAcademica[]>([])
   const [pares, setPares] = useState<Map<string, string>>(new Map())
   const [usarDefault, setUsarDefault] = useState(false)
@@ -169,10 +170,17 @@ export function EmparejamientoTab({ convocatoriaId }: Props) {
             type="checkbox"
             checked={usarDefault}
             onChange={e => aplicarDefault(e.target.checked)}
+            disabled={bloqueado}
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
           Usar emparejamiento default
         </label>
+
+        {bloqueado && (
+          <p className="text-xs text-muted-foreground">
+            El emparejamiento se bloquea al iniciar la evaluación y ya no puede modificarse.
+          </p>
+        )}
 
         <Table>
           <TableHeader>
@@ -191,6 +199,7 @@ export function EmparejamientoTab({ convocatoriaId }: Props) {
                     <Select
                       value={parejaId ?? ''}
                       onValueChange={v => handleSeleccionar(ua.id, v)}
+                      disabled={bloqueado}
                     >
                       <SelectTrigger className="w-[420px]">
                         <SelectValue placeholder="—" />
@@ -210,7 +219,7 @@ export function EmparejamientoTab({ convocatoriaId }: Props) {
         </Table>
 
         <div className="flex justify-end">
-          <Button onClick={handleConfirmar} disabled={guardando}>
+          <Button onClick={handleConfirmar} disabled={guardando || bloqueado}>
             {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {guardando ? 'Guardando...' : 'Confirmar'}
           </Button>

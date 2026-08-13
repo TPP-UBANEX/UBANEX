@@ -343,6 +343,211 @@ export interface Evaluacion {
   estado: string
 }
 
+// --- Evaluación (módulo de evaluación) ---
+
+export enum EstadoEvaluacion {
+  Borrador = 'Borrador',
+  Confirmada = 'Confirmada',
+}
+
+export enum TipoEvaluacionCruzada {
+  Propia = 'Propia',
+  Ajena = 'Ajena',
+  TerceraUa = 'TerceraUa',
+}
+
+export type TipoValorSubcategoria = 'numerico' | 'booleano'
+
+export interface SubcategoriaInstitucional {
+  id: string
+  texto: string
+  tipoValor: TipoValorSubcategoria
+  minimo: number | null
+  maximo: number | null
+  fundamentacion: string | null
+}
+
+export interface CategoriaInstitucional {
+  id: string
+  nombre: string
+  subcategorias: SubcategoriaInstitucional[]
+}
+
+export interface ItemChecklist {
+  id: string
+  texto: string
+}
+
+export interface EstructuraTemplateInstitucional {
+  categorias: CategoriaInstitucional[]
+  checklist: ItemChecklist[]
+}
+
+export interface ItemCruzada {
+  id: string
+  nombre: string
+  puntajeMaximo: number
+}
+
+export interface CategoriaCruzada {
+  id: string
+  nombre: string
+  puntajeMaximo: number
+  items: ItemCruzada[]
+}
+
+export interface EstructuraTemplateCruzada {
+  categorias: CategoriaCruzada[]
+}
+
+export interface TemplateEvaluacionInstitucional {
+  id: string
+  nombre: string
+  esDefault: boolean
+  esPlantilla: boolean
+  estructura: EstructuraTemplateInstitucional | null
+}
+
+export interface TemplateEvaluacionCruzada {
+  id: string
+  nombre: string
+  esDefault: boolean
+  esPlantilla: boolean
+  estructura: EstructuraTemplateCruzada | null
+}
+
+export interface GuardarTemplateInstitucionalDto {
+  nombre: string
+  esDefault?: boolean
+  estructura?: EstructuraTemplateInstitucional | null
+}
+
+export interface GuardarTemplateCruzadaDto {
+  nombre: string
+  esDefault?: boolean
+  estructura?: EstructuraTemplateCruzada | null
+}
+
+export interface EvaluacionInstitucional {
+  id: string
+  convocatoriaId: string
+  edicionId: string
+  templateId: string
+  estado: EstadoEvaluacion
+  categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
+  checklist: Record<string, boolean> | null
+  observaciones: string | null
+  realizadoPor?: Usuario
+  actualizadoPor?: Usuario
+  confirmadoPor?: Usuario
+  realizadoPorId?: string
+  actualizadoPorId?: string
+  confirmadoPorId?: string
+}
+
+export interface EvaluacionCruzada {
+  id: string
+  convocatoriaId: string
+  edicionId: string
+  evaluadorId: string
+  evaluador?: Usuario
+  tipo: TipoEvaluacionCruzada
+  templateId: string
+  estado: EstadoEvaluacion
+  items: Record<string, number> | null
+  observaciones: string | null
+  actualizadoPor?: Usuario
+  actualizadoPorId?: string
+}
+
+export interface EdicionEvaluableInstitucional {
+  edicion: Edicion
+  evaluacion: EvaluacionInstitucional | null
+}
+
+export interface EdicionEvaluableCruzada {
+  edicion: Edicion
+  tipo: TipoEvaluacionCruzada
+  evaluacion: EvaluacionCruzada | null
+}
+
+export interface HistorialEvaluacion {
+  fecha: string
+  accion: string
+  descripcion: string
+  usuarioId: string
+  usuarioNombre: string
+}
+
+export interface MonitoreoEvaluacion {
+  convocatoria: Convocatoria
+  meta: PaginationMeta
+  ediciones: Array<{
+    edicion: Edicion
+    institucional: {
+      id: string
+      estado: EstadoEvaluacion
+      observaciones: string | null
+      realizadoPor: { id: string; nombreCompleto: string } | null
+      confirmadoPor: { id: string; nombreCompleto: string } | null
+    } | null
+    cruzadas: Array<{
+      id: string
+      tipo: TipoEvaluacionCruzada
+      estado: EstadoEvaluacion
+      evaluador: { id: string; nombreCompleto: string } | null
+    }>
+  }>
+}
+
+export interface EvaluacionEdicionDetalle {
+  convocatoria: {
+    id: string
+    nombre: string | null
+    estado: string | null
+  }
+  institucional: {
+    id: string
+    estado: EstadoEvaluacion
+    observaciones: string | null
+    realizadoPor: { id: string; nombreCompleto: string } | null
+    confirmadoPor: { id: string; nombreCompleto: string } | null
+    categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
+    checklist: Record<string, boolean> | null
+  } | null
+  cruzadas: Array<{
+    id: string
+    tipo: TipoEvaluacionCruzada
+    estado: EstadoEvaluacion
+    evaluador: { id: string; nombreCompleto: string } | null
+    observaciones: string | null
+    items: Record<string, number> | null
+    puntaje: number | null
+    puntajeMaximo: number | null
+  }>
+  estructuraInstitucional: EstructuraTemplateInstitucional | null
+  estructuraCruzada: EstructuraTemplateCruzada | null
+  resumen: {
+    puntajeInstitucional: number
+    puntajeInstitucionalMaximo: number
+    puntajeCruzadaPromedio: number | null
+    puntajeCruzadaMaximo: number
+    notaFinal: number
+    adjudicado: boolean
+  } | null
+}
+
+export interface GuardarEvaluacionInstitucionalDto {
+  categorias?: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
+  checklist?: Record<string, boolean> | null
+  observaciones?: string
+}
+
+export interface GuardarEvaluacionCruzadaDto {
+  items?: Record<string, number> | null
+  observaciones?: string
+}
+
 export interface Rendicion {
   id: string
   proyectoId: string
@@ -497,6 +702,7 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Aceptada: 'default',
   Rechazada: 'destructive',
   MasInformacion: 'outline',
+  Confirmada: 'default',
 }
 
 export const estadoConvocatoriaLabel: Record<string, string> = {

@@ -30,8 +30,8 @@ export function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      api.proyectos.list(),
-      api.convocatorias.list(),
+      api.proyectos.todas(),
+      api.convocatorias.todas(),
     ]).then(([e, c]) => {
       setEdiciones(e)
       setConvocatorias(c)

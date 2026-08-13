@@ -37,6 +37,7 @@ import {
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
+import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import {
   CampoFormularioInput,
   EtiquetaCampoFormulario,
@@ -877,16 +878,7 @@ export function ProyectoDetail() {
         </TabsContent>
 
         <TabsContent value="evaluaciones" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium">Evaluaciones</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {edicion?.estado === EstadoEdicion.Borrador || edicion?.estado === EstadoEdicion.Presentado
-                  ? 'El proyecto aún no está en etapa de evaluación.'
-                  : 'Módulo de evaluaciones próximamente.'}
-              </p>
-            </CardContent>
-          </Card>
+          <EvaluacionesProyectoTab edicionId={edicion?.id} estado={edicion?.estado} />
         </TabsContent>
 
         <TabsContent value="rendiciones" className="mt-4">

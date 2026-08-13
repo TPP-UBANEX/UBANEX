@@ -1,6 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, ManyToOne, JoinColumn } from 'typeorm';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { Formulario } from '../formularios/formulario.entity';
+import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
+import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
 
 @Entity()
 export class Convocatoria {
@@ -43,4 +45,18 @@ export class Convocatoria {
 
   @Column({ nullable: true })
   formularioId: string | null;
+
+  @ManyToOne(() => TemplateEvaluacionInstitucional, { nullable: true })
+  @JoinColumn({ name: 'templateEvaluacionInstitucionalId' })
+  templateEvaluacionInstitucional: TemplateEvaluacionInstitucional | null;
+
+  @Column({ nullable: true })
+  templateEvaluacionInstitucionalId: string | null;
+
+  @ManyToOne(() => TemplateEvaluacionCruzada, { nullable: true })
+  @JoinColumn({ name: 'templateEvaluacionCruzadaId' })
+  templateEvaluacionCruzada: TemplateEvaluacionCruzada | null;
+
+  @Column({ nullable: true })
+  templateEvaluacionCruzadaId: string | null;
 }

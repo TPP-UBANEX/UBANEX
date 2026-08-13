@@ -32,13 +32,14 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Convocatoria, Edicion, ParticipacionConvocatoria } from '@/data/types'
-import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
+import type { Convocatoria, Edicion, ParticipacionConvocatoria, PaginatedResponse } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab'
-import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
+import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab'
+import { ArrowLeft, Pencil, Plus, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 function erroresFechas(f: {
@@ -71,8 +72,16 @@ export function ConvocatoriaDetail() {
   const { user } = useAuth()
   const [conv, setConv] = useState<Convocatoria | null>(null)
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
+  const [todasEdiciones, setTodasEdiciones] = useState<Edicion[]>([])
+  const [meta, setMeta] = useState<PaginatedResponse<Edicion>['meta'] | null>(null)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filtroEtapa, setFiltroEtapa] = useState('todas')
+  const [filtroAnio, setFiltroAnio] = useState('todas')
   const [invitacionEvaluador, setInvitacionEvaluador] = useState<ParticipacionConvocatoria | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingTabla, setLoadingTabla] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
   const [guardando, setGuardando] = useState(false)
@@ -97,11 +106,11 @@ export function ConvocatoriaDetail() {
     setLoading(true)
     Promise.all([
       api.convocatorias.get(id),
-      api.proyectos.list({ convocatoriaId: id }),
+      api.proyectos.todas({ convocatoriaId: id }),
       api.participaciones.listarMias().catch(() => []),
     ]).then(([c, e, p]) => {
       setConv(c)
-      setEdiciones(e)
+      setTodasEdiciones(e)
       const evaluador = (p as ParticipacionConvocatoria[]).find(pc =>
         pc.convocatoriaId === id && pc.rol === RolEjecucion.Evaluador,
       ) ?? null
@@ -112,6 +121,36 @@ export function ConvocatoriaDetail() {
   useEffect(() => {
     cargarDatos()
   }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    setLoadingTabla(true)
+    api.proyectos.list({
+      convocatoriaId: id,
+      page,
+      limit: 10,
+      search: debouncedSearch || undefined,
+      estado: filtroEtapa !== 'todas' ? filtroEtapa : undefined,
+      anio: filtroAnio !== 'todas' ? Number(filtroAnio) : undefined,
+    })
+      .then(res => {
+        setEdiciones(res.data)
+        setMeta(res.meta)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTabla(false))
+  }, [id, page, debouncedSearch, filtroEtapa, filtroAnio])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const cambiarEtapa = (v: string) => { setFiltroEtapa(v); setPage(1) }
+  const cambiarAnio = (v: string) => { setFiltroAnio(v); setPage(1) }
 
   const responderInvitacion = async (aceptada: boolean) => {
     if (!invitacionEvaluador) return
@@ -192,8 +231,10 @@ export function ConvocatoriaDetail() {
 
   const conteo: Record<string, number> = {}
   Object.values(EstadoEdicion).forEach(estado => {
-    conteo[estado] = ediciones.filter(e => e.estado === estado).length
+    conteo[estado] = todasEdiciones.filter(e => e.estado === estado).length
   })
+
+  const anios = [...new Set(todasEdiciones.map(e => e.anioEdicion).filter((a): a is number => a != null))].sort((a, b) => b - a)
 
   return (
     <div className="p-6 space-y-6">
@@ -338,13 +379,14 @@ export function ConvocatoriaDetail() {
 
       <Tabs defaultValue="proyectos">
         <TabsList>
-          <TabsTrigger value="proyectos">Proyectos ({ediciones.length})</TabsTrigger>
+          <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
           {!esUsuarioEjecucion && (
             <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>
           )}
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
           {esRectorado && <TabsTrigger value="formulario">Formulario</TabsTrigger>}
+          {esRectorado && <TabsTrigger value="evaluacion">Evaluación</TabsTrigger>}
         </TabsList>
         <TabsContent value="proyectos" className="mt-4">
           <Card>
@@ -381,42 +423,133 @@ export function ConvocatoriaDetail() {
                 </p>
               </div>
             )}
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Proyecto</TableHead>
-                    <TableHead>Creado por</TableHead>
-                    <TableHead>Facultad</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Presupuesto</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ediciones.map(e => (
-                    <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
-                      <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
-                      <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                      <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
-                      </TableCell>
-                    </TableRow>
+            <div className="px-6 pb-4 flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <Select value={filtroEtapa} onValueChange={cambiarEtapa}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas las etapas</SelectItem>
+                  {Object.values(EstadoEdicion).map(s => (
+                    <SelectItem key={s} value={s}>{estadoEdicionLabel[s] || s}</SelectItem>
                   ))}
-                </TableBody>
-              </Table>
+                </SelectContent>
+              </Select>
+              <Select value={filtroAnio} onValueChange={cambiarAnio}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Edición" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas las ediciones</SelectItem>
+                  {anios.map(a => (
+                    <SelectItem key={a} value={String(a)}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <CardContent>
+              {loadingTabla ? (
+                <div className="space-y-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="flex gap-4">
+                      {[...Array(5)].map((_, j) => (
+                        <Skeleton key={j} className="h-4 flex-1" />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : ediciones.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">No hay proyectos que coincidan con la búsqueda</div>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Proyecto</TableHead>
+                        <TableHead>Creado por</TableHead>
+                        <TableHead>Facultad</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Presupuesto</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ediciones.map(e => (
+                        <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
+                          <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
+                          <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
+                          <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {meta && meta.totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page <= 1}
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 2)
+                        .map((p, idx, arr) => (
+                          <span key={p} className="flex items-center gap-1">
+                            {idx > 0 && arr[idx - 1] !== p - 1 && (
+                              <span className="text-muted-foreground px-1">...</span>
+                            )}
+                            <Button
+                              variant={p === page ? 'default' : 'outline'}
+                              size="sm"
+                              className="min-w-[2rem]"
+                              onClick={() => setPage(p)}
+                            >
+                              {p}
+                            </Button>
+                          </span>
+                        ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= meta.totalPages}
+                        onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="emparejamiento" className="mt-4">
-          {id && <EmparejamientoTab convocatoriaId={id} />}
+          {id && (
+            <EmparejamientoTab
+              convocatoriaId={id}
+              bloqueado={
+                !conv ||
+                (conv.estado !== EstadoConvocatoria.Configuracion &&
+                  conv.estado !== EstadoConvocatoria.Presentacion)
+              }
+            />
+          )}
         </TabsContent>
         {esRectorado && (
           <TabsContent value="formulario" className="mt-4">
             {id && conv && <FormularioBuilderTab convocatoriaId={id} estadoConvocatoria={conv.estado} />}
+          </TabsContent>
+        )}
+        {esRectorado && (
+          <TabsContent value="evaluacion" className="mt-4">
+            {id && conv && <EvaluacionConfigTab convocatoriaId={id} estadoConvocatoria={conv.estado} />}
           </TabsContent>
         )}
         <TabsContent value="evaluadores" className="mt-4">

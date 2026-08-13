@@ -21,6 +21,7 @@ function tituloSeccion(pathname: string, search: string, userId?: string): strin
   if (pathname === '/proyectos') return search.includes('revision=true') ? 'Revisión de proyectos' : 'Proyectos'
   if (pathname.startsWith('/proyectos/')) return 'Proyecto'
   if (pathname === '/evaluacion') return 'Evaluación'
+  if (pathname === '/plantillas-evaluacion') return 'Plantillas de evaluación'
   if (pathname === '/usuarios') return 'Usuarios'
   if (pathname.startsWith('/usuarios/')) {
     const id = pathname.split('/')[2]

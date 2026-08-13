@@ -15,6 +15,8 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
 import { FormulariosModule } from './formularios/formularios.module';
 import { ParticipacionesConvocatoriaModule } from './participaciones-convocatoria/participaciones-convocatoria.module';
 import { SugerenciasModule } from './sugerencias/sugerencias.module';
+import { TemplatesEvaluacionModule } from './templates-evaluacion/templates-evaluacion.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
@@ -41,6 +43,8 @@ import { SugerenciasModule } from './sugerencias/sugerencias.module';
     FormulariosModule,
     ParticipacionesConvocatoriaModule,
     SugerenciasModule,
+    TemplatesEvaluacionModule,
+    SeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],

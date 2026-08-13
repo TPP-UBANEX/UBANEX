@@ -1,11 +1,13 @@
 import {
-  Controller, Get, Post, Patch, Put, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Patch, Put, Delete, Body, Param, Query, UseGuards,
 } from '@nestjs/common';
 import { ConvocatoriasService } from './convocatorias.service';
+import { ListarConvocatoriasDto } from './dto/listar-convocatorias.dto';
 import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
 import { GuardarFormularioDto } from './dto/guardar-formulario.dto';
+import { GuardarEstructuraInstitucionalDto, GuardarEstructuraCruzadaDto } from './dto/guardar-estructura-template.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,8 +21,13 @@ export class ConvocatoriasController {
   constructor(private readonly service: ConvocatoriasService) {}
 
   @Get()
-  listar() {
-    return this.service.listar();
+  listar(@CurrentUser() usuario: Usuario, @Query() dto: ListarConvocatoriasDto) {
+    return this.service.listar(usuario, dto);
+  }
+
+  @Get('todas')
+  listarTodas(@CurrentUser() usuario: Usuario) {
+    return this.service.listarTodas(usuario);
   }
 
   @Get(':id')
@@ -76,5 +83,33 @@ export class ConvocatoriasController {
     @Body() dto: GuardarFormularioDto,
   ) {
     return this.service.guardarFormulario(id, dto);
+  }
+
+  @Get(':id/template-evaluacion-institucional')
+  obtenerTemplateInstitucional(@Param('id') id: string) {
+    return this.service.obtenerTemplateInstitucional(id);
+  }
+
+  @Put(':id/template-evaluacion-institucional')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  guardarTemplateInstitucional(
+    @Param('id') id: string,
+    @Body() dto: GuardarEstructuraInstitucionalDto,
+  ) {
+    return this.service.guardarTemplateInstitucional(id, dto);
+  }
+
+  @Get(':id/template-evaluacion-cruzada')
+  obtenerTemplateCruzada(@Param('id') id: string) {
+    return this.service.obtenerTemplateCruzada(id);
+  }
+
+  @Put(':id/template-evaluacion-cruzada')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  guardarTemplateCruzada(
+    @Param('id') id: string,
+    @Body() dto: GuardarEstructuraCruzadaDto,
+  ) {
+    return this.service.guardarTemplateCruzada(id, dto);
   }
 }
