@@ -98,10 +98,12 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return campo
   }
 
-  const tipoCampoFormulario = (campo: string): TipoCampo | null => {
+  const campoFormularioDe = (campo: string): CampoFormulario | null => {
     if (!campo.startsWith('datosFormulario.')) return null
-    return camposFormulario.find(c => c.id === campo.slice(16))?.tipo ?? null
+    return camposFormulario.find(c => c.id === campo.slice(16)) ?? null
   }
+
+  const tipoCampoFormulario = (campo: string): TipoCampo | null => campoFormularioDe(campo)?.tipo ?? null
 
   // Un valor sugerido de geolocalización viaja serializado; si no es JSON válido se muestra tal cual (texto libre).
   const nombreValorGeo = (valor: string): string => {
@@ -114,14 +116,42 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return valor
   }
 
+  // El valor actual de una tabla viaja como el JSON del array de filas.
+  const nombreValorTabla = (valor: string, campoFormulario: CampoFormulario | null): string => {
+    const columnas = campoFormulario?.columnas ?? []
+    try {
+      const filas = JSON.parse(valor)
+      if (!Array.isArray(filas)) return valor
+      if (filas.length === 0) return '(sin filas)'
+      return filas
+        .map((fila: Record<string, unknown>) =>
+          columnas.map(c => `${c.nombre}: ${fila?.[c.id] ?? '-'}`).join(' · '))
+        .join('\n')
+    } catch {
+      return valor
+    }
+  }
+
   const ValorDiff = ({ campo, actual, sugerido }: { campo: string; actual: string | null; sugerido: string | null }) => {
-    const tipo = tipoCampoFormulario(campo)
-    // Las fechas se guardan en ISO y la geolocalización serializada; ambas se muestran legibles.
+    const campoFormulario = campoFormularioDe(campo)
+    const tipo = campoFormulario?.tipo ?? null
+    // Las fechas se guardan en ISO, la geolocalización y las tablas serializadas; se muestran legibles.
     const mostrar = (valor: string | null) => {
       if (valor == null) return '(sin valor)'
       if (tipo === TipoCampo.Fecha) return formatearFechaISO(valor)
       if (tipo === TipoCampo.Geolocalizacion) return nombreValorGeo(valor)
+      if (tipo === TipoCampo.Tabla) return nombreValorTabla(valor, campoFormulario)
       return valor
+    }
+
+    if (sugerido == null) {
+      return (
+        <div className="flex items-start gap-2 text-sm mb-2">
+          <span className="text-foreground whitespace-pre-wrap break-words line-clamp-3 min-w-0">
+            {mostrar(actual)}
+          </span>
+        </div>
+      )
     }
 
     return (

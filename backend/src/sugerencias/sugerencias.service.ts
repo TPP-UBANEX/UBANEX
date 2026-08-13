@@ -405,6 +405,9 @@ export class SugerenciasService {
     if (campoFormulario.tipo === TipoCampo.Seccion) {
       throw new BadRequestException('No se puede sugerir un cambio sobre una sección');
     }
+    if (campoFormulario.tipo === TipoCampo.Tabla) {
+      throw new BadRequestException('Sobre una tabla solo se puede dejar un comentario, no un valor sugerido');
+    }
 
     const valor = campoFormulario.tipo === TipoCampo.Geolocalizacion
       ? this.parsearValorGeo(valorSugerido)

@@ -48,6 +48,8 @@ interface SugerirCambioModalProps {
   step?: number | 'any'
   /** Para campos de geolocalización: reemplaza "Valor sugerido" por el buscador de localidades. */
   geo?: boolean
+  /** Para campos de tabla: oculta "Valor sugerido", la sugerencia queda como un comentario global sobre el campo. */
+  soloComentario?: boolean
   onSuccess?: () => void
 }
 
@@ -67,6 +69,7 @@ export function SugerirCambioModal({
   max,
   step,
   geo = false,
+  soloComentario = false,
   onSuccess,
 }: SugerirCambioModalProps) {
   const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
@@ -99,9 +102,11 @@ export function SugerirCambioModal({
   const enviar = async () => {
     setSubmitting(true)
     try {
-      const valorAEnviar = geo
-        ? (valorGeoSugerido?.nombre.trim() ? JSON.stringify(valorGeoSugerido) : undefined)
-        : (valorSugerido.trim() || undefined)
+      const valorAEnviar = soloComentario
+        ? undefined
+        : geo
+          ? (valorGeoSugerido?.nombre.trim() ? JSON.stringify(valorGeoSugerido) : undefined)
+          : (valorSugerido.trim() || undefined)
       await api.sugerencias.crear(edicionId, {
         campo,
         valorSugerido: valorAEnviar,
@@ -124,7 +129,9 @@ export function SugerirCambioModal({
         <DialogHeader>
           <DialogTitle>Sugerir cambio</DialogTitle>
           <DialogDescription>
-            Propone un nuevo valor para <strong>{label}</strong>
+            {soloComentario
+              ? <>Dejá un comentario sobre <strong>{label}</strong></>
+              : <>Propone un nuevo valor para <strong>{label}</strong></>}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -141,33 +148,35 @@ export function SugerirCambioModal({
               : <Input value={valorActual} disabled className="bg-muted" />}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium">
-              Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-            </p>
-            {geo ? (
-              <LocalidadAutocomplete value={valorGeoSugerido} onChange={setValorGeoSugerido} />
-            ) : multilinea ? (
-              <Textarea
-                rows={8}
-                value={valorSugerido}
-                maxLength={maxLongitud}
-                onChange={e => setValorSugerido(e.target.value)}
-                placeholder="Nuevo valor propuesto"
-              />
-            ) : (
-              <Input
-                type={tipoInput}
-                value={valorSugerido}
-                maxLength={maxLongitud}
-                min={tipoInput === 'number' ? min : undefined}
-                max={tipoInput === 'number' ? max : undefined}
-                step={tipoInput === 'number' ? step : undefined}
-                onChange={e => setValorSugerido(e.target.value)}
-                placeholder="Nuevo valor propuesto"
-              />
-            )}
-          </div>
+          {!soloComentario && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+              </p>
+              {geo ? (
+                <LocalidadAutocomplete value={valorGeoSugerido} onChange={setValorGeoSugerido} />
+              ) : multilinea ? (
+                <Textarea
+                  rows={8}
+                  value={valorSugerido}
+                  maxLength={maxLongitud}
+                  onChange={e => setValorSugerido(e.target.value)}
+                  placeholder="Nuevo valor propuesto"
+                />
+              ) : (
+                <Input
+                  type={tipoInput}
+                  value={valorSugerido}
+                  maxLength={maxLongitud}
+                  min={tipoInput === 'number' ? min : undefined}
+                  max={tipoInput === 'number' ? max : undefined}
+                  step={tipoInput === 'number' ? step : undefined}
+                  onChange={e => setValorSugerido(e.target.value)}
+                  placeholder="Nuevo valor propuesto"
+                />
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <p className="text-sm font-medium">
