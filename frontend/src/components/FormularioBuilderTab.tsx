@@ -1,38 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import { EstadoConvocatoria, TipoCampo, tipoCampoLabels } from '@/data/types'
+import { EstadoConvocatoria } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
+import { CamposFormularioEditor, campoVacio, validarCampos } from '@/components/CamposFormularioEditor'
 import { SeleccionarPlantillaDialog } from '@/components/SeleccionarPlantillaDialog'
-import { ArrowDown, ArrowUp, FileText, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { FileText, Loader2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
   convocatoriaId: string
   estadoConvocatoria: EstadoConvocatoria
-}
-
-const TIPOS_CON_OPCIONES = [TipoCampo.Select, TipoCampo.Checkbox]
-
-function campoVacio(): CampoFormulario {
-  return {
-    id: crypto.randomUUID(),
-    tipo: TipoCampo.Texto,
-    nombre: '',
-    textoAyuda: '',
-    esObligatorio: false,
-    orden: 0,
-  }
 }
 
 export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Props) {
@@ -52,82 +32,13 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
     cargarDatos().finally(() => setLoading(false))
   }, [cargarDatos])
 
-  const actualizarCampo = (id: string, cambios: Partial<CampoFormulario>) => {
-    setCampos(prev => prev.map(c => {
-      if (c.id !== id) return c
-      const actualizado = { ...c, ...cambios }
-      if (cambios.tipo && !TIPOS_CON_OPCIONES.includes(cambios.tipo)) {
-        actualizado.opciones = undefined
-      }
-      return actualizado
-    }))
-  }
-
-  const agregarCampo = () => {
-    setCampos(prev => [...prev, campoVacio()])
-  }
-
   const importarPlantilla = (camposPlantilla: CampoFormulario[]) => {
     setCampos(camposPlantilla)
     toast.success('Plantilla cargada. Revisá los campos y guardá para confirmar.')
   }
 
-  const eliminarCampo = (id: string) => {
-    setCampos(prev => prev.filter(c => c.id !== id))
-  }
-
-  const moverCampo = (index: number, direccion: -1 | 1) => {
-    setCampos(prev => {
-      const destino = index + direccion
-      if (destino < 0 || destino >= prev.length) return prev
-      const copia = [...prev]
-      const [campo] = copia.splice(index, 1)
-      copia.splice(destino, 0, campo)
-      return copia
-    })
-  }
-
-  const agregarOpcion = (id: string) => {
-    setCampos(prev => prev.map(c =>
-      c.id === id ? { ...c, opciones: [...(c.opciones ?? []), ''] } : c,
-    ))
-  }
-
-  const actualizarOpcion = (id: string, opcionIdx: number, valor: string) => {
-    setCampos(prev => prev.map(c => {
-      if (c.id !== id) return c
-      const opciones = [...(c.opciones ?? [])]
-      opciones[opcionIdx] = valor
-      return { ...c, opciones }
-    }))
-  }
-
-  const eliminarOpcion = (id: string, opcionIdx: number) => {
-    setCampos(prev => prev.map(c => {
-      if (c.id !== id) return c
-      return { ...c, opciones: (c.opciones ?? []).filter((_, i) => i !== opcionIdx) }
-    }))
-  }
-
-  const validar = (): boolean => {
-    for (const campo of campos) {
-      if (!campo.nombre.trim()) {
-        toast.error('Todos los campos deben tener una etiqueta')
-        return false
-      }
-      if (TIPOS_CON_OPCIONES.includes(campo.tipo)) {
-        const opciones = (campo.opciones ?? []).map(o => o.trim()).filter(Boolean)
-        if (opciones.length === 0) {
-          toast.error(`El campo "${campo.nombre}" debe tener al menos una opción`)
-          return false
-        }
-      }
-    }
-    return true
-  }
-
   const handleGuardar = async () => {
-    if (!validar()) return
+    if (!validarCampos(campos)) return
     setGuardando(true)
     try {
       await api.convocatorias.formulario.guardar(convocatoriaId, campos)
@@ -151,6 +62,26 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
     )
   }
 
+  const slotVacio = editable ? (
+    <div className="text-center py-8 space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Todavía no hay campos definidos. ¿Cómo querés empezar?
+      </p>
+      <div className="flex items-center justify-center gap-3">
+        <Button type="button" variant="outline" onClick={() => setPlantillaDialogOpen(true)}>
+          <FileText className="h-4 w-4 mr-2" />Empezar desde una plantilla
+        </Button>
+        <Button type="button" variant="outline" onClick={() => setCampos([campoVacio()])}>
+          <Plus className="h-4 w-4 mr-2" />Empezar de cero
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <p className="text-sm text-muted-foreground text-center py-4">
+      Este formulario no tiene campos definidos.
+    </p>
+  )
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -168,148 +99,18 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
           </p>
         )}
 
-        {campos.length === 0 ? (
-          editable ? (
-            <div className="text-center py-8 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Todavía no hay campos definidos. ¿Cómo querés empezar?
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <Button type="button" variant="outline" onClick={() => setPlantillaDialogOpen(true)}>
-                  <FileText className="h-4 w-4 mr-2" />Empezar desde una plantilla
-                </Button>
-                <Button type="button" variant="outline" onClick={agregarCampo}>
-                  <Plus className="h-4 w-4 mr-2" />Empezar de cero
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Este formulario no tiene campos definidos.
-            </p>
-          )
-        ) : (
-          <div className="space-y-3">
-            {campos.map((campo, index) => (
-              <div key={campo.id} className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <div className="flex-[2] space-y-1">
-                    <span className="text-xs text-muted-foreground">Etiqueta</span>
-                    <Input
-                      value={campo.nombre}
-                      disabled={!editable}
-                      onChange={e => actualizarCampo(campo.id, { nombre: e.target.value })}
-                      placeholder="Ej: Resumen del proyecto"
-                    />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <span className="text-xs text-muted-foreground">Tipo</span>
-                    <Select
-                      value={campo.tipo}
-                      disabled={!editable}
-                      onValueChange={v => actualizarCampo(campo.id, { tipo: v as TipoCampo })}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.values(TipoCampo).filter(t => t !== TipoCampo.Archivo).map(t => (
-                          <SelectItem key={t} value={t}>{tipoCampoLabels[t]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {editable && (
-                    <div className="flex items-center gap-1 pt-5">
-                      <Button type="button" variant="ghost" size="icon" disabled={index === 0} onClick={() => moverCampo(index, -1)}>
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button type="button" variant="ghost" size="icon" disabled={index === campos.length - 1} onClick={() => moverCampo(index, 1)}>
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => eliminarCampo(campo.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <div className="flex-[2] space-y-1">
-                    <span className="text-xs text-muted-foreground">Texto de ayuda (opcional)</span>
-                    <Input
-                      value={campo.textoAyuda ?? ''}
-                      disabled={!editable}
-                      onChange={e => actualizarCampo(campo.id, { textoAyuda: e.target.value })}
-                      placeholder="Aclaración que ve quien completa el formulario"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">¿Obligatorio?</span>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={campo.esObligatorio ? 'default' : 'outline'}
-                        size="sm"
-                        disabled={!editable}
-                        onClick={() => actualizarCampo(campo.id, { esObligatorio: true })}
-                      >
-                        Sí
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={!campo.esObligatorio ? 'default' : 'outline'}
-                        size="sm"
-                        disabled={!editable}
-                        onClick={() => actualizarCampo(campo.id, { esObligatorio: false })}
-                      >
-                        No
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {TIPOS_CON_OPCIONES.includes(campo.tipo) && (
-                  <div className="space-y-2 pl-2 border-l-2">
-                    <span className="text-xs text-muted-foreground">Opciones</span>
-                    {(campo.opciones ?? []).map((opcion, opcionIdx) => (
-                      <div key={opcionIdx} className="flex items-center gap-2">
-                        <Input
-                          value={opcion}
-                          disabled={!editable}
-                          onChange={e => actualizarOpcion(campo.id, opcionIdx, e.target.value)}
-                          placeholder={`Opción ${opcionIdx + 1}`}
-                        />
-                        {editable && (
-                          <Button type="button" variant="ghost" size="icon" onClick={() => eliminarOpcion(campo.id, opcionIdx)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    {editable && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => agregarOpcion(campo.id)}>
-                        <Plus className="h-3 w-3 mr-1" />Agregar opción
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {editable && (
-          <div className="flex items-center justify-between pt-2">
-            {campos.length > 0 ? (
-              <Button type="button" variant="outline" onClick={agregarCampo}>
-                <Plus className="h-4 w-4 mr-2" />Agregar campo
-              </Button>
-            ) : <span />}
+        <CamposFormularioEditor
+          campos={campos}
+          onChange={setCampos}
+          editable={editable}
+          slotVacio={slotVacio}
+          slotAcciones={
             <Button onClick={handleGuardar} disabled={guardando}>
               {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {guardando ? 'Guardando...' : 'Guardar formulario'}
             </Button>
-          </div>
-        )}
+          }
+        />
       </CardContent>
 
       <SeleccionarPlantillaDialog

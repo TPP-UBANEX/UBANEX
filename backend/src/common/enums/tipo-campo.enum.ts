@@ -1,7 +1,22 @@
 export enum TipoCampo {
   Texto = 'texto',
+  TextoLargo = 'texto_largo',
+  Numero = 'numero',
+  Fecha = 'fecha',
+  Geolocalizacion = 'geolocalizacion',
   Booleano = 'booleano',
   Checkbox = 'checkbox',
   Select = 'select',
   Archivo = 'archivo',
+  Seccion = 'seccion',
+  Tabla = 'tabla',
+  Usuario = 'usuario',
 }
+
+/** Tipos cuyo valor guardado es un objeto y por lo tanto viaja serializado por columnas text. */
+export const TIPOS_VALOR_OBJETO: TipoCampo[] = [TipoCampo.Geolocalizacion, TipoCampo.Usuario];
+
+export const MAX_LONGITUD_POR_TIPO: Partial<Record<TipoCampo, number>> = {
+  [TipoCampo.Texto]: 255,
+  [TipoCampo.TextoLargo]: 10000,
+};

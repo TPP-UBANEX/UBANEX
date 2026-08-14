@@ -17,6 +17,8 @@ import { PlantillasEvaluacion } from '@/pages/PlantillasEvaluacion'
 import { Usuarios } from '@/pages/Usuarios'
 import { UsuarioDetail } from '@/pages/UsuarioDetail'
 import { ValidacionDocente } from '@/pages/ValidacionDocente'
+import { PlantillasFormulario } from '@/pages/PlantillasFormulario'
+import { PlantillaFormularioDetail } from '@/pages/PlantillaFormularioDetail'
 import { RolUsuario } from '@/data/types'
 
 const ROLES_GESTION = [
@@ -72,6 +74,8 @@ function App() {
                   <Route path="/usuarios" element={<ProtectedRoute roles={ROLES_GESTION}><Usuarios /></ProtectedRoute>} />
                   <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION} allowOwnId><UsuarioDetail /></ProtectedRoute>} />
                   <Route path="/validacion-docente" element={<ValidacionDocente />} />
+                <Route path="/plantillas-formulario" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasFormulario /></ProtectedRoute>} />
+                <Route path="/plantillas-formulario/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaFormularioDetail /></ProtectedRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

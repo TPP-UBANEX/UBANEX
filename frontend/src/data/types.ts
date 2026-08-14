@@ -561,10 +561,74 @@ export interface Rendicion {
 
 export enum TipoCampo {
   Texto = 'texto',
+  TextoLargo = 'texto_largo',
+  Numero = 'numero',
+  Fecha = 'fecha',
+  Geolocalizacion = 'geolocalizacion',
   Booleano = 'booleano',
   Checkbox = 'checkbox',
   Select = 'select',
   Archivo = 'archivo',
+  Seccion = 'seccion',
+  Tabla = 'tabla',
+  Usuario = 'usuario',
+}
+
+// Espejo de backend/src/common/dto/campo-formulario.dto.ts
+export const TIPOS_COLUMNA_TABLA = Object.values(TipoCampo)
+  .filter(t => t !== TipoCampo.Seccion && t !== TipoCampo.Tabla && t !== TipoCampo.Archivo)
+
+// Espejo de backend/src/common/enums/tipo-campo.enum.ts
+export const TIPOS_VALOR_OBJETO: TipoCampo[] = [TipoCampo.Geolocalizacion, TipoCampo.Usuario]
+
+// Espejo de backend/src/common/enums/rol-usuario.enum.ts
+export const ROLES_USUARIO_BUSCABLES: RolUsuario[] = [RolUsuario.Docente, RolUsuario.Estudiante]
+
+export interface Localidad {
+  id: string
+  nombre: string
+  provincia: string
+  lat?: number
+  lon?: number
+}
+
+export interface ValorGeolocalizacion {
+  nombre: string
+  id?: string
+  provincia?: string
+  lat?: number
+  lon?: number
+}
+
+/** Espejo de backend/src/usuarios/usuario-sugerido.interface.ts */
+export interface UsuarioSugerido {
+  id: string
+  nombre: string
+  email: string
+}
+
+export interface ValorUsuario {
+  nombre: string
+  id?: string
+  email?: string
+}
+
+// Espejo de backend/src/common/enums/tipo-campo.enum.ts
+export const MAX_LONGITUD_POR_TIPO: Partial<Record<TipoCampo, number>> = {
+  [TipoCampo.Texto]: 255,
+  [TipoCampo.TextoLargo]: 10000,
+}
+
+export interface ColumnaTabla {
+  id: string
+  tipo: TipoCampo
+  nombre: string
+  esObligatorio: boolean
+  opciones?: string[]
+  minimo?: number
+  maximo?: number
+  admiteDecimales?: boolean
+  rolesUsuario?: RolUsuario[]
 }
 
 export interface CampoFormulario {
@@ -575,6 +639,13 @@ export interface CampoFormulario {
   esObligatorio: boolean
   orden: number
   opciones?: string[]
+  minimo?: number
+  maximo?: number
+  admiteDecimales?: boolean
+  columnas?: ColumnaTabla[]
+  filasMinimas?: number
+  filasMaximas?: number
+  rolesUsuario?: RolUsuario[]
 }
 
 export interface Formulario {
@@ -587,10 +658,17 @@ export interface Formulario {
 
 export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Texto]: 'Texto',
+  [TipoCampo.TextoLargo]: 'Texto largo',
+  [TipoCampo.Numero]: 'Número',
+  [TipoCampo.Fecha]: 'Fecha',
+  [TipoCampo.Geolocalizacion]: 'Ubicación (localidad)',
   [TipoCampo.Booleano]: 'Sí / No',
   [TipoCampo.Checkbox]: 'Casillas (múltiple)',
   [TipoCampo.Select]: 'Selección (única)',
   [TipoCampo.Archivo]: 'Archivo',
+  [TipoCampo.Seccion]: 'Sección',
+  [TipoCampo.Tabla]: 'Tabla',
+  [TipoCampo.Usuario]: 'Usuario (docente/estudiante)',
 }
 
 export interface Emparejamiento {

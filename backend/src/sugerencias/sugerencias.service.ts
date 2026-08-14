@@ -10,6 +10,7 @@ import { Proyecto } from '../proyectos/proyecto.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
+import { validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
 import { ResponderSugerenciaDto } from './dto/responder-sugerencia.dto';
@@ -18,6 +19,7 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
+import { TipoCampo, TIPOS_VALOR_OBJETO } from '../common/enums/tipo-campo.enum';
 
 @Injectable()
 export class SugerenciasService {
@@ -51,6 +53,7 @@ export class SugerenciasService {
 
     const valorActual = this.obtenerValorActual(edicion, proyecto, dto.campo);
     const valorSugerido = dto.valorSugerido?.trim() ? dto.valorSugerido.trim() : null;
+    await this.validarValorSugerido(edicion, dto.campo, valorSugerido);
 
     const pendienteExistente = await this.sugerenciaRepo.findOne({
       where: {
@@ -257,10 +260,29 @@ export class SugerenciasService {
         if (valor == null || typeof valor !== 'object') return null;
         valor = (valor as Record<string, unknown>)[parte];
       }
-      return valor != null ? String(valor) : null;
+      if (valor == null) return null;
+      // Un campo de geolocalizacion guarda un objeto: se serializa para viajar por la columna text.
+      return typeof valor === 'object' ? JSON.stringify(valor) : String(valor);
     } catch {
       return null;
     }
+  }
+
+  /** Intenta interpretar el valor sugerido como el objeto { nombre, ... } de un campo de geolocalizacion o usuario.
+   *  Si no es JSON valido (se sugirio como texto libre), lo trata como el nombre. */
+  private parsearValorObjeto(valor: string): unknown {
+    try {
+      const parsed: unknown = JSON.parse(valor);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      // no era JSON: se interpreta como texto libre
+    }
+    return { nombre: valor };
+  }
+
+  /** Los campos cuyo valor es un objeto viajan serializados por la columna text de la sugerencia. */
+  private valorParaCampo(tipo: TipoCampo | undefined, valorSugerido: string): unknown {
+    return tipo && TIPOS_VALOR_OBJETO.includes(tipo) ? this.parsearValorObjeto(valorSugerido) : valorSugerido;
   }
 
   private async aplicarCambio(edicion: Edicion, campo: string, valorSugerido: string | null) {
@@ -290,13 +312,17 @@ export class SugerenciasService {
           this.aplicarCambioJson(edicion, 'presupuesto', campo.replace('presupuesto.', ''), valorSugerido);
           await this.edicionRepo.save(edicion);
         } else if (campo.startsWith('datosFormulario.')) {
-          this.aplicarCambioJson(edicion, 'datosFormulario', campo.replace('datosFormulario.', ''), valorSugerido);
+          const campoId = campo.replace('datosFormulario.', '');
+          const campoFormulario = (await this.obtenerCamposFormulario(edicion.convocatoriaId))
+            .find(c => c.id === campoId);
+          const valor = this.valorParaCampo(campoFormulario?.tipo, valorSugerido);
+          this.aplicarCambioJson(edicion, 'datosFormulario', campoId, valor);
           await this.edicionRepo.save(edicion);
         }
     }
   }
 
-  private aplicarCambioJson(edicion: Edicion, columna: 'presupuesto' | 'datosFormulario', path: string, valor: string) {
+  private aplicarCambioJson(edicion: Edicion, columna: 'presupuesto' | 'datosFormulario', path: string, valor: unknown) {
     const obj = edicion[columna] ? JSON.parse(JSON.stringify(edicion[columna])) : {};
     const partes = path.match(/[^.[\]]+/g);
     if (!partes || partes.length === 0) return;
@@ -364,6 +390,30 @@ export class SugerenciasService {
       relations: { formulario: true },
     });
     return convocatoria?.formulario?.campos ?? [];
+  }
+
+  /** Un valor sugerido sobre un campo del formulario debe cumplir las mismas reglas que la carga directa. */
+  private async validarValorSugerido(
+    edicion: Edicion,
+    campo: string,
+    valorSugerido: string | null,
+  ): Promise<void> {
+    if (valorSugerido == null || !campo.startsWith('datosFormulario.')) return;
+
+    const campoId = campo.replace('datosFormulario.', '');
+    const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
+    const campoFormulario = campos.find(c => c.id === campoId);
+    if (!campoFormulario) return;
+
+    if (campoFormulario.tipo === TipoCampo.Seccion) {
+      throw new BadRequestException('No se puede sugerir un cambio sobre una sección');
+    }
+    if (campoFormulario.tipo === TipoCampo.Tabla) {
+      throw new BadRequestException('Sobre una tabla solo se puede dejar un comentario, no un valor sugerido');
+    }
+
+    const valor = this.valorParaCampo(campoFormulario.tipo, valorSugerido);
+    validarValoresFormulario([campoFormulario], { [campoId]: valor });
   }
 
   private nombreLegible(campo: string, campos: CampoFormulario[] = []): string {

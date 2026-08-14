@@ -21,7 +21,7 @@ import { CargoDocente } from '../common/enums/cargo-docente.enum';
 import { TipoDesignacionDocente } from '../common/enums/tipo-designacion-docente.enum';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Formulario } from '../formularios/formulario.entity';
-import { CampoFormulario } from '../formularios/campo-formulario.interface';
+import { CampoFormulario, ColumnaTabla } from '../formularios/campo-formulario.interface';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { Edicion } from '../proyectos/edicion.entity';
@@ -113,6 +113,23 @@ const TAMANIO_LOTE = 300;
 // considera que una unidad académica ya fue sembrada para esa convocatoria.
 const PROYECTOS_MASIVOS_MINIMO = 20;
 
+// Nombres de los campos del formulario estándar (ver camposFormularioEstandar más abajo),
+// usados por seedDatosFormulario() para ubicar cada campo por nombre en vez de por posición:
+// así un campo nuevo o reordenado no desalinea los datos sembrados.
+const CAMPOS_ESTANDAR = {
+  resumen: 'Resumen del proyecto',
+  antecedentes: '¿El proyecto tiene antecedentes en convocatorias anteriores?',
+  area: 'Área temática principal',
+  poblaciones: 'Poblaciones destinatarias',
+  cronograma: 'Cronograma de actividades',
+} as const;
+
+const COLUMNAS_CRONOGRAMA = {
+  actividad: 'Actividad',
+  fecha: 'Fecha',
+  responsable: 'Responsable',
+} as const;
+
 @Injectable()
 export class SeedService {
   private readonly usuarioRepo: Repository<Usuario>;
@@ -194,7 +211,7 @@ export class SeedService {
       {
         id: crypto.randomUUID(),
         tipo: TipoCampo.Texto,
-        nombre: 'Resumen del proyecto',
+        nombre: CAMPOS_ESTANDAR.resumen,
         textoAyuda: 'Describí brevemente el objetivo del proyecto',
         esObligatorio: true,
         orden: 0,
@@ -202,14 +219,14 @@ export class SeedService {
       {
         id: crypto.randomUUID(),
         tipo: TipoCampo.Booleano,
-        nombre: '¿El proyecto tiene antecedentes en convocatorias anteriores?',
+        nombre: CAMPOS_ESTANDAR.antecedentes,
         esObligatorio: true,
         orden: 1,
       },
       {
         id: crypto.randomUUID(),
         tipo: TipoCampo.Select,
-        nombre: 'Área temática principal',
+        nombre: CAMPOS_ESTANDAR.area,
         esObligatorio: true,
         orden: 2,
         opciones: ['Salud', 'Educación', 'Ambiente', 'Tecnología', 'Cultura'],
@@ -217,10 +234,24 @@ export class SeedService {
       {
         id: crypto.randomUUID(),
         tipo: TipoCampo.Checkbox,
-        nombre: 'Poblaciones destinatarias',
+        nombre: CAMPOS_ESTANDAR.poblaciones,
         esObligatorio: false,
         orden: 3,
         opciones: ['Niños y adolescentes', 'Adultos mayores', 'Personas con discapacidad', 'Comunidad general'],
+      },
+      {
+        id: crypto.randomUUID(),
+        tipo: TipoCampo.Tabla,
+        nombre: CAMPOS_ESTANDAR.cronograma,
+        textoAyuda: 'Detallá las actividades previstas para el proyecto',
+        esObligatorio: true,
+        orden: 4,
+        columnas: [
+          { id: crypto.randomUUID(), tipo: TipoCampo.Texto, nombre: COLUMNAS_CRONOGRAMA.actividad, esObligatorio: true },
+          { id: crypto.randomUUID(), tipo: TipoCampo.Fecha, nombre: COLUMNAS_CRONOGRAMA.fecha, esObligatorio: true },
+          { id: crypto.randomUUID(), tipo: TipoCampo.Texto, nombre: COLUMNAS_CRONOGRAMA.responsable, esObligatorio: false },
+        ],
+        filasMinimas: 1,
       },
     ];
   }
@@ -1311,18 +1342,64 @@ export class SeedService {
     return edicion;
   }
 
+  /**
+   * Busca un campo del formulario estándar por nombre (no por posición): si alguien agrega o
+   * reordena un campo en camposFormularioEstandar y se olvida de actualizar este método, falla acá
+   * en vez de sembrar datosFormulario con valores en los ids equivocados.
+   */
+  private campoEstandar(nombre: string): CampoFormulario {
+    const campo = this.camposFormularioEstandar.find((c) => c.nombre === nombre);
+    if (!campo) {
+      throw new Error(
+        `Seed desactualizado: el formulario estándar no tiene el campo "${nombre}". ` +
+          'Actualizá seedDatosFormulario() en backend/src/seed/seed.service.ts.',
+      );
+    }
+    return campo;
+  }
+
+  /** Ídem campoEstandar(), para una columna dentro de un campo tabla del formulario estándar. */
+  private columnaEstandar(campo: CampoFormulario, nombre: string): ColumnaTabla {
+    const columna = campo.columnas?.find((c) => c.nombre === nombre);
+    if (!columna) {
+      throw new Error(
+        `Seed desactualizado: "${campo.nombre}" no tiene la columna "${nombre}". ` +
+          'Actualizá seedDatosFormulario() en backend/src/seed/seed.service.ts.',
+      );
+    }
+    return columna;
+  }
+
   private seedDatosFormulario(opts: {
     resumen: string;
     area: string;
     poblaciones: string[];
     antecedentes?: boolean;
   }): Record<string, unknown> {
-    const [campoResumen, campoAntecedentes, campoArea, campoPoblaciones] = this.camposFormularioEstandar;
-    return {
+    const campoResumen = this.campoEstandar(CAMPOS_ESTANDAR.resumen);
+    const campoAntecedentes = this.campoEstandar(CAMPOS_ESTANDAR.antecedentes);
+    const campoArea = this.campoEstandar(CAMPOS_ESTANDAR.area);
+    const campoPoblaciones = this.campoEstandar(CAMPOS_ESTANDAR.poblaciones);
+    const campoCronograma = this.campoEstandar(CAMPOS_ESTANDAR.cronograma);
+    const base = {
       [campoResumen.id]: opts.resumen,
       [campoAntecedentes.id]: opts.antecedentes ?? false,
       [campoArea.id]: opts.area,
       [campoPoblaciones.id]: opts.poblaciones,
+    };
+    if (!campoCronograma.columnas) return base;
+    const colActividad = this.columnaEstandar(campoCronograma, COLUMNAS_CRONOGRAMA.actividad);
+    const colFecha = this.columnaEstandar(campoCronograma, COLUMNAS_CRONOGRAMA.fecha);
+    const colResponsable = this.columnaEstandar(campoCronograma, COLUMNAS_CRONOGRAMA.responsable);
+    return {
+      ...base,
+      [campoCronograma.id]: [
+        {
+          [colActividad.id]: 'Actividad inicial',
+          [colFecha.id]: '2026-09-10',
+          [colResponsable.id]: 'Director/a',
+        },
+      ],
     };
   }
 

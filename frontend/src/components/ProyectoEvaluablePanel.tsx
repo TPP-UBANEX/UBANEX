@@ -1,9 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import {
-  EtiquetaCampoFormulario,
-  formatearValorCampoFormulario,
-} from '@/components/CampoFormularioInput'
+import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
+import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { TipoRubro, estadoBadge, estadoEdicionLabel } from '@/data/types'
 import type { CampoFormulario, Edicion } from '@/data/types'
 
@@ -23,9 +21,10 @@ export function ProyectoEvaluablePanel({
   if (!edicion) return null
 
   const presupuesto = edicion.presupuesto
+  const secciones = agruparCamposEnSecciones(campos)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0">
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle>
@@ -89,7 +88,7 @@ export function ProyectoEvaluablePanel({
         <CardHeader>
           <CardTitle className="text-sm font-medium">Formulario de presentación</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+        <CardContent className="space-y-4 text-sm">
           {campos.length === 0 ? (
             <p className="text-muted-foreground">
               La convocatoria no tiene formulario de presentación configurado.
@@ -99,14 +98,27 @@ export function ProyectoEvaluablePanel({
               El proyecto no tiene datos del formulario de presentación cargados.
             </p>
           ) : (
-            campos.map((campo) => (
-              <div key={campo.id}>
-                <span className="text-muted-foreground">
-                  <EtiquetaCampoFormulario campo={campo} />:
-                </span>{' '}
-                {formatearValorCampoFormulario(campo, edicion.datosFormulario?.[campo.id])}
-              </div>
-            ))
+            secciones
+              .filter(seccion => seccion.campos.length > 0)
+              .map(seccion => (
+                <div key={seccion.id} className="space-y-3">
+                  {seccion.id !== 'resumen' && (
+                    <div className="border-b pb-1">
+                      <p className="font-medium">{seccion.nombre}</p>
+                      {seccion.descripcion && (
+                        <p className="text-xs text-muted-foreground">{seccion.descripcion}</p>
+                      )}
+                    </div>
+                  )}
+                  {seccion.campos.map(campo => (
+                    <CampoFormularioLectura
+                      key={campo.id}
+                      campo={campo}
+                      valor={edicion.datosFormulario?.[campo.id]}
+                    />
+                  ))}
+                </div>
+              ))
           )}
         </CardContent>
       </Card>

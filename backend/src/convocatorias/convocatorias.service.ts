@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as crypto from 'crypto';
 import { Convocatoria } from './convocatoria.entity';
 import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
@@ -22,6 +21,7 @@ import { PaginatedResponse } from '../common/interfaces/paginated-response.inter
 import { ListarConvocatoriasDto } from './dto/listar-convocatorias.dto';
 import { validarFechasConvocatoria } from '../common/dto/validador-fechas-convocatoria';
 import { validarCamposFormulario } from '../common/dto/validador-campos-formulario';
+import { normalizarCamposFormulario } from '../common/dto/normalizar-campos-formulario';
 import {
   validarEstructuraInstitucional,
   validarEstructuraCruzada,
@@ -257,15 +257,7 @@ export class ConvocatoriasService {
 
     validarCamposFormulario(dto.campos);
 
-    const campos = dto.campos.map((campo, index) => ({
-      id: campo.id || crypto.randomUUID(),
-      tipo: campo.tipo,
-      nombre: campo.nombre.trim(),
-      textoAyuda: campo.textoAyuda?.trim() || undefined,
-      esObligatorio: campo.esObligatorio,
-      orden: index,
-      opciones: campo.opciones?.map((o) => o.trim()).filter(Boolean),
-    }));
+    const campos = normalizarCamposFormulario(dto.campos);
 
     let formulario = convocatoria.formulario;
     if (!formulario) {

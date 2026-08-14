@@ -19,7 +19,8 @@ import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
-import { campoFormularioVacio } from '../formularios/campo-formulario.util';
+import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
+import { CampoFormulario } from '../formularios/campo-formulario.interface';
 
 @Injectable()
 export class ProyectosService {
@@ -272,6 +273,8 @@ export class ProyectosService {
     }
 
     if (dto.datosFormulario !== undefined) {
+      const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
+      validarValoresFormulario(campos, dto.datosFormulario as Record<string, unknown>);
       edicion.datosFormulario = dto.datosFormulario;
     }
 
@@ -311,24 +314,26 @@ export class ProyectosService {
       motivos.push('El proyecto no tiene usuarios de dirección ni codirección asignados aún');
     }
 
-    const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
-      where: { id: edicion.convocatoriaId },
-      relations: { formulario: true },
-    });
-    const campos = convocatoria?.formulario?.campos ?? [];
+    const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
     const datosFormulario = (edicion.datosFormulario as Record<string, unknown> | null) ?? {};
-    const camposObligatoriosFaltantes = campos
-      .filter(c => c.esObligatorio)
-      .filter(c => campoFormularioVacio(c, datosFormulario[c.id]));
-    if (camposObligatoriosFaltantes.length > 0) {
+    const camposIncompletos = camposIncompletosParaEnvio(campos, datosFormulario);
+    if (camposIncompletos.length > 0) {
       motivos.push(
-        `Faltan completar campos obligatorios: ${camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}`,
+        `Faltan completar campos obligatorios: ${camposIncompletos.join(', ')}`,
       );
     }
 
     if (motivos.length > 0) {
       throw new BadRequestException(motivos.join('. '));
     }
+  }
+
+  private async obtenerCamposFormulario(convocatoriaId: string): Promise<CampoFormulario[]> {
+    const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
+      where: { id: convocatoriaId },
+      relations: { formulario: true },
+    });
+    return convocatoria?.formulario?.campos ?? [];
   }
 
   private async obtenerEdicion(proyectoId: string, edicionId: string): Promise<Edicion> {
@@ -385,5 +390,54 @@ export class ProyectosService {
     await this.edicionRepo.softDelete(edicionId);
     await this.participacionRepo.delete({ edicionId });
     return { message: 'Edición eliminada' };
+  }
+
+  async iniciarEvaluacion(proyectoId: string, edicionId: string, usuario: Usuario) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+
+    const esRectorado = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado].includes(r),
+    );
+    const esSecretariaMismaUA = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+    ) && usuario.unidadAcademicaId === edicion.unidadAcademicaId;
+    if (!esRectorado && !esSecretariaMismaUA) {
+      throw new ForbiddenException(
+        'Solo la Secretaría de la Unidad Académica del proyecto o el Rectorado pueden iniciar la evaluación',
+      );
+    }
+
+    const convocatoria = await this.edicionRepo.manager.findOne(Convocatoria, {
+      where: { id: edicion.convocatoriaId },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+      },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    if (!convocatoria.templateEvaluacionInstitucional) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el formulario de evaluación institucional',
+      );
+    }
+    if (!convocatoria.templateEvaluacionCruzada) {
+      throw new BadRequestException(
+        'La convocatoria no tiene configurado el formulario de evaluación cruzada',
+      );
+    }
+
+    if (edicion.estado !== EstadoEdicion.Presentado && edicion.estado !== EstadoEdicion.PendienteDeCambios) {
+      throw new BadRequestException(
+        `No se puede iniciar la evaluación de una edición en estado ${edicion.estado}`,
+      );
+    }
+
+    edicion.estado = EstadoEdicion.EnEvaluacion;
+    await this.edicionRepo.save(edicion);
+
+    return this.obtenerProyecto(proyectoId);
   }
 }

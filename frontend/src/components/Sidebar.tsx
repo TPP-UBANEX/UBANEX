@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ClipboardList,
   UserCheck,
+  LayoutTemplate,
   Library,
   // CalendarCheck,
 } from 'lucide-react'
@@ -110,6 +111,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             )}
             {esRectorado && (
               <Button
+                key="/plantillas-formulario"
+                variant={location.pathname.startsWith('/plantillas-formulario') ? 'secondary' : 'ghost'}
+                className={cn(
+                  'w-full justify-start gap-3',
+                  collapsed && 'justify-center px-2',
+                )}
+                onClick={() => navigate('/plantillas-formulario')}
+              >
+                <LayoutTemplate className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="text-sm">Plantillas presentación</span>}
+              </Button>
+            )}
+            {esRectorado && (
+              <Button
                 key="/plantillas-evaluacion"
                 variant={location.pathname === '/plantillas-evaluacion' ? 'secondary' : 'ghost'}
                 className={cn(
@@ -119,7 +134,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 onClick={() => navigate('/plantillas-evaluacion')}
               >
                 <Library className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="text-sm">Plantillas de Evaluación</span>}
+                {!collapsed && <span className="text-sm">Plantillas evaluación</span>}
               </Button>
             )}
             <Button

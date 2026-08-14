@@ -11,6 +11,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { api } from '@/lib/api'
+import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
+import { UsuarioAutocomplete } from '@/components/UsuarioAutocomplete'
+import { parsearValorObjetoSerializado } from '@/components/CampoFormularioInput'
+import { TipoCampo } from '@/data/types'
+import type { RolUsuario, ValorGeolocalizacion, ValorUsuario } from '@/data/types'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -23,6 +28,21 @@ interface SugerirCambioModalProps {
   edicionId: string
   valorSugeridoInicial?: string
   comentarioInicial?: string
+  /** Para campos de texto largo: muestra los valores en textarea en vez de input de una línea. */
+  multilinea?: boolean
+  maxLongitud?: number
+  /** Tipo del input de "Valor sugerido"; 'date' muestra el date picker nativo, 'number' el input numérico. */
+  tipoInput?: 'text' | 'date' | 'number'
+  /** Límites del input numérico (solo aplican cuando tipoInput es 'number'). */
+  min?: number
+  max?: number
+  step?: number | 'any'
+  /** Para campos cuyo valor es un objeto: reemplaza "Valor sugerido" por el buscador correspondiente. */
+  tipoObjeto?: TipoCampo.Geolocalizacion | TipoCampo.Usuario | null
+  /** Roles configurados cuando tipoObjeto es Usuario. */
+  rolesUsuario?: RolUsuario[]
+  /** Para campos de tabla: oculta "Valor sugerido", la sugerencia queda como un comentario global sobre el campo. */
+  soloComentario?: boolean
   onSuccess?: () => void
 }
 
@@ -35,9 +55,19 @@ export function SugerirCambioModal({
   edicionId,
   valorSugeridoInicial = '',
   comentarioInicial = '',
+  multilinea = false,
+  maxLongitud,
+  tipoInput = 'text',
+  min,
+  max,
+  step,
+  tipoObjeto = null,
+  rolesUsuario,
+  soloComentario = false,
   onSuccess,
 }: SugerirCambioModalProps) {
   const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
+  const [valorObjetoSugerido, setValorObjetoSugerido] = useState<ValorGeolocalizacion | ValorUsuario | null>(null)
   const [comentario, setComentario] = useState(comentarioInicial)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -46,11 +76,12 @@ export function SugerirCambioModal({
   useEffect(() => {
     if (open) {
       setValorSugerido(valorSugeridoInicial)
+      setValorObjetoSugerido(tipoObjeto ? parsearValorObjetoSerializado(valorSugeridoInicial) : null)
       setComentario(comentarioInicial)
       setError('')
       setConfirmar(false)
     }
-  }, [open, valorSugeridoInicial, comentarioInicial])
+  }, [open, valorSugeridoInicial, comentarioInicial, tipoObjeto])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,9 +96,14 @@ export function SugerirCambioModal({
   const enviar = async () => {
     setSubmitting(true)
     try {
+      const valorAEnviar = soloComentario
+        ? undefined
+        : tipoObjeto
+          ? (valorObjetoSugerido?.nombre.trim() ? JSON.stringify(valorObjetoSugerido) : undefined)
+          : (valorSugerido.trim() || undefined)
       await api.sugerencias.crear(edicionId, {
         campo,
-        valorSugerido: valorSugerido.trim() || undefined,
+        valorSugerido: valorAEnviar,
         comentario: comentario.trim(),
       })
       toast.success('Sugerencia enviada correctamente')
@@ -83,11 +119,13 @@ export function SugerirCambioModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className={multilinea ? 'max-w-2xl max-h-[90vh] overflow-y-auto' : 'max-w-md'}>
         <DialogHeader>
           <DialogTitle>Sugerir cambio</DialogTitle>
           <DialogDescription>
-            Propone un nuevo valor para <strong>{label}</strong>
+            {soloComentario
+              ? <>Dejá un comentario sobre <strong>{label}</strong></>
+              : <>Propone un nuevo valor para <strong>{label}</strong></>}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -99,19 +137,49 @@ export function SugerirCambioModal({
 
           <div className="space-y-2">
             <p className="text-sm font-medium">Valor actual</p>
-            <Input value={valorActual} disabled className="bg-muted" />
+            {multilinea
+              ? <Textarea value={valorActual} disabled rows={6} className="bg-muted" />
+              : <Input value={valorActual} disabled className="bg-muted" />}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium">
-              Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-            </p>
-            <Input
-              value={valorSugerido}
-              onChange={e => setValorSugerido(e.target.value)}
-              placeholder="Nuevo valor propuesto"
-            />
-          </div>
+          {!soloComentario && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                Valor sugerido <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+              </p>
+              {tipoObjeto === TipoCampo.Geolocalizacion ? (
+                <LocalidadAutocomplete
+                  value={valorObjetoSugerido as ValorGeolocalizacion | null}
+                  onChange={setValorObjetoSugerido}
+                />
+              ) : tipoObjeto === TipoCampo.Usuario ? (
+                <UsuarioAutocomplete
+                  value={valorObjetoSugerido as ValorUsuario | null}
+                  roles={rolesUsuario}
+                  onChange={setValorObjetoSugerido}
+                />
+              ) : multilinea ? (
+                <Textarea
+                  rows={8}
+                  value={valorSugerido}
+                  maxLength={maxLongitud}
+                  onChange={e => setValorSugerido(e.target.value)}
+                  placeholder="Nuevo valor propuesto"
+                />
+              ) : (
+                <Input
+                  type={tipoInput}
+                  value={valorSugerido}
+                  maxLength={maxLongitud}
+                  min={tipoInput === 'number' ? min : undefined}
+                  max={tipoInput === 'number' ? max : undefined}
+                  step={tipoInput === 'number' ? step : undefined}
+                  onChange={e => setValorSugerido(e.target.value)}
+                  placeholder="Nuevo valor propuesto"
+                />
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <p className="text-sm font-medium">

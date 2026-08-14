@@ -2,7 +2,7 @@ import {
   Injectable, NotFoundException, BadRequestException, ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { Usuario } from './usuario.entity';
@@ -11,15 +11,28 @@ import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity'
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { ActualizarEstadoValidacionDocenteDto } from './dto/actualizar-estado-validacion-docente.dto';
-import { RolUsuario } from '../common/enums/rol-usuario.enum';
+import { BuscarUsuariosDto } from './dto/buscar-usuarios.dto';
+import { RolUsuario, ROLES_USUARIO_BUSCABLES } from '../common/enums/rol-usuario.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
+import { UsuarioSugerido } from './usuario-sugerido.interface';
 
 const SALT_ROUNDS = 10;
+const MIN_CARACTERES_BUSQUEDA_USUARIO = 3;
+const MAX_RESULTADOS_BUSQUEDA_USUARIO = 10;
+
+function esDeSecretaria(usuario: Usuario): boolean {
+  return usuario.roles.includes(RolUsuario.AutoridadDeSecretaria)
+    || usuario.roles.includes(RolUsuario.AsistenteDeSecretaria);
+}
+
+function esDeEjecucion(usuario: Usuario): boolean {
+  return usuario.roles.includes(RolUsuario.Estudiante) || usuario.roles.includes(RolUsuario.Docente);
+}
 
 const GRUPO_GESTION: RolUsuario[] = [
   RolUsuario.AutoridadDeRectorado,
@@ -139,23 +152,9 @@ export class UsuariosService {
       .leftJoinAndSelect('usuario.carrera', 'carrera')
       .leftJoinAndSelect('usuario.creadoPor', 'creadoPor');
 
-    const esSecretaria = usuarioLogueado.roles.includes(RolUsuario.AutoridadDeSecretaria) ||
-      usuarioLogueado.roles.includes(RolUsuario.AsistenteDeSecretaria);
+    const esSecretaria = esDeSecretaria(usuarioLogueado);
 
-    const esEjecucion = usuarioLogueado.roles.includes(RolUsuario.Estudiante) ||
-      usuarioLogueado.roles.includes(RolUsuario.Docente);
-
-    if (esSecretaria) {
-      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
-    } else if (esEjecucion) {
-      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
-      query.andWhere('(usuario.roles LIKE :rolEst OR usuario.roles LIKE :rolDoc)', {
-        rolEst: '%Estudiante%',
-        rolDoc: '%Docente%',
-      });
-    } else if (unidadAcademicaId) {
-      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId });
-    }
+    this.aplicarAlcanceUnidadAcademica(query, usuarioLogueado, unidadAcademicaId);
 
     if (search) {
       query.andWhere('usuario.nombreCompleto ILIKE :search', { search: `%${search}%` });
@@ -492,6 +491,57 @@ export class UsuariosService {
         );
       }
     }
+  }
+
+  private aplicarAlcanceUnidadAcademica(
+    query: SelectQueryBuilder<Usuario>,
+    usuarioLogueado: Usuario,
+    unidadAcademicaId?: string,
+  ): void {
+    if (esDeSecretaria(usuarioLogueado)) {
+      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
+    } else if (esDeEjecucion(usuarioLogueado)) {
+      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: usuarioLogueado.unidadAcademicaId });
+      query.andWhere('(usuario.roles LIKE :rolEst OR usuario.roles LIKE :rolDoc)', {
+        rolEst: '%Estudiante%',
+        rolDoc: '%Docente%',
+      });
+    } else if (unidadAcademicaId) {
+      query.andWhere('usuario.unidadAcademicaId = :uaId', { uaId: unidadAcademicaId });
+    }
+    // Rectorado sin unidadAcademicaId: ve todas las unidades académicas.
+  }
+
+  /** Busca docentes/estudiantes por nombre para los campos de formulario tipo usuario.
+   *  Nunca lanza: si el texto es muy corto devuelve vacío y el front guarda lo tipeado. */
+  async buscarParaFormulario(dto: BuscarUsuariosDto, usuarioLogueado: Usuario): Promise<UsuarioSugerido[]> {
+    const terminos = (dto.q ?? '').trim().split(/\s+/).filter(Boolean);
+    if (terminos.join('').length < MIN_CARACTERES_BUSQUEDA_USUARIO) return [];
+
+    const roles = dto.roles?.length ? dto.roles : ROLES_USUARIO_BUSCABLES;
+
+    const query = this.repo.createQueryBuilder('usuario')
+      .select(['usuario.id', 'usuario.nombreCompleto', 'usuario.email'])
+      .where('usuario.habilitado = true');
+
+    this.aplicarAlcanceUnidadAcademica(query, usuarioLogueado);
+
+    query.andWhere(new Brackets((qb) => {
+      roles.forEach((rol, i) => {
+        qb.orWhere(`usuario.roles LIKE :rolBuscado${i}`, { [`rolBuscado${i}`]: `%${rol}%` });
+      });
+    }));
+
+    terminos.forEach((termino, i) => {
+      query.andWhere(`usuario.nombreCompleto ILIKE :termino${i}`, { [`termino${i}`]: `%${termino}%` });
+    });
+
+    const usuarios = await query
+      .orderBy('usuario.nombreCompleto', 'ASC')
+      .take(MAX_RESULTADOS_BUSQUEDA_USUARIO)
+      .getMany();
+
+    return usuarios.map((u) => ({ id: u.id, nombre: u.nombreCompleto, email: u.email }));
   }
 
   private aplicarNombreApellido(entity: Usuario, dto: ActualizarUsuarioDto): void {

@@ -15,6 +15,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { SugerenciaCambio, CampoFormulario } from '@/data/types'
 import { estadoBadge, EstadoSugerencia } from '@/data/types'
+import { formatearValorSerializado } from '@/components/CampoFormularioInput'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -97,13 +98,46 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return campo
   }
 
-  const ValorDiff = ({ actual, sugerido }: { actual: string | null; sugerido: string | null }) => (
-    <div className="flex items-center gap-3 text-sm mb-2">
-      <span className="text-muted-foreground line-through">{actual ?? '(sin valor)'}</span>
-      <span className="text-muted-foreground">→</span>
-      <span className="font-medium text-foreground">{sugerido ?? '(sin valor)'}</span>
-    </div>
-  )
+  const campoFormularioDe = (campo: string): CampoFormulario | null => {
+    if (!campo.startsWith('datosFormulario.')) return null
+    return camposFormulario.find(c => c.id === campo.slice(16)) ?? null
+  }
+
+  // Los booleanos del proyecto (no del formulario) viajan como "true"/"false"; se muestran legibles.
+  const formatearValorProyecto = (campo: string, valor: string): string => {
+    if (campo === 'esConsolidado' || campo === 'esInterfacultad') return valor === 'true' ? 'Sí' : 'No'
+    return valor
+  }
+
+  const ValorDiff = ({ campo, actual, sugerido }: { campo: string; actual: string | null; sugerido: string | null }) => {
+    const campoFormulario = campoFormularioDe(campo)
+    const mostrar = (valor: string | null) => {
+      if (valor == null) return '(sin valor)'
+      return campoFormulario ? formatearValorSerializado(campoFormulario, valor) : formatearValorProyecto(campo, valor)
+    }
+
+    if (sugerido == null) {
+      return (
+        <div className="flex items-start gap-2 text-sm mb-2">
+          <span className="text-foreground whitespace-pre-wrap break-words line-clamp-3 min-w-0">
+            {mostrar(actual)}
+          </span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex items-start gap-2 text-sm mb-2">
+        <span className="text-muted-foreground line-through whitespace-pre-wrap break-words line-clamp-3 min-w-0">
+          {mostrar(actual)}
+        </span>
+        <span className="text-muted-foreground shrink-0">→</span>
+        <span className="font-medium text-foreground whitespace-pre-wrap break-words line-clamp-3 min-w-0">
+          {mostrar(sugerido)}
+        </span>
+      </div>
+    )
+  }
 
   if (loading) return (
     <div className="flex justify-center py-8">
@@ -141,8 +175,8 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
             </div>
           </CardHeader>
           <CardContent className="pb-3">
-            {s.valorSugerido != null && (
-              <ValorDiff actual={s.valorActual} sugerido={s.valorSugerido} />
+            {(s.valorActual != null || s.valorSugerido != null) && (
+              <ValorDiff campo={s.campo} actual={s.valorActual} sugerido={s.valorSugerido} />
             )}
             <div className="text-sm bg-muted/50 rounded-md p-3">
               <p className="text-xs text-muted-foreground mb-1">Comentario:</p>

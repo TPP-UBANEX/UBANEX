@@ -74,6 +74,14 @@ export const api = {
     eliminar: (id: string) => del(`/usuarios/${id}`),
     resetPassword: (id: string) => post<{ message: string }>(`/usuarios/${id}/reset-password`, {}),
     auditoria: (id: string) => get<import('@/data/types').Auditoria[]>(`/usuarios/${id}/auditoria`),
+    buscar: (q: string, roles?: import('@/data/types').RolUsuario[]) =>
+      get<import('@/data/types').UsuarioSugerido[]>(
+        `/usuarios/buscar?q=${encodeURIComponent(q)}${roles?.length ? `&roles=${roles.join(',')}` : ''}`,
+      ),
+  },
+  geo: {
+    localidades: (q: string) =>
+      get<import('@/data/types').Localidad[]>(`/geo/localidades?q=${encodeURIComponent(q)}`),
   },
   unidadesAcademicas: {
     list: () => get<import('@/data/types').UnidadAcademica[]>('/unidades-academicas'),
@@ -175,6 +183,8 @@ export const api = {
       patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}`, data),
     enviarEdicion: (id: string, edicionId: string) =>
       post<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/enviar`, {}),
+    iniciarEvaluacion: (id: string, edicionId: string) =>
+      post<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/iniciar-evaluacion`, {}),
     eliminarEdicion: (id: string, edicionId: string) =>
       del(`/proyectos/${id}/ediciones/${edicionId}`),
   },
@@ -233,8 +243,11 @@ export const api = {
   formularios: {
     list: () => get<import('@/data/types').Formulario[]>('/formularios'),
     get: (id: string) => get<import('@/data/types').Formulario>(`/formularios/${id}`),
-    crear: (data: { nombre: string; esDefault?: boolean }) =>
+    crear: (data: { nombre: string; esDefault?: boolean; campos?: import('@/data/types').CampoFormulario[] }) =>
       post<import('@/data/types').Formulario>('/formularios', data),
+    actualizar: (id: string, data: { nombre?: string; esDefault?: boolean; campos?: import('@/data/types').CampoFormulario[] }) =>
+      patch<import('@/data/types').Formulario>(`/formularios/${id}`, data),
+    eliminar: (id: string) => del(`/formularios/${id}`),
   },
   sugerencias: {
     listar: (edicionId: string) =>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import {
   camposPerfilDocente,
   camposPerfilFaltantes,
@@ -37,13 +37,14 @@ import {
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
+import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import {
   CampoFormularioInput,
-  EtiquetaCampoFormulario,
-  campoFormularioVacio,
-  formatearValorCampoFormulario,
+  camposIncompletosParaEnvio,
 } from '@/components/CampoFormularioInput'
+import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
+import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -65,16 +66,6 @@ export function ProyectoDetail() {
   const [eliminando, setEliminando] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
 
-  const TABS = ['info', 'direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias'] as const
-  const [tabActivo, setTabActivo] = useState<string>(() => {
-    const t = searchParams.get('tab')
-    return t && (TABS as readonly string[]).includes(t) ? t : 'info'
-  })
-  useEffect(() => {
-    const t = searchParams.get('tab')
-    if (t && (TABS as readonly string[]).includes(t)) setTabActivo(t)
-  }, [searchParams])
-
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
@@ -83,8 +74,31 @@ export function ProyectoDetail() {
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
+  const [iniciandoEvaluacion, setIniciandoEvaluacion] = useState(false)
 
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
+  const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
+  const seccionResumen = secciones[0]
+  const seccionesExtra = secciones.slice(1)
+
+  const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
+  const tabs = useMemo(
+    () => ['info', ...seccionesExtra.map(s => `seccion-${s.id}`), ...TABS_FIJAS_POST],
+    [seccionesExtra],
+  )
+  const [tabActivo, setTabActivo] = useState<string>(() => {
+    const t = searchParams.get('tab')
+    return t && tabs.includes(t) ? t : 'info'
+  })
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && tabs.includes(t)) {
+      setTabActivo(t)
+    } else if (!tabs.includes(tabActivo)) {
+      setTabActivo('info')
+    }
+  }, [searchParams, tabs])
+
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showAsignarDirector, setShowAsignarDirector] = useState(false)
 
@@ -110,6 +124,12 @@ export function ProyectoDetail() {
     open: false, campo: '', valorActual: '', label: '', valorSugeridoInicial: '', comentarioInicial: '',
   })
 
+  // Campo del formulario sobre el que se está sugiriendo (null si es un campo fijo del proyecto).
+  const campoSugerido = sugerenciaModal.campo.startsWith('datosFormulario.')
+    ? camposFormulario.find(c => c.id === sugerenciaModal.campo.replace('datosFormulario.', '')) ?? null
+    : null
+  const tipoCampoSugerido = campoSugerido?.tipo ?? null
+
   const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
   const esSecretaria = user?.roles.some(
@@ -125,8 +145,8 @@ export function ProyectoDetail() {
     d => d.rol === RolEjecucion.DirectorDeProyecto,
   ).length >= 2
   const directoresCompletos = tieneDirectorPrincipal && tieneSegundoDirector
-  const camposObligatoriosFaltantes = camposFormulario.filter(
-    c => c.esObligatorio && campoFormularioVacio(c, edicion?.datosFormulario?.[c.id]),
+  const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
+    camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos && camposObligatoriosFaltantes.length === 0
   const esDocente = user?.roles.includes(RolUsuario.Docente)
@@ -149,13 +169,13 @@ export function ProyectoDetail() {
     return ua ? `${d.usuario.nombreCompleto} (${ua})` : d.usuario.nombreCompleto
   }
 
-  const motivoEnvio = !esDocenteValidado
+  const motivoEnvio: ReactNode = !esDocenteValidado
     ? 'Tu usuario no está validado'
     : !directoresCompletos
       ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
       : camposObligatoriosFaltantes.length > 0
-        ? `Faltan completar campos obligatorios: ${camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}`
-        : ''
+        ? <ListaCamposFaltantes titulo="Falta completar lo siguiente:" campos={camposObligatoriosFaltantes} />
+        : null
 
   const cargarDatos = async () => {
     if (!id) return
@@ -508,6 +528,44 @@ export function ProyectoDetail() {
     montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
   })
 
+  const renderCamposEdicion = (campos: CampoFormulario[]) => (
+    <>
+      {campos.map(campo => (
+        <CampoFormularioInput
+          key={campo.id}
+          campo={campo}
+          valor={editDatosFormulario[campo.id]}
+          onChange={v => setEditDatosFormulario(prev => ({ ...prev, [campo.id]: v }))}
+        />
+      ))}
+    </>
+  )
+
+  const renderCamposLectura = (campos: CampoFormulario[]) => (
+    <>
+      {campos.map(campo => (
+        <CampoFormularioLectura
+          key={campo.id}
+          campo={campo}
+          valor={edicion?.datosFormulario?.[campo.id]}
+          envolverValor={(contenido, { valorFormateado, anchoCompleto }) => (
+            <CampoSugerible
+              campo={`datosFormulario.${campo.id}`}
+              valorActual={valorFormateado}
+              label={campo.nombre}
+              activo={modoSugerencia}
+              onClick={handleSugerirClick}
+              display={anchoCompleto ? 'flex' : 'inline-flex'}
+              className={anchoCompleto ? 'w-full items-start' : undefined}
+            >
+              {contenido}
+            </CampoSugerible>
+          )}
+        />
+      ))}
+    </>
+  )
+
   if (loading) return <ProyectoDetailSkeleton />
 
   if (!proyecto) return <div className="p-6"><p className="text-muted-foreground">Proyecto no encontrado</p></div>
@@ -547,8 +605,8 @@ export function ProyectoDetail() {
                       </span>
                     </TooltipTrigger>
                     {motivoEnvio && (
-                      <TooltipContent>
-                        <p>{motivoEnvio}</p>
+                      <TooltipContent className="max-w-xs">
+                        {motivoEnvio}
                       </TooltipContent>
                     )}
                   </Tooltip>
@@ -592,9 +650,25 @@ export function ProyectoDetail() {
               <X className="h-4 w-4 mr-2" />Cancelar sugerencia
             </Button>
           )}
-          {!editando && esSecretaria && edicion?.estado === EstadoEdicion.Presentado && (
+          {!editando && esSecretariaMismaUA && edicion?.estado === EstadoEdicion.Presentado && edicion.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
             <>
-              <Button onClick={() => toast('Iniciar evaluación — funcionalidad pendiente')}>
+              <Button
+                onClick={async () => {
+                  if (!id || !edicion?.id) return
+                  try {
+                    setIniciandoEvaluacion(true)
+                    await api.proyectos.iniciarEvaluacion(id, edicion.id)
+                    toast.success('Evaluación iniciada')
+                    cargarDatos()
+                  } catch {
+                    toast.error('No se pudo iniciar la evaluación')
+                  } finally {
+                    setIniciandoEvaluacion(false)
+                  }
+                }}
+                disabled={iniciandoEvaluacion}
+              >
+                {iniciandoEvaluacion ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Iniciar evaluación
               </Button>
             </>
@@ -645,6 +719,9 @@ export function ProyectoDetail() {
       <Tabs value={tabActivo} onValueChange={setTabActivo}>
         <TabsList>
           <TabsTrigger value="info">Resumen</TabsTrigger>
+          {seccionesExtra.map(seccion => (
+            <TabsTrigger key={seccion.id} value={`seccion-${seccion.id}`}>{seccion.nombre}</TabsTrigger>
+          ))}
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
           <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
@@ -680,23 +757,18 @@ export function ProyectoDetail() {
                         <Button type="button" variant={!editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(false)}>No</Button>
                       </div>
                     </div>
-                  {camposFormulario.map(campo => (
-                    <CampoFormularioInput
-                      key={campo.id}
-                      campo={campo}
-                      valor={editDatosFormulario[campo.id]}
-                      onChange={v => setEditDatosFormulario(prev => ({ ...prev, [campo.id]: v }))}
-                    />
-                  ))}
+                  {renderCamposEdicion(seccionResumen.campos)}
                 </CardContent>
               </Card>
             </div>
           ) : (
             <div className="space-y-4">
               {esPropietario && edicion?.estado === EstadoEdicion.Borrador && camposObligatoriosFaltantes.length > 0 && (
-                <div className="text-sm text-destructive bg-destructive/10 rounded-md p-3">
-                  Faltan completar {camposObligatoriosFaltantes.length === 1 ? '1 campo obligatorio' : `${camposObligatoriosFaltantes.length} campos obligatorios`} para poder enviar: {camposObligatoriosFaltantes.map(c => c.nombre).join(', ')}.
-                </div>
+                <ListaCamposFaltantes
+                  titulo="Falta completar lo siguiente para poder enviar:"
+                  campos={camposObligatoriosFaltantes}
+                  className="text-destructive bg-destructive/10 rounded-md p-3"
+                />
               )}
               <Card>
                 <CardHeader><CardTitle className="text-sm font-medium">Detalle del proyecto</CardTitle></CardHeader>
@@ -730,22 +802,7 @@ export function ProyectoDetail() {
                         {proyecto.esInterfacultad ? 'Sí' : 'No'}
                       </CampoSugerible>
                     </div>
-                    {camposFormulario.map(campo => (
-                      <div key={campo.id}>
-                        <span className="text-muted-foreground">
-                          <EtiquetaCampoFormulario campo={campo} />:
-                        </span>{' '}
-                        <CampoSugerible
-                          campo={`datosFormulario.${campo.id}`}
-                          valorActual={formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])}
-                          label={campo.nombre}
-                          activo={modoSugerencia}
-                          onClick={handleSugerirClick}
-                        >
-                          {formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])}
-                        </CampoSugerible>
-                      </div>
-                    ))}
+                    {renderCamposLectura(seccionResumen.campos)}
                   </div>
                 </CardContent>
               </Card>
@@ -755,6 +812,34 @@ export function ProyectoDetail() {
             <p className="text-xs text-muted-foreground mt-2">* Campos obligatorios para enviar la presentación</p>
           )}
         </TabsContent>
+
+        {seccionesExtra.map(seccion => (
+          <TabsContent key={seccion.id} value={`seccion-${seccion.id}`} className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">{seccion.nombre}</CardTitle>
+                {seccion.descripcion && (
+                  <p className="text-sm text-muted-foreground">{seccion.descripcion}</p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {seccion.campos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Esta sección no cuenta con ningún campo.
+                  </p>
+                ) : editando ? (
+                  <div className="space-y-4">
+                    {renderCamposEdicion(seccion.campos)}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {renderCamposLectura(seccion.campos)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
 
         <TabsContent value="direccion" className="mt-4">
           <Card>
@@ -925,6 +1010,17 @@ export function ProyectoDetail() {
         edicionId={edicion?.id ?? ''}
         valorSugeridoInicial={sugerenciaModal.valorSugeridoInicial}
         comentarioInicial={sugerenciaModal.comentarioInicial}
+        multilinea={tipoCampoSugerido === TipoCampo.TextoLargo || tipoCampoSugerido === TipoCampo.Tabla}
+        maxLongitud={tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined}
+        tipoInput={tipoCampoSugerido === TipoCampo.Fecha ? 'date' : tipoCampoSugerido === TipoCampo.Numero ? 'number' : 'text'}
+        min={campoSugerido?.minimo}
+        max={campoSugerido?.maximo}
+        step={campoSugerido?.admiteDecimales ? 'any' : 1}
+        tipoObjeto={tipoCampoSugerido && TIPOS_VALOR_OBJETO.includes(tipoCampoSugerido)
+          ? (tipoCampoSugerido as TipoCampo.Geolocalizacion | TipoCampo.Usuario)
+          : null}
+        rolesUsuario={campoSugerido?.rolesUsuario}
+        soloComentario={tipoCampoSugerido === TipoCampo.Tabla}
       />
 
       {edicion && (
@@ -1163,7 +1259,7 @@ function renderPresupuesto(
   return (
     <div className="space-y-4">
       {rubros.map((rubro, rubroIdx) => (
-        <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3">
+        <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3 bg-muted/30">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
             <div className="flex items-center gap-2">

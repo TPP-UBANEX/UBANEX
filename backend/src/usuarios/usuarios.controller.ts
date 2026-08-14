@@ -5,6 +5,7 @@ import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { ActualizarEstadoValidacionDocenteDto } from './dto/actualizar-estado-validacion-docente.dto';
+import { BuscarUsuariosDto } from './dto/buscar-usuarios.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -33,6 +34,14 @@ export class UsuariosController {
   )
   listar(@Query() dto: PaginationDto, @CurrentUser() usuario: Usuario) {
     return this.service.listar(dto, usuario);
+  }
+
+  /** Búsqueda de docentes/estudiantes para los campos de formulario tipo usuario.
+   *  Sin @Roles: cualquier usuario autenticado que completa un formulario debe poder usarla;
+   *  el alcance por unidad académica lo impone el service. */
+  @Get('buscar')
+  buscar(@Query() dto: BuscarUsuariosDto, @CurrentUser() usuario: Usuario) {
+    return this.service.buscarParaFormulario(dto, usuario);
   }
 
   @Get(':id')
