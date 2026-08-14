@@ -94,9 +94,30 @@ cd frontend && npm run lint        # ESLint
 cd frontend && npm run format      # Prettier
 ```
 
+## Seed
+
 El seed (`backend/src/seed/`) corre al iniciar el backend sólo si `UBANEX_SEED=true`.
 En Docker `docker-compose.yml` lo activa por defecto; para saltearlo, `UBANEX_SEED=false make dev`
 o fijar la variable en un `.env` en la raíz del repo. Es idempotente: no duplica datos.
+
+### Mantenerlo al día
+
+El seed escribe con `repo.save()` directo, sin pasar por los DTOs ni `class-validator`: puede
+insertar filas que la API rechazaría. Y TypeScript no valida las columnas `json`, cuya forma la
+define *otra fila*. Por eso el compilador no avisa cuando el seed queda desactualizado.
+
+**Un cambio no está terminado hasta revisar el seed.** Si tocaste algo de la izquierda, revisá lo
+de la derecha:
+
+| Si tocaste… | Revisá en el seed |
+|---|---|
+| `Formulario.campos` (o el formulario estándar) | `seedDatosFormulario()` |
+| `Edicion.presupuesto` | `generarPresupuesto()` en `seed.utils.ts` |
+| `templates-default.ts` (ids de categorías/checklist/items) | `categorias`, `checklist` e `items` en `seed.service.ts` |
+| cualquier `*.entity.ts` | columnas nuevas no-nulas y relaciones obligatorias |
+
+Después de tocarlo: `make reset-seed` y confirmar que arranca sin errores y que la pantalla
+afectada muestra los datos bien.
 
 ## Lo que NO hacer
 - No modificar `docs/project_context.md` (documentación de requerimientos).
