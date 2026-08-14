@@ -152,7 +152,10 @@ export const TITULO_INICIOS: string[] = [
   'Programa de', 'Red de', 'Talleres de', 'Laboratorio de', 'Observatorio de',
   'Campaña de', 'Jornadas de', 'Capacitación en', 'Fortalecimiento de', 'Acceso a',
   'Promoción de', 'Acompañamiento en', 'Producción de', 'Investigación sobre',
-  'Desarrollo de', 'Vinculación con',
+  'Desarrollo de', 'Vinculación con', 'Centro de', 'Ciclo de', 'Escuela de',
+  'Feria de', 'Sistema de', 'Red Territorial de', 'Equipo de', 'Banco de',
+  'Formación en', 'Difusión de', 'Fomento de', 'Fortalecimiento de la',
+  'Promoción de la', 'Acompañamiento de',
 ];
 
 export const TITULO_TEMAS: string[] = [
@@ -162,7 +165,23 @@ export const TITULO_TEMAS: string[] = [
   'acceso al agua potable', 'lectura en barrios populares', 'tecnología para adultos mayores',
   'arte y cultura comunitaria', 'deporte e inclusión social', 'soberanía alimentaria',
   'reciclaje y economía circular', 'turismo comunitario', 'comunicación popular',
-  'derechos de las niñeces', 'voluntariado universitario',
+  'derechos de las niñeces', 'voluntariado universitario', 'alimentación saludable',
+  'educación popular', 'salud mental comunitaria', 'producción audiovisual barrial',
+  'robótica educativa', 'huertas urbanas', 'oficios digitales', 'alfabetización financiera',
+  'teatro comunitario', 'música y niñez', 'prevención de violencias',
+  'acceso a la justicia', 'ciencia ciudadana', 'deporte y salud',
+  'tutorías para ingresantes', 'huerta agroecológica escolar',
+];
+
+export const RESUMENES_PROYECTO: string[] = [
+  'Propuesta de {tema} desarrollada junto a organizaciones sociales del territorio.',
+  'Iniciativa de {tema} con perspectiva comunitaria y participación estudiantil activa.',
+  'Proyecto de {tema} orientado a fortalecer capacidades en la comunidad destinataria.',
+  'Experiencia de {tema} articulada con instituciones educativas y de salud de la zona.',
+  'Dispositivo de {tema} con enfoque de derechos y continuidad en el tiempo.',
+  'Acción territorial de {tema} que integra docencia, investigación y extensión.',
+  'Espacio de {tema} con metodología participativa y evaluación colectiva.',
+  'Red de {tema} que articula equipos docentes, estudiantes y vecinos de la zona.',
 ];
 
 export const FUNDAMENTACIONES: string[] = [
@@ -171,6 +190,8 @@ export const FUNDAMENTACIONES: string[] = [
   'La metodología combina trabajo de campo con actividades de formación.',
   'Existe una red de vínculos previa con instituciones de la zona.',
   'El proyecto cuenta con antecedentes de ediciones anteriores de la convocatoria.',
+  'El diagnóstico participativo realizado en la zona sustenta la intervención propuesta.',
+  'La trayectoria del equipo en extensión avala la continuidad de las acciones.',
 ];
 
 export const OBSERVACIONES_INST: string[] = [
@@ -187,4 +208,14 @@ export const OBSERVACIONES_CRUZADA: string[] = [
   'El presupuesto es razonable en relación con los objetivos planteados.',
   'Problema relevante con impacto esperado en la comunidad destinataria.',
   'Se destaca la sostenibilidad de las acciones luego del período de ejecución.',
+  'La formulación del proyecto es clara y los indicadores resultan medibles.',
+];
+
+export const COMENTARIOS_SUGERENCIA: string[] = [
+  'Reformular el resumen para explicitar los destinatarios y el impacto esperado.',
+  'Completar el cronograma con actividades mensuales y responsables.',
+  'Precisar la población destinataria y los criterios de inclusión.',
+  'Ampliar la fundamentación del área temática elegida.',
+  'Ajustar el presupuesto a las actividades planteadas en el cronograma.',
+  'Incorporar instancias de evaluación y devolución a la comunidad.',
 ];

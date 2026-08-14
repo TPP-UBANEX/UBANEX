@@ -1,8 +1,25 @@
+import * as crypto from 'crypto';
 import {
   EstructuraTemplateCruzada,
   EstructuraTemplateInstitucional,
 } from '../templates-evaluacion/estructura-template';
+import { CampoFormulario, ColumnaTabla } from '../formularios/campo-formulario.interface';
 import { FUNDAMENTACIONES, OBSERVACIONES_CRUZADA, OBSERVACIONES_INST } from './seed.data';
+
+/**
+ * Copia los campos de una plantilla a una convocatoria regenerando los ids de
+ * cada campo y columna (igual que hace la UI al elegir una plantilla): así las
+ * respuestas de una convocatoria nunca se confunden con las de otra que partió
+ * de la misma plantilla.
+ */
+export function clonarCamposConIdsNuevos(campos: CampoFormulario[]): CampoFormulario[] {
+  const clonarColumna = (columna: ColumnaTabla): ColumnaTabla => ({ ...columna, id: crypto.randomUUID() });
+  return campos.map((campo) => ({
+    ...campo,
+    id: crypto.randomUUID(),
+    columnas: campo.columnas?.map(clonarColumna),
+  }));
+}
 
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;

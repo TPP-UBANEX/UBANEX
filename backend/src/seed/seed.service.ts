@@ -38,6 +38,8 @@ import {
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
 import { Notificacion } from '../sugerencias/notificacion.entity';
+import { SugerenciaCambio } from '../sugerencias/sugerencia-cambio.entity';
+import { EstadoSugerencia } from '../common/enums/estado-sugerencia.enum';
 import { Auditoria } from '../auditoria/auditoria.entity';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import {
@@ -49,6 +51,8 @@ import {
   AREAS_DOCENTE,
   TITULO_INICIOS,
   TITULO_TEMAS,
+  RESUMENES_PROYECTO,
+  COMENTARIOS_SUGERENCIA,
 } from './seed.data';
 import {
   Rng,
@@ -56,6 +60,7 @@ import {
   generarEvaluacionInstitucional,
   generarEvaluacionCruzada,
   slugUa,
+  clonarCamposConIdsNuevos,
 } from './seed.utils';
 
 type DatosSeedUsuario = {
@@ -79,16 +84,6 @@ type PoolUa = {
   evaluadores: Usuario[];
   docentes: Usuario[];
   estudiantes: Usuario[];
-};
-
-type EdicionMasiva = {
-  proyecto: Proyecto;
-  uaId: string;
-  convocatoriaId: string;
-  estado: EstadoEdicion;
-  directorId: string;
-  presupuesto: object;
-  datos: Record<string, unknown>;
 };
 
 class Progreso {
@@ -144,6 +139,7 @@ export class SeedService {
   private readonly institucionalEvalRepo: Repository<EvaluacionInstitucional>;
   private readonly cruzadaEvalRepo: Repository<EvaluacionCruzada>;
   private readonly notificacionRepo: Repository<Notificacion>;
+  private readonly sugerenciaRepo: Repository<SugerenciaCambio>;
   private readonly auditoriaRepo: Repository<Auditoria>;
 
   private readonly rng = new Rng(20260810);
@@ -154,6 +150,8 @@ export class SeedService {
   private readonly parMap = new Map<string, string>();
   private readonly titulosUsados = new Set<string>();
   private readonly aprobadosPorConvUa = new Map<string, Map<string, Set<string>>>();
+  // Proyectos masivos de 2025 elegibles para consolidarse en 2026 (mismo equipo, esConsolidado).
+  private readonly consolidados2025 = new Map<string, Array<{ proyecto: Proyecto; directorId: string }>>();
   private readonly progreso = new Progreso(42_000);
 
   private camposFormularioEstandar: CampoFormulario[];
@@ -187,6 +185,9 @@ export class SeedService {
   private p7!: Edicion;
   private p8!: Edicion;
 
+  private pCerrada!: Edicion;
+  private pConsolidada!: Edicion;
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly usuariosService: UsuariosService,
@@ -205,6 +206,7 @@ export class SeedService {
     this.institucionalEvalRepo = dataSource.getRepository(EvaluacionInstitucional);
     this.cruzadaEvalRepo = dataSource.getRepository(EvaluacionCruzada);
     this.notificacionRepo = dataSource.getRepository(Notificacion);
+    this.sugerenciaRepo = dataSource.getRepository(SugerenciaCambio);
     this.auditoriaRepo = dataSource.getRepository(Auditoria);
 
     this.camposFormularioEstandar = [
@@ -288,6 +290,9 @@ export class SeedService {
     console.log('\n=== SEED: Evaluaciones ===');
     await this.seedEvaluacionesCanonicas();
     await this.seedEvaluacionesMasivas([2023, 2024, 2025, 2026]);
+
+    console.log('\n=== SEED: Sugerencias ===');
+    await this.seedSugerencias();
 
     console.log('\n=== SEED COMPLETADO ===\n');
     await this.mostrarResumen();
@@ -1121,7 +1126,9 @@ export class SeedService {
         nombre: nombreCopia,
         esDefault: false,
         esPlantilla: false,
-        campos: this.formularioDefault.campos ? this.formularioDefault.campos.map((c) => ({ ...c })) : null,
+        campos: this.formularioDefault.campos
+          ? clonarCamposConIdsNuevos(this.formularioDefault.campos)
+          : null,
       }),
     );
     return copia.id;
@@ -1285,15 +1292,18 @@ export class SeedService {
     datosFormulario?: object,
     esInterfacultad = false,
     unidadAcademicaAdicionalId?: string,
+    esConsolidado = false,
   ): Promise<Edicion> {
     const existeProyecto = await this.proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
     if (existeProyecto) {
       if (
         existeProyecto.esInterfacultad !== esInterfacultad ||
-        existeProyecto.unidadAcademicaAdicionalId !== (unidadAcademicaAdicionalId ?? null)
+        existeProyecto.unidadAcademicaAdicionalId !== (unidadAcademicaAdicionalId ?? null) ||
+        existeProyecto.esConsolidado !== esConsolidado
       ) {
         existeProyecto.esInterfacultad = esInterfacultad;
         existeProyecto.unidadAcademicaAdicionalId = unidadAcademicaAdicionalId ?? null;
+        existeProyecto.esConsolidado = esConsolidado;
         await this.proyectoRepo.save(existeProyecto);
         console.log(`  ${nombreProyecto} — condición de interfacultad reconciliada`);
       }
@@ -1324,6 +1334,7 @@ export class SeedService {
         creadoPorId: creadoPor.id,
         esInterfacultad,
         unidadAcademicaAdicionalId: unidadAcademicaAdicionalId ?? null,
+        esConsolidado,
       }),
     );
     const edicion = await this.edicionRepo.save(
@@ -1343,22 +1354,22 @@ export class SeedService {
   }
 
   /**
-   * Busca un campo del formulario estándar por nombre (no por posición): si alguien agrega o
-   * reordena un campo en camposFormularioEstandar y se olvida de actualizar este método, falla acá
-   * en vez de sembrar datosFormulario con valores en los ids equivocados.
+   * Busca un campo del formulario de la convocatoria por nombre (no por posición): si alguien agrega
+   * o reordena un campo y se olvida de actualizar este método, falla acá en vez de sembrar
+   * datosFormulario con valores en los ids equivocados.
    */
-  private campoEstandar(nombre: string): CampoFormulario {
-    const campo = this.camposFormularioEstandar.find((c) => c.nombre === nombre);
+  private campoEstandar(campos: CampoFormulario[], nombre: string): CampoFormulario {
+    const campo = campos.find((c) => c.nombre === nombre);
     if (!campo) {
       throw new Error(
-        `Seed desactualizado: el formulario estándar no tiene el campo "${nombre}". ` +
+        `Seed desactualizado: el formulario de la convocatoria no tiene el campo "${nombre}". ` +
           'Actualizá seedDatosFormulario() en backend/src/seed/seed.service.ts.',
       );
     }
     return campo;
   }
 
-  /** Ídem campoEstandar(), para una columna dentro de un campo tabla del formulario estándar. */
+  /** Ídem campoEstandar(), para una columna dentro de un campo tabla. */
   private columnaEstandar(campo: CampoFormulario, nombre: string): ColumnaTabla {
     const columna = campo.columnas?.find((c) => c.nombre === nombre);
     if (!columna) {
@@ -1370,70 +1381,94 @@ export class SeedService {
     return columna;
   }
 
-  private seedDatosFormulario(opts: {
-    resumen: string;
-    area: string;
-    poblaciones: string[];
-    antecedentes?: boolean;
-  }): Record<string, unknown> {
-    const campoResumen = this.campoEstandar(CAMPOS_ESTANDAR.resumen);
-    const campoAntecedentes = this.campoEstandar(CAMPOS_ESTANDAR.antecedentes);
-    const campoArea = this.campoEstandar(CAMPOS_ESTANDAR.area);
-    const campoPoblaciones = this.campoEstandar(CAMPOS_ESTANDAR.poblaciones);
-    const campoCronograma = this.campoEstandar(CAMPOS_ESTANDAR.cronograma);
-    const base = {
+  /**
+   * Arma datosFormulario claveado por los ids del formulario real de la convocatoria (no por los de
+   * la plantilla): así las respuestas siempre coinciden con los campos que muestra la edición.
+   * Si `completo` es false se omiten campos (cronograma, poblaciones, antecedentes) para simular
+   * un borrador en preparación.
+   */
+  private seedDatosFormulario(
+    campos: CampoFormulario[],
+    opts: {
+      resumen: string;
+      area: string;
+      poblaciones: string[];
+      antecedentes?: boolean;
+      anio: number;
+      completo?: boolean;
+    },
+  ): Record<string, unknown> {
+    const campoResumen = this.campoEstandar(campos, CAMPOS_ESTANDAR.resumen);
+    const campoArea = this.campoEstandar(campos, CAMPOS_ESTANDAR.area);
+    const completo = opts.completo ?? true;
+
+    const base: Record<string, unknown> = {
       [campoResumen.id]: opts.resumen,
-      [campoAntecedentes.id]: opts.antecedentes ?? false,
       [campoArea.id]: opts.area,
-      [campoPoblaciones.id]: opts.poblaciones,
     };
+    if (!completo) return base;
+
+    const campoAntecedentes = this.campoEstandar(campos, CAMPOS_ESTANDAR.antecedentes);
+    const campoPoblaciones = this.campoEstandar(campos, CAMPOS_ESTANDAR.poblaciones);
+    base[campoAntecedentes.id] = opts.antecedentes ?? false;
+    base[campoPoblaciones.id] = opts.poblaciones;
+
+    const campoCronograma = this.campoEstandar(campos, CAMPOS_ESTANDAR.cronograma);
     if (!campoCronograma.columnas) return base;
     const colActividad = this.columnaEstandar(campoCronograma, COLUMNAS_CRONOGRAMA.actividad);
     const colFecha = this.columnaEstandar(campoCronograma, COLUMNAS_CRONOGRAMA.fecha);
     const colResponsable = this.columnaEstandar(campoCronograma, COLUMNAS_CRONOGRAMA.responsable);
-    return {
-      ...base,
-      [campoCronograma.id]: [
-        {
-          [colActividad.id]: 'Actividad inicial',
-          [colFecha.id]: '2026-09-10',
-          [colResponsable.id]: 'Director/a',
-        },
-      ],
-    };
+    base[campoCronograma.id] = [
+      {
+        [colActividad.id]: 'Diagnóstico y relevamiento territorial',
+        [colFecha.id]: `${opts.anio}-09-15`,
+        [colResponsable.id]: 'Dirección',
+      },
+      {
+        [colActividad.id]: 'Desarrollo de actividades con la comunidad',
+        [colFecha.id]: `${opts.anio}-11-10`,
+        [colResponsable.id]: 'Equipo docente',
+      },
+      {
+        [colActividad.id]: 'Evaluación y devolución de resultados',
+        [colFecha.id]: `${opts.anio + 1}-02-20`,
+        [colResponsable.id]: 'Dirección',
+      },
+    ];
+    return base;
   }
 
   private async seedProyectosCanonicos(): Promise<void> {
-    const presupuestoEjecucion = {
+    const presupuestoEjecucion = (anio: number) => ({
       montoTotal: 500000,
       rubros: [
         {
           tipo: 'ViaticosYSeguros',
           subtotal: 200000,
           partidas: [
-            { tipoPersona: 'Docente', descripcion: 'Viáticos para docentes', periodoInicio: '2025-08', periodoFin: '2025-12', monto: 100000 },
-            { tipoPersona: 'Estudiante', descripcion: 'Viáticos para estudiantes', periodoInicio: '2025-08', periodoFin: '2025-12', monto: 100000 },
+            { tipoPersona: 'Docente', descripcion: 'Viáticos para docentes', periodoInicio: `${anio}-08`, periodoFin: `${anio}-12`, monto: 100000 },
+            { tipoPersona: 'Estudiante', descripcion: 'Viáticos para estudiantes', periodoInicio: `${anio}-08`, periodoFin: `${anio}-12`, monto: 100000 },
           ],
         },
         { tipo: 'BienesDeConsumo', subtotal: 150000, partidas: [{ descripcion: 'Materiales e insumos', cantidad: 50, precioUnitario: 3000, monto: 150000 }] },
         { tipo: 'BienesDeUso', subtotal: 150000, partidas: [{ descripcion: 'Equipamiento', cantidad: 3, precioUnitario: 50000, monto: 150000 }] },
       ],
-    };
-    const presupuestoBorrador = {
+    });
+    const presupuestoBorrador = (anio: number) => ({
       montoTotal: 600000,
       rubros: [
         {
           tipo: 'ViaticosYSeguros',
           subtotal: 250000,
           partidas: [
-            { tipoPersona: 'Docente', descripcion: 'Viáticos', periodoInicio: '2026-11', periodoFin: '2027-02', monto: 150000 },
-            { tipoPersona: 'Estudiante', descripcion: 'Viáticos', periodoInicio: '2026-11', periodoFin: '2027-02', monto: 100000 },
+            { tipoPersona: 'Docente', descripcion: 'Viáticos', periodoInicio: `${anio}-11`, periodoFin: `${anio + 1}-02`, monto: 150000 },
+            { tipoPersona: 'Estudiante', descripcion: 'Viáticos', periodoInicio: `${anio}-11`, periodoFin: `${anio + 1}-02`, monto: 100000 },
           ],
         },
         { tipo: 'BienesDeConsumo', subtotal: 200000, partidas: [{ descripcion: 'Insumos', cantidad: 100, precioUnitario: 2000, monto: 200000 }] },
         { tipo: 'BienesDeUso', subtotal: 150000, partidas: [{ descripcion: 'Equipos', cantidad: 2, precioUnitario: 75000, monto: 150000 }] },
       ],
-    };
+    });
 
     const derecho = this.uaMap.get('Facultad de Derecho')!;
     const ingenieria = this.uaMap.get('Facultad de Ingeniería')!;
@@ -1441,92 +1476,133 @@ export class SeedService {
     const cbc = this.uaMap.get('Ciclo Básico Común (CBC)')!;
     const conv2025 = this.convs.get(2025)!;
     const conv2026 = this.convs.get(2026)!;
+    const campos2025 = await this.camposDeConvocatoria(conv2025);
+    const campos2026 = await this.camposDeConvocatoria(conv2026);
 
     this.p1 = await this.seedProyectoConEdicion(
       'Red de Voluntariado Ambiental',
-      this.garcia, derecho, conv2026, EstadoEdicion.Borrador, presupuestoBorrador,
-      this.seedDatosFormulario({
+      this.garcia, derecho, conv2026, EstadoEdicion.Presentado, presupuestoBorrador(2026),
+      this.seedDatosFormulario(campos2026, {
         resumen: 'Red de voluntarios para la restauración de humedales y espacios verdes urbanos.',
         area: 'Ambiente',
         poblaciones: ['Comunidad general'],
+        anio: 2026,
       }),
     );
     this.p2 = await this.seedProyectoConEdicion(
       'Inclusión Digital en Barrios Populares',
-      this.perez, derecho, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador,
-      this.seedDatosFormulario({
+      this.perez, derecho, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador(2026),
+      this.seedDatosFormulario(campos2026, {
         resumen: 'Talleres de alfabetización digital y acceso a herramientas tecnológicas en barrios populares.',
         area: 'Tecnología',
         poblaciones: ['Niños y adolescentes', 'Adultos mayores'],
         antecedentes: true,
+        anio: 2026,
       }),
       true,
       cbc.id,
     );
     this.p3 = await this.seedProyectoConEdicion(
       'Huerta Comunitaria y Seguridad Alimentaria',
-      this.fernandez, ingenieria, conv2026, EstadoEdicion.Borrador, presupuestoBorrador,
-      this.seedDatosFormulario({
+      this.fernandez, ingenieria, conv2026, EstadoEdicion.Adjudicado, presupuestoBorrador(2026),
+      this.seedDatosFormulario(campos2026, {
         resumen: 'Huertas comunitarias con técnicas agroecológicas para mejorar la seguridad alimentaria del barrio.',
         area: 'Ambiente',
         poblaciones: ['Comunidad general'],
+        anio: 2026,
       }),
+      false,
+      undefined,
+      true,
     );
     this.p4 = await this.seedProyectoConEdicion(
       'Alfabetización Científica en Escuelas',
-      this.diaz, ingenieria, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador,
-      this.seedDatosFormulario({
+      this.diaz, ingenieria, conv2026, EstadoEdicion.EnEvaluacion, presupuestoBorrador(2026),
+      this.seedDatosFormulario(campos2026, {
         resumen: 'Laboratorios itinerantes de ciencias en escuelas secundarias para fomentar vocaciones científicas.',
         area: 'Educación',
         poblaciones: ['Niños y adolescentes'],
         antecedentes: true,
+        anio: 2026,
       }),
       true,
       medicina.id,
     );
     this.p5 = await this.seedProyectoConEdicion(
       'Taller de Oficios para la Inclusión Laboral',
-      this.garcia, derecho, conv2025, EstadoEdicion.EnEjecucion, presupuestoEjecucion,
-      this.seedDatosFormulario({
+      this.garcia, derecho, conv2025, EstadoEdicion.EnEjecucion, presupuestoEjecucion(2025),
+      this.seedDatosFormulario(campos2025, {
         resumen: 'Talleres de oficios orientados a la inserción laboral de personas en situación de vulnerabilidad.',
         area: 'Cultura',
         poblaciones: ['Comunidad general'],
+        anio: 2025,
       }),
     );
     this.p6 = await this.seedProyectoConEdicion(
       'Salud Comunitaria en Barrios Vulnerables',
-      this.torres, medicina, conv2025, EstadoEdicion.EnEjecucion, presupuestoEjecucion,
-      this.seedDatosFormulario({
+      this.torres, medicina, conv2025, EstadoEdicion.EnEjecucion, presupuestoEjecucion(2025),
+      this.seedDatosFormulario(campos2025, {
         resumen: 'Atención primaria de salud y prevención en barrios vulnerables con participación comunitaria.',
         area: 'Salud',
         poblaciones: ['Comunidad general'],
+        anio: 2025,
       }),
     );
 
     const conv2027 = this.convs.get(2027)!;
+    const campos2027 = await this.camposDeConvocatoria(conv2027);
     this.p7 = await this.seedProyectoConEdicion(
       'Huerta Agroecológica y Educación Ambiental',
-      this.garcia, derecho, conv2027, EstadoEdicion.Presentado, presupuestoBorrador,
-      this.seedDatosFormulario({
+      this.garcia, derecho, conv2027, EstadoEdicion.Presentado, presupuestoBorrador(2027),
+      this.seedDatosFormulario(campos2027, {
         resumen: 'Huerta agroecológica escolar con talleres de educación ambiental para niños y adolescentes.',
         area: 'Ambiente',
         poblaciones: ['Niños y adolescentes'],
         antecedentes: true,
+        anio: 2027,
       }),
     );
     this.p8 = await this.seedProyectoConEdicion(
       'Cine Comunitario y Memoria Barrial',
-      this.fernandez, ingenieria, conv2027, EstadoEdicion.PendienteDeCambios, presupuestoBorrador,
-      this.seedDatosFormulario({
+      this.fernandez, ingenieria, conv2027, EstadoEdicion.PendienteDeCambios, presupuestoBorrador(2027),
+      this.seedDatosFormulario(campos2027, {
         resumen: 'Ciclos de cine comunitario para la recuperación de la memoria barrial y la identidad local.',
         area: 'Cultura',
         poblaciones: ['Comunidad general'],
+        anio: 2027,
       }),
+    );
+
+    const conv2023 = this.convs.get(2023)!;
+    const campos2023 = await this.camposDeConvocatoria(conv2023);
+    this.pCerrada = await this.seedProyectoConEdicion(
+      'Prevención Comunitaria en Salud Bucal',
+      this.torres, medicina, conv2023, EstadoEdicion.Cerrado, presupuestoEjecucion(2023),
+      this.seedDatosFormulario(campos2023, {
+        resumen: 'Campañas de prevención y hábitos de salud bucal en escuelas y centros comunitarios.',
+        area: 'Salud',
+        poblaciones: ['Niños y adolescentes'],
+        anio: 2023,
+      }),
+    );
+
+    this.pConsolidada = await this.seedProyectoConEdicion(
+      'Oficios Digitales para la Inclusión Laboral',
+      this.diaz, ingenieria, conv2025, EstadoEdicion.EnEjecucion, presupuestoEjecucion(2025),
+      this.seedDatosFormulario(campos2025, {
+        resumen: 'Fortalecimiento de talleres de oficios digitales, consolidando la línea iniciada en ediciones previas.',
+        area: 'Tecnología',
+        poblaciones: ['Comunidad general'],
+        antecedentes: true,
+        anio: 2025,
+      }),
+      false,
+      undefined,
+      true,
     );
   }
 
-  private generarTituloUnico(): string {
-    const base = `${this.rng.pick(TITULO_INICIOS)} ${this.rng.pick(TITULO_TEMAS)}`;
+  private tituloUnico(base: string): string {
     let titulo = base;
     let sufijo = 1;
     while (this.titulosUsados.has(titulo)) {
@@ -1536,14 +1612,152 @@ export class SeedService {
     return titulo;
   }
 
+  /** Estados de edición coherentes con la etapa en que está la convocatoria. */
+  private estadosEdicionPorConvocatoria(estado: EstadoConvocatoria): EstadoEdicion[] {
+    switch (estado) {
+      case EstadoConvocatoria.Cierre:
+        return [EstadoEdicion.Cerrado];
+      case EstadoConvocatoria.Ejecucion:
+        return [EstadoEdicion.EnEjecucion];
+      case EstadoConvocatoria.Evaluacion:
+        return [EstadoEdicion.Presentado, EstadoEdicion.EnEvaluacion];
+      case EstadoConvocatoria.Presentacion:
+        return [EstadoEdicion.Borrador, EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios];
+      default:
+        return [];
+    }
+  }
+
+  private async camposDeConvocatoria(convocatoria: Convocatoria): Promise<CampoFormulario[]> {
+    if (convocatoria.formulario?.campos) return convocatoria.formulario.campos;
+    const conv = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoria.id },
+      relations: { formulario: true },
+    });
+    return conv?.formulario?.campos ?? [];
+  }
+
+  private tomarUsuarioDisponible(participantes: Usuario[], usados: Set<string>): Usuario | undefined {
+    if (participantes.length === 0) return undefined;
+    for (let i = 0; i < participantes.length; i++) {
+      const u = participantes[this.rng.entero(0, participantes.length - 1)];
+      if (!usados.has(u.id)) {
+        usados.add(u.id);
+        return u;
+      }
+    }
+    return undefined;
+  }
+
+  /** Codirector de la UA adicional si el proyecto es interfacultad, sino del pool propio. */
+  private elegirCodirector(
+    pool: PoolUa,
+    uaAdicionalId: string | null,
+    usadosConv: Set<string>,
+  ): Usuario | undefined {
+    if (uaAdicionalId) {
+      const fuente = this.usuariosPorUa.get(uaAdicionalId);
+      const candidato = fuente ? this.tomarUsuarioDisponible(fuente.docentes, usadosConv) : undefined;
+      if (candidato) return candidato;
+    }
+    return this.tomarUsuarioDisponible(pool.docentes, usadosConv);
+  }
+
+  /**
+   * Inserta en lote todas las ediciones masivas de una convocatoria y sus participaciones de
+   * director/codirector. Antes de esto el seed guardaba proyecto + edición + participaciones
+   * registro por registro (un round-trip a la DB por cada uno); acá se acumulan y se hacen
+   * INSERT múltiples por lote.
+   */
+  private async flushEdicionesMasivas(
+    convocatoriaId: string,
+    anio: number,
+    edicionesPlan: Array<{
+      proyecto: Proyecto;
+      uaId: string;
+      estado: EstadoEdicion;
+      directorId: string;
+      codirectorId: string | null;
+      presupuesto: object | null;
+      datos: Record<string, unknown>;
+    }>,
+  ): Promise<void> {
+    if (edicionesPlan.length === 0) return;
+
+    const ediciones: Edicion[] = edicionesPlan.map((plan) => {
+      const edicion = this.edicionRepo.create({
+        proyectoId: plan.proyecto.id,
+        convocatoriaId,
+        estado: plan.estado,
+        creadoPorId: plan.directorId,
+        unidadAcademicaId: plan.uaId,
+        anioEdicion: anio,
+        presupuesto: plan.presupuesto,
+        datosFormulario: plan.datos,
+      });
+      edicion.id = crypto.randomUUID();
+      return edicion;
+    });
+
+    for (let i = 0; i < ediciones.length; i += TAMANIO_LOTE) {
+      const chunk = ediciones.slice(i, i + TAMANIO_LOTE);
+      await this.edicionRepo.insert(chunk);
+      this.progreso.sumar(chunk.length);
+    }
+
+    const participaciones: ParticipacionConvocatoria[] = [];
+    for (let i = 0; i < ediciones.length; i++) {
+      const edicion = ediciones[i];
+      const plan = edicionesPlan[i];
+      const pool = this.usuariosPorUa.get(plan.uaId);
+      const secretaria = pool?.secretaria;
+      if (!secretaria) continue;
+
+      const filas: ParticipacionConvocatoria[] = [
+        this.participacionRepo.create({
+          usuarioId: plan.directorId,
+          convocatoriaId,
+          rol: RolEjecucion.DirectorDeProyecto,
+          edicionId: edicion.id,
+          esDirectorPrincipal: true,
+          asignadoPorId: secretaria.id,
+          estado: null,
+        }),
+      ];
+      if (plan.codirectorId) {
+        filas.push(
+          this.participacionRepo.create({
+            usuarioId: plan.codirectorId,
+            convocatoriaId,
+            rol: RolEjecucion.DirectorDeProyecto,
+            edicionId: edicion.id,
+            esDirectorPrincipal: false,
+            asignadoPorId: secretaria.id,
+            estado: null,
+          }),
+        );
+      }
+      for (const fila of filas) fila.id = crypto.randomUUID();
+      participaciones.push(...filas);
+    }
+
+    for (let i = 0; i < participaciones.length; i += TAMANIO_LOTE) {
+      const chunk = participaciones.slice(i, i + TAMANIO_LOTE);
+      await this.participacionRepo.insert(chunk);
+      this.progreso.sumar(chunk.length);
+    }
+  }
+
   private async seedProyectosMasivos(anios: number[]): Promise<void> {
     const areas = ['Salud', 'Educación', 'Ambiente', 'Tecnología', 'Cultura'];
     const poblaciones = ['Niños y adolescentes', 'Adultos mayores', 'Personas con discapacidad', 'Comunidad general'];
 
     for (const anio of anios) {
       const conv = this.convs.get(anio)!;
-      const estadoEdicion =
-        anio === 2026 ? EstadoEdicion.EnEvaluacion : anio === 2027 ? null : EstadoEdicion.EnEjecucion;
+      const camposConv = await this.camposDeConvocatoria(conv);
+      const usadosConv = new Set<string>();
+      const estadosPermitidos = this.estadosEdicionPorConvocatoria(conv.estado);
+      if (estadosPermitidos.length === 0) continue;
 
       const edicionesExistentes = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id },
@@ -1555,88 +1769,152 @@ export class SeedService {
         edicionesPorUa.set(e.unidadAcademicaId, (edicionesPorUa.get(e.unidadAcademicaId) ?? 0) + 1);
       }
 
+      const seleccionarEstadoMasivo = (): EstadoEdicion => {
+        if (estadosPermitidos.length === 1) return estadosPermitidos[0];
+        if (estadosPermitidos.length === 2) {
+          return this.rng.bool(0.42) ? estadosPermitidos[0] : estadosPermitidos[1];
+        }
+        const r = this.rng.float();
+        if (r < 0.35) return EstadoEdicion.Borrador;
+        return r < 0.8 ? EstadoEdicion.Presentado : EstadoEdicion.PendienteDeCambios;
+      };
+
+      // Acumuladores de la corrida: se construyen en memoria (decisión determinista por UA) y
+      // se persisten al final por lotes, para no pagar un round-trip por registro.
+      const proyectosNuevos: Proyecto[] = [];
+      const consolidados: Proyecto[] = [];
+      const edicionesPlan: Array<{
+        proyecto: Proyecto;
+        uaId: string;
+        estado: EstadoEdicion;
+        directorId: string;
+        codirectorId: string | null;
+        presupuesto: object | null;
+        datos: Record<string, unknown>;
+      }> = [];
+
       for (const ua of this.uas) {
         const pool = this.usuariosPorUa.get(ua.id);
         if (!pool) continue;
-        const cantidad = this.rng.proyectosPorUa();
-
-        // Si la UA ya tiene al menos PROYECTOS_MASIVOS_MINIMO ediciones en esta
-        // convocatoria, el año ya fue sembrado y se saltea: el cupo se sortea en
-        // cada arranque, así que sin este corte cada seed agregaría otra tanda.
-        // Los proyectos canónicos son un puñado y nunca llegan a ese piso.
         if ((edicionesPorUa.get(ua.id) ?? 0) >= PROYECTOS_MASIVOS_MINIMO) continue;
 
-        const specs: EdicionMasiva[] = [];
-        const proyectoEnts: Proyecto[] = [];
-        const directoresDisponibles = [...pool.directores];
+        // 1) Consolidados de 2025 → en 2026 pasan directo a la adjudicación (saltean evaluación).
+        if (anio === 2026) {
+          const candidatos = this.consolidados2025.get(ua.id) ?? [];
+          for (const cand of candidatos) {
+            if (nombresExistentes.has(cand.proyecto.nombre)) continue;
+            cand.proyecto.esConsolidado = true;
+            consolidados.push(cand.proyecto);
+            usadosConv.add(cand.directorId);
+            const codirector = this.elegirCodirector(
+              pool,
+              cand.proyecto.esInterfacultad ? cand.proyecto.unidadAcademicaAdicionalId : null,
+              usadosConv,
+            );
+            if (codirector) usadosConv.add(codirector.id);
+            nombresExistentes.add(cand.proyecto.nombre);
+            edicionesPlan.push({
+              proyecto: cand.proyecto,
+              uaId: ua.id,
+              estado: EstadoEdicion.Adjudicado,
+              directorId: cand.directorId,
+              codirectorId: codirector?.id ?? null,
+              presupuesto: generarPresupuesto(this.rng, anio),
+              datos: this.seedDatosFormulario(camposConv, {
+                resumen: 'Proyecto consolidado que continúa su línea de trabajo con el mismo equipo directivo.',
+                area: this.rng.pick(areas),
+                poblaciones: [this.rng.pick(poblaciones)],
+                antecedentes: true,
+                anio,
+              }),
+            });
+          }
+        }
+
+        // 2) Proyectos nuevos.
+        const cantidad = this.rng.proyectosPorUa();
+        const directoresDisponibles = pool.directores.filter((d) => !usadosConv.has(d.id));
+        const consolidablesUa: Array<{ proyecto: Proyecto; directorId: string }> = [];
 
         for (let i = 0; i < cantidad; i++) {
-          const titulo = this.generarTituloUnico();
-          const director =
-            directoresDisponibles.splice(
-              this.rng.entero(0, directoresDisponibles.length - 1),
-              1,
-            )[0] ?? pool.directores[0];
-          const estado =
-            estadoEdicion ??
-            (this.rng.bool(0.85) ? EstadoEdicion.Presentado : EstadoEdicion.PendienteDeCambios);
-          const presupuesto = generarPresupuesto(this.rng, anio);
-          const datos = this.seedDatosFormulario({
-            resumen: `Propuesta de ${titulo.toLowerCase()} con trabajo articulado con organizaciones de la zona.`,
-            area: this.rng.pick(areas),
-            poblaciones: [this.rng.pick(poblaciones)],
-            antecedentes: this.rng.bool(0.5),
-          });
-
+          const tema = this.rng.pick(TITULO_TEMAS);
+          const titulo = this.tituloUnico(`${this.rng.pick(TITULO_INICIOS)} ${tema}`);
           if (nombresExistentes.has(titulo)) continue;
 
-          const esInterfacultad = this.rng.bool(0.4);
-          const unidadAcademicaAdicionalId = esInterfacultad
+          const esInterfacultad = this.rng.bool(0.28);
+          const uaAdicionalId = esInterfacultad
             ? this.rng.pick(this.uas.filter((u) => u.id !== ua.id)).id
             : null;
+
+          let estado = seleccionarEstadoMasivo();
+          const director = this.tomarUsuarioDisponible(directoresDisponibles, usadosConv);
+          if (!director) break;
+
+          let codirectorId: string | null = null;
+          if (estado !== EstadoEdicion.Borrador) {
+            const codirector = this.elegirCodirector(pool, uaAdicionalId, usadosConv);
+            if (codirector) {
+              codirectorId = codirector.id;
+            } else {
+              estado = EstadoEdicion.Borrador;
+            }
+          }
+
           const proyecto = this.proyectoRepo.create({
             nombre: titulo,
             creadoPorId: director.id,
+            esConsolidado: false,
             esInterfacultad,
-            unidadAcademicaAdicionalId,
+            unidadAcademicaAdicionalId: uaAdicionalId,
           });
-          proyectoEnts.push(proyecto);
-          specs.push({
+          proyecto.id = crypto.randomUUID();
+          proyectosNuevos.push(proyecto);
+
+          const datos = this.seedDatosFormulario(camposConv, {
+            resumen: this.rng.pick(RESUMENES_PROYECTO).replace('{tema}', tema),
+            area: this.rng.pick(areas),
+            poblaciones: [this.rng.pick(poblaciones)],
+            antecedentes: this.rng.bool(0.5),
+            anio,
+            completo: estado !== EstadoEdicion.Borrador,
+          });
+          const presupuesto = estado === EstadoEdicion.Borrador ? null : generarPresupuesto(this.rng, anio);
+
+          edicionesPlan.push({
             proyecto,
             uaId: ua.id,
-            convocatoriaId: conv.id,
             estado,
             directorId: director.id,
+            codirectorId,
             presupuesto,
             datos,
           });
+          nombresExistentes.add(titulo);
+
+          if (anio === 2025 && estado === EstadoEdicion.EnEjecucion && this.rng.bool(0.12)) {
+            consolidablesUa.push({ proyecto, directorId: director.id });
+          }
         }
 
-        const proyectosGuardados: Proyecto[] = [];
-        for (let i = 0; i < proyectoEnts.length; i += TAMANIO_LOTE) {
-          const chunk = proyectoEnts.slice(i, i + TAMANIO_LOTE);
-          proyectosGuardados.push(...(await this.proyectoRepo.save(chunk)));
-          this.progreso.sumar(chunk.length);
-        }
-
-        const ediciones = specs.map((s, i) =>
-          this.edicionRepo.create({
-            proyectoId: proyectosGuardados[i].id,
-            convocatoriaId: s.convocatoriaId,
-            estado: s.estado,
-            creadoPorId: s.directorId,
-            unidadAcademicaId: s.uaId,
-            anioEdicion: conv.anio,
-            presupuesto: s.presupuesto,
-            datosFormulario: s.datos,
-          }),
-        );
-        for (let i = 0; i < ediciones.length; i += TAMANIO_LOTE) {
-          const chunk = ediciones.slice(i, i + TAMANIO_LOTE);
-          await this.edicionRepo.save(chunk);
-          this.progreso.sumar(chunk.length);
+        if (anio === 2025) {
+          this.consolidados2025.set(ua.id, consolidablesUa);
         }
       }
+
+      // Flush por lotes: consolidados (UPDATE) → proyectos nuevos (INSERT) → ediciones y participaciones.
+      if (consolidados.length > 0) {
+        for (let i = 0; i < consolidados.length; i += TAMANIO_LOTE) {
+          const ids = consolidados.slice(i, i + TAMANIO_LOTE).map((p) => p.id);
+          await this.proyectoRepo.update({ id: In(ids) }, { esConsolidado: true });
+          this.progreso.sumar(ids.length);
+        }
+      }
+      for (let i = 0; i < proyectosNuevos.length; i += TAMANIO_LOTE) {
+        const chunk = proyectosNuevos.slice(i, i + TAMANIO_LOTE);
+        await this.proyectoRepo.insert(chunk);
+        this.progreso.sumar(chunk.length);
+      }
+      await this.flushEdicionesMasivas(conv.id, anio, edicionesPlan);
     }
   }
 
@@ -1705,6 +1983,7 @@ export class SeedService {
   }
 
   private async seedParticipacionesCanonicas(): Promise<void> {
+    const conv2023 = this.convs.get(2023)!;
     const conv2025 = this.convs.get(2025)!;
     const conv2026 = this.convs.get(2026)!;
     const conv2027 = this.convs.get(2027)!;
@@ -1725,6 +2004,9 @@ export class SeedService {
     await this.seedEvaluadorAprobadoCanonico(this.romero.id, conv2025.id, conv2025.nombre, this.authMedicina.id);
     await this.seedEvaluadorAprobadoCanonico(this.evaluadorDerecho.id, conv2025.id, conv2025.nombre, this.authDerecho.id);
     await this.seedEvaluadorAprobadoCanonico(this.evaluadorEconomicas.id, conv2025.id, conv2025.nombre, this.admin.id);
+    await this.seedParticipacion({ usuarioId: this.diaz.id, convocatoriaId: conv2025.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.pConsolidada.id, esDirectorPrincipal: true, asignadoPorId: this.authIngenieria.id });
+
+    await this.seedParticipacion({ usuarioId: this.torres.id, convocatoriaId: conv2023.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.pCerrada.id, esDirectorPrincipal: true, asignadoPorId: this.authMedicina.id });
 
     await this.seedParticipacion({ usuarioId: this.garcia.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p7.id, esDirectorPrincipal: true, asignadoPorId: this.authDerecho.id });
     await this.seedParticipacion({ usuarioId: this.perez.id, convocatoriaId: conv2027.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: this.p7.id, esDirectorPrincipal: false, asignadoPorId: this.authDerecho.id });
@@ -1734,92 +2016,17 @@ export class SeedService {
   private async seedParticipacionesMasivas(anios: number[]): Promise<void> {
     for (const anio of anios) {
       const conv = this.convs.get(anio)!;
-      const ediciones = await this.edicionRepo.find({
-        where: { convocatoriaId: conv.id },
-        relations: { creadoPor: true, proyecto: true },
-      });
       const existentes = await this.participacionRepo.find({
         where: { convocatoriaId: conv.id },
         relations: { usuario: true },
         select: {
           usuarioId: true,
-          edicionId: true,
           estado: true,
           rol: true,
-          esDirectorPrincipal: true,
           usuario: { id: true, unidadAcademicaId: true },
         },
       });
       const existSet = new Set(existentes.map((p) => p.usuarioId));
-      const edicionesConCodirector = new Set(
-        existentes
-          .filter((p) => p.rol === RolEjecucion.DirectorDeProyecto && p.esDirectorPrincipal === false)
-          .map((p) => p.edicionId),
-      );
-      const rows: ParticipacionConvocatoria[] = [];
-
-      for (const ed of ediciones) {
-        const pool = this.usuariosPorUa.get(ed.unidadAcademicaId);
-        const secretaria = pool?.secretaria;
-        const director = ed.creadoPor;
-        if (!secretaria || !director) continue;
-
-        const esInterfacultad = ed.proyecto?.esInterfacultad ?? false;
-        const uaAdicionalId = ed.proyecto?.unidadAcademicaAdicionalId ?? null;
-        const fuenteCodirector = esInterfacultad && uaAdicionalId
-          ? (this.usuariosPorUa.get(uaAdicionalId) ?? pool)
-          : pool;
-
-        if (!existSet.has(director.id)) {
-          rows.push(
-            this.participacionRepo.create({
-              usuarioId: director.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.DirectorDeProyecto,
-              edicionId: ed.id,
-              esDirectorPrincipal: true,
-              asignadoPorId: secretaria.id,
-              estado: null,
-            }),
-          );
-          existSet.add(director.id);
-        }
-
-        let docentesValidados: Usuario[] = [];
-        if (!edicionesConCodirector.has(ed.id)) {
-          docentesValidados = (fuenteCodirector?.docentes ?? []).filter(
-            (d) =>
-              d.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
-              !existSet.has(d.id),
-          );
-          if (docentesValidados.length === 0 && fuenteCodirector !== pool) {
-            docentesValidados = (pool?.docentes ?? []).filter(
-              (d) =>
-                d.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
-                !existSet.has(d.id),
-            );
-          }
-        }
-        const integrante =
-          docentesValidados.length > 0
-            ? docentesValidados[this.rng.entero(0, docentesValidados.length - 1)]
-            : undefined;
-        if (integrante && !existSet.has(integrante.id)) {
-          rows.push(
-            this.participacionRepo.create({
-              usuarioId: integrante.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.DirectorDeProyecto,
-              edicionId: ed.id,
-              esDirectorPrincipal: false,
-              asignadoPorId: secretaria.id,
-              estado: null,
-            }),
-          );
-          existSet.add(integrante.id);
-        }
-      }
-
       const evaluadorRows: ParticipacionConvocatoria[] = [];
       const notifMeta: Array<{
         usuarioId: string;
@@ -1939,12 +2146,6 @@ export class SeedService {
             leida: true,
           });
         }
-      }
-
-      for (let i = 0; i < rows.length; i += TAMANIO_LOTE) {
-        const chunk = rows.slice(i, i + TAMANIO_LOTE);
-        await this.participacionRepo.save(chunk);
-        this.progreso.sumar(chunk.length);
       }
 
       for (let i = 0; i < evaluadorRows.length; i += TAMANIO_LOTE) {
@@ -2157,6 +2358,7 @@ export class SeedService {
 
       const ediciones = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id, estado: Not(EstadoEdicion.Borrador) },
+        relations: { proyecto: true },
       });
       const [instExistentes, cruzadaExistentes] = await Promise.all([
         this.institucionalEvalRepo.find({ where: { convocatoriaId: conv.id }, select: { edicionId: true } }),
@@ -2185,28 +2387,25 @@ export class SeedService {
         const pool = this.usuariosPorUa.get(ed.unidadAcademicaId);
         if (!pool) continue;
 
+        // Consolidados/adjudicados y presentados aún sin evaluar no llevan evaluaciones.
+        if (ed.estado === EstadoEdicion.Adjudicado) continue;
+        if (anio === 2026 && ed.estado === EstadoEdicion.Presentado) continue;
+
         // La edición ya fue sembrada en una corrida anterior: se deja como está.
-        // conCruzadas se sortea, así que volver a evaluarla sumaría cruzadas
-        // nuevas en cada arranque sobre ediciones que ya tenían su evaluación.
         if (instSet.has(ed.id)) continue;
 
         let instEstado: EstadoEvaluacion;
-        let conCruzadas: boolean;
         if (anio === 2026) {
-          if (this.rng.bool(0.2)) {
-            instEstado = EstadoEvaluacion.Borrador;
-            conCruzadas = false;
-          } else {
-            instEstado = EstadoEvaluacion.Confirmada;
-            conCruzadas = true;
-          }
-        } else if (anio === 2025) {
-          instEstado = EstadoEvaluacion.Confirmada;
-          conCruzadas = this.rng.bool(0.8);
+          instEstado = this.rng.bool(0.2) ? EstadoEvaluacion.Borrador : EstadoEvaluacion.Confirmada;
         } else {
           instEstado = EstadoEvaluacion.Confirmada;
-          conCruzadas = true;
         }
+
+        const esInterfacultad = ed.proyecto?.esInterfacultad ?? false;
+        // Interfacultad: institucional + cruzada propia + ajena. No interfacultad: sólo ajena.
+        const tiposCruzadas: TipoEvaluacionCruzada[] = esInterfacultad
+          ? [TipoEvaluacionCruzada.Propia, TipoEvaluacionCruzada.Ajena]
+          : [TipoEvaluacionCruzada.Ajena];
 
         if (estructuraInst && convConTemplates?.templateEvaluacionInstitucionalId) {
           const generada = generarEvaluacionInstitucional(estructuraInst, this.rng, instEstado === EstadoEvaluacion.Confirmada);
@@ -2232,28 +2431,31 @@ export class SeedService {
           }
         }
 
-        if (!conCruzadas || !estructuraCruzada || !convConTemplates?.templateEvaluacionCruzadaId) continue;
+        if (instEstado !== EstadoEvaluacion.Confirmada) continue;
+        if (!estructuraCruzada || !convConTemplates?.templateEvaluacionCruzadaId) continue;
 
-        const candidatosPropia = aprobadosDe(ed.unidadAcademicaId);
-        const evaluadorPropia = candidatosPropia.length > 0
-          ? candidatosPropia[this.rng.entero(0, candidatosPropia.length - 1)]
-          : undefined;
-        if (evaluadorPropia && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`)) {
-          const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
-          cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Propia}`);
-          cruzadaRows.push(
-            this.cruzadaEvalRepo.create({
-              convocatoriaId: conv.id,
-              edicionId: ed.id,
-              evaluadorId: evaluadorPropia.id,
-              tipo: TipoEvaluacionCruzada.Propia,
-              templateId: convConTemplates.templateEvaluacionCruzadaId,
-              estado: EstadoEvaluacion.Confirmada,
-              items: generada.items,
-              observaciones: generada.observaciones,
-            }),
-          );
-          cruzadaMeta.push({ usuario: evaluadorPropia, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Propia });
+        if (tiposCruzadas.includes(TipoEvaluacionCruzada.Propia)) {
+          const candidatosPropia = aprobadosDe(ed.unidadAcademicaId);
+          const evaluadorPropia = candidatosPropia.length > 0
+            ? candidatosPropia[this.rng.entero(0, candidatosPropia.length - 1)]
+            : undefined;
+          if (evaluadorPropia && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`)) {
+            const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
+            cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Propia}`);
+            cruzadaRows.push(
+              this.cruzadaEvalRepo.create({
+                convocatoriaId: conv.id,
+                edicionId: ed.id,
+                evaluadorId: evaluadorPropia.id,
+                tipo: TipoEvaluacionCruzada.Propia,
+                templateId: convConTemplates.templateEvaluacionCruzadaId,
+                estado: EstadoEvaluacion.Confirmada,
+                items: generada.items,
+                observaciones: generada.observaciones,
+              }),
+            );
+            cruzadaMeta.push({ usuario: evaluadorPropia, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Propia });
+          }
         }
 
         const uaPar = this.parMap.get(ed.unidadAcademicaId);
@@ -2330,6 +2532,131 @@ export class SeedService {
       }
       await drenarAuditoria();
     }
+  }
+
+  // ─────────────────── Sugerencias ───────────────────
+
+  /** Sugerencias de Secretaría para ediciones en PendienteDeCambios (sólo 2027). */
+  private async seedSugerencias(): Promise<void> {
+    const conv = this.convs.get(2027);
+    if (!conv) return;
+    const campos = await this.camposDeConvocatoria(conv);
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId: conv.id, estado: EstadoEdicion.PendienteDeCambios },
+      relations: { proyecto: true, creadoPor: true },
+    });
+
+    for (const ed of ediciones) {
+      const pool = this.usuariosPorUa.get(ed.unidadAcademicaId);
+      if (!pool?.secretaria) continue;
+      if ((await this.sugerenciaRepo.count({ where: { edicionId: ed.id } })) > 0) continue;
+
+      const cantidad = this.rng.bool(0.5) ? 2 : 1;
+      const camposUsados = new Set<string>();
+
+      for (let i = 0; i < cantidad; i++) {
+        const sugerida = this.elegirCampoSugerencia(campos, ed, camposUsados);
+        if (!sugerida) continue;
+
+        const sugerencia = await this.sugerenciaRepo.save(
+          this.sugerenciaRepo.create({
+            edicionId: ed.id,
+            sugeridoPorId: pool.secretaria.id,
+            campo: sugerida.campo,
+            valorActual: sugerida.valorActual,
+            valorSugerido: sugerida.valorSugerido,
+            comentario: this.rng.pick(COMENTARIOS_SUGERENCIA),
+            estado: EstadoSugerencia.Pendiente,
+          }),
+        );
+        await this.notificarSugerencia(ed, pool.secretaria, sugerencia, campos);
+        this.progreso.sumar(1);
+      }
+    }
+  }
+
+  private elegirCampoSugerencia(
+    campos: CampoFormulario[],
+    ed: Edicion,
+    usados: Set<string>,
+  ): { campo: string; valorActual: string | null; valorSugerido: string | null } | undefined {
+    const candidatos: Array<{ nombre: string; comentarioSolo: boolean }> = [
+      { nombre: 'nombre', comentarioSolo: true },
+      { nombre: CAMPOS_ESTANDAR.resumen, comentarioSolo: false },
+      { nombre: CAMPOS_ESTANDAR.area, comentarioSolo: true },
+      { nombre: CAMPOS_ESTANDAR.poblaciones, comentarioSolo: true },
+      { nombre: CAMPOS_ESTANDAR.antecedentes, comentarioSolo: true },
+      { nombre: CAMPOS_ESTANDAR.cronograma, comentarioSolo: true },
+    ];
+    const disponibles = candidatos.filter((c) => !usados.has(c.nombre));
+    if (disponibles.length === 0) return undefined;
+    const elegido = disponibles[this.rng.entero(0, disponibles.length - 1)];
+    usados.add(elegido.nombre);
+
+    if (elegido.nombre === 'nombre') {
+      return {
+        campo: 'nombre',
+        valorActual: ed.proyecto?.nombre ?? null,
+        valorSugerido: null,
+      };
+    }
+
+    let campoForm: CampoFormulario;
+    try {
+      campoForm = this.campoEstandar(campos, elegido.nombre);
+    } catch {
+      return undefined;
+    }
+    const datos = ed.datosFormulario as Record<string, unknown> | null;
+    const actual = datos?.[campoForm.id];
+    const valorActual =
+      actual == null ? null : typeof actual === 'object' ? JSON.stringify(actual) : String(actual);
+
+    let valorSugerido: string | null = null;
+    if (!elegido.comentarioSolo && typeof actual === 'string' && actual.length > 0) {
+      valorSugerido = `Propuesta: ${actual}`;
+    }
+    return {
+      campo: `datosFormulario.${campoForm.id}`,
+      valorActual,
+      valorSugerido,
+    };
+  }
+
+  private async notificarSugerencia(
+    ed: Edicion,
+    sugeridoPor: Usuario,
+    sugerencia: SugerenciaCambio,
+    campos: CampoFormulario[],
+  ): Promise<void> {
+    const destinatarios = new Set<string>([ed.creadoPorId]);
+    const directores = await this.participacionRepo.find({
+      where: { edicionId: ed.id, rol: RolEjecucion.DirectorDeProyecto },
+    });
+    directores.forEach((d) => destinatarios.add(d.usuarioId));
+
+    const nombreCampo = this.nombreLegibleSugerencia(sugerencia.campo, campos);
+    for (const usuarioId of destinatarios) {
+      if (usuarioId === sugeridoPor.id) continue;
+      await this.notificacionRepo.save(
+        this.notificacionRepo.create({
+          usuarioId,
+          tipo: TipoNotificacion.NUEVA_SUGERENCIA,
+          sugerenciaId: sugerencia.id,
+          mensaje: `${sugeridoPor.nombreCompleto} sugirió un cambio en "${nombreCampo}" del proyecto "${ed.proyecto?.nombre ?? ''}"`,
+        }),
+      );
+    }
+  }
+
+  private nombreLegibleSugerencia(campo: string, campos: CampoFormulario[]): string {
+    if (campo === 'nombre') return 'Nombre del proyecto';
+    if (campo.startsWith('datosFormulario.')) {
+      const id = campo.replace('datosFormulario.', '');
+      return campos.find((c) => c.id === id)?.nombre ?? campo;
+    }
+    return campo;
   }
 
   // ─────────────────── Resumen ───────────────────
