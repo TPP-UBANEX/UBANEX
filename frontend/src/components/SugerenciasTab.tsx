@@ -14,8 +14,8 @@ import {
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { SugerenciaCambio, CampoFormulario } from '@/data/types'
-import { estadoBadge, EstadoSugerencia, TipoCampo, TIPOS_VALOR_OBJETO } from '@/data/types'
-import { formatearFechaISO } from '@/components/CampoFormularioInput'
+import { estadoBadge, EstadoSugerencia } from '@/data/types'
+import { formatearValorSerializado } from '@/components/CampoFormularioInput'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -103,43 +103,17 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return camposFormulario.find(c => c.id === campo.slice(16)) ?? null
   }
 
-  // Un valor sugerido de geolocalización/usuario viaja serializado; si no es JSON válido se muestra tal cual (texto libre).
-  const nombreValorObjeto = (valor: string): string => {
-    try {
-      const parsed = JSON.parse(valor)
-      if (parsed && typeof parsed === 'object' && typeof parsed.nombre === 'string') return parsed.nombre
-    } catch {
-      // no era JSON
-    }
+  // Los booleanos del proyecto (no del formulario) viajan como "true"/"false"; se muestran legibles.
+  const formatearValorProyecto = (campo: string, valor: string): string => {
+    if (campo === 'esConsolidado' || campo === 'esInterfacultad') return valor === 'true' ? 'Sí' : 'No'
     return valor
-  }
-
-  // El valor actual de una tabla viaja como el JSON del array de filas.
-  const nombreValorTabla = (valor: string, campoFormulario: CampoFormulario | null): string => {
-    const columnas = campoFormulario?.columnas ?? []
-    try {
-      const filas = JSON.parse(valor)
-      if (!Array.isArray(filas)) return valor
-      if (filas.length === 0) return '(sin filas)'
-      return filas
-        .map((fila: Record<string, unknown>) =>
-          columnas.map(c => `${c.nombre}: ${fila?.[c.id] ?? '-'}`).join(' · '))
-        .join('\n')
-    } catch {
-      return valor
-    }
   }
 
   const ValorDiff = ({ campo, actual, sugerido }: { campo: string; actual: string | null; sugerido: string | null }) => {
     const campoFormulario = campoFormularioDe(campo)
-    const tipo = campoFormulario?.tipo ?? null
-    // Las fechas se guardan en ISO, la geolocalización y las tablas serializadas; se muestran legibles.
     const mostrar = (valor: string | null) => {
       if (valor == null) return '(sin valor)'
-      if (tipo === TipoCampo.Fecha) return formatearFechaISO(valor)
-      if (tipo && TIPOS_VALOR_OBJETO.includes(tipo)) return nombreValorObjeto(valor)
-      if (tipo === TipoCampo.Tabla) return nombreValorTabla(valor, campoFormulario)
-      return valor
+      return campoFormulario ? formatearValorSerializado(campoFormulario, valor) : formatearValorProyecto(campo, valor)
     }
 
     if (sugerido == null) {
@@ -201,7 +175,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
             </div>
           </CardHeader>
           <CardContent className="pb-3">
-            {s.valorSugerido != null && (
+            {(s.valorActual != null || s.valorSugerido != null) && (
               <ValorDiff campo={s.campo} actual={s.valorActual} sugerido={s.valorSugerido} />
             )}
             <div className="text-sm bg-muted/50 rounded-md p-3">

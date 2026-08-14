@@ -70,6 +70,36 @@ export function formatearValorCampoFormulario(campo: CampoFormulario | ColumnaTa
   return String(valor)
 }
 
+/** Un valor geo/usuario viaja serializado; si no es JSON válido se trata como texto libre. */
+export function parsearValorObjetoSerializado(valor: string): ValorGeolocalizacion | ValorUsuario | null {
+  if (!valor.trim()) return null
+  try {
+    const parsed = JSON.parse(valor)
+    if (parsed && typeof parsed === 'object' && typeof parsed.nombre === 'string') return parsed
+  } catch {
+    // no era JSON: se interpreta como texto libre
+  }
+  return { nombre: valor }
+}
+
+/** Des-serializa un valor tal como viaja en una sugerencia (columna text) y lo formatea legible. */
+export function formatearValorSerializado(campo: CampoFormulario, valor: string): string {
+  if (campo.tipo === TipoCampo.Booleano) {
+    return formatearValorCampoFormulario(campo, valor === 'true')
+  }
+  if (campo.tipo === TipoCampo.Checkbox || campo.tipo === TipoCampo.Tabla) {
+    try {
+      return formatearValorCampoFormulario(campo, JSON.parse(valor))
+    } catch {
+      return valor
+    }
+  }
+  if (campo.tipo === TipoCampo.Geolocalizacion || campo.tipo === TipoCampo.Usuario) {
+    return formatearValorCampoFormulario(campo, parsearValorObjetoSerializado(valor))
+  }
+  return formatearValorCampoFormulario(campo, valor)
+}
+
 /** El subconjunto de un campo/columna necesario para resolver qué control de entrada mostrar. */
 type CampoControlable = Pick<CampoFormulario, 'tipo' | 'opciones' | 'minimo' | 'maximo' | 'admiteDecimales' | 'rolesUsuario'>
 

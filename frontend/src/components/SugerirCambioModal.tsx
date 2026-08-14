@@ -13,22 +13,11 @@ import {
 import { api } from '@/lib/api'
 import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
 import { UsuarioAutocomplete } from '@/components/UsuarioAutocomplete'
+import { parsearValorObjetoSerializado } from '@/components/CampoFormularioInput'
 import { TipoCampo } from '@/data/types'
 import type { RolUsuario, ValorGeolocalizacion, ValorUsuario } from '@/data/types'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-
-/** El valor sugerido de un campo geo/usuario viaja serializado; si no es JSON valido se trata como texto libre. */
-function parsearValorObjeto(valor: string): ValorGeolocalizacion | ValorUsuario | null {
-  if (!valor.trim()) return null
-  try {
-    const parsed = JSON.parse(valor)
-    if (parsed && typeof parsed === 'object' && typeof parsed.nombre === 'string') return parsed
-  } catch {
-    // no era JSON: se interpreta como texto libre
-  }
-  return { nombre: valor }
-}
 
 interface SugerirCambioModalProps {
   open: boolean
@@ -87,7 +76,7 @@ export function SugerirCambioModal({
   useEffect(() => {
     if (open) {
       setValorSugerido(valorSugeridoInicial)
-      setValorObjetoSugerido(tipoObjeto ? parsearValorObjeto(valorSugeridoInicial) : null)
+      setValorObjetoSugerido(tipoObjeto ? parsearValorObjetoSerializado(valorSugeridoInicial) : null)
       setComentario(comentarioInicial)
       setError('')
       setConfirmar(false)
