@@ -41,12 +41,9 @@ import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import {
   CampoFormularioInput,
-  EtiquetaCampoFormulario,
-  TextoLargoColapsable,
   camposIncompletosParaEnvio,
-  formatearValorCampoFormulario,
 } from '@/components/CampoFormularioInput'
-import { TablaCampoFormulario } from '@/components/TablaCampoFormulario'
+import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -546,25 +543,12 @@ export function ProyectoDetail() {
 
   const renderCamposLectura = (campos: CampoFormulario[]) => (
     <>
-      {campos.map(campo => {
-        const valorFormateado = formatearValorCampoFormulario(campo, edicion?.datosFormulario?.[campo.id])
-        // Los campos de texto largo y tabla ocupan las dos columnas, en su posición según el orden definido.
-        const esTextoLargo = campo.tipo === TipoCampo.TextoLargo
-        const esTabla = campo.tipo === TipoCampo.Tabla
-        const anchoCompleto = esTextoLargo || esTabla
-        return (
-          <div key={campo.id} className={anchoCompleto ? 'col-span-2 space-y-1' : undefined}>
-            {anchoCompleto ? (
-              <p className="text-muted-foreground">
-                <EtiquetaCampoFormulario campo={campo} />:
-              </p>
-            ) : (
-              <>
-                <span className="text-muted-foreground">
-                  <EtiquetaCampoFormulario campo={campo} />:
-                </span>{' '}
-              </>
-            )}
+      {campos.map(campo => (
+        <CampoFormularioLectura
+          key={campo.id}
+          campo={campo}
+          valor={edicion?.datosFormulario?.[campo.id]}
+          envolverValor={(contenido, { valorFormateado, anchoCompleto }) => (
             <CampoSugerible
               campo={`datosFormulario.${campo.id}`}
               valorActual={valorFormateado}
@@ -574,15 +558,11 @@ export function ProyectoDetail() {
               display={anchoCompleto ? 'flex' : 'inline-flex'}
               className={anchoCompleto ? 'w-full items-start' : undefined}
             >
-              {esTabla
-                ? <TablaCampoFormulario campo={campo} valor={edicion?.datosFormulario?.[campo.id]} />
-                : esTextoLargo
-                  ? <TextoLargoColapsable texto={valorFormateado} />
-                  : valorFormateado}
+              {contenido}
             </CampoSugerible>
-          </div>
-        )
-      })}
+          )}
+        />
+      ))}
     </>
   )
 
