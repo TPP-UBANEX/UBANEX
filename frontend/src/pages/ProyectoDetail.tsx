@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
+import type { Proyecto, Edicion, Convocatoria, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import {
   camposPerfilDocente,
@@ -45,6 +45,9 @@ import {
 } from '@/components/CampoFormularioInput'
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
+import {
+  formatearMoneda, normalizarPresupuesto, numeroNoNegativo, presupuestoIncompletoParaEnvio,
+} from '@/lib/presupuesto'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -148,7 +151,9 @@ export function ProyectoDetail() {
   const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
     camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
-  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos && camposObligatoriosFaltantes.length === 0
+  const presupuestoFaltante = presupuestoIncompletoParaEnvio(edicion?.presupuesto, edicion?.convocatoria)
+  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
+    && camposObligatoriosFaltantes.length === 0 && presupuestoFaltante.length === 0
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
@@ -175,7 +180,9 @@ export function ProyectoDetail() {
       ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
       : camposObligatoriosFaltantes.length > 0
         ? <ListaCamposFaltantes titulo="Falta completar lo siguiente:" campos={camposObligatoriosFaltantes} />
-        : null
+        : presupuestoFaltante.length > 0
+          ? <ListaCamposFaltantes titulo="Falta completar el presupuesto:" campos={presupuestoFaltante} />
+          : null
 
   const cargarDatos = async () => {
     if (!id) return
@@ -477,7 +484,7 @@ export function ProyectoDetail() {
       rubro.partidas = partidas
     }
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...actual, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...actual, rubros }))
   }
 
   const removePartida = (rubroIdx: number, partidaIdx: number) => {
@@ -491,7 +498,7 @@ export function ProyectoDetail() {
       rubro.partidas = (partidas as BienPresupuesto[]).filter((_, i) => i !== partidaIdx)
     }
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
 
   const updateViatico = (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => {
@@ -500,12 +507,9 @@ export function ProyectoDetail() {
     const rubro = { ...rubros[rubroIdx] }
     const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
     partidas[pIdx] = { ...partidas[pIdx], [field]: value }
-    if (field === 'monto') {
-      rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
-    }
     rubro.partidas = partidas
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
 
   const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
@@ -514,19 +518,10 @@ export function ProyectoDetail() {
     const rubro = { ...rubros[rubroIdx] }
     const partidas = [...(rubro.partidas as BienPresupuesto[])]
     partidas[pIdx] = { ...partidas[pIdx], [field]: value }
-    if (field === 'cantidad' || field === 'precioUnitario') {
-      partidas[pIdx].monto = partidas[pIdx].cantidad * partidas[pIdx].precioUnitario
-    }
-    rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
     rubro.partidas = partidas
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
-
-  const recalcularPresupuesto = (p: Presupuesto): Presupuesto => ({
-    ...p,
-    montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
-  })
 
   const renderCamposEdicion = (campos: CampoFormulario[]) => (
     <>
@@ -706,7 +701,7 @@ export function ProyectoDetail() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
-          <CardContent><p className="text-sm font-bold">${(edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</p></CardContent>
+          <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuesto?.montoTotal)}</p></CardContent>
         </Card>
         {puedeAsignarDirector && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
@@ -951,11 +946,11 @@ export function ProyectoDetail() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Presupuesto</CardTitle>
               <span className="text-sm font-bold">
-                Total: ${(editando ? (editPresupuesto?.montoTotal ?? 0) : (edicion?.presupuesto?.montoTotal ?? 0)).toLocaleString()}
+                Total: {formatearMoneda(editando ? editPresupuesto?.montoTotal : edicion?.presupuesto?.montoTotal)}
               </span>
             </CardHeader>
             <CardContent className="space-y-4">
-              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, {
+              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, edicion?.convocatoria, {
                 addPartida, removePartida, updateViatico, updateBien,
               })}
             </CardContent>
@@ -1238,9 +1233,23 @@ function AsignarDirectorModal({
   )
 }
 
+function periodoInvalido(p: ViaticoPresupuesto, convocatoria: Convocatoria | undefined): string | null {
+  if (!p.periodoInicio || !p.periodoFin) return null
+  if (p.periodoInicio > p.periodoFin) return 'El inicio del período debe ser anterior o igual al fin'
+  const { fechaInicioEjecucion, fechaFinEjecucion } = convocatoria ?? {}
+  if (
+    fechaInicioEjecucion && fechaFinEjecucion
+    && (p.periodoInicio < fechaInicioEjecucion || p.periodoFin > fechaFinEjecucion)
+  ) {
+    return 'El período está fuera de la ejecución de la convocatoria'
+  }
+  return null
+}
+
 function renderPresupuesto(
   presupuesto: Presupuesto | null,
   editando: boolean,
+  convocatoria: Convocatoria | undefined,
   handlers?: {
     addPartida: (rubroIdx: number, tipo: TipoRubro) => void
     removePartida: (rubroIdx: number, partidaIdx: number) => void
@@ -1263,7 +1272,7 @@ function renderPresupuesto(
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Subtotal: ${rubro.subtotal.toLocaleString()}</span>
+              <span className="text-xs text-muted-foreground">Subtotal: {formatearMoneda(rubro.subtotal)}</span>
               {editando && handlers && (
                 <Button type="button" variant="outline" size="sm" onClick={() => handlers.addPartida(rubroIdx, rubro.tipo as TipoRubro)}>
                   <Plus className="h-3 w-3 mr-1" />Agregar
@@ -1273,53 +1282,61 @@ function renderPresupuesto(
           </div>
 
           {rubro.partidas.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Sin partidas</p>
+            <p className={editando ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
+              {editando ? 'Sin partidas — este rubro necesita al menos una para poder presentar el proyecto' : 'Sin partidas'}
+            </p>
           ) : rubro.tipo === TipoRubro.ViaticosYSeguros ? (
             <div className="space-y-2">
-              {(rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => (
-                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
-                  {editando && handlers ? (
-                    <>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Tipo</span>
-                        <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Docente">Docente</SelectItem>
-                            <SelectItem value="Estudiante">Estudiante</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-[2] space-y-1">
-                        <span className="text-xs">Descripción</span>
-                        <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Inicio</span>
-                        <Input type="date" value={p.periodoInicio} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Fin</span>
-                        <Input type="date" value={p.periodoFin} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Monto</span>
-                        <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', Number(e.target.value))} />
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm flex-1">{p.tipoPersona}</span>
-                      <span className="text-sm flex-[2]">{p.descripcion}</span>
-                      <span className="text-sm flex-1">{p.periodoInicio} → {p.periodoFin}</span>
-                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
-                    </>
-                  )}
-                </div>
-              ))}
+              {(rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => {
+                const error = editando ? periodoInvalido(p, convocatoria) : null
+                return (
+                  <div key={pIdx} className="bg-muted/30 p-2 rounded-md space-y-1">
+                    <div className="flex items-end gap-2">
+                      {editando && handlers ? (
+                        <>
+                          <div className="flex-1 space-y-1">
+                            <span className="text-xs">Tipo</span>
+                            <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Docente">Docente</SelectItem>
+                                <SelectItem value="Estudiante">Estudiante</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex-[2] space-y-1">
+                            <span className="text-xs">Descripción</span>
+                            <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <span className="text-xs">Inicio</span>
+                            <Input type="date" value={p.periodoInicio} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <span className="text-xs">Fin</span>
+                            <Input type="date" value={p.periodoFin} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <span className="text-xs">Monto</span>
+                            <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', numeroNoNegativo(e.target.value))} />
+                          </div>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm flex-1">{p.tipoPersona}</span>
+                          <span className="text-sm flex-[2]">{p.descripcion}</span>
+                          <span className="text-sm flex-1">{p.periodoInicio} → {p.periodoFin}</span>
+                          <span className="text-sm flex-1">{formatearMoneda(p.monto)}</span>
+                        </>
+                      )}
+                    </div>
+                    {error && <p className="text-xs text-destructive">{error}</p>}
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="space-y-2">
@@ -1333,11 +1350,11 @@ function renderPresupuesto(
                       </div>
                       <div className="flex-1 space-y-1">
                         <span className="text-xs">Cantidad</span>
-                        <Input type="number" min="1" step="1" value={p.cantidad || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'cantidad', Number(e.target.value))} />
+                        <Input type="number" min="1" step="1" value={p.cantidad || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'cantidad', numeroNoNegativo(e.target.value))} />
                       </div>
                       <div className="flex-1 space-y-1">
                         <span className="text-xs">Precio unit.</span>
-                        <Input type="number" min="0" step="0.01" value={p.precioUnitario || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'precioUnitario', Number(e.target.value))} />
+                        <Input type="number" min="0" step="0.01" value={p.precioUnitario || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'precioUnitario', numeroNoNegativo(e.target.value))} />
                       </div>
                       <div className="flex-1 space-y-1">
                         <span className="text-xs">Monto</span>
@@ -1351,8 +1368,8 @@ function renderPresupuesto(
                     <>
                       <span className="text-sm flex-[2]">{p.descripcion}</span>
                       <span className="text-sm flex-1">{p.cantidad}</span>
-                      <span className="text-sm flex-1">${p.precioUnitario.toLocaleString()}</span>
-                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
+                      <span className="text-sm flex-1">{formatearMoneda(p.precioUnitario)}</span>
+                      <span className="text-sm flex-1">{formatearMoneda(p.monto)}</span>
                     </>
                   )}
                 </div>
