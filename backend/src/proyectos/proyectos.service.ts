@@ -21,6 +21,7 @@ import { PaginatedResponse } from '../common/interfaces/paginated-response.inter
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
+import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
 
 @Injectable()
 export class ProyectosService {
@@ -269,7 +270,8 @@ export class ProyectosService {
     }
 
     if (dto.presupuesto !== undefined) {
-      edicion.presupuesto = dto.presupuesto;
+      validarPresupuesto(dto.presupuesto);
+      edicion.presupuesto = normalizarPresupuesto(dto.presupuesto);
     }
 
     if (dto.datosFormulario !== undefined) {
@@ -321,6 +323,11 @@ export class ProyectosService {
       motivos.push(
         `Faltan completar campos obligatorios: ${camposIncompletos.join(', ')}`,
       );
+    }
+
+    const presupuestoIncompleto = presupuestoIncompletoParaEnvio(edicion.presupuesto, edicion.convocatoria);
+    if (presupuestoIncompleto.length > 0) {
+      motivos.push(`Presupuesto: ${presupuestoIncompleto.join(', ')}`);
     }
 
     if (motivos.length > 0) {

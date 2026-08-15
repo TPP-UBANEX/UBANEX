@@ -7,6 +7,7 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
+import { Presupuesto } from './presupuesto.interface';
 
 @Entity()
 export class Edicion {
@@ -48,7 +49,7 @@ export class Edicion {
   anioEdicion: number | null;
 
   @Column({ type: 'json', nullable: true })
-  presupuesto: object | null;
+  presupuesto: Presupuesto | null;
 
   @Column({ type: 'json', nullable: true })
   datosFormulario: object | null;
