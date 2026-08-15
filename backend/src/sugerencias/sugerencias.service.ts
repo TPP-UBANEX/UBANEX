@@ -11,6 +11,8 @@ import { ParticipacionConvocatoria } from '../participaciones-convocatoria/parti
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { validarValoresFormulario } from '../formularios/campo-formulario.util';
+import { Presupuesto } from '../proyectos/presupuesto.interface';
+import { normalizarPresupuesto, validarPresupuesto } from '../proyectos/presupuesto.util';
 import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
 import { ResponderSugerenciaDto } from './dto/responder-sugerencia.dto';
@@ -309,21 +311,54 @@ export class SugerenciasService {
         break;
       default:
         if (campo.startsWith('presupuesto.')) {
-          this.aplicarCambioJson(edicion, 'presupuesto', campo.replace('presupuesto.', ''), valorSugerido);
+          this.aplicarCambioPresupuesto(edicion, campo.replace('presupuesto.', ''), valorSugerido);
           await this.edicionRepo.save(edicion);
         } else if (campo.startsWith('datosFormulario.')) {
           const campoId = campo.replace('datosFormulario.', '');
           const campoFormulario = (await this.obtenerCamposFormulario(edicion.convocatoriaId))
             .find(c => c.id === campoId);
           const valor = this.valorParaCampo(campoFormulario?.tipo, valorSugerido);
-          this.aplicarCambioJson(edicion, 'datosFormulario', campoId, valor);
+          this.aplicarCambioJson(edicion, campoId, valor);
           await this.edicionRepo.save(edicion);
         }
     }
   }
 
-  private aplicarCambioJson(edicion: Edicion, columna: 'presupuesto' | 'datosFormulario', path: string, valor: unknown) {
-    const obj = edicion[columna] ? JSON.parse(JSON.stringify(edicion[columna])) : {};
+  /**
+   * Escribe el valor sugerido en la partida existente, casteando al tipo correcto (los campos
+   * numéricos no viajan como string), y revalida + recalcula todo el presupuesto antes de guardar.
+   * A diferencia de aplicarCambioJson, nunca crea nodos intermedios: si la partida ya no existe
+   * (se borró desde que se sugirió el cambio), se rechaza en vez de reconstruirla a ciegas.
+   */
+  private aplicarCambioPresupuesto(edicion: Edicion, path: string, valorSugerido: string): void {
+    const ruta = this.parsearRutaPresupuesto(path);
+    if (!ruta || !edicion.presupuesto) {
+      throw new BadRequestException('No se puede aplicar ese cambio de presupuesto');
+    }
+    const rubro = edicion.presupuesto.rubros[ruta.rubroIndice];
+    const partidaExistente = rubro?.partidas?.[ruta.partidaIndice];
+    if (!rubro || !partidaExistente) {
+      throw new BadRequestException('No se puede aplicar ese cambio: la partida ya no existe');
+    }
+
+    const valor = ['monto', 'cantidad', 'precioUnitario'].includes(ruta.campo)
+      ? Number(valorSugerido)
+      : valorSugerido;
+    if (typeof valor === 'number' && !Number.isFinite(valor)) {
+      throw new BadRequestException('El valor sugerido debe ser un número válido');
+    }
+
+    const nuevoPresupuesto: Presupuesto = JSON.parse(JSON.stringify(edicion.presupuesto));
+    const partida = nuevoPresupuesto.rubros[ruta.rubroIndice].partidas[ruta.partidaIndice] as unknown as
+      Record<string, unknown>;
+    partida[ruta.campo] = valor;
+
+    validarPresupuesto(nuevoPresupuesto);
+    edicion.presupuesto = normalizarPresupuesto(nuevoPresupuesto);
+  }
+
+  private aplicarCambioJson(edicion: Edicion, path: string, valor: unknown) {
+    const obj = edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {};
     const partes = path.match(/[^.[\]]+/g);
     if (!partes || partes.length === 0) return;
 
@@ -333,7 +368,7 @@ export class SugerenciasService {
       actual = actual[partes[i]];
     }
     actual[partes[partes.length - 1]] = valor;
-    edicion[columna] = obj;
+    edicion.datosFormulario = obj;
   }
 
   private async notificarDirectores(edicion: Edicion, proyecto: Proyecto, sugeridoPor: Usuario, sugerencia: SugerenciaCambio) {
@@ -384,6 +419,26 @@ export class SugerenciasService {
     );
   }
 
+  private static readonly CAMPOS_PARTIDA_PERMITIDOS = [
+    'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+  ];
+
+  private static readonly FORMATO_RUTA_PRESUPUESTO = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/;
+
+  /**
+   * Solo se puede sugerir un cambio sobre un campo de una partida ya existente. `subtotal` y
+   * `montoTotal` quedan fuera de la whitelist: son derivados, se recalculan al aplicar el cambio.
+   */
+  private parsearRutaPresupuesto(
+    path: string,
+  ): { rubroIndice: number; partidaIndice: number; campo: string } | null {
+    const match = SugerenciasService.FORMATO_RUTA_PRESUPUESTO.exec(path);
+    if (!match) return null;
+    const [, rubroIndice, partidaIndice, campo] = match;
+    if (!SugerenciasService.CAMPOS_PARTIDA_PERMITIDOS.includes(campo)) return null;
+    return { rubroIndice: Number(rubroIndice), partidaIndice: Number(partidaIndice), campo };
+  }
+
   private async obtenerCamposFormulario(convocatoriaId: string): Promise<CampoFormulario[]> {
     const convocatoria = await this.convocatoriaRepo.findOne({
       where: { id: convocatoriaId },
@@ -398,7 +453,23 @@ export class SugerenciasService {
     campo: string,
     valorSugerido: string | null,
   ): Promise<void> {
-    if (valorSugerido == null || !campo.startsWith('datosFormulario.')) return;
+    if (valorSugerido == null) return;
+
+    if (campo.startsWith('presupuesto.')) {
+      const ruta = this.parsearRutaPresupuesto(campo.replace('presupuesto.', ''));
+      if (!ruta) {
+        throw new BadRequestException('No se puede sugerir un cambio sobre esa ruta del presupuesto');
+      }
+      if (
+        ['monto', 'cantidad', 'precioUnitario'].includes(ruta.campo)
+        && (valorSugerido.trim() === '' || !Number.isFinite(Number(valorSugerido)))
+      ) {
+        throw new BadRequestException('El valor sugerido debe ser un número válido');
+      }
+      return;
+    }
+
+    if (!campo.startsWith('datosFormulario.')) return;
 
     const campoId = campo.replace('datosFormulario.', '');
     const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
