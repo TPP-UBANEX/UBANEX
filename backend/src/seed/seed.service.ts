@@ -25,6 +25,9 @@ import { CampoFormulario, ColumnaTabla } from '../formularios/campo-formulario.i
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { Edicion } from '../proyectos/edicion.entity';
+import { Presupuesto } from '../proyectos/presupuesto.interface';
+import { TipoRubro } from '../common/enums/tipo-rubro.enum';
+import { TipoPersona } from '../common/enums/tipo-persona.enum';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
@@ -1288,7 +1291,7 @@ export class SeedService {
     unidadAcademica: UnidadAcademica,
     convocatoria: Convocatoria,
     estado: EstadoEdicion,
-    presupuesto?: object,
+    presupuesto?: Presupuesto,
     datosFormulario?: object,
     esInterfacultad = false,
     unidadAcademicaAdicionalId?: string,
@@ -1439,34 +1442,48 @@ export class SeedService {
   }
 
   private async seedProyectosCanonicos(): Promise<void> {
-    const presupuestoEjecucion = (anio: number) => ({
+    // Periodos dentro de la ejecucion de la convocatoria (anio-08-01 a (anio+1)-02-28, ver
+    // seedConvocatoria mas abajo): AAAA-MM-DD, igual formato que produce la UI.
+    const presupuestoEjecucion = (anio: number): Presupuesto => ({
       montoTotal: 500000,
       rubros: [
         {
-          tipo: 'ViaticosYSeguros',
+          tipo: TipoRubro.ViaticosYSeguros,
           subtotal: 200000,
           partidas: [
-            { tipoPersona: 'Docente', descripcion: 'Viáticos para docentes', periodoInicio: `${anio}-08`, periodoFin: `${anio}-12`, monto: 100000 },
-            { tipoPersona: 'Estudiante', descripcion: 'Viáticos para estudiantes', periodoInicio: `${anio}-08`, periodoFin: `${anio}-12`, monto: 100000 },
+            {
+              tipoPersona: TipoPersona.Docente, descripcion: 'Viáticos para docentes',
+              periodoInicio: `${anio}-08-01`, periodoFin: `${anio}-12-15`, monto: 100000,
+            },
+            {
+              tipoPersona: TipoPersona.Estudiante, descripcion: 'Viáticos para estudiantes',
+              periodoInicio: `${anio}-08-01`, periodoFin: `${anio}-12-15`, monto: 100000,
+            },
           ],
         },
-        { tipo: 'BienesDeConsumo', subtotal: 150000, partidas: [{ descripcion: 'Materiales e insumos', cantidad: 50, precioUnitario: 3000, monto: 150000 }] },
-        { tipo: 'BienesDeUso', subtotal: 150000, partidas: [{ descripcion: 'Equipamiento', cantidad: 3, precioUnitario: 50000, monto: 150000 }] },
+        { tipo: TipoRubro.BienesDeConsumo, subtotal: 150000, partidas: [{ descripcion: 'Materiales e insumos', cantidad: 50, precioUnitario: 3000, monto: 150000 }] },
+        { tipo: TipoRubro.BienesDeUso, subtotal: 150000, partidas: [{ descripcion: 'Equipamiento', cantidad: 3, precioUnitario: 50000, monto: 150000 }] },
       ],
     });
-    const presupuestoBorrador = (anio: number) => ({
+    const presupuestoBorrador = (anio: number): Presupuesto => ({
       montoTotal: 600000,
       rubros: [
         {
-          tipo: 'ViaticosYSeguros',
+          tipo: TipoRubro.ViaticosYSeguros,
           subtotal: 250000,
           partidas: [
-            { tipoPersona: 'Docente', descripcion: 'Viáticos', periodoInicio: `${anio}-11`, periodoFin: `${anio + 1}-02`, monto: 150000 },
-            { tipoPersona: 'Estudiante', descripcion: 'Viáticos', periodoInicio: `${anio}-11`, periodoFin: `${anio + 1}-02`, monto: 100000 },
+            {
+              tipoPersona: TipoPersona.Docente, descripcion: 'Viáticos',
+              periodoInicio: `${anio}-11-01`, periodoFin: `${anio + 1}-02-15`, monto: 150000,
+            },
+            {
+              tipoPersona: TipoPersona.Estudiante, descripcion: 'Viáticos',
+              periodoInicio: `${anio}-11-01`, periodoFin: `${anio + 1}-02-15`, monto: 100000,
+            },
           ],
         },
-        { tipo: 'BienesDeConsumo', subtotal: 200000, partidas: [{ descripcion: 'Insumos', cantidad: 100, precioUnitario: 2000, monto: 200000 }] },
-        { tipo: 'BienesDeUso', subtotal: 150000, partidas: [{ descripcion: 'Equipos', cantidad: 2, precioUnitario: 75000, monto: 150000 }] },
+        { tipo: TipoRubro.BienesDeConsumo, subtotal: 200000, partidas: [{ descripcion: 'Insumos', cantidad: 100, precioUnitario: 2000, monto: 200000 }] },
+        { tipo: TipoRubro.BienesDeUso, subtotal: 150000, partidas: [{ descripcion: 'Equipos', cantidad: 2, precioUnitario: 75000, monto: 150000 }] },
       ],
     });
 
@@ -1678,7 +1695,7 @@ export class SeedService {
       estado: EstadoEdicion;
       directorId: string;
       codirectorId: string | null;
-      presupuesto: object | null;
+      presupuesto: Presupuesto | null;
       datos: Record<string, unknown>;
     }>,
   ): Promise<void> {
@@ -1789,7 +1806,7 @@ export class SeedService {
         estado: EstadoEdicion;
         directorId: string;
         codirectorId: string | null;
-        presupuesto: object | null;
+        presupuesto: Presupuesto | null;
         datos: Record<string, unknown>;
       }> = [];
 
@@ -1878,7 +1895,11 @@ export class SeedService {
             anio,
             completo: estado !== EstadoEdicion.Borrador,
           });
-          const presupuesto = estado === EstadoEdicion.Borrador ? null : generarPresupuesto(this.rng, anio);
+          // La mitad de los borradores queda sin presupuesto (para ver el envío bloqueado) y la
+          // otra mitad con uno completo (para ver el envío habilitado); el resto de los estados
+          // siempre tiene presupuesto, porque ya pasaron por el envío.
+          const tienePresupuesto = estado !== EstadoEdicion.Borrador || this.rng.bool(0.5);
+          const presupuesto = tienePresupuesto ? generarPresupuesto(this.rng, anio) : null;
 
           edicionesPlan.push({
             proyecto,
