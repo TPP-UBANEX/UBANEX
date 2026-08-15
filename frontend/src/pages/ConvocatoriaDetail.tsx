@@ -39,6 +39,7 @@ import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab'
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab'
+import { formatearMoneda } from '@/lib/presupuesto'
 import { ArrowLeft, Pencil, Plus, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -480,7 +481,7 @@ export function ConvocatoriaDetail() {
                           <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                          <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
                           </TableCell>

@@ -4,6 +4,7 @@ import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { TipoRubro, estadoBadge, estadoEdicionLabel } from '@/data/types'
 import type { CampoFormulario, Edicion } from '@/data/types'
+import { formatearMoneda } from '@/lib/presupuesto'
 
 const tipoRubroLabels: Record<TipoRubro, string> = {
   [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
@@ -66,7 +67,7 @@ export function ProyectoEvaluablePanel({
             </div>
             <div>
               <span className="text-muted-foreground">Presupuesto:</span>{' '}
-              {presupuesto ? `$${presupuesto.montoTotal.toLocaleString()}` : '-'}
+              {presupuesto ? formatearMoneda(presupuesto.montoTotal) : '-'}
             </div>
           </div>
 
@@ -76,7 +77,7 @@ export function ProyectoEvaluablePanel({
               {presupuesto.rubros.map((rubro) => (
                 <div key={rubro.tipo} className="flex items-center justify-between text-sm">
                   <span>{tipoRubroLabels[rubro.tipo] ?? rubro.tipo}</span>
-                  <span className="text-muted-foreground">${rubro.subtotal.toLocaleString()}</span>
+                  <span className="text-muted-foreground">{formatearMoneda(rubro.subtotal)}</span>
                 </div>
               ))}
             </div>
