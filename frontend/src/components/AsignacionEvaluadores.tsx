@@ -22,7 +22,8 @@ import { RolUsuario, RolEjecucion, EstadoValidacionDocente, EstadoPropuestaEvalu
 import type { ParticipacionConvocatoria, Usuario } from '@/data/types'
 import { camposPerfilFaltantes } from '@/data/perfil'
 import { useAuth } from '@/lib/auth-context'
-import { Loader2, Trash2, Check, X, Plus, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { EvaluadorPerfilDialog } from '@/components/EvaluadorPerfilDialog'
+import { Loader2, Trash2, Check, X, Plus, CheckCircle2, AlertTriangle, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CANTIDAD_EVALUADORES_POR_UA = 3
@@ -62,6 +63,14 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     accion: 'aprobar' | 'rechazar'
   } | null>(null)
   const [confirmandoAccion, setConfirmandoAccion] = useState(false)
+  const [perfilUsuarioId, setPerfilUsuarioId] = useState<string | null>(null)
+  const [perfilOpen, setPerfilOpen] = useState(false)
+
+  const abrirPerfil = (usuarioId?: string) => {
+    if (!usuarioId) return
+    setPerfilUsuarioId(usuarioId)
+    setPerfilOpen(true)
+  }
 
   const evaluadores = participaciones.filter(p => p.rol === RolEjecucion.Evaluador)
   const evaluadoresPropios = evaluadores.filter(
@@ -319,7 +328,16 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                     </TableRow>
                     {grupo.lista.map(p => (
                       <TableRow key={p.id}>
-                        <TableCell className="font-medium">{p.usuario?.nombreCompleto || '—'}</TableCell>
+                        <TableCell className="font-medium">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 text-left hover:text-primary hover:underline"
+                            onClick={() => abrirPerfil(p.usuario?.id)}
+                          >
+                            <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
+                            {p.usuario?.nombreCompleto || '—'}
+                          </button>
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{p.usuario?.email || '—'}</TableCell>
                         <TableCell>
                           <Badge variant={estadoVariant[p.estado || EstadoPropuestaEvaluador.Propuesto]}>
@@ -363,7 +381,16 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
             <TableBody>
               {evaluadoresPropios.map(p => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.usuario?.nombreCompleto || '—'}</TableCell>
+                  <TableCell className="font-medium">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 text-left hover:text-primary hover:underline"
+                      onClick={() => abrirPerfil(p.usuario?.id)}
+                    >
+                      <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
+                      {p.usuario?.nombreCompleto || '—'}
+                    </button>
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{p.usuario?.email || '—'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {p.usuario?.unidadAcademica?.nombre || '—'}
@@ -445,6 +472,12 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EvaluadorPerfilDialog
+        usuarioId={perfilUsuarioId}
+        open={perfilOpen}
+        onOpenChange={setPerfilOpen}
+      />
     </div>
   )
 }
