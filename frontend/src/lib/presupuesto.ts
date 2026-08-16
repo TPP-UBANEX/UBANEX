@@ -79,8 +79,6 @@ export function etiquetaCampoPresupuesto(presupuesto: Presupuesto | null | undef
     return `Presupuesto > ${label}`
   }
 
-  if (path === '') return 'Presupuesto'
-
   return `Presupuesto > ${path}`
 }
 

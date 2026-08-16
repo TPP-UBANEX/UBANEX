@@ -139,12 +139,14 @@ export function SugerirCambioModal({
             </div>
           )}
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Valor actual</p>
-            {multilinea
-              ? <Textarea value={valorActual} disabled rows={6} className="bg-muted" />
-              : <Input value={valorActual} disabled className="bg-muted" />}
-          </div>
+          {valorActual.trim() !== '' && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Valor actual</p>
+              {multilinea
+                ? <Textarea value={valorActual} disabled rows={6} className="bg-muted" />
+                : <Input value={valorActual} disabled className="bg-muted" />}
+            </div>
+          )}
 
           {!soloComentario && (
             <div className="space-y-2">

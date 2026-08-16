@@ -269,8 +269,8 @@ describe('parsearRutaPartida', () => {
 describe('esRutaComentarioPresupuesto', () => {
   const p = normalizarPresupuesto(presupuestoValido());
 
-  it('acepta la ruta vacia (comentario sobre todo el presupuesto)', () => {
-    expect(esRutaComentarioPresupuesto(p, '')).toBe(true);
+  it('rechaza la ruta vacia (no hay comentario sobre todo el presupuesto)', () => {
+    expect(esRutaComentarioPresupuesto(p, '')).toBe(false);
   });
 
   it('acepta un rubro existente', () => {

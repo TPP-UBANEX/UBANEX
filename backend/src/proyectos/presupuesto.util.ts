@@ -60,7 +60,6 @@ export function parsearRutaPartida(
  * campo de una partida) solo admite un comentario: sirve para pedir agregar o quitar partidas.
  */
 export function esRutaComentarioPresupuesto(presupuesto: Presupuesto | null, path: string): boolean {
-  if (path === '') return true;
   const match = FORMATO_RUTA_RUBRO.exec(path);
   if (!match) return false;
   const indice = Number(match[1]);
@@ -93,8 +92,6 @@ export function etiquetaCampoPresupuesto(presupuesto: Presupuesto | null, path: 
     const label = rubro ? LABELS_RUBRO[rubro.tipo] : `Rubro ${Number(matchRubro[1]) + 1}`;
     return `Presupuesto > ${label}`;
   }
-
-  if (path === '') return 'Presupuesto';
 
   return `Presupuesto > ${path}`;
 }
