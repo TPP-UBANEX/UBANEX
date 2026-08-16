@@ -39,6 +39,7 @@ import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
+import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
 import {
   CampoFormularioInput,
   camposIncompletosParaEnvio,
@@ -46,8 +47,8 @@ import {
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import {
-  formatearMoneda, LABELS_CAMPO_PARTIDA, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA,
-  normalizarPresupuesto, numeroNoNegativo, parsearRutaPartida, presupuestoIncompletoParaEnvio,
+  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA,
+  normalizarPresupuesto, parsearRutaPartida, presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -1271,19 +1272,6 @@ function AsignarDirectorModal({
   )
 }
 
-function periodoInvalido(p: ViaticoPresupuesto, convocatoria: Convocatoria | undefined): string | null {
-  if (!p.periodoInicio || !p.periodoFin) return null
-  if (p.periodoInicio > p.periodoFin) return 'El inicio del período debe ser anterior o igual al fin'
-  const { fechaInicioEjecucion, fechaFinEjecucion } = convocatoria ?? {}
-  if (
-    fechaInicioEjecucion && fechaFinEjecucion
-    && (p.periodoInicio < fechaInicioEjecucion || p.periodoFin > fechaFinEjecucion)
-  ) {
-    return 'El período está fuera de la ejecución de la convocatoria'
-  }
-  return null
-}
-
 function renderPresupuesto(
   presupuesto: Presupuesto | null,
   editando: boolean,
@@ -1299,9 +1287,6 @@ function renderPresupuesto(
     onSugerir: (campo: string, valorActual: string, label: string) => void
   },
 ) {
-  const campoPartida = (rubroIdx: number, pIdx: number, campo: string) =>
-    `presupuesto.rubros[${rubroIdx}].partidas[${pIdx}].${campo}`
-  const labelPartida = (rubroLabel: string, campo: string) => `${rubroLabel} > ${LABELS_CAMPO_PARTIDA[campo]}`
   const rubros = presupuesto?.rubros?.length
     ? presupuesto.rubros
     : [
@@ -1338,175 +1323,14 @@ function renderPresupuesto(
             </div>
           </div>
 
-          {rubro.partidas.length === 0 ? (
-            <p className={editando ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
-              {editando ? 'Sin partidas — este rubro necesita al menos una para poder presentar el proyecto' : 'Sin partidas'}
-            </p>
-          ) : rubro.tipo === TipoRubro.ViaticosYSeguros ? (
-            <div className="space-y-2">
-              {(rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => {
-                const error = editando ? periodoInvalido(p, convocatoria) : null
-                return (
-                  <div key={pIdx} className="bg-muted/30 p-2 rounded-md space-y-1">
-                    <div className="flex items-end gap-2">
-                      {editando && handlers ? (
-                        <>
-                          <div className="flex-1 space-y-1">
-                            <span className="text-xs">Tipo</span>
-                            <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Docente">Docente</SelectItem>
-                                <SelectItem value="Estudiante">Estudiante</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex-[2] space-y-1">
-                            <span className="text-xs">Descripción</span>
-                            <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
-                          </div>
-                          <div className="flex-1 space-y-1">
-                            <span className="text-xs">Inicio</span>
-                            <Input type="date" value={p.periodoInicio} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
-                          </div>
-                          <div className="flex-1 space-y-1">
-                            <span className="text-xs">Fin</span>
-                            <Input type="date" value={p.periodoFin} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
-                          </div>
-                          <div className="flex-1 space-y-1">
-                            <span className="text-xs">Monto</span>
-                            <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', numeroNoNegativo(e.target.value))} />
-                          </div>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <CampoSugerible
-                            campo={campoPartida(rubroIdx, pIdx, 'tipoPersona')}
-                            valorActual={p.tipoPersona}
-                            label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'tipoPersona')}
-                            activo={!!sugerencia?.activo}
-                            onClick={sugerencia?.onSugerir ?? (() => {})}
-                            className="flex-1"
-                          >
-                            <span className="text-sm">{p.tipoPersona}</span>
-                          </CampoSugerible>
-                          <CampoSugerible
-                            campo={campoPartida(rubroIdx, pIdx, 'descripcion')}
-                            valorActual={p.descripcion}
-                            label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'descripcion')}
-                            activo={!!sugerencia?.activo}
-                            onClick={sugerencia?.onSugerir ?? (() => {})}
-                            className="flex-[2]"
-                          >
-                            <span className="text-sm">{p.descripcion}</span>
-                          </CampoSugerible>
-                          <span className="text-sm flex-1 flex items-center gap-1">
-                            <CampoSugerible
-                              campo={campoPartida(rubroIdx, pIdx, 'periodoInicio')}
-                              valorActual={p.periodoInicio}
-                              label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'periodoInicio')}
-                              activo={!!sugerencia?.activo}
-                              onClick={sugerencia?.onSugerir ?? (() => {})}
-                            >
-                              {p.periodoInicio}
-                            </CampoSugerible>
-                            →
-                            <CampoSugerible
-                              campo={campoPartida(rubroIdx, pIdx, 'periodoFin')}
-                              valorActual={p.periodoFin}
-                              label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'periodoFin')}
-                              activo={!!sugerencia?.activo}
-                              onClick={sugerencia?.onSugerir ?? (() => {})}
-                            >
-                              {p.periodoFin}
-                            </CampoSugerible>
-                          </span>
-                          <CampoSugerible
-                            campo={campoPartida(rubroIdx, pIdx, 'monto')}
-                            valorActual={String(p.monto)}
-                            label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'monto')}
-                            activo={!!sugerencia?.activo}
-                            onClick={sugerencia?.onSugerir ?? (() => {})}
-                            className="flex-1"
-                          >
-                            <span className="text-sm">{formatearMoneda(p.monto)}</span>
-                          </CampoSugerible>
-                        </>
-                      )}
-                    </div>
-                    {error && <p className="text-xs text-destructive">{error}</p>}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {(rubro.partidas as BienPresupuesto[]).map((p, pIdx) => (
-                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
-                  {editando && handlers ? (
-                    <>
-                      <div className="flex-[2] space-y-1">
-                        <span className="text-xs">Descripción</span>
-                        <Input value={p.descripcion} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Resmas de papel" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Cantidad</span>
-                        <Input type="number" min="1" step="1" value={p.cantidad || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'cantidad', numeroNoNegativo(e.target.value))} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Precio unit.</span>
-                        <Input type="number" min="0" step="0.01" value={p.precioUnitario || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'precioUnitario', numeroNoNegativo(e.target.value))} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Monto</span>
-                        <Input type="number" value={p.monto || ''} disabled className="bg-muted" />
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <CampoSugerible
-                        campo={campoPartida(rubroIdx, pIdx, 'descripcion')}
-                        valorActual={p.descripcion}
-                        label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'descripcion')}
-                        activo={!!sugerencia?.activo}
-                        onClick={sugerencia?.onSugerir ?? (() => {})}
-                        className="flex-[2]"
-                      >
-                        <span className="text-sm">{p.descripcion}</span>
-                      </CampoSugerible>
-                      <CampoSugerible
-                        campo={campoPartida(rubroIdx, pIdx, 'cantidad')}
-                        valorActual={String(p.cantidad)}
-                        label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'cantidad')}
-                        activo={!!sugerencia?.activo}
-                        onClick={sugerencia?.onSugerir ?? (() => {})}
-                        className="flex-1"
-                      >
-                        <span className="text-sm">{p.cantidad}</span>
-                      </CampoSugerible>
-                      <CampoSugerible
-                        campo={campoPartida(rubroIdx, pIdx, 'precioUnitario')}
-                        valorActual={String(p.precioUnitario)}
-                        label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'precioUnitario')}
-                        activo={!!sugerencia?.activo}
-                        onClick={sugerencia?.onSugerir ?? (() => {})}
-                        className="flex-1"
-                      >
-                        <span className="text-sm">{formatearMoneda(p.precioUnitario)}</span>
-                      </CampoSugerible>
-                      <span className="text-sm flex-1">{formatearMoneda(p.monto)}</span>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          <TablaPartidasPresupuesto
+            rubro={rubro}
+            rubroIdx={rubroIdx}
+            editando={editando}
+            convocatoria={convocatoria}
+            handlers={handlers}
+            sugerencia={sugerencia}
+          />
         </div>
       ))}
     </div>
