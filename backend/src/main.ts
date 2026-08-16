@@ -19,12 +19,20 @@ async function bootstrap() {
 
   // El seed corre al iniciar el backend solo si se pide explícitamente:
   // UBANEX_SEED=true lo habilita; por defecto queda desactivado.
-  const seedHabilitado = (process.env.UBANEX_SEED ?? 'false') === 'true';
+  // En Render nunca se corre (RENDER=true), aunque la variable quede activa:
+  // relee tablas completas y materializa miles de entidades en memoria, lo que
+  // agota el heap del proceso durante el arranque.
+  const seedHabilitado =
+    (process.env.UBANEX_SEED ?? 'false') === 'true'
+    && process.env.RENDER !== 'true';
   if (seedHabilitado) {
     const seedService = app.get(SeedService);
     await seedService.ejecutarSeed();
   } else {
-    console.log('\n[SEED] deshabilitado (UBANEX_SEED=false)');
+    const motivo = process.env.UBANEX_SEED === 'true'
+      ? 'deshabilitado en Render (RENDER=true)'
+      : 'deshabilitado (UBANEX_SEED=false)';
+    console.log(`\n[SEED] ${motivo}`);
   }
 
   const port = process.env.PORT || 3000;
