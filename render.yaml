@@ -6,6 +6,11 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run start:prod
     plan: free
+    envVars:
+      # El seed (lecturas masivas al arrancar) es solo para desarrollo; en prod
+      # la base ya tiene datos y no debe re-sembrarse en cada deploy.
+      - key: UBANEX_SEED
+        value: false
 
   - type: static
     name: ubanex-frontend
