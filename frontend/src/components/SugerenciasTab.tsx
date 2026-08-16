@@ -13,9 +13,10 @@ import {
 } from '@/components/ui/dialog'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { SugerenciaCambio, CampoFormulario } from '@/data/types'
-import { estadoBadge, EstadoSugerencia } from '@/data/types'
+import type { SugerenciaCambio, CampoFormulario, Presupuesto } from '@/data/types'
+import { estadoBadge, EstadoSugerencia, RolUsuario } from '@/data/types'
 import { formatearValorSerializado } from '@/components/CampoFormularioInput'
+import { etiquetaCampoPresupuesto, formatearMoneda, parsearRutaPartida } from '@/lib/presupuesto'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -32,10 +33,11 @@ interface SugerenciasTabProps {
   creadoPorId: string
   directorIds?: string[]
   camposFormulario?: CampoFormulario[]
+  presupuesto?: Presupuesto | null
   onRespondida?: () => void
 }
 
-export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], camposFormulario = [], onRespondida }: SugerenciasTabProps) {
+export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], camposFormulario = [], presupuesto = null, onRespondida }: SugerenciasTabProps) {
   const { user } = useAuth()
   const [sugerencias, setSugerencias] = useState<SugerenciaCambio[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +46,10 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
   const [respuestaTexto, setRespuestaTexto] = useState('')
   const [confirmacion, setConfirmacion] = useState<{ id: string; estado: EstadoSugerencia; campo: string } | null>(null)
 
-  const puedeResponder = user?.id === creadoPorId || directorIds.includes(user?.id ?? '')
+  const esRectorado = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+  )
+  const puedeResponder = esRectorado || user?.id === creadoPorId || directorIds.includes(user?.id ?? '')
 
   const cargar = useCallback(async () => {
     try {
@@ -89,7 +94,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
       esInterfacultad: 'Es interfacultad',
     }
     if (mapa[campo]) return mapa[campo]
-    if (campo.startsWith('presupuesto.')) return `Presupuesto > ${campo.slice(12)}`
+    if (campo.startsWith('presupuesto.')) return etiquetaCampoPresupuesto(presupuesto, campo.slice(12))
     if (campo.startsWith('datosFormulario.')) {
       const campoId = campo.slice(16)
       const campoFormulario = camposFormulario.find(c => c.id === campoId)
@@ -109,11 +114,22 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     return valor
   }
 
+  // Los montos del presupuesto viajan como string; se formatean como moneda para el diff.
+  const formatearValorPresupuesto = (campo: string, valor: string): string => {
+    const ruta = parsearRutaPartida(campo.slice(12))
+    if (ruta && (ruta.campo === 'monto' || ruta.campo === 'precioUnitario')) {
+      return formatearMoneda(Number(valor))
+    }
+    return valor
+  }
+
   const ValorDiff = ({ campo, actual, sugerido }: { campo: string; actual: string | null; sugerido: string | null }) => {
     const campoFormulario = campoFormularioDe(campo)
     const mostrar = (valor: string | null) => {
       if (valor == null) return '(sin valor)'
-      return campoFormulario ? formatearValorSerializado(campoFormulario, valor) : formatearValorProyecto(campo, valor)
+      if (campoFormulario) return formatearValorSerializado(campoFormulario, valor)
+      if (campo.startsWith('presupuesto.')) return formatearValorPresupuesto(campo, valor)
+      return formatearValorProyecto(campo, valor)
     }
 
     if (sugerido == null) {

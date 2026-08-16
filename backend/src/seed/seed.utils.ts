@@ -4,6 +4,10 @@ import {
   EstructuraTemplateInstitucional,
 } from '../templates-evaluacion/estructura-template';
 import { CampoFormulario, ColumnaTabla } from '../formularios/campo-formulario.interface';
+import { Presupuesto } from '../proyectos/presupuesto.interface';
+import { normalizarPresupuesto } from '../proyectos/presupuesto.util';
+import { TipoRubro } from '../common/enums/tipo-rubro.enum';
+import { TipoPersona } from '../common/enums/tipo-persona.enum';
 import { FUNDAMENTACIONES, OBSERVACIONES_CRUZADA, OBSERVACIONES_INST } from './seed.data';
 
 /**
@@ -63,51 +67,68 @@ export class Rng {
   }
 }
 
-export function generarPresupuesto(rng: Rng, anioInicio: number): object {
-  const montoTotal =
-    Math.round((rng.entero(80_000, 950_000) * (1 + 0.1 * (anioInicio - 2023))) / 10_000) * 10_000;
-  const montoViaticos = Math.round(((montoTotal * rng.entero(35, 45)) / 100) / 1000) * 1000;
-  const montoConsumo = Math.round(((montoTotal * rng.entero(25, 35)) / 100) / 1000) * 1000;
-  const montoUso = montoTotal - montoViaticos - montoConsumo;
-  return {
-    montoTotal,
+/**
+ * Genera solo las partidas (con períodos AAAA-MM-DD dentro de la ejecución de la convocatoria,
+ * que arranca el 1 de agosto de anioInicio) y deja que normalizarPresupuesto derive montos de
+ * bienes, subtotales y monto total: un presupuesto de seed nunca puede quedar con sumas que no
+ * cierran, porque pasa por el mismo cálculo que usa la API.
+ */
+export function generarPresupuesto(rng: Rng, anioInicio: number): Presupuesto {
+  const escala = 1 + 0.1 * (anioInicio - 2023);
+  const precioUnitarioConsumo = Math.round((2000 * escala) / 100) * 100;
+  const precioUnitarioUso = Math.round((rng.entero(15_000, 60_000) * escala) / 100) * 100;
+
+  const crudo: Presupuesto = {
+    montoTotal: 0,
     rubros: [
       {
-        tipo: 'ViaticosYSeguros',
-        subtotal: montoViaticos,
+        tipo: TipoRubro.ViaticosYSeguros,
+        subtotal: 0,
         partidas: [
           {
-            tipoPersona: 'Docente',
+            tipoPersona: TipoPersona.Docente,
             descripcion: 'Viáticos para docentes',
-            periodoInicio: `${anioInicio}-08`,
-            periodoFin: `${anioInicio + 1}-02`,
-            monto: Math.round(montoViaticos * 0.55),
+            periodoInicio: `${anioInicio}-08-01`,
+            periodoFin: `${anioInicio + 1}-02-28`,
+            monto: Math.round((rng.entero(20_000, 60_000) * escala) / 1000) * 1000,
           },
           {
-            tipoPersona: 'Estudiante',
+            tipoPersona: TipoPersona.Estudiante,
             descripcion: 'Viáticos para estudiantes',
-            periodoInicio: `${anioInicio}-08`,
-            periodoFin: `${anioInicio + 1}-02`,
-            monto: Math.round(montoViaticos * 0.45),
+            periodoInicio: `${anioInicio}-08-01`,
+            periodoFin: `${anioInicio + 1}-02-28`,
+            monto: Math.round((rng.entero(15_000, 45_000) * escala) / 1000) * 1000,
           },
         ],
       },
       {
-        tipo: 'BienesDeConsumo',
-        subtotal: montoConsumo,
+        tipo: TipoRubro.BienesDeConsumo,
+        subtotal: 0,
         partidas: [
-          { descripcion: 'Materiales e insumos', cantidad: rng.entero(20, 120), precioUnitario: 2500, monto: montoConsumo },
+          {
+            descripcion: 'Materiales e insumos',
+            cantidad: rng.entero(20, 120),
+            precioUnitario: precioUnitarioConsumo,
+            monto: 0,
+          },
         ],
       },
       {
-        tipo: 'BienesDeUso',
-        subtotal: montoUso,
+        tipo: TipoRubro.BienesDeUso,
+        subtotal: 0,
         partidas: [
-          { descripcion: 'Equipamiento', cantidad: rng.entero(1, 5), precioUnitario: Math.round(montoUso / 3), monto: montoUso },
+          {
+            descripcion: 'Equipamiento',
+            cantidad: rng.entero(1, 5),
+            precioUnitario: precioUnitarioUso,
+            monto: 0,
+          },
         ],
       },
     ],
   };
+
+  return normalizarPresupuesto(crudo);
 }
 
 export function generarEvaluacionInstitucional(

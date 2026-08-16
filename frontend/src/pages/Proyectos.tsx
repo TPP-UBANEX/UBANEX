@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import type { Edicion, Convocatoria, PaginatedResponse } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion } from '@/data/types'
+import { formatearMoneda } from '@/lib/presupuesto'
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const pipelineColumns = [
@@ -190,7 +191,7 @@ export function Proyectos() {
                             : e.unidadAcademica?.nombre || '-'}
                         </TableCell>
                         <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                        <TableCell className="text-sm">${(e.presupuesto?.montoTotal ?? 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
                         </TableCell>
@@ -262,7 +263,7 @@ export function Proyectos() {
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
                         <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
-                        {e.presupuesto && <Badge variant="outline" className="text-xs">${e.presupuesto.montoTotal.toLocaleString()}</Badge>}
+                        {e.presupuesto && <Badge variant="outline" className="text-xs">{formatearMoneda(e.presupuesto.montoTotal)}</Badge>}
                       </CardContent>
                     </Card>
                   ))}
