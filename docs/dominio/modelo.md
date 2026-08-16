@@ -46,16 +46,45 @@ classDiagram
         +esObligatorio: boolean
         +orden: number
         +opciones: string[]
+        +minimo: number
+        +maximo: number
+        +admiteDecimales: boolean
+        +columnas: ColumnaTabla[]
+        +filasMinimas: number
+        +filasMaximas: number
+        +rolesUsuario: RolUsuario[]
+    }
+
+    class ColumnaTabla {
+        <<value object>>
+        +id: string
+        +tipo: TipoCampo
+        +nombre: string
+        +esObligatorio: boolean
+        +opciones: string[]
+        +minimo: number
+        +maximo: number
+        +admiteDecimales: boolean
+        +rolesUsuario: RolUsuario[]
     }
 
     class TipoCampo {
         <<enumeration>>
         texto
+        texto_largo
+        numero
+        fecha
+        geolocalizacion
         booleano
         checkbox
         select
         archivo
+        seccion
+        tabla
+        usuario
     }
+
+    CampoFormulario *-- ColumnaTabla : columnas (si tipo = tabla)
 
     Convocatoria *-- EstadoConvocatoria : estado
     Convocatoria *-- RangoFechas : fechasPresentacion
@@ -74,8 +103,10 @@ classDiagram
 - `Formulario` es la definición de los campos dinámicos del formulario de presentación (no se llama `TemplateFormulario` como el resto de los templates del dominio porque, a diferencia de ellos, no tiene una entidad hermana que guarde las respuestas — las respuestas de cada proyecto se guardan directamente en `Edicion.datosFormulario`). `esPlantilla: true` marca los formularios de biblioteca, reutilizables, que se pueden usar como punto de partida; `esPlantilla: false` es el formulario privado de una convocatoria. `esDefault` indica, entre las plantillas, cuál se sugiere primero — hay a lo sumo una.
 - Aunque `CampoFormulario` es un value object, lleva un `id` estable: es la clave con la que se guardan las respuestas en `Edicion.datosFormulario`, y debe sobrevivir a que se renombre la etiqueta (`nombre`) del campo más adelante. Por eso, al copiar los campos de una plantilla a una convocatoria, cada `CampoFormulario.id` se regenera: así las respuestas de una convocatoria nunca se confunden con las de otra que partió de la misma plantilla.
 - `Edicion.datosFormulario` es un objeto cuyas claves son los `CampoFormulario.id` del `Formulario` de la convocatoria correspondiente.
-- Un `CampoFormulario` puede tener `opciones` solo cuando su `tipo` es `checkbox` o `select`.
-- El `tipo` `archivo` está contemplado en `TipoCampo` pero no está disponible para usarse hasta que exista un mecanismo de almacenamiento de adjuntos.
+- Un `CampoFormulario` puede tener `opciones` solo cuando su `tipo` es `checkbox` o `select`; `minimo`/`maximo`/`admiteDecimales` para `numero`; `rolesUsuario` para `usuario`.
+- El `tipo` `archivo` está contemplado en `TipoCampo` pero no está disponible para usarse hasta que exista un mecanismo de almacenamiento de adjuntos (lo mismo aplica a `seccion`, que solo es un separador visual).
+- `geolocalizacion` y `usuario` guardan un valor objeto y viajan serializados por columnas de texto (`TIPOS_VALOR_OBJETO`). El campo `usuario` se completa buscando docentes/estudiantes por nombre; `geolocalizacion` consulta localidades (módulo `geo`).
+- Un campo `tabla` contiene `columnas` tipadas (cada una con su propio `TipoCampo`), con `filasMinimas`/`filasMaximas`. Al enviar la edición se exige completar las filas y columnas marcadas como obligatorias.
 - El `Formulario` de una convocatoria solo puede editarse (agregar, quitar o modificar `CampoFormulario`) mientras la convocatoria esté en estado `Configuracion`. Al pasar a `Presentacion` queda congelado.
 - Tanto `AutoridadDeRectorado` como `AsistenteDeRectorado` pueden configurar el `Formulario` de una convocatoria.
 - El `Formulario` de una convocatoria es siempre propio (`esPlantilla: false`) y se crea recién la primera vez que se guardan campos; hasta ese momento la convocatoria no tiene formulario asociado. Elegir una plantilla como punto de partida copia sus `CampoFormulario` (con `id` regenerados) sin referenciar ni modificar la plantilla original, y esos campos se siguen editando libremente antes de guardar.
@@ -136,7 +167,8 @@ classDiagram
         <<value object>>
         +tipoPersona: TipoPersona
         +descripcion: string
-        +periodo: string
+        +periodoInicio: string
+        +periodoFin: string
         +monto: number
     }
 
@@ -185,6 +217,10 @@ classDiagram
 - El estado `NoAdjudicado` es terminal (no hay suplencia).
 - El `Presupuesto` se compone de exactamente 3 rubros fijos: `ViaticosYSeguros`, `BienesDeConsumo` y `BienesDeUso`.
 - `Viatico` tiene un `tipoPersona` (Docente o Estudiante). Ambos tipos suman al subtotal del rubro `ViaticosYSeguros`.
+- Las partidas de presupuesto no pueden tener montos negativos, y cada rubro presenta un reporte solo si tiene al menos una partida por completo (todos sus campos obligatorios completos).
+- El backend recalcula siempre los subtotales por rubro y el total (ignora los montos que envía el front), así que el total es la suma exacta de las partidas.
+- Un `Viatico` lleva `periodoInicio` y `periodoFin` (fechas que deben caer dentro del rango de `fechasEjecucion` de la convocatoria).
+- Las sugerencias de cambio de presupuesto (así como las de demás campos de la edición) se implementan con el patrón de ediciones entrantes (ver sección Sugerencias).
 - `Edicion` tiene un `creadoPor` (usuario que creó la edición). Los directores se asignan mediante `ParticipacionConvocatoria` con rol `DirectorDeProyecto`.
 
 ---
@@ -294,11 +330,27 @@ classDiagram
 classDiagram
     class Usuario {
         +id: string
-        +email: string
         +nombreCompleto: string
+        +nombre: string
+        +apellido: string
+        +email: string
         +roles: RolUsuario[]
         +estadoValidacionDocente: EstadoValidacionDocente
         +habilitado: boolean
+        +telefono: string
+        +genero: Genero
+        +personaConDiscapacidad: boolean
+        +direccionLocalidad: string
+        +porcentajeCarrera: number
+        +cargoDocente: CargoDocente
+        +tipoDesignacionDocente: TipoDesignacionDocente
+        +areaDocente: string
+        +carrera: Carrera
+    }
+
+    class Carrera {
+        +id: string
+        +nombre: string
     }
 
     class ParticipacionConvocatoria {
@@ -344,6 +396,7 @@ classDiagram
     Usuario *-- EstadoValidacionDocente : estadoValidacionDocente (si tiene Docente en roles)
     Usuario --> UnidadAcademica : pertenece a (nullable)
     Usuario --> Usuario : creado por
+    Usuario --> Carrera : carrera (estudiante, nullable)
     Usuario --> ParticipacionConvocatoria : tiene
     ParticipacionConvocatoria --> Convocatoria : en
     ParticipacionConvocatoria *-- RolEjecucion : rol
@@ -355,8 +408,8 @@ classDiagram
 
 - **Rectorado**: 1 a 3 Autoridades, 0 a N Asistentes. No pertenecen a ninguna UA.
 - **Secretaría de Extensión**: 1 a 3 Autoridades, 0 a N Asistentes por UA. Cada usuario de Secretaría pertenece a una UA específica.
-- **Estudiante**: 0 a N. Se registra solo. Puede crear proyectos.
-- **Docente**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Puede ser asignado como Director o Evaluador en una convocatoria mediante `ParticipacionConvocatoria`.
+- **Estudiante**: 0 a N. Se registra solo. Puede crear proyectos. Completa datos de perfil académico: `carrera`, `direccionLocalidad`, `genero`, `personaConDiscapacidad`, `porcentajeCarrera`.
+- **Docente**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Su perfil docente incluye `cargoDocente`, `tipoDesignacionDocente` y `areaDocente`. Puede ser asignado como Director o Evaluador en una convocatoria mediante `ParticipacionConvocatoria`.
 - **Director de Proyecto**: rol de ejecución asignado por convocatoria. Máximo 2 participaciones como director por convocatoria.
 - **Evaluador**: rol de ejecución por convocatoria. No se asigna de forma directa: lo **propone** una Autoridad o un Asistente de Secretaría, y la propuesta recorre el circuito descrito más abajo hasta quedar `Aprobado`.
 - Los roles se dividen en dos **grupos** excluyentes:
@@ -656,3 +709,10 @@ classDiagram
 - Cada pregunta puede ser de tipo `texto`, `booleano`, `escalaNumerica` (con mínimo y máximo por pregunta), `select` o `checkbox` (con `opciones` predefinidas).
 - La completa el director o codirector de la Edición durante la etapa `Ejecucion`. Puede guardarse como `Borrador` y retomarse después.
 - Es requisito obligatorio para el cierre: la Edición no pasa a `Cerrado` hasta que la autoevaluación esté `Completada`.
+
+---
+
+## Catálogos de datos
+
+- **Carreras** (`carreras/`): catálogo de `Carrera` (id, nombre). Se usa en el perfil del estudiante (`Usuario.carrera`) y se puede consultar al completar formularios de presentación.
+- **Geo** (`geo/`): catálogo de localidades, provincias y países (Argentina). Se usa por los campos `geolocalizacion` de los formularios para que el usuario elija una ubicación desde el mapa; el valor guardado en `Edicion.datosFormulario` es un objeto serializado.
