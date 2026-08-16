@@ -10,6 +10,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
 import { UsuarioAutocomplete } from '@/components/UsuarioAutocomplete'
@@ -43,6 +44,8 @@ interface SugerirCambioModalProps {
   rolesUsuario?: RolUsuario[]
   /** Para campos de tabla: oculta "Valor sugerido", la sugerencia queda como un comentario global sobre el campo. */
   soloComentario?: boolean
+  /** Para campos de valores fijos (ej. enums): reemplaza el input de "Valor sugerido" por un Select. */
+  opciones?: { value: string; label: string }[]
   onSuccess?: () => void
 }
 
@@ -64,6 +67,7 @@ export function SugerirCambioModal({
   tipoObjeto = null,
   rolesUsuario,
   soloComentario = false,
+  opciones,
   onSuccess,
 }: SugerirCambioModalProps) {
   const [valorSugerido, setValorSugerido] = useState(valorSugeridoInicial)
@@ -158,6 +162,15 @@ export function SugerirCambioModal({
                   roles={rolesUsuario}
                   onChange={setValorObjetoSugerido}
                 />
+              ) : opciones ? (
+                <Select value={valorSugerido} onValueChange={setValorSugerido}>
+                  <SelectTrigger><SelectValue placeholder="Nuevo valor propuesto" /></SelectTrigger>
+                  <SelectContent>
+                    {opciones.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : multilinea ? (
                 <Textarea
                   rows={8}

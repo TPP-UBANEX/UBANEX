@@ -13,10 +13,75 @@ const ORDEN_RUBROS: TipoRubro[] = [
   TipoRubro.BienesDeUso,
 ]
 
-const LABELS_RUBRO: Record<TipoRubro, string> = {
+export const LABELS_RUBRO: Record<TipoRubro, string> = {
   [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
   [TipoRubro.BienesDeConsumo]: 'Bienes de Consumo',
   [TipoRubro.BienesDeUso]: 'Bienes de Uso',
+}
+
+export const MAX_LONGITUD_DESCRIPCION_PARTIDA = 500
+
+/** Campos de una partida sobre los que se puede sugerir un cambio (espejo del backend). */
+export const CAMPOS_PARTIDA_PERMITIDOS = [
+  'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+] as const
+
+export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
+  descripcion: 'Descripción',
+  monto: 'Monto',
+  cantidad: 'Cantidad',
+  precioUnitario: 'Precio unitario',
+  periodoInicio: 'Inicio del período',
+  periodoFin: 'Fin del período',
+  tipoPersona: 'Tipo de persona',
+}
+
+const FORMATO_RUTA_PARTIDA = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/
+const FORMATO_RUTA_RUBRO = /^rubros\[(\d+)\]$/
+
+/**
+ * Espejo de backend/src/proyectos/presupuesto.util.ts#parsearRutaPartida. Interpreta una ruta
+ * relativa a `presupuesto.` (sin ese prefijo) como el campo de una partida.
+ */
+export function parsearRutaPartida(
+  path: string,
+): { rubroIndice: number; partidaIndice: number; campo: string } | null {
+  const match = FORMATO_RUTA_PARTIDA.exec(path)
+  if (!match) return null
+  const [, rubroIndice, partidaIndice, campo] = match
+  if (!(CAMPOS_PARTIDA_PERMITIDOS as readonly string[]).includes(campo)) return null
+  return { rubroIndice: Number(rubroIndice), partidaIndice: Number(partidaIndice), campo }
+}
+
+/**
+ * Espejo de backend/src/proyectos/presupuesto.util.ts#etiquetaCampoPresupuesto. Etiqueta legible
+ * de una ruta relativa a `presupuesto.` (sin ese prefijo), para mostrar en la lista de sugerencias
+ * y en el modal de "Sugerir cambio".
+ */
+export function etiquetaCampoPresupuesto(presupuesto: Presupuesto | null | undefined, path: string): string {
+  const rutaPartida = parsearRutaPartida(path)
+  if (rutaPartida) {
+    const rubro = presupuesto?.rubros?.[rutaPartida.rubroIndice]
+    const partida = rubro?.partidas?.[rutaPartida.partidaIndice]
+    const label = rubro ? LABELS_RUBRO[rubro.tipo] : `Rubro ${rutaPartida.rubroIndice + 1}`
+    const campoLabel = LABELS_CAMPO_PARTIDA[rutaPartida.campo] ?? rutaPartida.campo
+    const descripcion = partida?.descripcion?.trim()
+    const partidaLabel = descripcion
+      ? `partida ${rutaPartida.partidaIndice + 1} "${descripcion}"`
+      : `partida ${rutaPartida.partidaIndice + 1}`
+    return `Presupuesto > ${label} > ${partidaLabel} · ${campoLabel}`
+  }
+
+  const matchRubro = FORMATO_RUTA_RUBRO.exec(path)
+  if (matchRubro) {
+    const rubro = presupuesto?.rubros?.[Number(matchRubro[1])]
+    const label = rubro ? LABELS_RUBRO[rubro.tipo] : `Rubro ${Number(matchRubro[1]) + 1}`
+    return `Presupuesto > ${label}`
+  }
+
+  if (path === '') return 'Presupuesto'
+
+  return `Presupuesto > ${path}`
 }
 
 function redondear2(n: number): number {

@@ -46,15 +46,28 @@ import {
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import {
-  formatearMoneda, normalizarPresupuesto, numeroNoNegativo, presupuestoIncompletoParaEnvio,
+  formatearMoneda, LABELS_CAMPO_PARTIDA, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA,
+  normalizarPresupuesto, numeroNoNegativo, parsearRutaPartida, presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
-const tipoRubroLabels: Record<TipoRubro, string> = {
-  [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
-  [TipoRubro.BienesDeConsumo]: 'Bienes de Consumo',
-  [TipoRubro.BienesDeUso]: 'Bienes de Uso',
+const OPCIONES_TIPO_PERSONA = [
+  { value: TipoPersona.Docente, label: 'Docente' },
+  { value: TipoPersona.Estudiante, label: 'Estudiante' },
+]
+
+interface ModalConfigSugerencia {
+  multilinea?: boolean
+  maxLongitud?: number
+  tipoInput?: 'text' | 'date' | 'number'
+  min?: number
+  max?: number
+  step?: number | 'any'
+  tipoObjeto?: TipoCampo.Geolocalizacion | TipoCampo.Usuario | null
+  rolesUsuario?: RolUsuario[]
+  soloComentario?: boolean
+  opciones?: { value: string; label: string }[]
 }
 
 export function ProyectoDetail() {
@@ -132,6 +145,32 @@ export function ProyectoDetail() {
     ? camposFormulario.find(c => c.id === sugerenciaModal.campo.replace('datosFormulario.', '')) ?? null
     : null
   const tipoCampoSugerido = campoSugerido?.tipo ?? null
+
+  const modalConfig: ModalConfigSugerencia = ((): ModalConfigSugerencia => {
+    if (sugerenciaModal.campo.startsWith('presupuesto.')) {
+      const ruta = parsearRutaPartida(sugerenciaModal.campo.replace('presupuesto.', ''))
+      if (!ruta) return { soloComentario: true }
+      if (ruta.campo === 'tipoPersona') return { opciones: OPCIONES_TIPO_PERSONA }
+      if (ruta.campo === 'monto' || ruta.campo === 'precioUnitario') return { tipoInput: 'number', min: 0, step: 'any' }
+      if (ruta.campo === 'cantidad') return { tipoInput: 'number', min: 1, step: 1 }
+      if (ruta.campo === 'periodoInicio' || ruta.campo === 'periodoFin') return { tipoInput: 'date' }
+      if (ruta.campo === 'descripcion') return { maxLongitud: MAX_LONGITUD_DESCRIPCION_PARTIDA }
+      return {}
+    }
+    return {
+      multilinea: tipoCampoSugerido === TipoCampo.TextoLargo || tipoCampoSugerido === TipoCampo.Tabla,
+      maxLongitud: tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined,
+      tipoInput: tipoCampoSugerido === TipoCampo.Fecha ? 'date' : tipoCampoSugerido === TipoCampo.Numero ? 'number' : 'text',
+      min: campoSugerido?.minimo,
+      max: campoSugerido?.maximo,
+      step: campoSugerido?.admiteDecimales ? 'any' : 1,
+      tipoObjeto: tipoCampoSugerido && TIPOS_VALOR_OBJETO.includes(tipoCampoSugerido)
+        ? (tipoCampoSugerido as TipoCampo.Geolocalizacion | TipoCampo.Usuario)
+        : null,
+      rolesUsuario: campoSugerido?.rolesUsuario,
+      soloComentario: tipoCampoSugerido === TipoCampo.Tabla,
+    }
+  })()
 
   const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
@@ -952,7 +991,7 @@ export function ProyectoDetail() {
             <CardContent className="space-y-4">
               {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, edicion?.convocatoria, {
                 addPartida, removePartida, updateViatico, updateBien,
-              })}
+              }, { activo: modoSugerencia, onSugerir: handleSugerirClick })}
             </CardContent>
           </Card>
         </TabsContent>
@@ -976,7 +1015,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="sugerencias" className="mt-4">
           {edicion ? (
-            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} onRespondida={cargarDatos} />
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} presupuesto={edicion.presupuesto} onRespondida={cargarDatos} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
@@ -1005,17 +1044,16 @@ export function ProyectoDetail() {
         edicionId={edicion?.id ?? ''}
         valorSugeridoInicial={sugerenciaModal.valorSugeridoInicial}
         comentarioInicial={sugerenciaModal.comentarioInicial}
-        multilinea={tipoCampoSugerido === TipoCampo.TextoLargo || tipoCampoSugerido === TipoCampo.Tabla}
-        maxLongitud={tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined}
-        tipoInput={tipoCampoSugerido === TipoCampo.Fecha ? 'date' : tipoCampoSugerido === TipoCampo.Numero ? 'number' : 'text'}
-        min={campoSugerido?.minimo}
-        max={campoSugerido?.maximo}
-        step={campoSugerido?.admiteDecimales ? 'any' : 1}
-        tipoObjeto={tipoCampoSugerido && TIPOS_VALOR_OBJETO.includes(tipoCampoSugerido)
-          ? (tipoCampoSugerido as TipoCampo.Geolocalizacion | TipoCampo.Usuario)
-          : null}
-        rolesUsuario={campoSugerido?.rolesUsuario}
-        soloComentario={tipoCampoSugerido === TipoCampo.Tabla}
+        multilinea={modalConfig.multilinea}
+        maxLongitud={modalConfig.maxLongitud}
+        tipoInput={modalConfig.tipoInput}
+        min={modalConfig.min}
+        max={modalConfig.max}
+        step={modalConfig.step}
+        tipoObjeto={modalConfig.tipoObjeto}
+        rolesUsuario={modalConfig.rolesUsuario}
+        soloComentario={modalConfig.soloComentario}
+        opciones={modalConfig.opciones}
       />
 
       {edicion && (
@@ -1256,7 +1294,14 @@ function renderPresupuesto(
     updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
     updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
   },
+  sugerencia?: {
+    activo: boolean
+    onSugerir: (campo: string, valorActual: string, label: string) => void
+  },
 ) {
+  const campoPartida = (rubroIdx: number, pIdx: number, campo: string) =>
+    `presupuesto.rubros[${rubroIdx}].partidas[${pIdx}].${campo}`
+  const labelPartida = (rubroLabel: string, campo: string) => `${rubroLabel} > ${LABELS_CAMPO_PARTIDA[campo]}`
   const rubros = presupuesto?.rubros?.length
     ? presupuesto.rubros
     : [
@@ -1270,12 +1315,24 @@ function renderPresupuesto(
       {rubros.map((rubro, rubroIdx) => (
         <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3 bg-muted/30">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
+            <h4 className="text-sm font-medium">{LABELS_RUBRO[rubro.tipo as TipoRubro]}</h4>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Subtotal: {formatearMoneda(rubro.subtotal)}</span>
               {editando && handlers && (
                 <Button type="button" variant="outline" size="sm" onClick={() => handlers.addPartida(rubroIdx, rubro.tipo as TipoRubro)}>
                   <Plus className="h-3 w-3 mr-1" />Agregar
+                </Button>
+              )}
+              {!editando && sugerencia?.activo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => sugerencia.onSugerir(
+                    `presupuesto.rubros[${rubroIdx}]`, '', LABELS_RUBRO[rubro.tipo as TipoRubro],
+                  )}
+                >
+                  <MessageSquare className="h-3 w-3 mr-1" />Comentar
                 </Button>
               )}
             </div>
@@ -1326,10 +1383,57 @@ function renderPresupuesto(
                         </>
                       ) : (
                         <>
-                          <span className="text-sm flex-1">{p.tipoPersona}</span>
-                          <span className="text-sm flex-[2]">{p.descripcion}</span>
-                          <span className="text-sm flex-1">{p.periodoInicio} → {p.periodoFin}</span>
-                          <span className="text-sm flex-1">{formatearMoneda(p.monto)}</span>
+                          <CampoSugerible
+                            campo={campoPartida(rubroIdx, pIdx, 'tipoPersona')}
+                            valorActual={p.tipoPersona}
+                            label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'tipoPersona')}
+                            activo={!!sugerencia?.activo}
+                            onClick={sugerencia?.onSugerir ?? (() => {})}
+                            className="flex-1"
+                          >
+                            <span className="text-sm">{p.tipoPersona}</span>
+                          </CampoSugerible>
+                          <CampoSugerible
+                            campo={campoPartida(rubroIdx, pIdx, 'descripcion')}
+                            valorActual={p.descripcion}
+                            label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'descripcion')}
+                            activo={!!sugerencia?.activo}
+                            onClick={sugerencia?.onSugerir ?? (() => {})}
+                            className="flex-[2]"
+                          >
+                            <span className="text-sm">{p.descripcion}</span>
+                          </CampoSugerible>
+                          <span className="text-sm flex-1 flex items-center gap-1">
+                            <CampoSugerible
+                              campo={campoPartida(rubroIdx, pIdx, 'periodoInicio')}
+                              valorActual={p.periodoInicio}
+                              label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'periodoInicio')}
+                              activo={!!sugerencia?.activo}
+                              onClick={sugerencia?.onSugerir ?? (() => {})}
+                            >
+                              {p.periodoInicio}
+                            </CampoSugerible>
+                            →
+                            <CampoSugerible
+                              campo={campoPartida(rubroIdx, pIdx, 'periodoFin')}
+                              valorActual={p.periodoFin}
+                              label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'periodoFin')}
+                              activo={!!sugerencia?.activo}
+                              onClick={sugerencia?.onSugerir ?? (() => {})}
+                            >
+                              {p.periodoFin}
+                            </CampoSugerible>
+                          </span>
+                          <CampoSugerible
+                            campo={campoPartida(rubroIdx, pIdx, 'monto')}
+                            valorActual={String(p.monto)}
+                            label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'monto')}
+                            activo={!!sugerencia?.activo}
+                            onClick={sugerencia?.onSugerir ?? (() => {})}
+                            className="flex-1"
+                          >
+                            <span className="text-sm">{formatearMoneda(p.monto)}</span>
+                          </CampoSugerible>
                         </>
                       )}
                     </div>
@@ -1366,9 +1470,36 @@ function renderPresupuesto(
                     </>
                   ) : (
                     <>
-                      <span className="text-sm flex-[2]">{p.descripcion}</span>
-                      <span className="text-sm flex-1">{p.cantidad}</span>
-                      <span className="text-sm flex-1">{formatearMoneda(p.precioUnitario)}</span>
+                      <CampoSugerible
+                        campo={campoPartida(rubroIdx, pIdx, 'descripcion')}
+                        valorActual={p.descripcion}
+                        label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'descripcion')}
+                        activo={!!sugerencia?.activo}
+                        onClick={sugerencia?.onSugerir ?? (() => {})}
+                        className="flex-[2]"
+                      >
+                        <span className="text-sm">{p.descripcion}</span>
+                      </CampoSugerible>
+                      <CampoSugerible
+                        campo={campoPartida(rubroIdx, pIdx, 'cantidad')}
+                        valorActual={String(p.cantidad)}
+                        label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'cantidad')}
+                        activo={!!sugerencia?.activo}
+                        onClick={sugerencia?.onSugerir ?? (() => {})}
+                        className="flex-1"
+                      >
+                        <span className="text-sm">{p.cantidad}</span>
+                      </CampoSugerible>
+                      <CampoSugerible
+                        campo={campoPartida(rubroIdx, pIdx, 'precioUnitario')}
+                        valorActual={String(p.precioUnitario)}
+                        label={labelPartida(LABELS_RUBRO[rubro.tipo as TipoRubro], 'precioUnitario')}
+                        activo={!!sugerencia?.activo}
+                        onClick={sugerencia?.onSugerir ?? (() => {})}
+                        className="flex-1"
+                      >
+                        <span className="text-sm">{formatearMoneda(p.precioUnitario)}</span>
+                      </CampoSugerible>
                       <span className="text-sm flex-1">{formatearMoneda(p.monto)}</span>
                     </>
                   )}

@@ -25,7 +25,8 @@ import { CampoFormulario, ColumnaTabla } from '../formularios/campo-formulario.i
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { Edicion } from '../proyectos/edicion.entity';
-import { Presupuesto } from '../proyectos/presupuesto.interface';
+import { BienPresupuesto, Presupuesto, ViaticoPresupuesto } from '../proyectos/presupuesto.interface';
+import { etiquetaCampoPresupuesto } from '../proyectos/presupuesto.util';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { TipoPersona } from '../common/enums/tipo-persona.enum';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
@@ -2604,6 +2605,7 @@ export class SeedService {
   ): { campo: string; valorActual: string | null; valorSugerido: string | null } | undefined {
     const candidatos: Array<{ nombre: string; comentarioSolo: boolean }> = [
       { nombre: 'nombre', comentarioSolo: true },
+      { nombre: 'presupuesto', comentarioSolo: false },
       { nombre: CAMPOS_ESTANDAR.resumen, comentarioSolo: false },
       { nombre: CAMPOS_ESTANDAR.area, comentarioSolo: true },
       { nombre: CAMPOS_ESTANDAR.poblaciones, comentarioSolo: true },
@@ -2620,6 +2622,16 @@ export class SeedService {
         campo: 'nombre',
         valorActual: ed.proyecto?.nombre ?? null,
         valorSugerido: null,
+      };
+    }
+
+    if (elegido.nombre === 'presupuesto') {
+      const sugerida = this.primeraPartidaSugerible(ed.presupuesto);
+      if (!sugerida) return undefined;
+      return {
+        campo: sugerida.campo,
+        valorActual: String(sugerida.valorActual),
+        valorSugerido: String(sugerida.valorSugerido),
       };
     }
 
@@ -2645,6 +2657,36 @@ export class SeedService {
     };
   }
 
+  /**
+   * Busca la primera partida con descripción cargada para armar una sugerencia de presupuesto de
+   * ejemplo. El monto de un bien es derivado (cantidad * precioUnitario), así que si el rubro no
+   * es de viáticos se sugiere sobre el precio unitario en vez del monto.
+   */
+  private primeraPartidaSugerible(
+    presupuesto: Presupuesto | null,
+  ): { campo: string; valorActual: number; valorSugerido: number } | undefined {
+    if (!presupuesto) return undefined;
+    for (let rubroIdx = 0; rubroIdx < presupuesto.rubros.length; rubroIdx++) {
+      const rubro = presupuesto.rubros[rubroIdx];
+      const partidaIdx = rubro.partidas.findIndex((p) => p.descripcion?.trim());
+      if (partidaIdx === -1) continue;
+
+      const esViatico = rubro.tipo === TipoRubro.ViaticosYSeguros;
+      const campoNumerico = esViatico ? 'monto' : 'precioUnitario';
+      const valorActual = esViatico
+        ? (rubro.partidas[partidaIdx] as ViaticoPresupuesto).monto
+        : (rubro.partidas[partidaIdx] as BienPresupuesto).precioUnitario;
+      const valorSugerido = Math.round(valorActual * 0.8 * 100) / 100;
+
+      return {
+        campo: `presupuesto.rubros[${rubroIdx}].partidas[${partidaIdx}].${campoNumerico}`,
+        valorActual,
+        valorSugerido,
+      };
+    }
+    return undefined;
+  }
+
   private async notificarSugerencia(
     ed: Edicion,
     sugeridoPor: Usuario,
@@ -2657,7 +2699,7 @@ export class SeedService {
     });
     directores.forEach((d) => destinatarios.add(d.usuarioId));
 
-    const nombreCampo = this.nombreLegibleSugerencia(sugerencia.campo, campos);
+    const nombreCampo = this.nombreLegibleSugerencia(sugerencia.campo, campos, ed.presupuesto);
     for (const usuarioId of destinatarios) {
       if (usuarioId === sugeridoPor.id) continue;
       await this.notificacionRepo.save(
@@ -2671,8 +2713,11 @@ export class SeedService {
     }
   }
 
-  private nombreLegibleSugerencia(campo: string, campos: CampoFormulario[]): string {
+  private nombreLegibleSugerencia(campo: string, campos: CampoFormulario[], presupuesto: Presupuesto | null): string {
     if (campo === 'nombre') return 'Nombre del proyecto';
+    if (campo.startsWith('presupuesto.')) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.replace('presupuesto.', ''));
+    }
     if (campo.startsWith('datosFormulario.')) {
       const id = campo.replace('datosFormulario.', '');
       return campos.find((c) => c.id === id)?.nombre ?? campo;

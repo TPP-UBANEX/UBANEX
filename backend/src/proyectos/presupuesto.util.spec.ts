@@ -1,7 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
 import { BadRequestException } from '@nestjs/common';
 import {
-  normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto,
+  esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, normalizarPresupuesto, parsearRutaPartida,
+  presupuestoIncompletoParaEnvio, validarPresupuesto,
 } from './presupuesto.util';
 import { Presupuesto } from './presupuesto.interface';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
@@ -241,5 +242,72 @@ describe('presupuestoIncompletoParaEnvio', () => {
     expect(motivos).toContain(
       '"Viáticos y Seguros": el período de la partida 1 no puede comenzar antes de hoy',
     );
+  });
+});
+
+describe('parsearRutaPartida', () => {
+  it('interpreta una ruta valida de un campo permitido', () => {
+    expect(parsearRutaPartida('rubros[0].partidas[1].monto')).toEqual({
+      rubroIndice: 0,
+      partidaIndice: 1,
+      campo: 'monto',
+    });
+  });
+
+  it('rechaza un campo fuera de la whitelist (subtotal y montoTotal son derivados)', () => {
+    expect(parsearRutaPartida('rubros[0].partidas[1].subtotal')).toBeNull();
+    expect(parsearRutaPartida('rubros[0].montoTotal')).toBeNull();
+  });
+
+  it('rechaza un formato de ruta invalido', () => {
+    expect(parsearRutaPartida('rubros[0]')).toBeNull();
+    expect(parsearRutaPartida('rubros[0].partidas[1]')).toBeNull();
+    expect(parsearRutaPartida('')).toBeNull();
+  });
+});
+
+describe('esRutaComentarioPresupuesto', () => {
+  const p = normalizarPresupuesto(presupuestoValido());
+
+  it('acepta la ruta vacia (comentario sobre todo el presupuesto)', () => {
+    expect(esRutaComentarioPresupuesto(p, '')).toBe(true);
+  });
+
+  it('acepta un rubro existente', () => {
+    expect(esRutaComentarioPresupuesto(p, 'rubros[0]')).toBe(true);
+  });
+
+  it('rechaza un indice de rubro fuera de rango', () => {
+    expect(esRutaComentarioPresupuesto(p, 'rubros[5]')).toBe(false);
+  });
+
+  it('rechaza una ruta que en realidad apunta a un campo de partida', () => {
+    expect(esRutaComentarioPresupuesto(p, 'rubros[0].partidas[0].monto')).toBe(false);
+  });
+});
+
+describe('etiquetaCampoPresupuesto', () => {
+  const p = normalizarPresupuesto(presupuestoValido());
+
+  it('arma una etiqueta legible para un campo de partida con descripcion', () => {
+    expect(etiquetaCampoPresupuesto(p, 'rubros[0].partidas[0].monto')).toBe(
+      'Presupuesto > Viáticos y Seguros > partida 1 "Viáticos docentes" · Monto',
+    );
+  });
+
+  it('omite las comillas si la partida no tiene descripcion', () => {
+    const sinDescripcion: Presupuesto = JSON.parse(JSON.stringify(p));
+    (sinDescripcion.rubros[0].partidas[0] as { descripcion: string }).descripcion = '';
+    expect(etiquetaCampoPresupuesto(sinDescripcion, 'rubros[0].partidas[0].monto')).toBe(
+      'Presupuesto > Viáticos y Seguros > partida 1 · Monto',
+    );
+  });
+
+  it('arma una etiqueta para un comentario a nivel rubro', () => {
+    expect(etiquetaCampoPresupuesto(p, 'rubros[1]')).toBe('Presupuesto > Bienes de Consumo');
+  });
+
+  it('devuelve la ruta cruda si no matchea ningun patron conocido', () => {
+    expect(etiquetaCampoPresupuesto(p, 'algoInesperado')).toBe('Presupuesto > algoInesperado');
   });
 });

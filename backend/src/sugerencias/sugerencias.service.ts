@@ -12,7 +12,11 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { Presupuesto } from '../proyectos/presupuesto.interface';
-import { normalizarPresupuesto, validarPresupuesto } from '../proyectos/presupuesto.util';
+import {
+  esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, normalizarPresupuesto,
+  parsearRutaPartida, validarPresupuesto,
+} from '../proyectos/presupuesto.util';
+import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
 import { ResponderSugerenciaDto } from './dto/responder-sugerencia.dto';
@@ -244,7 +248,9 @@ export class SugerenciasService {
       case 'anioEdicion': return edicion.anioEdicion != null ? String(edicion.anioEdicion) : null;
       default:
         if (campo.startsWith('presupuesto.')) {
-          return this.obtenerValorJson(edicion.presupuesto, campo.replace('presupuesto.', ''));
+          const path = campo.replace('presupuesto.', '');
+          if (!parsearRutaPartida(path)) return null;
+          return this.obtenerValorJson(edicion.presupuesto, path);
         }
         if (campo.startsWith('datosFormulario.')) {
           return this.obtenerValorJson(edicion.datosFormulario, campo.replace('datosFormulario.', ''));
@@ -331,7 +337,7 @@ export class SugerenciasService {
    * (se borró desde que se sugirió el cambio), se rechaza en vez de reconstruirla a ciegas.
    */
   private aplicarCambioPresupuesto(edicion: Edicion, path: string, valorSugerido: string): void {
-    const ruta = this.parsearRutaPresupuesto(path);
+    const ruta = parsearRutaPartida(path);
     if (!ruta || !edicion.presupuesto) {
       throw new BadRequestException('No se puede aplicar ese cambio de presupuesto');
     }
@@ -382,7 +388,7 @@ export class SugerenciasService {
     directores.forEach(d => destinatarios.add(d.usuarioId));
 
     const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
-    const nombreCampo = this.nombreLegible(sugerencia.campo, campos);
+    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, edicion.presupuesto);
     const mensaje = `${sugeridoPor.nombreCompleto} sugirió un cambio en "${nombreCampo}" del proyecto "${proyecto.nombre}"`;
 
     for (const usuarioId of destinatarios) {
@@ -406,7 +412,7 @@ export class SugerenciasService {
     };
     const accion = accionTexto[sugerencia.estado] || 'respondió a';
     const campos = await this.obtenerCamposFormulario(sugerencia.edicion.convocatoriaId);
-    const nombreCampo = this.nombreLegible(sugerencia.campo, campos);
+    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, sugerencia.edicion.presupuesto);
     const mensaje = `${respondidoPor.nombreCompleto} ${accion} la sugerencia en "${nombreCampo}"`;
 
     await this.notificacionRepo.save(
@@ -419,26 +425,6 @@ export class SugerenciasService {
     );
   }
 
-  private static readonly CAMPOS_PARTIDA_PERMITIDOS = [
-    'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
-  ];
-
-  private static readonly FORMATO_RUTA_PRESUPUESTO = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/;
-
-  /**
-   * Solo se puede sugerir un cambio sobre un campo de una partida ya existente. `subtotal` y
-   * `montoTotal` quedan fuera de la whitelist: son derivados, se recalculan al aplicar el cambio.
-   */
-  private parsearRutaPresupuesto(
-    path: string,
-  ): { rubroIndice: number; partidaIndice: number; campo: string } | null {
-    const match = SugerenciasService.FORMATO_RUTA_PRESUPUESTO.exec(path);
-    if (!match) return null;
-    const [, rubroIndice, partidaIndice, campo] = match;
-    if (!SugerenciasService.CAMPOS_PARTIDA_PERMITIDOS.includes(campo)) return null;
-    return { rubroIndice: Number(rubroIndice), partidaIndice: Number(partidaIndice), campo };
-  }
-
   private async obtenerCamposFormulario(convocatoriaId: string): Promise<CampoFormulario[]> {
     const convocatoria = await this.convocatoriaRepo.findOne({
       where: { id: convocatoriaId },
@@ -447,19 +433,27 @@ export class SugerenciasService {
     return convocatoria?.formulario?.campos ?? [];
   }
 
-  /** Un valor sugerido sobre un campo del formulario debe cumplir las mismas reglas que la carga directa. */
-  private async validarValorSugerido(
-    edicion: Edicion,
-    campo: string,
-    valorSugerido: string | null,
-  ): Promise<void> {
-    if (valorSugerido == null) return;
-
-    if (campo.startsWith('presupuesto.')) {
-      const ruta = this.parsearRutaPresupuesto(campo.replace('presupuesto.', ''));
-      if (!ruta) {
-        throw new BadRequestException('No se puede sugerir un cambio sobre esa ruta del presupuesto');
+  /**
+   * Sobre el presupuesto se puede sugerir un valor nuevo en un campo de una partida existente
+   * (se aplica solo al aceptar), o dejar un comentario sobre un rubro completo, para pedir agregar
+   * o quitar partidas (eso no se automatiza). El monto de un bien es derivado
+   * (cantidad * precioUnitario, ver normalizarPresupuesto), así que no es sugerible: aceptar esa
+   * sugerencia lo descartaría en silencio y el director creería que se aplicó.
+   */
+  private validarCampoPresupuesto(edicion: Edicion, path: string, valorSugerido: string | null): void {
+    const ruta = parsearRutaPartida(path);
+    if (ruta) {
+      const rubro = edicion.presupuesto?.rubros?.[ruta.rubroIndice];
+      const partida = rubro?.partidas?.[ruta.partidaIndice];
+      if (!rubro || !partida) {
+        throw new BadRequestException('No se puede sugerir un cambio sobre una partida que no existe');
       }
+      if (ruta.campo === 'monto' && rubro.tipo !== TipoRubro.ViaticosYSeguros) {
+        throw new BadRequestException(
+          'El monto de un bien se calcula solo: sugerí un cambio en la cantidad o el precio unitario',
+        );
+      }
+      if (valorSugerido == null) return;
       if (
         ['monto', 'cantidad', 'precioUnitario'].includes(ruta.campo)
         && (valorSugerido.trim() === '' || !Number.isFinite(Number(valorSugerido)))
@@ -468,6 +462,29 @@ export class SugerenciasService {
       }
       return;
     }
+
+    if (esRutaComentarioPresupuesto(edicion.presupuesto, path)) {
+      if (valorSugerido != null) {
+        throw new BadRequestException('Sobre un rubro solo se puede dejar un comentario, no un valor sugerido');
+      }
+      return;
+    }
+
+    throw new BadRequestException('No se puede sugerir un cambio sobre esa ruta del presupuesto');
+  }
+
+  /** Un valor sugerido sobre un campo del formulario debe cumplir las mismas reglas que la carga directa. */
+  private async validarValorSugerido(
+    edicion: Edicion,
+    campo: string,
+    valorSugerido: string | null,
+  ): Promise<void> {
+    if (campo.startsWith('presupuesto.')) {
+      this.validarCampoPresupuesto(edicion, campo.replace('presupuesto.', ''), valorSugerido);
+      return;
+    }
+
+    if (valorSugerido == null) return;
 
     if (!campo.startsWith('datosFormulario.')) return;
 
@@ -487,7 +504,7 @@ export class SugerenciasService {
     validarValoresFormulario([campoFormulario], { [campoId]: valor });
   }
 
-  private nombreLegible(campo: string, campos: CampoFormulario[] = []): string {
+  private nombreLegible(campo: string, campos: CampoFormulario[] = [], presupuesto: Presupuesto | null = null): string {
     const mapa: Record<string, string> = {
       nombre: 'Nombre',
       anioEdicion: 'Año de edición',
@@ -495,7 +512,9 @@ export class SugerenciasService {
       esInterfacultad: 'Es interfacultad',
     };
     if (mapa[campo]) return mapa[campo];
-    if (campo.startsWith('presupuesto.')) return `Presupuesto > ${campo.replace('presupuesto.', '')}`;
+    if (campo.startsWith('presupuesto.')) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.replace('presupuesto.', ''));
+    }
     if (campo.startsWith('datosFormulario.')) {
       const campoId = campo.replace('datosFormulario.', '');
       const campoFormulario = campos.find(c => c.id === campoId);

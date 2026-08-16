@@ -16,11 +16,88 @@ const ORDEN_RUBROS: TipoRubro[] = [
   TipoRubro.BienesDeUso,
 ];
 
-const LABELS_RUBRO: Record<TipoRubro, string> = {
+export const LABELS_RUBRO: Record<TipoRubro, string> = {
   [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
   [TipoRubro.BienesDeConsumo]: 'Bienes de Consumo',
   [TipoRubro.BienesDeUso]: 'Bienes de Uso',
 };
+
+/** Campos de una partida sobre los que se puede sugerir un cambio (ver sugerencias.service.ts). */
+export const CAMPOS_PARTIDA_PERMITIDOS = [
+  'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+] as const;
+
+export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
+  descripcion: 'Descripción',
+  monto: 'Monto',
+  cantidad: 'Cantidad',
+  precioUnitario: 'Precio unitario',
+  periodoInicio: 'Inicio del período',
+  periodoFin: 'Fin del período',
+  tipoPersona: 'Tipo de persona',
+};
+
+const FORMATO_RUTA_PARTIDA = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/;
+const FORMATO_RUTA_RUBRO = /^rubros\[(\d+)\]$/;
+
+/**
+ * Interpreta una ruta relativa a `presupuesto.` (sin ese prefijo) como el campo de una partida.
+ * Solo reconoce campos de la whitelist: `subtotal` y `montoTotal` quedan afuera porque son
+ * derivados y se recalculan al aplicar el cambio.
+ */
+export function parsearRutaPartida(
+  path: string,
+): { rubroIndice: number; partidaIndice: number; campo: string } | null {
+  const match = FORMATO_RUTA_PARTIDA.exec(path);
+  if (!match) return null;
+  const [, rubroIndice, partidaIndice, campo] = match;
+  if (!(CAMPOS_PARTIDA_PERMITIDOS as readonly string[]).includes(campo)) return null;
+  return { rubroIndice: Number(rubroIndice), partidaIndice: Number(partidaIndice), campo };
+}
+
+/**
+ * Una ruta relativa a `presupuesto.` (sin ese prefijo) que apunta a un rubro completo (no a un
+ * campo de una partida) solo admite un comentario: sirve para pedir agregar o quitar partidas.
+ */
+export function esRutaComentarioPresupuesto(presupuesto: Presupuesto | null, path: string): boolean {
+  if (path === '') return true;
+  const match = FORMATO_RUTA_RUBRO.exec(path);
+  if (!match) return false;
+  const indice = Number(match[1]);
+  return !!presupuesto?.rubros?.[indice];
+}
+
+/**
+ * Etiqueta legible de una ruta relativa a `presupuesto.` (sin ese prefijo), para mostrar en la
+ * lista de sugerencias y en las notificaciones. Se degrada con gracia: si la partida referenciada
+ * ya no tiene descripción cargada, omite las comillas; si la ruta no matchea ningún patrón
+ * conocido, devuelve la ruta cruda como antes.
+ */
+export function etiquetaCampoPresupuesto(presupuesto: Presupuesto | null, path: string): string {
+  const rutaPartida = parsearRutaPartida(path);
+  if (rutaPartida) {
+    const rubro = presupuesto?.rubros?.[rutaPartida.rubroIndice];
+    const partida = rubro?.partidas?.[rutaPartida.partidaIndice];
+    const label = rubro ? LABELS_RUBRO[rubro.tipo] : `Rubro ${rutaPartida.rubroIndice + 1}`;
+    const campoLabel = LABELS_CAMPO_PARTIDA[rutaPartida.campo] ?? rutaPartida.campo;
+    const descripcion = partida?.descripcion?.trim();
+    const partidaLabel = descripcion
+      ? `partida ${rutaPartida.partidaIndice + 1} "${descripcion}"`
+      : `partida ${rutaPartida.partidaIndice + 1}`;
+    return `Presupuesto > ${label} > ${partidaLabel} · ${campoLabel}`;
+  }
+
+  const matchRubro = FORMATO_RUTA_RUBRO.exec(path);
+  if (matchRubro) {
+    const rubro = presupuesto?.rubros?.[Number(matchRubro[1])];
+    const label = rubro ? LABELS_RUBRO[rubro.tipo] : `Rubro ${Number(matchRubro[1]) + 1}`;
+    return `Presupuesto > ${label}`;
+  }
+
+  if (path === '') return 'Presupuesto';
+
+  return `Presupuesto > ${path}`;
+}
 
 function esMontoValido(valor: unknown): valor is number {
   return typeof valor === 'number' && Number.isFinite(valor) && valor >= 0 && valor <= MONTO_MAXIMO_PARTIDA;
