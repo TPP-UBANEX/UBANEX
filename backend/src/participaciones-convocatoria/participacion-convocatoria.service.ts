@@ -177,6 +177,13 @@ export class ParticipacionConvocatoriaService {
 
     if (dto.rol === RolEjecucion.Evaluador) {
       await this.notificarDocentePropuesto(usuario, convocatoria, saved.id);
+      await this.auditoria.registrar({
+        usuarioId: usuario.id,
+        accion: TipoAccionAuditoria.PROPUESTA_EVALUADOR,
+        descripcion: `Propuesto como evaluador en la convocatoria "${convocatoria.nombre}"`,
+        responsableId: asignadoPor.id,
+        responsableNombre: asignadoPor.nombreCompleto,
+      });
     }
 
     return saved;
@@ -215,7 +222,11 @@ export class ParticipacionConvocatoriaService {
     }
   }
 
-  async actualizarEstado(id: string, dto: ActualizarEstadoParticipacionDto): Promise<ParticipacionConvocatoria> {
+  async actualizarEstado(
+    id: string,
+    dto: ActualizarEstadoParticipacionDto,
+    usuario: Usuario,
+  ): Promise<ParticipacionConvocatoria> {
     const entity = await this.repo.findOne({
       where: { id },
       relations: { usuario: true, convocatoria: true },
@@ -230,6 +241,14 @@ export class ParticipacionConvocatoriaService {
     entity.estado = dto.estado;
     const saved = await this.repo.save(entity);
     await this.notificarAutoridadesEstadoEvaluador(saved);
+    const aprobado = dto.estado === EstadoPropuestaEvaluador.Aprobado;
+    await this.auditoria.registrar({
+      usuarioId: entity.usuarioId,
+      accion: TipoAccionAuditoria.APROBACION_EVALUADOR,
+      descripcion: `Rectorado ${aprobado ? 'aprobó' : 'rechazó'} su participación como evaluador en la convocatoria "${saved.convocatoria?.nombre ?? ''}"`,
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+    });
     return saved;
   }
 
@@ -259,6 +278,13 @@ export class ParticipacionConvocatoriaService {
     const saved = await this.repo.save(entity);
     await this.notificarSecretariaRespuestaDocente(saved, aceptada);
     await this.resolverNotificacionPropuesta(docente.id, saved.id);
+    await this.auditoria.registrar({
+      usuarioId: entity.usuarioId,
+      accion: TipoAccionAuditoria.RESPUESTA_EVALUADOR,
+      descripcion: `${aceptada ? 'Aceptó' : 'Declinó'} ser evaluador en la convocatoria "${saved.convocatoria?.nombre ?? ''}"`,
+      responsableId: docente.id,
+      responsableNombre: docente.nombreCompleto,
+    });
     return saved;
   }
 
@@ -568,6 +594,22 @@ export class ParticipacionConvocatoriaService {
 
     await this.notificacionRepo.delete({ participacionId: id });
     await this.repo.remove(entity);
+
+    const convocatoria = entity.convocatoriaId
+      ? await this.convocatoriaRepo.findOne({ where: { id: entity.convocatoriaId } })
+      : null;
+    const evaluador = await this.usuarioRepo.findOne({
+      where: { id: entity.usuarioId },
+      relations: { unidadAcademica: true },
+    });
+    const uaNombre = evaluador?.unidadAcademica?.nombre ?? 'la Unidad Académica';
+    await this.auditoria.registrar({
+      usuarioId: entity.usuarioId,
+      accion: TipoAccionAuditoria.ELIMINACION_EVALUADOR,
+      descripcion: `${uaNombre} lo quitó como evaluador de la convocatoria "${convocatoria?.nombre ?? ''}"`,
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+    });
   }
 
   async listarPorConvocatoria(convocatoriaId: string): Promise<ParticipacionConvocatoria[]> {
