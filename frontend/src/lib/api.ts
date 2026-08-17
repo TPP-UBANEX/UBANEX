@@ -269,4 +269,46 @@ export const api = {
       return get<import('@/data/types').Rendicion[]>(`/rendiciones${qs}`)
     },
   },
+  ejecucion: {
+    hitos: {
+      listar: (edicionId: string) =>
+        get<import('@/data/types').Hito[]>(`/hitos/ediciones/${edicionId}`),
+      crear: (edicionId: string, data: import('@/data/types').CrearHitoDto) =>
+        post<import('@/data/types').Hito>(`/hitos/ediciones/${edicionId}`, data),
+      actualizar: (id: string, data: import('@/data/types').ActualizarHitoDto) =>
+        request<import('@/data/types').Hito>('PUT', `/hitos/${id}`, data),
+      eliminar: (id: string) => del(`/hitos/${id}`),
+    },
+    autoevaluacion: {
+      obtener: (edicionId: string) =>
+        get<{ autoevaluacion: import('@/data/types').AutoevaluacionImpacto | null; template: import('@/data/types').TemplateAutoevaluacionImpacto | null }>(`/autoevaluacion-impacto/ediciones/${edicionId}`),
+      guardar: (edicionId: string, data: import('@/data/types').GuardarAutoevaluacionDto) =>
+        request<{ autoevaluacion: import('@/data/types').AutoevaluacionImpacto; template: import('@/data/types').TemplateAutoevaluacionImpacto | null }>('PUT', `/autoevaluacion-impacto/ediciones/${edicionId}`, data),
+      completar: (edicionId: string) =>
+        post<import('@/data/types').AutoevaluacionImpacto>(`/autoevaluacion-impacto/ediciones/${edicionId}/completar`, {}),
+    },
+    informeFinal: {
+      obtener: (edicionId: string) =>
+        get<import('@/data/types').InformeFinal | null>(`/informe-final/ediciones/${edicionId}`),
+      guardar: (edicionId: string, data: import('@/data/types').GuardarInformeFinalDto) =>
+        request<import('@/data/types').InformeFinal>('PUT', `/informe-final/ediciones/${edicionId}`, data),
+      confirmar: (edicionId: string) =>
+        post<import('@/data/types').InformeFinal>(`/informe-final/ediciones/${edicionId}/confirmar`, {}),
+    },
+  },
+  templatesAutoevaluacion: {
+    list: () => get<import('@/data/types').TemplateAutoevaluacionImpacto[]>('/templates-autoevaluacion-impacto'),
+    get: (id: string) => get<import('@/data/types').TemplateAutoevaluacionImpacto>(`/templates-autoevaluacion-impacto/${id}`),
+    crear: (data: { nombre: string; esDefault?: boolean; estructura?: import('@/data/types').EstructuraTemplateAutoevaluacion }) =>
+      post<import('@/data/types').TemplateAutoevaluacionImpacto>('/templates-autoevaluacion-impacto', data),
+    actualizar: (id: string, data: { nombre?: string; esDefault?: boolean; estructura?: import('@/data/types').EstructuraTemplateAutoevaluacion }) =>
+      request<import('@/data/types').TemplateAutoevaluacionImpacto>('PUT', `/templates-autoevaluacion-impacto/${id}`, data),
+    eliminar: (id: string) => del(`/templates-autoevaluacion-impacto/${id}`),
+    porConvocatoria: {
+      get: (convocatoriaId: string) =>
+        get<import('@/data/types').TemplateAutoevaluacionImpacto>(`/convocatorias/${convocatoriaId}/template-autoevaluacion-impacto`),
+      guardar: (convocatoriaId: string, estructura: import('@/data/types').EstructuraTemplateAutoevaluacion | null) =>
+        request<import('@/data/types').TemplateAutoevaluacionImpacto>('PUT', `/convocatorias/${convocatoriaId}/template-autoevaluacion-impacto`, { estructura }),
+    },
+  },
 }
