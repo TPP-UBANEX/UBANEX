@@ -193,14 +193,12 @@ function PreguntaRenderer({
   onToggle: (opcion: string) => void
 }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-sm flex-1">
-          {pregunta.texto}
-          {pregunta.esObligatorio && <span className="text-destructive"> *</span>}
-        </p>
-        {renderInput(pregunta, valor, disabled, onChange, onToggle)}
-      </div>
+    <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+      <p className="text-sm font-medium">
+        {pregunta.texto}
+        {pregunta.esObligatorio && <span className="text-destructive"> *</span>}
+      </p>
+      {renderInput(pregunta, valor, disabled, onChange, onToggle)}
     </div>
   )
 }
@@ -253,7 +251,7 @@ function renderInput(
         <div className="flex items-center gap-2">
           <Input
             type="number"
-            className="w-24"
+            className="w-full max-w-[6rem]"
             disabled={disabled}
             value={valor === null || valor === undefined ? '' : String(valor)}
             onChange={(e) =>
@@ -267,7 +265,7 @@ function renderInput(
     }
     case 'select':
       return (
-        <div className="w-56">
+        <div className="w-full max-w-xs">
           <Select
             value={typeof valor === 'string' ? valor : ''}
             onValueChange={(v) => onChange(v)}
@@ -286,7 +284,7 @@ function renderInput(
       )
     case 'checkbox':
       return (
-        <div className="flex flex-col items-end gap-1.5">
+        <div className="flex flex-col items-start gap-1.5">
           {(pregunta.opciones ?? []).map((o) => {
             const marcado = (valor as string[])?.includes(o) ?? false
             return (
