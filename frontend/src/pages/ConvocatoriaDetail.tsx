@@ -243,11 +243,18 @@ export function ConvocatoriaDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/convocatorias')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <Badge variant={estadoBadge[conv.estado]}>{estadoConvocatoriaLabel[conv.estado] || conv.estado}</Badge>
+            <h2 className="text-xl font-semibold text-foreground truncate" title={conv.nombre}>
+              {conv.nombre}
+            </h2>
+            <Badge variant={estadoBadge[conv.estado]} className="shrink-0">
+              {estadoConvocatoriaLabel[conv.estado] || conv.estado}
+            </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">{conv.descripcion}</p>
+          {conv.descripcion && (
+            <p className="text-sm text-muted-foreground truncate">{conv.descripcion}</p>
+          )}
         </div>
         {user?.roles.includes(RolUsuario.AutoridadDeRectorado) && (
           <div className="flex gap-2">
@@ -611,7 +618,10 @@ function DetailSkeleton() {
       <div className="flex gap-4 items-center">
         <Skeleton className="h-8 w-8 rounded-md" />
         <div className="space-y-2">
-          <Skeleton className="h-6 w-64" />
+          <div className="flex gap-3 items-center">
+            <Skeleton className="h-7 w-72" />
+            <Skeleton className="h-5 w-24 rounded-full" />
+          </div>
           <Skeleton className="h-4 w-48" />
         </div>
       </div>
