@@ -35,6 +35,7 @@ import { useAuth } from '@/lib/auth-context'
 import type { Convocatoria, Edicion, ParticipacionConvocatoria, PaginatedResponse } from '@/data/types'
 import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
+import { ResubirProyectoDialog } from '@/components/ResubirProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab'
@@ -83,6 +84,7 @@ export function ConvocatoriaDetail() {
   const [invitacionEvaluador, setInvitacionEvaluador] = useState<ParticipacionConvocatoria | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingTabla, setLoadingTabla] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
   const [guardando, setGuardando] = useState(false)
@@ -116,6 +118,7 @@ export function ConvocatoriaDetail() {
         pc.convocatoriaId === id && pc.rol === RolEjecucion.Evaluador,
       ) ?? null
       setInvitacionEvaluador(evaluador)
+      setRefreshKey(k => k + 1)
     }).finally(() => setLoading(false))
   }
 
@@ -140,7 +143,7 @@ export function ConvocatoriaDetail() {
       })
       .catch(() => {})
       .finally(() => setLoadingTabla(false))
-  }, [id, page, debouncedSearch, filtroEtapa, filtroAnio])
+  }, [id, page, debouncedSearch, filtroEtapa, filtroAnio, refreshKey])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -394,14 +397,24 @@ export function ConvocatoriaDetail() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Proyectos Presentados</CardTitle>
               {esUsuarioEjecucion && !tieneInvPendiente && !esEvaluadorActivo && (
-                <NuevoProyectoDialog
-                  onCreated={cargarDatos}
-                  convocatoriaId={conv?.id}
-                  convocatoriaNombre={conv?.nombre}
-                  trigger={
-                    <Button><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
-                  }
-                />
+                <div className="flex gap-2">
+                  <NuevoProyectoDialog
+                    onCreated={cargarDatos}
+                    convocatoriaId={conv?.id}
+                    convocatoriaNombre={conv?.nombre}
+                    trigger={
+                      <Button><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
+                    }
+                  />
+                  <ResubirProyectoDialog
+                    onResubido={cargarDatos}
+                    convocatoriaId={conv?.id}
+                    convocatoriaNombre={conv?.nombre}
+                    trigger={
+                      <Button variant="outline">Resubir Proyecto</Button>
+                    }
+                  />
+                </div>
               )}
             </CardHeader>
             {esUsuarioEjecucion && tieneInvPendiente && (
@@ -476,14 +489,14 @@ export function ConvocatoriaDetail() {
                     </TableHeader>
                     <TableBody>
                       {ediciones.map(e => (
-                        <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
+                        <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`)}>
                           <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                           <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
+                            <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
                           </TableCell>
                         </TableRow>
                       ))}

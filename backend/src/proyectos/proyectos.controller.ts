@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { ProyectosService } from './proyectos.service';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
+import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -24,6 +25,16 @@ export class ProyectosController {
     return this.service.crearProyecto(dto, usuario);
   }
 
+  @Post(':id/resubir')
+  @Roles(RolUsuario.Estudiante, RolUsuario.Docente)
+  resubir(
+    @Param('id') id: string,
+    @Body() dto: ResubirProyectoDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.resubirProyecto(id, dto, usuario);
+  }
+
   @Get()
   listar(@CurrentUser() usuario: Usuario, @Query() dto: ListarProyectosDto) {
     return this.service.listar(usuario, dto);
@@ -35,6 +46,15 @@ export class ProyectosController {
     @Query('convocatoriaId') convocatoriaId?: string,
   ) {
     return this.service.listarTodas(usuario, convocatoriaId);
+  }
+
+  @Get('disponibles-para-resubir')
+  disponiblesParaResubir(
+    @CurrentUser() usuario: Usuario,
+    @Query('convocatoriaId') convocatoriaId: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.proyectosDisponiblesParaResubir(usuario, convocatoriaId, search);
   }
 
   @Get(':id')
