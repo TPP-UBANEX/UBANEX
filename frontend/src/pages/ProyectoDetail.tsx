@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -58,6 +58,8 @@ const OPCIONES_TIPO_PERSONA = [
   { value: TipoPersona.Estudiante, label: 'Estudiante' },
 ]
 
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
+
 interface ModalConfigSugerencia {
   multilinea?: boolean
   maxLongitud?: number
@@ -74,7 +76,7 @@ interface ModalConfigSugerencia {
 export function ProyectoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [edicion, setEdicion] = useState<Edicion | null>(null)
@@ -96,25 +98,23 @@ export function ProyectoDetail() {
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
   const seccionResumen = secciones[0]
-  const seccionesExtra = secciones.slice(1)
+  const seccionesExtra = useMemo(() => secciones.slice(1), [secciones])
 
-  const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
   const tabs = useMemo(
     () => ['info', ...seccionesExtra.map(s => `seccion-${s.id}`), ...TABS_FIJAS_POST],
     [seccionesExtra],
   )
-  const [tabActivo, setTabActivo] = useState<string>(() => {
-    const t = searchParams.get('tab')
-    return t && tabs.includes(t) ? t : 'info'
-  })
-  useEffect(() => {
-    const t = searchParams.get('tab')
-    if (t && tabs.includes(t)) {
-      setTabActivo(t)
-    } else if (!tabs.includes(tabActivo)) {
-      setTabActivo('info')
-    }
-  }, [searchParams, tabs])
+  const tabParam = searchParams.get('tab')
+  const tabActivo = tabParam && tabs.includes(tabParam) ? tabParam : 'info'
+
+  const cambiarTab = useCallback((tab: string) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'info') next.delete('tab')
+      else next.set('tab', tab)
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
 
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showAsignarDirector, setShowAsignarDirector] = useState(false)
@@ -750,7 +750,7 @@ export function ProyectoDetail() {
         )}
       </div>
 
-      <Tabs value={tabActivo} onValueChange={setTabActivo}>
+      <Tabs value={tabActivo} onValueChange={cambiarTab}>
         <TabsList>
           <TabsTrigger value="info">Resumen</TabsTrigger>
           {seccionesExtra.map(seccion => (
