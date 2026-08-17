@@ -7,7 +7,7 @@ import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
 import { GuardarFormularioDto } from './dto/guardar-formulario.dto';
-import { GuardarEstructuraInstitucionalDto, GuardarEstructuraCruzadaDto } from './dto/guardar-estructura-template.dto';
+import { GuardarEstructuraInstitucionalDto, GuardarEstructuraCruzadaDto, GuardarEstructuraAutoevaluacionDto } from './dto/guardar-estructura-template.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -111,5 +111,19 @@ export class ConvocatoriasController {
     @Body() dto: GuardarEstructuraCruzadaDto,
   ) {
     return this.service.guardarTemplateCruzada(id, dto);
+  }
+
+  @Get(':id/template-autoevaluacion-impacto')
+  obtenerTemplateAutoevaluacion(@Param('id') id: string) {
+    return this.service.obtenerTemplateAutoevaluacion(id);
+  }
+
+  @Put(':id/template-autoevaluacion-impacto')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  guardarTemplateAutoevaluacion(
+    @Param('id') id: string,
+    @Body() dto: GuardarEstructuraAutoevaluacionDto,
+  ) {
+    return this.service.guardarTemplateAutoevaluacion(id, dto);
   }
 }

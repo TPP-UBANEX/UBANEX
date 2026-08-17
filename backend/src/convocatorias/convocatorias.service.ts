@@ -6,11 +6,12 @@ import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
 import { GuardarFormularioDto } from './dto/guardar-formulario.dto';
-import { GuardarEstructuraInstitucionalDto, GuardarEstructuraCruzadaDto } from './dto/guardar-estructura-template.dto';
+import { GuardarEstructuraInstitucionalDto, GuardarEstructuraCruzadaDto, GuardarEstructuraAutoevaluacionDto } from './dto/guardar-estructura-template.dto';
 import { Emparejamiento } from './emparejamiento.entity';
 import { Formulario } from '../formularios/formulario.entity';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
+import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Edicion } from '../proyectos/edicion.entity';
@@ -26,6 +27,7 @@ import {
   validarEstructuraInstitucional,
   validarEstructuraCruzada,
 } from '../common/dto/validador-estructura-evaluacion';
+import { validarEstructuraAutoevaluacion } from '../common/dto/validador-estructura-autoevaluacion';
 
 @Injectable()
 export class ConvocatoriasService {
@@ -42,6 +44,8 @@ export class ConvocatoriasService {
     private readonly templateInstitucionalRepo: Repository<TemplateEvaluacionInstitucional>,
     @InjectRepository(TemplateEvaluacionCruzada)
     private readonly templateCruzadaRepo: Repository<TemplateEvaluacionCruzada>,
+    @InjectRepository(TemplateAutoevaluacionImpacto)
+    private readonly templateAutoevaluacionRepo: Repository<TemplateAutoevaluacionImpacto>,
     @InjectRepository(Edicion)
     private readonly edicionRepo: Repository<Edicion>,
   ) {}
@@ -402,6 +406,65 @@ export class ConvocatoriasService {
     return guardado;
   }
 
+  async obtenerTemplateAutoevaluacion(convocatoriaId: string): Promise<TemplateAutoevaluacionImpacto> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateAutoevaluacionImpacto: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.templateAutoevaluacionImpacto) {
+      return convocatoria.templateAutoevaluacionImpacto;
+    }
+
+    return {
+      id: '',
+      nombre: '',
+      esDefault: false,
+      esPlantilla: false,
+      estructura: null,
+    } as TemplateAutoevaluacionImpacto;
+  }
+
+  async guardarTemplateAutoevaluacion(
+    convocatoriaId: string,
+    dto: GuardarEstructuraAutoevaluacionDto,
+  ): Promise<TemplateAutoevaluacionImpacto> {
+    const convocatoria = await this.repo.findOne({
+      where: { id: convocatoriaId },
+      relations: { templateAutoevaluacionImpacto: true },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    if (convocatoria.estado !== EstadoConvocatoria.Configuracion) {
+      throw new BadRequestException(
+        'El template de autoevaluación de impacto solo puede editarse mientras la convocatoria está en etapa de configuración',
+      );
+    }
+
+    validarEstructuraAutoevaluacion(dto.estructura);
+
+    let template = convocatoria.templateAutoevaluacionImpacto;
+    if (!template || template.esPlantilla) {
+      template = this.templateAutoevaluacionRepo.create({
+        nombre: `Autoevaluación de impacto ${convocatoria.nombre}`,
+        esDefault: false,
+        esPlantilla: false,
+        estructura: template?.estructura ?? null,
+      });
+    }
+    template.estructura = dto.estructura ?? null;
+    const guardado = await this.templateAutoevaluacionRepo.save(template);
+
+    if (convocatoria.templateAutoevaluacionImpactoId !== guardado.id) {
+      convocatoria.templateAutoevaluacionImpactoId = guardado.id;
+      convocatoria.templateAutoevaluacionImpacto = guardado;
+      await this.repo.save(convocatoria);
+    }
+
+    return guardado;
+  }
+
   // Al salir de Configuración la convocatoria "toma como propios" los templates que
   // estuviera compartiendo con la biblioteca: los congela en copias privadas
   // (esPlantilla: false, invisibles en la biblioteca e inmutables). Idempotente: si ya
@@ -409,7 +472,11 @@ export class ConvocatoriasService {
   private async congelarTemplatesSiCompartidos(convocatoriaId: string) {
     const convocatoria = await this.repo.findOne({
       where: { id: convocatoriaId },
-      relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+        templateAutoevaluacionImpacto: true,
+      },
     });
     if (!convocatoria) return;
 
@@ -442,6 +509,21 @@ export class ConvocatoriasService {
       );
       convocatoria.templateEvaluacionCruzadaId = copia.id;
       convocatoria.templateEvaluacionCruzada = copia;
+      huboCambios = true;
+    }
+
+    const autoeval = convocatoria.templateAutoevaluacionImpacto;
+    if (autoeval?.esPlantilla) {
+      const copia = await this.templateAutoevaluacionRepo.save(
+        this.templateAutoevaluacionRepo.create({
+          nombre: `Autoevaluación de impacto ${convocatoria.nombre}`,
+          esDefault: false,
+          esPlantilla: false,
+          estructura: autoeval.estructura,
+        }),
+      );
+      convocatoria.templateAutoevaluacionImpactoId = copia.id;
+      convocatoria.templateAutoevaluacionImpacto = copia;
       huboCambios = true;
     }
 
