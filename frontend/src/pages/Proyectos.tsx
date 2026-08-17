@@ -182,7 +182,7 @@ export function Proyectos() {
                   </TableHeader>
                   <TableBody>
                     {ediciones.map(e => (
-                      <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
+                      <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`)}>
                         <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -193,7 +193,7 @@ export function Proyectos() {
                         <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                         <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
+                          <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -259,7 +259,7 @@ export function Proyectos() {
                 <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{col.label}</div>
                 <div className="space-y-2">
                   {kanbanEdiciones.filter(e => e.estado === col.key).map(e => (
-                    <Card key={e.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
+                    <Card key={e.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`)}>
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
                         <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
