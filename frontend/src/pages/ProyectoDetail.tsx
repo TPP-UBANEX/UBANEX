@@ -222,7 +222,10 @@ export function ProyectoDetail() {
       const p = await api.proyectos.get(id)
       setProyecto(p)
       const eds = p.ediciones || []
-      const ed = eds.length > 0 ? eds[0] : null
+      const convocatoriaId = searchParams.get('convocatoria')
+      const ed = convocatoriaId
+        ? eds.find(e => e.convocatoriaId === convocatoriaId) ?? eds[0] ?? null
+        : eds[0] ?? null
       setEdicion(ed)
 
       if (ed) {
@@ -245,7 +248,7 @@ export function ProyectoDetail() {
 
   useEffect(() => {
     cargarDatos()
-  }, [id])
+  }, [id, searchParams.get('convocatoria')])
 
   useEffect(() => {
     api.unidadesAcademicas.list()

@@ -187,6 +187,12 @@ export const api = {
       post<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/iniciar-evaluacion`, {}),
     eliminarEdicion: (id: string, edicionId: string) =>
       del(`/proyectos/${id}/ediciones/${edicionId}`),
+    resubir: (id: string, data: { convocatoriaId: string; anioEdicion?: number }) =>
+      post<import('@/data/types').Proyecto>(`/proyectos/${id}/resubir`, data),
+    disponiblesParaResubir: (convocatoriaId: string, search?: string) => {
+      const qs = `?convocatoriaId=${encodeURIComponent(convocatoriaId)}${search ? `&search=${encodeURIComponent(search)}` : ''}`
+      return get<{ proyectoId: string; proyectoNombre: string; esConsolidado: boolean }[]>(`/proyectos/disponibles-para-resubir${qs}`)
+    },
   },
   evaluaciones: {
     monitoreo: (convocatoriaId: string, params?: { page?: number; limit?: number; search?: string; estado?: string; unidadAcademicaId?: string }) =>
