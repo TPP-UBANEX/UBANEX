@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,10 +21,11 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Edicion, Convocatoria, PaginatedResponse } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion } from '@/data/types'
+import { useAuth } from '@/lib/auth-context'
+import type { Edicion, Convocatoria, PaginatedResponse, Hito } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, RolUsuario, categoriaHitoLabel } from '@/data/types'
 import { formatearMoneda } from '@/lib/presupuesto'
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 
 const pipelineColumns = [
   { key: EstadoEdicion.Borrador, label: 'Borrador' },
@@ -39,6 +40,7 @@ const pipelineColumns = [
 export function Proyectos() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { user } = useAuth()
   const esRevision = searchParams.get('revision') === 'true'
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [kanbanEdiciones, setKanbanEdiciones] = useState<Edicion[]>([])
@@ -52,6 +54,35 @@ export function Proyectos() {
   const [meta, setMeta] = useState<PaginatedResponse<Edicion>['meta'] | null>(null)
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
   const [loading, setLoading] = useState(true)
+  const [expandidaId, setExpandidaId] = useState<string | null>(null)
+  const [hitosExpansion, setHitosExpansion] = useState<Record<string, Hito[]>>({})
+  const [loadingHitosId, setLoadingHitosId] = useState<string | null>(null)
+
+  const esAdmin = user?.roles.some(r =>
+    r === RolUsuario.AutoridadDeSecretaria ||
+    r === RolUsuario.AsistenteDeSecretaria ||
+    r === RolUsuario.AutoridadDeRectorado ||
+    r === RolUsuario.AsistenteDeRectorado,
+  )
+
+  const toggleExpandir = async (edicionId: string) => {
+    if (expandidaId === edicionId) {
+      setExpandidaId(null)
+      return
+    }
+    setExpandidaId(edicionId)
+    if (!hitosExpansion[edicionId]) {
+      setLoadingHitosId(edicionId)
+      try {
+        const hitos = await api.ejecucion.hitos.listar(edicionId)
+        setHitosExpansion(prev => ({ ...prev, [edicionId]: hitos }))
+      } catch {
+        setHitosExpansion(prev => ({ ...prev, [edicionId]: [] }))
+      } finally {
+        setLoadingHitosId(null)
+      }
+    }
+  }
 
   useEffect(() => {
     api.convocatorias.todas().then(setConvocatorias).catch(() => {})
@@ -172,6 +203,7 @@ export function Proyectos() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {esAdmin && <TableHead className="w-10"></TableHead>}
                       <TableHead>Proyecto</TableHead>
                       <TableHead>Creado por</TableHead>
                       <TableHead>Facultad</TableHead>
@@ -182,20 +214,57 @@ export function Proyectos() {
                   </TableHeader>
                   <TableBody>
                     {ediciones.map(e => (
-                      <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
-                        <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {e.proyecto?.esInterfacultad && e.proyecto.unidadAcademicaAdicionalId !== e.unidadAcademicaId && e.proyecto.unidadAcademicaAdicional
-                            ? `${e.unidadAcademica?.nombre} y ${e.proyecto.unidadAcademicaAdicional.nombre}`
-                            : e.unidadAcademica?.nombre || '-'}
-                        </TableCell>
-                        <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                        <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
-                        </TableCell>
-                      </TableRow>
+                      <Fragment key={e.id}>
+                        <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}`)}>
+                          {esAdmin && (
+                            <TableCell onClick={ev => ev.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleExpandir(e.id)}
+                                disabled={loadingHitosId === e.id}
+                                aria-label="Ver hitos de ejecución"
+                              >
+                                {loadingHitosId === e.id ? (
+                                  <Skeleton className="h-3 w-3 rounded-full" />
+                                ) : expandidaId === e.id ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRightIcon className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TableCell>
+                          )}
+                          <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {e.proyecto?.esInterfacultad && e.proyecto.unidadAcademicaAdicionalId !== e.unidadAcademicaId && e.proyecto.unidadAcademicaAdicional
+                              ? `${e.unidadAcademica?.nombre} y ${e.proyecto.unidadAcademicaAdicional.nombre}`
+                              : e.unidadAcademica?.nombre || '-'}
+                          </TableCell>
+                          <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
+                          <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}`) }}>Ver</Button>
+                          </TableCell>
+                        </TableRow>
+                        {expandidaId === e.id && (
+                          <TableRow key={`${e.id}-detalle`}>
+                            <TableCell colSpan={esAdmin ? 7 : 6}>
+                              <div className="py-2">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                                  Hitos de ejecución
+                                </p>
+                                <ExpandirHitosDetalle
+                                  edicionId={e.id}
+                                  hitos={hitosExpansion[e.id]}
+                                  loading={loadingHitosId === e.id}
+                                />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
                     ))}
                   </TableBody>
                 </Table>
@@ -273,6 +342,46 @@ export function Proyectos() {
           </div>
         )
       )}
+    </div>
+  )
+}
+
+function ExpandirHitosDetalle({
+  hitos,
+  loading,
+}: {
+  edicionId: string
+  hitos?: Hito[]
+  loading: boolean
+}) {
+  if (loading) {
+    return <Skeleton className="h-16 w-full" />
+  }
+  if (!hitos || hitos.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Esta edición no tiene hitos de ejecución registrados.
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-2">
+      {hitos.map(h => (
+        <div key={h.id} className="rounded-md border bg-muted/30 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">{h.titulo}</p>
+            <Badge variant="outline">{categoriaHitoLabel[h.categoria] || h.categoria}</Badge>
+          </div>
+          {(h.fechaInicio || h.fechaFin) && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {h.fechaInicio || '—'}{h.fechaFin ? ` → ${h.fechaFin}` : ''}
+            </p>
+          )}
+          {h.descripcion && (
+            <p className="text-sm mt-1">{h.descripcion}</p>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
