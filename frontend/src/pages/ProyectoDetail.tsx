@@ -611,15 +611,14 @@ export function ProyectoDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/proyectos')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{estadoEdicionLabel[edicion.estado] || edicion.estado}</Badge>}
-          </div>
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-foreground truncate" title={proyecto.nombre}>
+            {proyecto.nombre}
+          </h2>
           {edicion && (
-            <p className="text-sm text-muted-foreground">
-              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {nombreUnidadesAcademicas()}
-              {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
-            </p>
+            <Badge variant={estadoBadge[edicion.estado]} className="shrink-0">
+              {estadoEdicionLabel[edicion.estado] || edicion.estado}
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -1342,9 +1341,9 @@ function ProyectoDetailSkeleton() {
     <div className="p-6 space-y-6">
       <div className="flex gap-4 items-center">
         <Skeleton className="h-8 w-8 rounded-md" />
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-4 w-48" />
+        <div className="flex gap-3 items-center">
+          <Skeleton className="h-7 w-72" />
+          <Skeleton className="h-5 w-24 rounded-full" />
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-4">
