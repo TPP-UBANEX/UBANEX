@@ -274,4 +274,75 @@ describe('ProyectosService', () => {
       expect(guardada.estado).toBe(EstadoEdicion.Presentado);
     });
   });
+
+  describe('actualizarEdicion — permisos de autoridad', () => {
+    const convocatoria = { id: 'convocatoria-1', formulario: null } as unknown as Convocatoria;
+    const proyecto = { id: 'proyecto-1' } as unknown as Proyecto;
+    const secretaria = {
+      id: 'u-secretaria',
+      roles: [RolUsuario.AutoridadDeSecretaria],
+    } as unknown as Usuario;
+
+    beforeEach(() => {
+      findOneManager.mockResolvedValue(convocatoria);
+      findOneProyecto.mockResolvedValue(proyecto);
+      findEdiciones.mockResolvedValue([]);
+      saveEdicion.mockResolvedValue(undefined);
+      updateProyecto.mockResolvedValue(undefined);
+      findOneParticipacion.mockResolvedValue(null);
+    });
+
+    it('permite a una autoridad modificar esInterfacultad y unidadAcademicaAdicionalId en Presentado', async () => {
+      findOneEdicion.mockResolvedValue(
+        edicion({ convocatoria, estado: EstadoEdicion.Presentado } as unknown as Partial<Edicion>),
+      );
+
+      await service.actualizarEdicion('proyecto-1', 'edicion-1', {
+        esInterfacultad: true,
+        unidadAcademicaAdicionalId: 'ua-otra',
+      } as unknown as Parameters<typeof service.actualizarEdicion>[2], secretaria);
+
+      expect(saveEdicion).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechaza a una autoridad que intenta modificar otros campos', async () => {
+      findOneEdicion.mockResolvedValue(
+        edicion({ convocatoria, estado: EstadoEdicion.Presentado } as unknown as Partial<Edicion>),
+      );
+
+      await expect(
+        service.actualizarEdicion('proyecto-1', 'edicion-1', {
+          nombre: 'Otro nombre',
+        } as unknown as Parameters<typeof service.actualizarEdicion>[2], secretaria),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(saveEdicion).not.toHaveBeenCalled();
+    });
+
+    it('rechaza a una autoridad si la edición está en un estado no editable', async () => {
+      findOneEdicion.mockResolvedValue(
+        edicion({ convocatoria, estado: EstadoEdicion.EnEvaluacion } as unknown as Partial<Edicion>),
+      );
+
+      await expect(
+        service.actualizarEdicion('proyecto-1', 'edicion-1', {
+          esInterfacultad: true,
+        } as unknown as Parameters<typeof service.actualizarEdicion>[2], secretaria),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveEdicion).not.toHaveBeenCalled();
+    });
+
+    it('sigue permitiendo al creador actualizar todos los campos en Borrador', async () => {
+      findOneEdicion.mockResolvedValue(
+        edicion({ convocatoria, estado: EstadoEdicion.Borrador } as unknown as Partial<Edicion>),
+      );
+
+      await service.actualizarEdicion('proyecto-1', 'edicion-1', {
+        nombre: 'Nuevo nombre',
+        esInterfacultad: true,
+      } as unknown as Parameters<typeof service.actualizarEdicion>[2], creador);
+
+      expect(saveEdicion).toHaveBeenCalledTimes(1);
+      expect(updateProyecto).toHaveBeenCalledWith('proyecto-1', { nombre: 'Nuevo nombre' });
+    });
+  });
 });

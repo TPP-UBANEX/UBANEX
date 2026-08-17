@@ -19,17 +19,24 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
 import { EMPAREJAMIENTO_DEFAULT } from '@/data/emparejamiento-default'
-import type { UnidadAcademica } from '@/data/types'
+import { EstadoConvocatoria, RolUsuario, type UnidadAcademica } from '@/data/types'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
 interface Props {
   convocatoriaId: string
-  bloqueado?: boolean
+  estadoConvocatoria: EstadoConvocatoria
 }
 
-export function EmparejamientoTab({ convocatoriaId, bloqueado = false }: Props) {
+export function EmparejamientoTab({ convocatoriaId, estadoConvocatoria }: Props) {
+  const { user } = useAuth()
+  const esRectorado = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+  )
+  const editable = !!esRectorado && estadoConvocatoria === EstadoConvocatoria.Configuracion
+
   const [uas, setUas] = useState<UnidadAcademica[]>([])
   const [pares, setPares] = useState<Map<string, string>>(new Map())
   const [usarDefault, setUsarDefault] = useState(false)
@@ -60,6 +67,12 @@ export function EmparejamientoTab({ convocatoriaId, bloqueado = false }: Props) 
   const uaPorNombre = useMemo(() => {
     const m = new Map<string, UnidadAcademica>()
     for (const ua of uas) m.set(ua.nombre, ua)
+    return m
+  }, [uas])
+
+  const uaPorId = useMemo(() => {
+    const m = new Map<string, UnidadAcademica>()
+    for (const ua of uas) m.set(ua.id, ua)
     return m
   }, [uas])
 
@@ -159,6 +172,43 @@ export function EmparejamientoTab({ convocatoriaId, bloqueado = false }: Props) 
     )
   }
 
+  if (!editable) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium">Emparejamiento de UAs</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            El emparejamiento solo puede definirse durante la configuración de la convocatoria y por
+            rectorado. Esta vista es solo informativa.
+          </p>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Unidad Académica</TableHead>
+                <TableHead>Emparejada con</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {uasSorted.map(ua => {
+                const parejaId = parejaDe(ua.id)
+                const pareja = parejaId ? uaPorId.get(parejaId) : undefined
+                return (
+                  <TableRow key={ua.id}>
+                    <TableCell className="font-medium">{ua.nombre}</TableCell>
+                    <TableCell>{pareja?.nombre ?? '—'}</TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -170,17 +220,10 @@ export function EmparejamientoTab({ convocatoriaId, bloqueado = false }: Props) 
             type="checkbox"
             checked={usarDefault}
             onChange={e => aplicarDefault(e.target.checked)}
-            disabled={bloqueado}
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
           Usar emparejamiento default
         </label>
-
-        {bloqueado && (
-          <p className="text-xs text-muted-foreground">
-            El emparejamiento se bloquea al iniciar la evaluación y ya no puede modificarse.
-          </p>
-        )}
 
         <Table>
           <TableHeader>
@@ -199,7 +242,6 @@ export function EmparejamientoTab({ convocatoriaId, bloqueado = false }: Props) 
                     <Select
                       value={parejaId ?? ''}
                       onValueChange={v => handleSeleccionar(ua.id, v)}
-                      disabled={bloqueado}
                     >
                       <SelectTrigger className="w-[420px]">
                         <SelectValue placeholder="—" />
@@ -219,7 +261,7 @@ export function EmparejamientoTab({ convocatoriaId, bloqueado = false }: Props) 
         </Table>
 
         <div className="flex justify-end">
-          <Button onClick={handleConfirmar} disabled={guardando || bloqueado}>
+          <Button onClick={handleConfirmar} disabled={guardando}>
             {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {guardando ? 'Guardando...' : 'Confirmar'}
           </Button>
