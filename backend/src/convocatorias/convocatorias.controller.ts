@@ -63,7 +63,7 @@ export class ConvocatoriasController {
   }
 
   @Put(':id/emparejamientos')
-  @Roles(RolUsuario.AutoridadDeRectorado)
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
   guardarEmparejamientos(
     @Param('id') id: string,
     @Body() dto: GuardarEmparejamientoDto,

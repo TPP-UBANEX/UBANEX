@@ -23,6 +23,13 @@ import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formula
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
 
+const CAMPOS_EDICION_AUTORIDAD = ['esInterfacultad', 'unidadAcademicaAdicionalId'];
+const ESTADOS_EDITABLES_AUTORIDAD = [
+  EstadoEdicion.Borrador,
+  EstadoEdicion.Presentado,
+  EstadoEdicion.PendienteDeCambios,
+];
+
 @Injectable()
 export class ProyectosService {
   constructor(
@@ -245,8 +252,25 @@ export class ProyectosService {
   ) {
     const edicion = await this.obtenerEdicion(proyectoId, edicionId);
 
-    await this.validarAccesoEdicion(edicion, usuario);
-    this.validarEstadoEditable(edicion);
+    if (await this.esCreadorODirector(edicion, usuario)) {
+      this.validarEstadoEditable(edicion);
+    } else if (this.esAutoridad(usuario)) {
+      const camposNoPermitidos = Object.keys(dto).filter(
+        campo => !CAMPOS_EDICION_AUTORIDAD.includes(campo),
+      );
+      if (camposNoPermitidos.length > 0) {
+        throw new ForbiddenException(
+          'Las autoridades solo pueden modificar si es interfacultad y las direcciones; el resto requiere una sugerencia de cambio',
+        );
+      }
+      if (!ESTADOS_EDITABLES_AUTORIDAD.includes(edicion.estado)) {
+        throw new BadRequestException(
+          `No se puede modificar una edición en estado ${edicion.estado}`,
+        );
+      }
+    } else {
+      throw new ForbiddenException('No tenés permisos sobre esta edición');
+    }
 
     if (dto.nombre !== undefined) {
       await this.proyectoRepo.update(proyectoId, { nombre: dto.nombre });
@@ -357,8 +381,8 @@ export class ProyectosService {
     return edicion;
   }
 
-  private async validarAccesoEdicion(edicion: Edicion, usuario: Usuario) {
-    if (edicion.creadoPorId === usuario.id) return;
+  private async esCreadorODirector(edicion: Edicion, usuario: Usuario): Promise<boolean> {
+    if (edicion.creadoPorId === usuario.id) return true;
 
     const participacion = await this.participacionRepo.findOne({
       where: {
@@ -367,7 +391,22 @@ export class ProyectosService {
         rol: RolEjecucion.DirectorDeProyecto,
       },
     });
-    if (!participacion) {
+    return !!participacion;
+  }
+
+  private esAutoridad(usuario: Usuario): boolean {
+    return usuario.roles.some(r =>
+      [
+        RolUsuario.AutoridadDeRectorado,
+        RolUsuario.AsistenteDeRectorado,
+        RolUsuario.AutoridadDeSecretaria,
+        RolUsuario.AsistenteDeSecretaria,
+      ].includes(r),
+    );
+  }
+
+  private async validarAccesoEdicion(edicion: Edicion, usuario: Usuario) {
+    if (!(await this.esCreadorODirector(edicion, usuario))) {
       throw new ForbiddenException('No tenés permisos sobre esta edición');
     }
   }
