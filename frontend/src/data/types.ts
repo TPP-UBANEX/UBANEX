@@ -255,6 +255,7 @@ export interface Convocatoria {
   fechaFinEjecucion: string | null
   formularioId: string | null
   formulario?: Formulario
+  umbralInconsistenciaCruzada: number | null
 }
 
 export interface Proyecto {
@@ -497,7 +498,19 @@ export interface MonitoreoEvaluacion {
       estado: EstadoEvaluacion
       evaluador: { id: string; nombreCompleto: string } | null
     }>
+    inconsistencia: {
+      inconsistente: boolean
+      diferencia: number
+      umbral: number
+    } | null
   }>
+}
+
+export interface CandidatoTerceraUa {
+  id: string
+  nombreCompleto: string
+  email: string
+  unidadAcademica: { id: string; nombre: string } | null
 }
 
 export interface EvaluacionEdicionDetalle {

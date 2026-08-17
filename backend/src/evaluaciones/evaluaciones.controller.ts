@@ -122,6 +122,15 @@ export class EvaluacionesController {
     return this.service.confirmarCruzada(convocatoriaId, edicionId, usuario);
   }
 
+  @Get('cruzadas/:edicionId/tercera-candidatos')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  candidatosTercera(
+    @Param('edicionId') edicionId: string,
+    @Query('convocatoriaId') convocatoriaId: string,
+  ) {
+    return this.service.listarCandidatosTercera(convocatoriaId, edicionId);
+  }
+
   @Post('cruzadas/:edicionId/designar-tercera')
   @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
   designarTercera(

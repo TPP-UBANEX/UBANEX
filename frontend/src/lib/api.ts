@@ -133,9 +133,9 @@ export const api = {
     },
     todas: () => get<import('@/data/types').Convocatoria[]>('/convocatorias/todas'),
     get: (id: string) => get<import('@/data/types').Convocatoria>(`/convocatorias/${id}`),
-    crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string; umbralInconsistenciaCruzada?: number }) =>
       post<import('@/data/types').Convocatoria>('/convocatorias', data),
-    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string; umbralInconsistenciaCruzada?: number | null }) =>
       patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
     eliminar: (id: string) => del(`/convocatorias/${id}`),
     emparejamientos: {
@@ -216,6 +216,8 @@ export const api = {
         post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/confirmar?convocatoriaId=${convocatoriaId}`, {}),
       designarTercera: (convocatoriaId: string, edicionId: string, evaluadorId: string) =>
         post<import('@/data/types').EvaluacionCruzada>(`/evaluaciones/cruzadas/${edicionId}/designar-tercera?convocatoriaId=${convocatoriaId}`, { evaluadorId }),
+      candidatosTercera: (convocatoriaId: string, edicionId: string) =>
+        get<import('@/data/types').CandidatoTerceraUa[]>(`/evaluaciones/cruzadas/${edicionId}/tercera-candidatos?convocatoriaId=${convocatoriaId}`),
       historial: (convocatoriaId: string, edicionId: string) =>
         get<import('@/data/types').HistorialEvaluacion[]>(`/evaluaciones/cruzadas/${edicionId}/historial?convocatoriaId=${convocatoriaId}`),
     },

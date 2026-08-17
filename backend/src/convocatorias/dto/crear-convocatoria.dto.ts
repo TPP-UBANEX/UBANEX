@@ -36,4 +36,9 @@ export class CrearConvocatoriaDto {
   @IsDateString()
   @IsOptional()
   fechaFinEjecucion?: string;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  umbralInconsistenciaCruzada?: number;
 }

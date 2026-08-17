@@ -42,4 +42,9 @@ export class ActualizarConvocatoriaDto {
   @IsDateString()
   @IsOptional()
   fechaFinEjecucion?: string;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  umbralInconsistenciaCruzada?: number;
 }
