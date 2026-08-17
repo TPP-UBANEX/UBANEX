@@ -1,16 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -24,22 +17,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Convocatoria, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
-import {
-  camposPerfilDocente,
-  camposPerfilFaltantes,
-  generoOptions,
-  cargoDocenteOptions,
-  tipoDesignacionDocenteOptions,
-  personaConDiscapacidadOptions,
-} from '@/data/perfil'
+import type { Proyecto, Edicion, Convocatoria, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
+import { useDireccionEdicion, DireccionEditor } from '@/components/DireccionEditor'
+import { GestionarDireccionModal } from '@/components/GestionarDireccionModal'
 import {
   CampoFormularioInput,
   camposIncompletosParaEnvio,
@@ -58,6 +45,8 @@ const OPCIONES_TIPO_PERSONA = [
   { value: TipoPersona.Estudiante, label: 'Estudiante' },
 ]
 
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
+
 interface ModalConfigSugerencia {
   multilinea?: boolean
   maxLongitud?: number
@@ -74,7 +63,7 @@ interface ModalConfigSugerencia {
 export function ProyectoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [edicion, setEdicion] = useState<Edicion | null>(null)
@@ -87,7 +76,6 @@ export function ProyectoDetail() {
   const [editNombre, setEditNombre] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
   const [editEsConsolidado, setEditEsConsolidado] = useState(false)
-  const [editEsInterfacultad, setEditEsInterfacultad] = useState(false)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
@@ -96,37 +84,28 @@ export function ProyectoDetail() {
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
   const seccionResumen = secciones[0]
-  const seccionesExtra = secciones.slice(1)
+  const seccionesExtra = useMemo(() => secciones.slice(1), [secciones])
 
-  const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
   const tabs = useMemo(
     () => ['info', ...seccionesExtra.map(s => `seccion-${s.id}`), ...TABS_FIJAS_POST],
     [seccionesExtra],
   )
-  const [tabActivo, setTabActivo] = useState<string>(() => {
-    const t = searchParams.get('tab')
-    return t && tabs.includes(t) ? t : 'info'
-  })
-  useEffect(() => {
-    const t = searchParams.get('tab')
-    if (t && tabs.includes(t)) {
-      setTabActivo(t)
-    } else if (!tabs.includes(tabActivo)) {
-      setTabActivo('info')
-    }
-  }, [searchParams, tabs])
+  const tabParam = searchParams.get('tab')
+  const tabActivo = tabParam && tabs.includes(tabParam) ? tabParam : 'info'
+
+  const cambiarTab = useCallback((tab: string) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'info') next.delete('tab')
+      else next.set('tab', tab)
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
 
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
-  const [showAsignarDirector, setShowAsignarDirector] = useState(false)
+  const [showGestionarDireccion, setShowGestionarDireccion] = useState(false)
 
   const [uas, setUas] = useState<UnidadAcademica[]>([])
-  const [candidatosDireccion, setCandidatosDireccion] = useState<Usuario[]>([])
-  const [candidatosCodireccion, setCandidatosCodireccion] = useState<Usuario[]>([])
-  const [loadingCandidatos, setLoadingCandidatos] = useState(false)
-  const [editDirectorId, setEditDirectorId] = useState('')
-  const [editCodirectorId, setEditCodirectorId] = useState('')
-  const [editDirectorUaId, setEditDirectorUaId] = useState('')
-  const [editCodirectorUaId, setEditCodirectorUaId] = useState('')
 
   const [modoSugerencia, setModoSugerencia] = useState(false)
   const [sugerenciasPropias, setSugerenciasPropias] = useState<SugerenciaCambio[]>([])
@@ -181,6 +160,10 @@ export function ProyectoDetail() {
   const puedeAsignarDirector = user?.roles.some(r =>
     [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado].includes(r),
   )
+  const puedeGestionarDireccion = puedeAsignarDirector &&
+    [EstadoEdicion.Borrador, EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios].includes(
+      edicion?.estado as EstadoEdicion,
+    )
   const esDocenteValidado = user?.roles.includes(RolUsuario.Docente) &&
     user?.estadoValidacionDocente === 'Validado'
   const tieneDirectorPrincipal = directores.some(d => d.esDirectorPrincipal)
@@ -278,181 +261,41 @@ export function ProyectoDetail() {
       .catch(() => toast.error('Error al cargar sugerencias'))
   }, [modoSugerencia, edicion?.id, user?.id])
 
-  const cargarCandidatos = async (uaId: string, setter: (u: Usuario[]) => void) => {
-    if (!edicion) return
-    setLoadingCandidatos(true)
-    try {
-      const res = await api.participaciones.candidatos({
-        unidadAcademicaId: uaId,
-        convocatoriaId: edicion.convocatoriaId,
-        edicionId: edicion.id,
-        incluirBloqueados: true,
-      })
-      setter(res)
-    } catch {
-      toast.error('Error al cargar docentes candidatos')
-    } finally {
-      setLoadingCandidatos(false)
-    }
-  }
-
-  const nombreUA = (uaId?: string) => uas.find(u => u.id === uaId)?.nombre ?? 'Sin UA'
-
-  const motivoCandidato = (u: Usuario): string | null => {
-    if (u.ocupado) return 'Participa de otro proyecto'
-    if (u.estadoValidacionDocente && u.estadoValidacionDocente !== EstadoValidacionDocente.Validado) {
-      return 'No validado'
-    }
-    if (u.habilitado === false) return 'Deshabilitado'
-    return null
-  }
-
-  const directorPrincipalUsuario = directores.find(d => d.esDirectorPrincipal)?.usuario
-  const codirectorUsuario = directores.find(d => !d.esDirectorPrincipal)?.usuario
-
-  const opcionesDireccion = [
-    ...candidatosDireccion,
-    ...(directorPrincipalUsuario && directorPrincipalUsuario.unidadAcademica?.id === editDirectorUaId
-      ? [directorPrincipalUsuario]
-      : []),
-  ]
-    .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
-
-  const opcionesCodireccion = [
-    ...candidatosCodireccion,
-    ...(codirectorUsuario && codirectorUsuario.unidadAcademica?.id === editCodirectorUaId
-      ? [codirectorUsuario]
-      : []),
-  ]
-    .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
-
-  const motivoDireccion = (() => {
-    if (!editEsInterfacultad || !edicion) return ''
-    const uaCreador = edicion.unidadAcademicaId
-    if (editDirectorUaId !== uaCreador && editCodirectorUaId !== uaCreador) {
-      return `Una unidad académica participante tiene que ser ${nombreUA(uaCreador)}`
-    }
-    if (editDirectorUaId === editCodirectorUaId) {
-      return 'La dirección y la codirección deben pertenecer a unidades académicas distintas para ser interfacultad'
-    }
-    return ''
-  })()
-
-  const toggleInterfacultad = (v: boolean) => {
-    setEditEsInterfacultad(v)
-    setEditDirectorId('')
-    setEditCodirectorId('')
-    const uaCreador = edicion?.unidadAcademicaId ?? ''
-    if (v) {
-      const uaDirector = directorPrincipalUsuario?.unidadAcademica?.id ?? uaCreador
-      const uaCodirector = codirectorUsuario?.unidadAcademica?.id
-        ?? (proyecto?.unidadAcademicaAdicionalId && proyecto.unidadAcademicaAdicionalId !== uaCreador
-          ? proyecto.unidadAcademicaAdicionalId
-          : uaCreador)
-      setEditDirectorUaId(uaDirector)
-      setEditCodirectorUaId(uaCodirector)
-      if (edicion) {
-        cargarCandidatos(uaDirector, setCandidatosDireccion)
-        cargarCandidatos(uaCodirector, setCandidatosCodireccion)
-      }
-    } else {
-      setEditDirectorUaId(uaCreador)
-      setEditCodirectorUaId(uaCreador)
-      if (edicion) {
-        cargarCandidatos(uaCreador, setCandidatosDireccion)
-        cargarCandidatos(uaCreador, setCandidatosCodireccion)
-      }
-    }
-  }
-
-  const handleCambioDirectorUA = (uaId: string) => {
-    setEditDirectorUaId(uaId)
-    setEditDirectorId('')
-    cargarCandidatos(uaId, setCandidatosDireccion)
-  }
-
-  const handleCambioCodirectorUA = (uaId: string) => {
-    setEditCodirectorUaId(uaId)
-    setEditCodirectorId('')
-    cargarCandidatos(uaId, setCandidatosCodireccion)
-  }
+  const direccion = useDireccionEdicion({ proyecto, edicion, directores, uas })
 
   const iniciarEdicion = () => {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
     setEditAnioEdicion(edicion.anioEdicion ?? null)
     setEditEsConsolidado(proyecto.esConsolidado)
-    setEditEsInterfacultad(proyecto.esInterfacultad)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
-    setEditDirectorId(directores.find(d => d.esDirectorPrincipal)?.usuarioId ?? '')
-    setEditCodirectorId(directores.find(d => !d.esDirectorPrincipal)?.usuarioId ?? '')
-    const uaDirector = directores.find(d => d.esDirectorPrincipal)?.usuario?.unidadAcademica?.id ?? edicion.unidadAcademicaId
-    const uaCodirector = directores.find(d => !d.esDirectorPrincipal)?.usuario?.unidadAcademica?.id
-      ?? (proyecto.esInterfacultad ? proyecto.unidadAcademicaAdicionalId : edicion.unidadAcademicaId)
-      ?? edicion.unidadAcademicaId
-    setEditDirectorUaId(uaDirector)
-    setEditCodirectorUaId(uaCodirector)
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
-    cargarCandidatos(uaDirector, setCandidatosDireccion)
-    cargarCandidatos(uaCodirector, setCandidatosCodireccion)
+    direccion.reset()
   }
 
   const cancelarEdicion = () => {
     setEditando(false)
   }
 
-  const sincronizarDirecciones = async () => {
-    if (!edicion) return
-    const deseado: { usuarioId: string; esDirectorPrincipal: boolean }[] = []
-    if (editDirectorId) deseado.push({ usuarioId: editDirectorId, esDirectorPrincipal: true })
-    if (editCodirectorId) deseado.push({ usuarioId: editCodirectorId, esDirectorPrincipal: false })
-
-    const actual = directores
-
-    const crear = deseado.filter(des =>
-      !actual.some(p => p.usuarioId === des.usuarioId && p.esDirectorPrincipal === des.esDirectorPrincipal),
-    )
-    const borrar = actual.filter(p =>
-      !deseado.some(des => des.usuarioId === p.usuarioId && des.esDirectorPrincipal === p.esDirectorPrincipal),
-    )
-
-    for (const p of borrar) {
-      await api.participaciones.desasignar(p.id)
-    }
-    for (const des of crear) {
-      await api.participaciones.asignar({
-        usuarioId: des.usuarioId,
-        convocatoriaId: edicion.convocatoriaId,
-        rol: RolEjecucion.DirectorDeProyecto,
-        edicionId: edicion.id,
-        esDirectorPrincipal: des.esDirectorPrincipal,
-      })
-    }
-  }
-
   const handleGuardar = async () => {
     if (!id || !edicion) return
-    if (motivoDireccion) {
-      toast.error(motivoDireccion)
+    if (direccion.motivoDireccion) {
+      toast.error(direccion.motivoDireccion)
       return
     }
     setGuardando(true)
     try {
-      const uaCreador = edicion.unidadAcademicaId
-      const unidadAcademicaAdicionalId = editEsInterfacultad
-        ? (editDirectorUaId !== uaCreador ? editDirectorUaId : editCodirectorUaId)
-        : null
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
         anioEdicion: editAnioEdicion ?? undefined,
         esConsolidado: editEsConsolidado,
-        esInterfacultad: editEsInterfacultad,
-        unidadAcademicaAdicionalId,
+        esInterfacultad: direccion.esInterfacultad,
+        unidadAcademicaAdicionalId: direccion.unidadAcademicaAdicionalId,
         presupuesto: editPresupuesto || undefined,
         datosFormulario: editDatosFormulario,
       })
-      await sincronizarDirecciones()
+      await direccion.sincronizar()
       toast.success('Proyecto actualizado')
       setEditando(false)
       cargarDatos()
@@ -614,15 +457,14 @@ export function ProyectoDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/proyectos')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            {edicion && <Badge variant={estadoBadge[edicion.estado]}>{estadoEdicionLabel[edicion.estado] || edicion.estado}</Badge>}
-          </div>
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-foreground truncate" title={proyecto.nombre}>
+            {proyecto.nombre}
+          </h2>
           {edicion && (
-            <p className="text-sm text-muted-foreground">
-              {edicion?.creadoPor?.nombreCompleto || 'Sin creador'} · {nombreUnidadesAcademicas()}
-              {edicion.convocatoria && ` · ${edicion.convocatoria.nombre}`}
-            </p>
+            <Badge variant={estadoBadge[edicion.estado]} className="shrink-0">
+              {estadoEdicionLabel[edicion.estado] || edicion.estado}
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -663,15 +505,15 @@ export function ProyectoDetail() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span tabIndex={0}>
-                      <Button onClick={handleGuardar} disabled={guardando || !!motivoDireccion}>
+                      <Button onClick={handleGuardar} disabled={guardando || !!direccion.motivoDireccion}>
                         {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                         Guardar
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {motivoDireccion && (
+                  {direccion.motivoDireccion && (
                     <TooltipContent>
-                      <p>{motivoDireccion}</p>
+                      <p>{direccion.motivoDireccion}</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -746,15 +588,20 @@ export function ProyectoDetail() {
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
           <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuesto?.montoTotal)}</p></CardContent>
         </Card>
-        {puedeAsignarDirector && (
-          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
-            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Asignar usuario de dirección</CardTitle></CardHeader>
-            <CardContent><p className="text-sm text-muted-foreground">+ Agregar usuario de dirección</p></CardContent>
+        {puedeGestionarDireccion && (
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowGestionarDireccion(true)}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                Gestionar dirección y codirección
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent><p className="text-sm text-muted-foreground">Editar dirección, codirección e interfacultad</p></CardContent>
           </Card>
         )}
       </div>
 
-      <Tabs value={tabActivo} onValueChange={setTabActivo}>
+      <Tabs value={tabActivo} onValueChange={cambiarTab}>
         <TabsList>
           <TabsTrigger value="info">Resumen</TabsTrigger>
           {seccionesExtra.map(seccion => (
@@ -884,75 +731,7 @@ export function ProyectoDetail() {
             <CardHeader><CardTitle className="text-sm font-medium">Dirección y codirección</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {editando ? (
-                <>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">¿Es interfacultad?</p>
-                    <div className="flex gap-2">
-                      <Button type="button" variant={editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => toggleInterfacultad(true)}>Sí</Button>
-                      <Button type="button" variant={!editEsInterfacultad ? 'default' : 'outline'} size="sm" onClick={() => toggleInterfacultad(false)}>No</Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Dirección</p>
-                    {editEsInterfacultad ? (
-                      <Select value={editDirectorUaId} onValueChange={handleCambioDirectorUA}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar unidad académica" /></SelectTrigger>
-                        <SelectContent>
-                          {uas.map(u => (
-                            <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Unidad académica: <span className="font-medium text-foreground">{nombreUA(edicion?.unidadAcademicaId)}</span>
-                      </p>
-                    )}
-                    <Select value={editDirectorId} onValueChange={setEditDirectorId}>
-                      <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar director'} /></SelectTrigger>
-                      <SelectContent>
-                        {opcionesDireccion.map(u => {
-                          const motivo = motivoCandidato(u)
-                          return (
-                            <SelectItem key={u.id} value={u.id} disabled={!!motivo}>
-                              {u.nombreCompleto}{motivo ? ` — ${motivo}` : ''}
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Codirección</p>
-                    {editEsInterfacultad ? (
-                      <Select value={editCodirectorUaId} onValueChange={handleCambioCodirectorUA}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar unidad académica" /></SelectTrigger>
-                        <SelectContent>
-                          {uas.map(u => (
-                            <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Unidad académica: <span className="font-medium text-foreground">{nombreUA(edicion?.unidadAcademicaId)}</span>
-                      </p>
-                    )}
-                    <Select value={editCodirectorId} onValueChange={setEditCodirectorId}>
-                      <SelectTrigger><SelectValue placeholder={loadingCandidatos ? 'Cargando...' : 'Seleccionar codirector'} /></SelectTrigger>
-                      <SelectContent>
-                        {opcionesCodireccion.filter(u => u.id !== editDirectorId).map(u => {
-                          const motivo = motivoCandidato(u)
-                          return (
-                            <SelectItem key={u.id} value={u.id} disabled={!!motivo}>
-                              {u.nombreCompleto}{motivo ? ` — ${motivo}` : ''}
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
+                <DireccionEditor direccion={direccion} edicionUnidadAcademicaId={edicion?.unidadAcademicaId} />
               ) : (
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -1060,12 +839,14 @@ export function ProyectoDetail() {
         opciones={modalConfig.opciones}
       />
 
-      {edicion && (
-        <AsignarDirectorModal
-          open={showAsignarDirector}
-          onOpenChange={setShowAsignarDirector}
-          convocatoriaId={edicion.convocatoriaId}
-          edicionId={edicion.id}
+      {proyecto && edicion && (
+        <GestionarDireccionModal
+          open={showGestionarDireccion}
+          onOpenChange={setShowGestionarDireccion}
+          proyecto={proyecto}
+          edicion={edicion}
+          directores={directores}
+          uas={uas}
           onSuccess={cargarDatos}
         />
       )}
@@ -1088,190 +869,6 @@ export function ProyectoDetail() {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-function AsignarDirectorModal({
-  open,
-  onOpenChange,
-  convocatoriaId,
-  edicionId,
-  onSuccess,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  convocatoriaId: string
-  edicionId: string
-  onSuccess: () => void
-}) {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
-  const [esDirectorPrincipal, setEsDirectorPrincipal] = useState(false)
-  const [completar, setCompletar] = useState<Record<string, string>>({})
-  const [submitting, setSubmitting] = useState(false)
-  const [loadingUsuarios, setLoadingUsuarios] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    const fetchUsuarios = async () => {
-      setLoadingUsuarios(true)
-      try {
-        const [res, resParticipaciones] = await Promise.all([
-          api.usuarios.list({ rol: 'Docente', limit: 100 }),
-          api.participaciones.listar(convocatoriaId),
-        ])
-        const idsConRol = new Set(resParticipaciones.map(p => p.usuarioId))
-        setUsuarios(res.data.filter(u =>
-          !idsConRol.has(u.id) &&
-          u.estadoValidacionDocente === 'Validado'
-        ))
-      } catch {
-        toast.error('Error al cargar docentes')
-      } finally {
-        setLoadingUsuarios(false)
-      }
-    }
-    fetchUsuarios()
-  }, [open, convocatoriaId])
-
-  const selectedUsuario = usuarios.find(u => u.id === selectedUsuarioId)
-  const faltantes = selectedUsuario ? camposPerfilFaltantes(selectedUsuario) : []
-
-  const seleccionarUsuario = (id: string) => {
-    setSelectedUsuarioId(id)
-    setCompletar({})
-  }
-
-  const faltantesCompletos = faltantes.every(campo => {
-    const valor = completar[campo]
-    if (campo === 'personaConDiscapacidad') return valor === 'true' || valor === 'false'
-    return valor !== undefined && valor.trim() !== ''
-  })
-  const puedeAsignar = !!selectedUsuarioId && faltantesCompletos
-
-  const handleSubmit = async () => {
-    if (!puedeAsignar) return
-    setSubmitting(true)
-    try {
-      const payload: CrearParticipacionDto = {
-        usuarioId: selectedUsuarioId,
-        convocatoriaId,
-        rol: RolEjecucion.DirectorDeProyecto,
-        edicionId,
-        esDirectorPrincipal,
-      }
-      const extra: Record<string, string | boolean> = {}
-      for (const campo of faltantes) {
-        const valor = completar[campo]
-        extra[campo] = campo === 'personaConDiscapacidad' ? valor === 'true' : valor.trim()
-      }
-      await api.participaciones.asignar({ ...payload, ...extra })
-      toast.success('Usuario de dirección asignado correctamente')
-      onOpenChange(false)
-      onSuccess()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al asignar usuario de dirección')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Asignar usuario de dirección</DialogTitle>
-          <DialogDescription>Seleccione un usuario docente para asignar como dirección del proyecto.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Docente</p>
-            <Select value={selectedUsuarioId} onValueChange={seleccionarUsuario}>
-              <SelectTrigger>
-                <SelectValue placeholder={loadingUsuarios ? 'Cargando...' : 'Seleccionar usuario docente'} />
-              </SelectTrigger>
-              <SelectContent>
-                {usuarios.map(u => {
-                  const incompleto = camposPerfilFaltantes(u).length > 0
-                  return (
-                    <SelectItem key={u.id} value={u.id} disabled={u.habilitado === false}>
-                      {u.nombreCompleto}{incompleto ? ' — perfil incompleto' : ''}{u.habilitado === false ? ' — Deshabilitado' : ''}
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
-          </div>
-          {faltantes.length > 0 && (
-            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-              <div>
-                <p className="text-sm font-medium">Completar datos del perfil</p>
-                <p className="text-xs text-muted-foreground">
-                  El docente tiene el perfil incompleto. Completá los datos faltantes para poder asignarlo.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {faltantes.map(campo => {
-                  const def = camposPerfilDocente.find(c => c.campo === campo)!
-                  if (def.tipo === 'select') {
-                    const options = campo === 'genero'
-                      ? generoOptions
-                      : campo === 'cargoDocente'
-                        ? cargoDocenteOptions
-                        : campo === 'tipoDesignacionDocente'
-                          ? tipoDesignacionDocenteOptions
-                          : personaConDiscapacidadOptions
-                    return (
-                      <div key={campo} className="space-y-1.5">
-                        <label className="text-xs font-medium">{def.etiqueta}</label>
-                        <Select
-                          value={completar[campo] ?? ''}
-                          onValueChange={v => setCompletar({ ...completar, [campo]: v })}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                          <SelectContent>
-                            {options.map(o => (
-                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={campo} className="space-y-1.5">
-                      <label className="text-xs font-medium">{def.etiqueta}</label>
-                      <Input
-                        placeholder={`Completar ${def.etiqueta.toLowerCase()}`}
-                        value={completar[campo] ?? ''}
-                        onChange={e => setCompletar({ ...completar, [campo]: e.target.value })}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="esDirectorPrincipal"
-              checked={esDirectorPrincipal}
-              onChange={e => setEsDirectorPrincipal(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <label htmlFor="esDirectorPrincipal" className="text-sm">Dirección principal</label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!puedeAsignar || submitting}>
-            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Asignar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -1345,9 +942,9 @@ function ProyectoDetailSkeleton() {
     <div className="p-6 space-y-6">
       <div className="flex gap-4 items-center">
         <Skeleton className="h-8 w-8 rounded-md" />
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-4 w-48" />
+        <div className="flex gap-3 items-center">
+          <Skeleton className="h-7 w-72" />
+          <Skeleton className="h-5 w-24 rounded-full" />
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-4">
