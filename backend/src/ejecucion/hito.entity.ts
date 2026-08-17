@@ -30,7 +30,7 @@ export class Hito {
   @Column({ type: 'date', nullable: true })
   fechaFin: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   integrantes: string | null;
 
   @Column({ type: 'varchar' })

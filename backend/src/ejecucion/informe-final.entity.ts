@@ -32,21 +32,21 @@ export class InformeFinal {
   @Column({ type: 'text', nullable: true })
   contenido: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   archivoAdjuntoUrl: string | null;
 
   @ManyToOne(() => Usuario, { nullable: true })
   @JoinColumn({ name: 'actualizadoPorId' })
   actualizadoPor: Usuario | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   actualizadoPorId: string | null;
 
   @ManyToOne(() => Usuario, { nullable: true })
   @JoinColumn({ name: 'confirmadoPorId' })
   confirmadoPor: Usuario | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   confirmadoPorId: string | null;
 
   @CreateDateColumn()

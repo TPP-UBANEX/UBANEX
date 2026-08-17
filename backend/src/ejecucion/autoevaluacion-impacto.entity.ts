@@ -26,7 +26,7 @@ export class AutoevaluacionImpacto {
   @Column()
   convocatoriaId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   templateId: string;
 
   @Column({ type: 'varchar', default: EstadoAutoevaluacion.Borrador })
@@ -39,21 +39,21 @@ export class AutoevaluacionImpacto {
   @JoinColumn({ name: 'realizadoPorId' })
   realizadoPor: Usuario | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   realizadoPorId: string | null;
 
   @ManyToOne(() => Usuario, { nullable: true })
   @JoinColumn({ name: 'actualizadoPorId' })
   actualizadoPor: Usuario | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   actualizadoPorId: string | null;
 
   @ManyToOne(() => Usuario, { nullable: true })
   @JoinColumn({ name: 'confirmadoPorId' })
   confirmadoPor: Usuario | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   confirmadoPorId: string | null;
 
   @CreateDateColumn()
