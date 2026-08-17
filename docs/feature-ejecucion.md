@@ -1,5 +1,9 @@
 # Feature: Módulo de Ejecución (Hitos + Autoevaluación de Impacto + Informe Final)
 
+> **ESTADO: COMPLETADO (Etapas 1-10).** Backend + frontend listos, build y lint OK en ambos.
+> Pendiente de verificación manual: `make reset-seed` (no reposible en esta máquina) y la
+> pantalla de templates (Etapa 11, opcional, no implementada).
+
 Documento de trabajo para implementar el ciclo de ejecución/cierre de UBANEX.
 Este archivo es la fuente de verdad del plan. Si la conversación se compacta,
 volver a leer SIEMPRE este documento antes de continuar.
