@@ -38,6 +38,7 @@ import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-eval
 import {
   TEMPLATE_INSTITUCIONAL_DEFAULT,
   TEMPLATE_CRUZADA_DEFAULT,
+  TEMPLATE_AUTOEVALUACION_DEFAULT,
 } from '../evaluaciones/templates-default';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
@@ -46,6 +47,13 @@ import { SugerenciaCambio } from '../sugerencias/sugerencia-cambio.entity';
 import { EstadoSugerencia } from '../common/enums/estado-sugerencia.enum';
 import { Auditoria } from '../auditoria/auditoria.entity';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
+import { Hito } from '../ejecucion/hito.entity';
+import { AutoevaluacionImpacto } from '../ejecucion/autoevaluacion-impacto.entity';
+import { InformeFinal } from '../ejecucion/informe-final.entity';
+import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
+import { CategoriaHito } from '../common/enums/categoria-hito.enum';
+import { EstadoAutoevaluacion } from '../common/enums/estado-autoevaluacion.enum';
+import { EstadoInforme } from '../common/enums/estado-informe.enum';
 import {
   UAS_NOMBRES,
   CARRERAS_POR_UA,
@@ -145,6 +153,10 @@ export class SeedService {
   private readonly notificacionRepo: Repository<Notificacion>;
   private readonly sugerenciaRepo: Repository<SugerenciaCambio>;
   private readonly auditoriaRepo: Repository<Auditoria>;
+  private readonly hitoRepo: Repository<Hito>;
+  private readonly autoevaluacionRepo: Repository<AutoevaluacionImpacto>;
+  private readonly informeRepo: Repository<InformeFinal>;
+  private readonly templateAutoevalRepo: Repository<TemplateAutoevaluacionImpacto>;
 
   private readonly rng = new Rng(20260810);
   private readonly uaMap = new Map<string, UnidadAcademica>();
@@ -162,6 +174,7 @@ export class SeedService {
   private formularioDefault!: Formulario;
   private templateInst!: TemplateEvaluacionInstitucional;
   private templateCruzada!: TemplateEvaluacionCruzada;
+  private templateAutoeval!: TemplateAutoevaluacionImpacto;
   private passwordHashCache: string | null = null;
 
   private admin!: Usuario;
@@ -212,6 +225,10 @@ export class SeedService {
     this.notificacionRepo = dataSource.getRepository(Notificacion);
     this.sugerenciaRepo = dataSource.getRepository(SugerenciaCambio);
     this.auditoriaRepo = dataSource.getRepository(Auditoria);
+    this.hitoRepo = dataSource.getRepository(Hito);
+    this.autoevaluacionRepo = dataSource.getRepository(AutoevaluacionImpacto);
+    this.informeRepo = dataSource.getRepository(InformeFinal);
+    this.templateAutoevalRepo = dataSource.getRepository(TemplateAutoevaluacionImpacto);
 
     this.camposFormularioEstandar = [
       {
@@ -297,6 +314,9 @@ export class SeedService {
 
     console.log('\n=== SEED: Sugerencias ===');
     await this.seedSugerencias();
+
+    console.log('\n=== SEED: Ejecución (hitos, autoevaluación, informe) ===');
+    await this.seedEjecucion();
 
     console.log('\n=== SEED COMPLETADO ===\n');
     await this.mostrarResumen();
@@ -1093,6 +1113,23 @@ export class SeedService {
           estructura: TEMPLATE_CRUZADA_DEFAULT,
         }),
       ));
+
+    const nombreAutoeval = 'Plantilla de autoevaluación UBANEX';
+    const existenteAutoeval = await this.templateAutoevalRepo.findOne({ where: { esDefault: true } });
+    if (existenteAutoeval && existenteAutoeval.nombre !== nombreAutoeval) {
+      existenteAutoeval.nombre = nombreAutoeval;
+      await this.templateAutoevalRepo.save(existenteAutoeval);
+    }
+    this.templateAutoeval =
+      existenteAutoeval ??
+      (await this.templateAutoevalRepo.save(
+        this.templateAutoevalRepo.create({
+          nombre: nombreAutoeval,
+          esDefault: true,
+          esPlantilla: true,
+          estructura: TEMPLATE_AUTOEVALUACION_DEFAULT,
+        }),
+      ));
   }
 
   // ─────────────────── Convocatorias ───────────────────
@@ -1141,7 +1178,11 @@ export class SeedService {
   private async asegurarTemplatesConvocatoria(convocatoria: Convocatoria): Promise<void> {
     const conv = await this.convocatoriaRepo.findOne({
       where: { id: convocatoria.id },
-      relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+        templateAutoevaluacionImpacto: true,
+      },
     });
     if (!conv) return;
 
@@ -1244,6 +1285,27 @@ export class SeedService {
       conv.templateEvaluacionCruzada = copia;
       huboCambios = true;
       console.log(`  ${conv.nombre} — formulario cruzada congelado (copia privada)`);
+    }
+
+    const autoeval = conv.templateAutoevaluacionImpacto;
+    if (!autoeval) {
+      if (congelada) {
+        const copia = await this.templateAutoevalRepo.save(
+          this.templateAutoevalRepo.create({
+            nombre: `Autoevaluación de impacto ${conv.nombre}`,
+            esDefault: false,
+            esPlantilla: false,
+            estructura: this.templateAutoeval.estructura,
+          }),
+        );
+        conv.templateAutoevaluacionImpactoId = copia.id;
+        conv.templateAutoevaluacionImpacto = copia;
+        console.log(`  ${conv.nombre} — template de autoevaluación congelado (copia privada)`);
+      } else {
+        conv.templateAutoevaluacionImpactoId = this.templateAutoeval.id;
+        conv.templateAutoevaluacionImpacto = this.templateAutoeval;
+      }
+      huboCambios = true;
     }
 
     if (huboCambios) {
@@ -2725,6 +2787,139 @@ export class SeedService {
     return campo;
   }
 
+  // ─────────────────── Ejecución (hitos, autoevaluación, informe) ───────────────────
+
+  private async seedEjecucion(): Promise<void> {
+    await this.seedHitos();
+    await this.seedAutoevaluaciones();
+    await this.seedInformesFinales();
+  }
+
+  private async seedHitos(): Promise<void> {
+    const casos = [
+      {
+        edicion: this.p5,
+        autor: this.garcia,
+        hitos: [
+          { titulo: 'Constitución del equipo y plan de trabajo', categoria: CategoriaHito.Organizacion, fechaInicio: '2025-08-10', fechaFin: '2025-08-30', integrantes: 'Dirección y docentes', descripcion: 'Reuniones iniciales y definición del cronograma.' },
+          { titulo: 'Taller de oficios de carpintería', categoria: CategoriaHito.Organizacion, fechaInicio: '2025-09-01', fechaFin: '2025-11-30', integrantes: '3 docentes, 12 estudiantes', descripcion: 'Formación práctica en el territorio.' },
+          { titulo: 'Jornada de articulación con cooperativas', categoria: CategoriaHito.Articulacion, fechaInicio: '2025-10-15', fechaFin: '2025-10-16', integrantes: 'Equipo completo', descripcion: 'Acuerdos de práctica con el Centro de Formación Laboral.' },
+          { titulo: 'Difusión de resultados parciales', categoria: CategoriaHito.Difusion, fechaInicio: '2025-12-01', fechaFin: '2025-12-05', integrantes: 'Dirección', descripcion: 'Charla abierta en la facultad.' },
+        ],
+      },
+      {
+        edicion: this.p6,
+        autor: this.torres,
+        hitos: [
+          { titulo: 'Relevamiento de necesidades sanitarias', categoria: CategoriaHito.InformeParcial, fechaInicio: '2025-08-15', fechaFin: '2025-09-10', integrantes: 'Estudiantes de medicina', descripcion: 'Entrevistas en los barrios objetivo.' },
+          { titulo: 'Campaña de prevención bucal', categoria: CategoriaHito.ActividadConLaComunidad, fechaInicio: '2025-09-20', fechaFin: '2025-10-30', integrantes: 'Equipo de salud, 20 estudiantes', descripcion: 'Controles y talleres en escuelas.' },
+          { titulo: 'Capacitación a agentes comunitarios', categoria: CategoriaHito.Capacitacion, fechaInicio: '2025-11-05', fechaFin: '2025-11-25', integrantes: 'Docentes', descripcion: 'Formación de referentes barriales.' },
+        ],
+      },
+      {
+        edicion: this.pConsolidada,
+        autor: this.diaz,
+        hitos: [
+          { titulo: 'Alcance del equipamiento informático', categoria: CategoriaHito.Organizacion, fechaInicio: '2025-08-15', fechaFin: '2025-08-25', integrantes: 'Dirección', descripcion: 'Definición de sedes y computadoras.' },
+          { titulo: 'Talleres intensivos de oficios digitales', categoria: CategoriaHito.Capacitacion, fechaInicio: '2025-09-01', fechaFin: '2026-01-15', integrantes: '4 docentes, 15 estudiantes', descripcion: 'Programación web y marketing digital.' },
+        ],
+      },
+    ];
+
+    for (const caso of casos) {
+      const yaSembrado = await this.hitoRepo.count({ where: { edicionId: caso.edicion.id } });
+      if (yaSembrado > 0) continue;
+      for (const h of caso.hitos) {
+        await this.hitoRepo.save(
+          this.hitoRepo.create({
+            edicionId: caso.edicion.id,
+            titulo: h.titulo,
+            descripcion: h.descripcion,
+            fechaInicio: h.fechaInicio,
+            fechaFin: h.fechaFin,
+            integrantes: h.integrantes,
+            categoria: h.categoria,
+            creadoPorId: caso.autor.id,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedAutoevaluaciones(): Promise<void> {
+    const conv2025 = this.convs.get(2025)!;
+    const conv = await this.convocatoriaRepo.findOne({
+      where: { id: conv2025.id },
+      relations: { templateAutoevaluacionImpacto: true },
+    });
+    if (!conv || !conv.templateAutoevaluacionImpactoId) return;
+
+    const completa = {
+      'preg-objetivos': 'Se cumplieron los objetivos centrales; quedó pendiente ampliar el alcance.',
+      'preg-impacto': 8,
+      'preg-participacion': true,
+      'preg-continuidad': 'Sí',
+      'preg-aprendizajes': ['Formación en extensión', 'Articulación con la comunidad', 'Trabajo en equipo'],
+    };
+
+    const casos: Array<[Edicion, Usuario]> = [
+      [this.p5, this.garcia],
+      [this.p6, this.torres],
+      [this.pConsolidada, this.diaz],
+    ];
+
+    for (const [edicion, autor] of casos) {
+      const existente = await this.autoevaluacionRepo.findOne({ where: { edicionId: edicion.id } });
+      if (existente) continue;
+      await this.autoevaluacionRepo.save(
+        this.autoevaluacionRepo.create({
+          edicionId: edicion.id,
+          convocatoriaId: conv.id,
+          templateId: conv.templateAutoevaluacionImpactoId,
+          estado: EstadoAutoevaluacion.Completada,
+          realizadoPorId: autor.id,
+          confirmadoPorId: autor.id,
+          respuestas: completa,
+        }),
+      );
+    }
+  }
+
+  private async seedInformesFinales(): Promise<void> {
+    const casos = [
+      { edicion: this.p5, autor: this.garcia },
+      { edicion: this.p6, autor: this.torres },
+      { edicion: this.pConsolidada, autor: this.diaz },
+    ];
+
+    for (const caso of casos) {
+      const existente = await this.informeRepo.findOne({ where: { edicionId: caso.edicion.id } });
+      if (existente) continue;
+      const contenido = await this.autogenerarInformeSeed(caso.edicion.id);
+      await this.informeRepo.save(
+        this.informeRepo.create({
+          edicionId: caso.edicion.id,
+          convocatoriaId: caso.edicion.convocatoriaId,
+          estado: EstadoInforme.Borrador,
+          contenido,
+          actualizadoPorId: caso.autor.id,
+        }),
+      );
+    }
+  }
+
+  private async autogenerarInformeSeed(edicionId: string): Promise<string> {
+    const hitos = await this.hitoRepo.find({ where: { edicionId }, order: { fechaInicio: 'ASC' } });
+    if (hitos.length === 0) return 'Informe final de la edición.';
+    const cuerpos = hitos.map(
+      (h, i) =>
+        `${i + 1}. ${h.titulo}\nCategoría: ${h.categoria}\n` +
+        `Período: ${h.fechaInicio ?? '—'} a ${h.fechaFin ?? '—'}\n` +
+        `Integrantes: ${h.integrantes ?? '—'}\n${h.descripcion ?? ''}`.trim(),
+    );
+    return 'Informe final de la edición.\n\nActividades ejecutadas:\n\n' + cuerpos.join('\n\n');
+  }
+
   // ─────────────────── Resumen ───────────────────
 
   private async mostrarResumen(): Promise<void> {
@@ -2738,5 +2933,8 @@ export class SeedService {
     await contar('Emparejamientos', this.emparejamientoRepo);
     await contar('Evaluaciones institucionales', this.institucionalEvalRepo);
     await contar('Evaluaciones cruzadas', this.cruzadaEvalRepo);
+    await contar('Hitos', this.hitoRepo);
+    await contar('Autoevaluaciones de impacto', this.autoevaluacionRepo);
+    await contar('Informes finales', this.informeRepo);
   }
 }
