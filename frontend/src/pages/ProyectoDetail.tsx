@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
+import type { Proyecto, Edicion, Convocatoria, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, Usuario, CrearParticipacionDto, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, EstadoValidacionDocente, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import {
   camposPerfilDocente,
@@ -39,19 +39,36 @@ import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
+import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
 import {
   CampoFormularioInput,
   camposIncompletosParaEnvio,
 } from '@/components/CampoFormularioInput'
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
+import {
+  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA,
+  normalizarPresupuesto, parsearRutaPartida, presupuestoIncompletoParaEnvio,
+} from '@/lib/presupuesto'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
 
-const tipoRubroLabels: Record<TipoRubro, string> = {
-  [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
-  [TipoRubro.BienesDeConsumo]: 'Bienes de Consumo',
-  [TipoRubro.BienesDeUso]: 'Bienes de Uso',
+const OPCIONES_TIPO_PERSONA = [
+  { value: TipoPersona.Docente, label: 'Docente' },
+  { value: TipoPersona.Estudiante, label: 'Estudiante' },
+]
+
+interface ModalConfigSugerencia {
+  multilinea?: boolean
+  maxLongitud?: number
+  tipoInput?: 'text' | 'date' | 'number'
+  min?: number
+  max?: number
+  step?: number | 'any'
+  tipoObjeto?: TipoCampo.Geolocalizacion | TipoCampo.Usuario | null
+  rolesUsuario?: RolUsuario[]
+  soloComentario?: boolean
+  opciones?: { value: string; label: string }[]
 }
 
 export function ProyectoDetail() {
@@ -130,6 +147,32 @@ export function ProyectoDetail() {
     : null
   const tipoCampoSugerido = campoSugerido?.tipo ?? null
 
+  const modalConfig: ModalConfigSugerencia = ((): ModalConfigSugerencia => {
+    if (sugerenciaModal.campo.startsWith('presupuesto.')) {
+      const ruta = parsearRutaPartida(sugerenciaModal.campo.replace('presupuesto.', ''))
+      if (!ruta) return { soloComentario: true }
+      if (ruta.campo === 'tipoPersona') return { opciones: OPCIONES_TIPO_PERSONA }
+      if (ruta.campo === 'monto' || ruta.campo === 'precioUnitario') return { tipoInput: 'number', min: 0, step: 'any' }
+      if (ruta.campo === 'cantidad') return { tipoInput: 'number', min: 1, step: 1 }
+      if (ruta.campo === 'periodoInicio' || ruta.campo === 'periodoFin') return { tipoInput: 'date' }
+      if (ruta.campo === 'descripcion') return { maxLongitud: MAX_LONGITUD_DESCRIPCION_PARTIDA }
+      return {}
+    }
+    return {
+      multilinea: tipoCampoSugerido === TipoCampo.TextoLargo || tipoCampoSugerido === TipoCampo.Tabla,
+      maxLongitud: tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined,
+      tipoInput: tipoCampoSugerido === TipoCampo.Fecha ? 'date' : tipoCampoSugerido === TipoCampo.Numero ? 'number' : 'text',
+      min: campoSugerido?.minimo,
+      max: campoSugerido?.maximo,
+      step: campoSugerido?.admiteDecimales ? 'any' : 1,
+      tipoObjeto: tipoCampoSugerido && TIPOS_VALOR_OBJETO.includes(tipoCampoSugerido)
+        ? (tipoCampoSugerido as TipoCampo.Geolocalizacion | TipoCampo.Usuario)
+        : null,
+      rolesUsuario: campoSugerido?.rolesUsuario,
+      soloComentario: tipoCampoSugerido === TipoCampo.Tabla,
+    }
+  })()
+
   const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
   const esSecretaria = user?.roles.some(
@@ -148,7 +191,9 @@ export function ProyectoDetail() {
   const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
     camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
-  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos && camposObligatoriosFaltantes.length === 0
+  const presupuestoFaltante = presupuestoIncompletoParaEnvio(edicion?.presupuesto, edicion?.convocatoria)
+  const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
+    && camposObligatoriosFaltantes.length === 0 && presupuestoFaltante.length === 0
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
@@ -175,7 +220,9 @@ export function ProyectoDetail() {
       ? 'El proyecto no tiene usuarios de dirección ni codirección asignados aún'
       : camposObligatoriosFaltantes.length > 0
         ? <ListaCamposFaltantes titulo="Falta completar lo siguiente:" campos={camposObligatoriosFaltantes} />
-        : null
+        : presupuestoFaltante.length > 0
+          ? <ListaCamposFaltantes titulo="Falta completar el presupuesto:" campos={presupuestoFaltante} />
+          : null
 
   const cargarDatos = async () => {
     if (!id) return
@@ -477,7 +524,7 @@ export function ProyectoDetail() {
       rubro.partidas = partidas
     }
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...actual, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...actual, rubros }))
   }
 
   const removePartida = (rubroIdx: number, partidaIdx: number) => {
@@ -491,7 +538,7 @@ export function ProyectoDetail() {
       rubro.partidas = (partidas as BienPresupuesto[]).filter((_, i) => i !== partidaIdx)
     }
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
 
   const updateViatico = (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => {
@@ -500,12 +547,9 @@ export function ProyectoDetail() {
     const rubro = { ...rubros[rubroIdx] }
     const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
     partidas[pIdx] = { ...partidas[pIdx], [field]: value }
-    if (field === 'monto') {
-      rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
-    }
     rubro.partidas = partidas
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
 
   const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
@@ -514,19 +558,10 @@ export function ProyectoDetail() {
     const rubro = { ...rubros[rubroIdx] }
     const partidas = [...(rubro.partidas as BienPresupuesto[])]
     partidas[pIdx] = { ...partidas[pIdx], [field]: value }
-    if (field === 'cantidad' || field === 'precioUnitario') {
-      partidas[pIdx].monto = partidas[pIdx].cantidad * partidas[pIdx].precioUnitario
-    }
-    rubro.subtotal = partidas.reduce((sum, p) => sum + p.monto, 0)
     rubro.partidas = partidas
     rubros[rubroIdx] = rubro
-    setEditPresupuesto(recalcularPresupuesto({ ...editPresupuesto, rubros }))
+    setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
-
-  const recalcularPresupuesto = (p: Presupuesto): Presupuesto => ({
-    ...p,
-    montoTotal: p.rubros.reduce((sum, r) => sum + r.subtotal, 0),
-  })
 
   const renderCamposEdicion = (campos: CampoFormulario[]) => (
     <>
@@ -706,7 +741,7 @@ export function ProyectoDetail() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
-          <CardContent><p className="text-sm font-bold">${(edicion?.presupuesto?.montoTotal ?? 0).toLocaleString()}</p></CardContent>
+          <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuesto?.montoTotal)}</p></CardContent>
         </Card>
         {puedeAsignarDirector && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowAsignarDirector(true)}>
@@ -951,13 +986,13 @@ export function ProyectoDetail() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Presupuesto</CardTitle>
               <span className="text-sm font-bold">
-                Total: ${(editando ? (editPresupuesto?.montoTotal ?? 0) : (edicion?.presupuesto?.montoTotal ?? 0)).toLocaleString()}
+                Total: {formatearMoneda(editando ? editPresupuesto?.montoTotal : edicion?.presupuesto?.montoTotal)}
               </span>
             </CardHeader>
             <CardContent className="space-y-4">
-              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, {
+              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, edicion?.convocatoria, {
                 addPartida, removePartida, updateViatico, updateBien,
-              })}
+              }, { activo: modoSugerencia, onSugerir: handleSugerirClick })}
             </CardContent>
           </Card>
         </TabsContent>
@@ -981,7 +1016,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="sugerencias" className="mt-4">
           {edicion ? (
-            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} onRespondida={cargarDatos} />
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} presupuesto={edicion.presupuesto} onRespondida={cargarDatos} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
@@ -1010,17 +1045,16 @@ export function ProyectoDetail() {
         edicionId={edicion?.id ?? ''}
         valorSugeridoInicial={sugerenciaModal.valorSugeridoInicial}
         comentarioInicial={sugerenciaModal.comentarioInicial}
-        multilinea={tipoCampoSugerido === TipoCampo.TextoLargo || tipoCampoSugerido === TipoCampo.Tabla}
-        maxLongitud={tipoCampoSugerido ? MAX_LONGITUD_POR_TIPO[tipoCampoSugerido] : undefined}
-        tipoInput={tipoCampoSugerido === TipoCampo.Fecha ? 'date' : tipoCampoSugerido === TipoCampo.Numero ? 'number' : 'text'}
-        min={campoSugerido?.minimo}
-        max={campoSugerido?.maximo}
-        step={campoSugerido?.admiteDecimales ? 'any' : 1}
-        tipoObjeto={tipoCampoSugerido && TIPOS_VALOR_OBJETO.includes(tipoCampoSugerido)
-          ? (tipoCampoSugerido as TipoCampo.Geolocalizacion | TipoCampo.Usuario)
-          : null}
-        rolesUsuario={campoSugerido?.rolesUsuario}
-        soloComentario={tipoCampoSugerido === TipoCampo.Tabla}
+        multilinea={modalConfig.multilinea}
+        maxLongitud={modalConfig.maxLongitud}
+        tipoInput={modalConfig.tipoInput}
+        min={modalConfig.min}
+        max={modalConfig.max}
+        step={modalConfig.step}
+        tipoObjeto={modalConfig.tipoObjeto}
+        rolesUsuario={modalConfig.rolesUsuario}
+        soloComentario={modalConfig.soloComentario}
+        opciones={modalConfig.opciones}
       />
 
       {edicion && (
@@ -1241,11 +1275,16 @@ function AsignarDirectorModal({
 function renderPresupuesto(
   presupuesto: Presupuesto | null,
   editando: boolean,
+  convocatoria: Convocatoria | undefined,
   handlers?: {
     addPartida: (rubroIdx: number, tipo: TipoRubro) => void
     removePartida: (rubroIdx: number, partidaIdx: number) => void
     updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
     updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
+  },
+  sugerencia?: {
+    activo: boolean
+    onSugerir: (campo: string, valorActual: string, label: string) => void
   },
 ) {
   const rubros = presupuesto?.rubros?.length
@@ -1261,104 +1300,37 @@ function renderPresupuesto(
       {rubros.map((rubro, rubroIdx) => (
         <div key={rubro.tipo} className="border rounded-lg p-4 space-y-3 bg-muted/30">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">{tipoRubroLabels[rubro.tipo as TipoRubro]}</h4>
+            <h4 className="text-sm font-medium">{LABELS_RUBRO[rubro.tipo as TipoRubro]}</h4>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Subtotal: ${rubro.subtotal.toLocaleString()}</span>
+              <span className="text-xs text-muted-foreground">Subtotal: {formatearMoneda(rubro.subtotal)}</span>
               {editando && handlers && (
                 <Button type="button" variant="outline" size="sm" onClick={() => handlers.addPartida(rubroIdx, rubro.tipo as TipoRubro)}>
                   <Plus className="h-3 w-3 mr-1" />Agregar
                 </Button>
               )}
+              {!editando && sugerencia?.activo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => sugerencia.onSugerir(
+                    `presupuesto.rubros[${rubroIdx}]`, '', LABELS_RUBRO[rubro.tipo as TipoRubro],
+                  )}
+                >
+                  <MessageSquare className="h-3 w-3 mr-1" />Comentar
+                </Button>
+              )}
             </div>
           </div>
 
-          {rubro.partidas.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Sin partidas</p>
-          ) : rubro.tipo === TipoRubro.ViaticosYSeguros ? (
-            <div className="space-y-2">
-              {(rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => (
-                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
-                  {editando && handlers ? (
-                    <>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Tipo</span>
-                        <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Docente">Docente</SelectItem>
-                            <SelectItem value="Estudiante">Estudiante</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-[2] space-y-1">
-                        <span className="text-xs">Descripción</span>
-                        <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Inicio</span>
-                        <Input type="date" value={p.periodoInicio} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Fin</span>
-                        <Input type="date" value={p.periodoFin} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Monto</span>
-                        <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', Number(e.target.value))} />
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm flex-1">{p.tipoPersona}</span>
-                      <span className="text-sm flex-[2]">{p.descripcion}</span>
-                      <span className="text-sm flex-1">{p.periodoInicio} → {p.periodoFin}</span>
-                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {(rubro.partidas as BienPresupuesto[]).map((p, pIdx) => (
-                <div key={pIdx} className="flex items-end gap-2 bg-muted/30 p-2 rounded-md">
-                  {editando && handlers ? (
-                    <>
-                      <div className="flex-[2] space-y-1">
-                        <span className="text-xs">Descripción</span>
-                        <Input value={p.descripcion} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Resmas de papel" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Cantidad</span>
-                        <Input type="number" min="1" step="1" value={p.cantidad || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'cantidad', Number(e.target.value))} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Precio unit.</span>
-                        <Input type="number" min="0" step="0.01" value={p.precioUnitario || ''} onChange={e => handlers.updateBien(rubroIdx, pIdx, 'precioUnitario', Number(e.target.value))} />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <span className="text-xs">Monto</span>
-                        <Input type="number" value={p.monto || ''} disabled className="bg-muted" />
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm flex-[2]">{p.descripcion}</span>
-                      <span className="text-sm flex-1">{p.cantidad}</span>
-                      <span className="text-sm flex-1">${p.precioUnitario.toLocaleString()}</span>
-                      <span className="text-sm flex-1">${p.monto.toLocaleString()}</span>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          <TablaPartidasPresupuesto
+            rubro={rubro}
+            rubroIdx={rubroIdx}
+            editando={editando}
+            convocatoria={convocatoria}
+            handlers={handlers}
+            sugerencia={sugerencia}
+          />
         </div>
       ))}
     </div>

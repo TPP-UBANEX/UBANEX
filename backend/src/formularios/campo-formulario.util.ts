@@ -35,7 +35,7 @@ export function maxLongitudCampo(tipo: TipoCampo): number | undefined {
 const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Acepta solo fechas ISO (AAAA-MM-DD) reales: el parser nativo rechaza dias fuera de rango. */
-function esFechaValida(valor: string): boolean {
+export function esFechaValida(valor: string): boolean {
   return FORMATO_FECHA.test(valor) && !Number.isNaN(new Date(valor).getTime());
 }
 

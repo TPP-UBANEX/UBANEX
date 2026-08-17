@@ -29,7 +29,12 @@ import { SeedModule } from './seed/seed.module';
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
-        synchronize: true,
+        // synchronize compara el schema con la base en cada arranque (~9s) y se
+        // usa solo en desarrollo (Docker/local). En Render (RENDER=true) se
+        // desactiva: el schema ya existe y el boot debe ser rápido y estable.
+        // Los cambios de schema en producción se aplican con migraciones
+        // (ver ormconfig.ts).
+        synchronize: process.env.RENDER !== 'true',
       }),
     }),
     ConvocatoriasModule,

@@ -31,8 +31,9 @@ export class ParticipacionConvocatoriaController {
   actualizarEstado(
     @Param('id') id: string,
     @Body() dto: ActualizarEstadoParticipacionDto,
+    @CurrentUser() usuario: Usuario,
   ) {
-    return this.service.actualizarEstado(id, dto);
+    return this.service.actualizarEstado(id, dto, usuario);
   }
 
   @Post(':id/aceptar')
