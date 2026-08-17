@@ -182,12 +182,9 @@ export class ConvocatoriasService {
     const convocatoria = await this.repo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
-    if (
-      convocatoria.estado !== EstadoConvocatoria.Configuracion &&
-      convocatoria.estado !== EstadoConvocatoria.Presentacion
-    ) {
+    if (convocatoria.estado !== EstadoConvocatoria.Configuracion) {
       throw new BadRequestException(
-        'El emparejamiento solo puede modificarse durante la configuración o la presentación',
+        'El emparejamiento solo puede modificarse durante la configuración de la convocatoria',
       );
     }
 

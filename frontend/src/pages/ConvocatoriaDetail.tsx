@@ -33,7 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Convocatoria, Edicion, ParticipacionConvocatoria, PaginatedResponse } from '@/data/types'
-import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
@@ -539,15 +539,8 @@ export function ConvocatoriaDetail() {
           </Card>
         </TabsContent>
         <TabsContent value="emparejamiento" className="mt-4">
-          {id && (
-            <EmparejamientoTab
-              convocatoriaId={id}
-              bloqueado={
-                !conv ||
-                (conv.estado !== EstadoConvocatoria.Configuracion &&
-                  conv.estado !== EstadoConvocatoria.Presentacion)
-              }
-            />
+          {id && conv && (
+            <EmparejamientoTab convocatoriaId={id} estadoConvocatoria={conv.estado} />
           )}
         </TabsContent>
         {esRectorado && (
