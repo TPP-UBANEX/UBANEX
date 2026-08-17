@@ -54,6 +54,7 @@ import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluac
 import { CategoriaHito } from '../common/enums/categoria-hito.enum';
 import { EstadoAutoevaluacion } from '../common/enums/estado-autoevaluacion.enum';
 import { EstadoInforme } from '../common/enums/estado-informe.enum';
+import { TipoPregunta } from '../common/enums/tipo-pregunta.enum';
 import {
   UAS_NOMBRES,
   CARRERAS_POR_UA,
@@ -168,6 +169,7 @@ export class SeedService {
   private readonly aprobadosPorConvUa = new Map<string, Map<string, Set<string>>>();
   // Proyectos masivos de 2025 elegibles para consolidarse en 2026 (mismo equipo, esConsolidado).
   private readonly consolidados2025 = new Map<string, Array<{ proyecto: Proyecto; directorId: string }>>();
+  private readonly hitosPorEdicion = new Map<string, Hito[]>();
   private readonly progreso = new Progreso(42_000);
 
   private camposFormularioEstandar: CampoFormulario[];
@@ -2795,122 +2797,189 @@ export class SeedService {
     await this.seedInformesFinales();
   }
 
-  private async seedHitos(): Promise<void> {
-    const casos = [
-      {
-        edicion: this.p5,
-        autor: this.garcia,
-        hitos: [
-          { titulo: 'Constitución del equipo y plan de trabajo', categoria: CategoriaHito.Organizacion, fechaInicio: '2025-08-10', fechaFin: '2025-08-30', integrantes: 'Dirección y docentes', descripcion: 'Reuniones iniciales y definición del cronograma.' },
-          { titulo: 'Taller de oficios de carpintería', categoria: CategoriaHito.Organizacion, fechaInicio: '2025-09-01', fechaFin: '2025-11-30', integrantes: '3 docentes, 12 estudiantes', descripcion: 'Formación práctica en el territorio.' },
-          { titulo: 'Jornada de articulación con cooperativas', categoria: CategoriaHito.Articulacion, fechaInicio: '2025-10-15', fechaFin: '2025-10-16', integrantes: 'Equipo completo', descripcion: 'Acuerdos de práctica con el Centro de Formación Laboral.' },
-          { titulo: 'Difusión de resultados parciales', categoria: CategoriaHito.Difusion, fechaInicio: '2025-12-01', fechaFin: '2025-12-05', integrantes: 'Dirección', descripcion: 'Charla abierta en la facultad.' },
-        ],
-      },
-      {
-        edicion: this.p6,
-        autor: this.torres,
-        hitos: [
-          { titulo: 'Relevamiento de necesidades sanitarias', categoria: CategoriaHito.InformeParcial, fechaInicio: '2025-08-15', fechaFin: '2025-09-10', integrantes: 'Estudiantes de medicina', descripcion: 'Entrevistas en los barrios objetivo.' },
-          { titulo: 'Campaña de prevención bucal', categoria: CategoriaHito.ActividadConLaComunidad, fechaInicio: '2025-09-20', fechaFin: '2025-10-30', integrantes: 'Equipo de salud, 20 estudiantes', descripcion: 'Controles y talleres en escuelas.' },
-          { titulo: 'Capacitación a agentes comunitarios', categoria: CategoriaHito.Capacitacion, fechaInicio: '2025-11-05', fechaFin: '2025-11-25', integrantes: 'Docentes', descripcion: 'Formación de referentes barriales.' },
-        ],
-      },
-      {
-        edicion: this.pConsolidada,
-        autor: this.diaz,
-        hitos: [
-          { titulo: 'Alcance del equipamiento informático', categoria: CategoriaHito.Organizacion, fechaInicio: '2025-08-15', fechaFin: '2025-08-25', integrantes: 'Dirección', descripcion: 'Definición de sedes y computadoras.' },
-          { titulo: 'Talleres intensivos de oficios digitales', categoria: CategoriaHito.Capacitacion, fechaInicio: '2025-09-01', fechaFin: '2026-01-15', integrantes: '4 docentes, 15 estudiantes', descripcion: 'Programación web y marketing digital.' },
-        ],
-      },
-    ];
+  /** Plantillas de hitos usadas para sembrar ejecución de forma determinista. */
+  private static readonly TITULOS_HITOS: Array<{
+    categoria: CategoriaHito;
+    titulo: string;
+    descripcion: string;
+    integrantes: string;
+  }> = [
+    { categoria: CategoriaHito.Organizacion, titulo: 'Constitución del equipo y plan de trabajo', descripcion: 'Reuniones iniciales y definición del cronograma.', integrantes: 'Dirección y docentes' },
+    { categoria: CategoriaHito.ActividadConLaComunidad, titulo: 'Actividad con la comunidad destinataria', descripcion: 'Jornadas de trabajo en el territorio.', integrantes: 'Equipo completo y estudiantes' },
+    { categoria: CategoriaHito.Capacitacion, titulo: 'Taller de capacitación para participantes', descripcion: 'Formación práctica para el equipo y beneficiarios.', integrantes: 'Docentes y estudiantes' },
+    { categoria: CategoriaHito.Articulacion, titulo: 'Jornada de articulación institucional', descripcion: 'Acuerdos con organizaciones del territorio.', integrantes: 'Dirección' },
+    { categoria: CategoriaHito.Difusion, titulo: 'Difusión de resultados parciales', descripcion: 'Presentación de avances a la comunidad.', integrantes: 'Dirección y equipo' },
+    { categoria: CategoriaHito.InformeParcial, titulo: 'Informe parcial de gestión', descripcion: 'Sistematización de actividades y resultados.', integrantes: 'Dirección' },
+  ];
 
-    for (const caso of casos) {
-      const yaSembrado = await this.hitoRepo.count({ where: { edicionId: caso.edicion.id } });
-      if (yaSembrado > 0) continue;
-      for (const h of caso.hitos) {
-        await this.hitoRepo.save(
-          this.hitoRepo.create({
-            edicionId: caso.edicion.id,
-            titulo: h.titulo,
-            descripcion: h.descripcion,
-            fechaInicio: h.fechaInicio,
-            fechaFin: h.fechaFin,
-            integrantes: h.integrantes,
-            categoria: h.categoria,
-            creadoPorId: caso.autor.id,
-          }),
-        );
+  private hashDeId(id: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  private rngDeEdicion(id: string): Rng {
+    return new Rng(this.hashDeId(id));
+  }
+
+  private async edicionesCalificadasEjecucion(): Promise<Edicion[]> {
+    return this.edicionRepo.find({
+      where: {
+        estado: In([EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado]),
+      },
+      relations: { convocatoria: true },
+    });
+  }
+
+  private async seedHitos(): Promise<void> {
+    const ediciones = await this.edicionesCalificadasEjecucion();
+    const yaSembradas = new Set((await this.hitoRepo.find({ select: { edicionId: true } })).map((h) => h.edicionId));
+
+    const filas: Hito[] = [];
+    for (const edicion of ediciones) {
+      if (yaSembradas.has(edicion.id)) continue;
+      const rng = this.rngDeEdicion(edicion.id);
+      const anio = edicion.anioEdicion ?? edicion.convocatoria.anio ?? 2025;
+      const inicio = edicion.convocatoria.fechaInicioEjecucion ?? this.crearFecha(anio, 8, 1);
+      const cantidad = rng.entero(2, 4);
+      for (let i = 0; i < cantidad; i++) {
+        const t = SeedService.TITULOS_HITOS[rng.entero(0, SeedService.TITULOS_HITOS.length - 1)];
+        const diaInicio = rng.entero(0, 60) + i * 40;
+        const diaFin = diaInicio + rng.entero(20, 80);
+        const h = this.hitoRepo.create({
+          edicionId: edicion.id,
+          titulo: t.titulo,
+          descripcion: t.descripcion,
+          fechaInicio: this.sumarDias(inicio, diaInicio),
+          fechaFin: this.sumarDias(inicio, diaFin),
+          integrantes: t.integrantes,
+          categoria: t.categoria,
+          creadoPorId: edicion.creadoPorId,
+        });
+        filas.push(h);
       }
+    }
+
+    for (let i = 0; i < filas.length; i += TAMANIO_LOTE) {
+      const chunk = filas.slice(i, i + TAMANIO_LOTE);
+      await this.hitoRepo.insert(chunk.map((h) => h));
+      this.progreso.sumar(chunk.length);
     }
   }
 
+  private sumarDias(fecha: string, dias: number): string {
+    const d = new Date(`${fecha}T00:00:00`);
+    d.setDate(d.getDate() + dias);
+    return d.toISOString().slice(0, 10);
+  }
+
   private async seedAutoevaluaciones(): Promise<void> {
-    const conv2025 = this.convs.get(2025)!;
-    const conv = await this.convocatoriaRepo.findOne({
-      where: { id: conv2025.id },
+    const ediciones = await this.edicionesCalificadasEjecucion();
+    const convocatorias = await this.convocatoriaRepo.find({
+      where: { id: In([...new Set(ediciones.map((e) => e.convocatoriaId))]) },
       relations: { templateAutoevaluacionImpacto: true },
     });
-    if (!conv || !conv.templateAutoevaluacionImpactoId) return;
+    const convPorId = new Map(convocatorias.map((c) => [c.id, c]));
 
-    const completa = {
-      'preg-objetivos': 'Se cumplieron los objetivos centrales; quedó pendiente ampliar el alcance.',
-      'preg-impacto': 8,
-      'preg-participacion': true,
-      'preg-continuidad': 'Sí',
-      'preg-aprendizajes': ['Formación en extensión', 'Articulación con la comunidad', 'Trabajo en equipo'],
-    };
-
-    const casos: Array<[Edicion, Usuario]> = [
-      [this.p5, this.garcia],
-      [this.p6, this.torres],
-      [this.pConsolidada, this.diaz],
-    ];
-
-    for (const [edicion, autor] of casos) {
+    const filas: AutoevaluacionImpacto[] = [];
+    for (const edicion of ediciones) {
       const existente = await this.autoevaluacionRepo.findOne({ where: { edicionId: edicion.id } });
       if (existente) continue;
-      await this.autoevaluacionRepo.save(
+      const conv = convPorId.get(edicion.convocatoriaId);
+      const template = conv?.templateAutoevaluacionImpacto;
+      if (!template?.estructura) continue;
+
+      const rng = this.rngDeEdicion(`${edicion.id}:auto`);
+      const respuestas: Record<string, unknown> = {};
+      for (const pregunta of template.estructura.preguntas) {
+        respuestas[pregunta.id] = this.respuestaParaPregunta(pregunta, rng);
+      }
+
+      filas.push(
         this.autoevaluacionRepo.create({
           edicionId: edicion.id,
-          convocatoriaId: conv.id,
-          templateId: conv.templateAutoevaluacionImpactoId,
+          convocatoriaId: edicion.convocatoriaId,
+          templateId: template.id,
           estado: EstadoAutoevaluacion.Completada,
-          realizadoPorId: autor.id,
-          confirmadoPorId: autor.id,
-          respuestas: completa,
+          realizadoPorId: edicion.creadoPorId,
+          confirmadoPorId: edicion.creadoPorId,
+          respuestas,
         }),
       );
+    }
+
+    for (let i = 0; i < filas.length; i += TAMANIO_LOTE) {
+      const chunk = filas.slice(i, i + TAMANIO_LOTE);
+      await this.autoevaluacionRepo.insert(
+        chunk as Parameters<(typeof this.autoevaluacionRepo)['insert']>[0],
+      );
+      this.progreso.sumar(chunk.length);
+    }
+  }
+
+  private respuestaParaPregunta(
+    pregunta: { tipo: TipoPregunta; opciones: string[] | null; escalaMin: number | null; escalaMax: number | null },
+    rng: Rng,
+  ): unknown {
+    switch (pregunta.tipo) {
+      case TipoPregunta.EscalaNumerica: {
+        const min = pregunta.escalaMin ?? 1;
+        const max = pregunta.escalaMax ?? 10;
+        return rng.entero(min, max);
+      }
+      case TipoPregunta.Booleano:
+        return rng.bool(0.75);
+      case TipoPregunta.Select:
+        return pregunta.opciones && pregunta.opciones.length > 0
+          ? pregunta.opciones[rng.entero(0, pregunta.opciones.length - 1)]
+          : null;
+      case TipoPregunta.Checkbox: {
+        const opciones = pregunta.opciones ?? [];
+        return opciones.filter(() => rng.bool(0.5));
+      }
+      case TipoPregunta.Texto:
+      default:
+        return 'Se cumplieron los objetivos centrales del proyecto, con resultados positivos en la comunidad destinataria.';
     }
   }
 
   private async seedInformesFinales(): Promise<void> {
-    const casos = [
-      { edicion: this.p5, autor: this.garcia },
-      { edicion: this.p6, autor: this.torres },
-      { edicion: this.pConsolidada, autor: this.diaz },
-    ];
+    const ediciones = await this.edicionesCalificadasEjecucion();
+    const filas: InformeFinal[] = [];
+    const ahora = new Date();
 
-    for (const caso of casos) {
-      const existente = await this.informeRepo.findOne({ where: { edicionId: caso.edicion.id } });
+    for (const edicion of ediciones) {
+      const existente = await this.informeRepo.findOne({ where: { edicionId: edicion.id } });
       if (existente) continue;
-      const contenido = await this.autogenerarInformeSeed(caso.edicion.id);
-      await this.informeRepo.save(
+      const hitos = await this.hitoRepo.find({ where: { edicionId: edicion.id }, order: { fechaInicio: 'ASC' } });
+      if (hitos.length === 0) continue;
+
+      const esCerrada = edicion.estado === EstadoEdicion.Cerrado;
+      const contenido = this.cuerpoInforme(hitos);
+      filas.push(
         this.informeRepo.create({
-          edicionId: caso.edicion.id,
-          convocatoriaId: caso.edicion.convocatoriaId,
-          estado: EstadoInforme.Borrador,
+          edicionId: edicion.id,
+          convocatoriaId: edicion.convocatoriaId,
+          estado: esCerrada ? EstadoInforme.Confirmado : EstadoInforme.Borrador,
           contenido,
-          actualizadoPorId: caso.autor.id,
+          actualizadoPorId: edicion.creadoPorId,
+          confirmadoPorId: esCerrada ? edicion.creadoPorId : null,
+          confirmadoEn: esCerrada ? ahora : null,
         }),
       );
     }
+
+    for (let i = 0; i < filas.length; i += TAMANIO_LOTE) {
+      const chunk = filas.slice(i, i + TAMANIO_LOTE);
+      await this.informeRepo.insert(chunk);
+      this.progreso.sumar(chunk.length);
+    }
   }
 
-  private async autogenerarInformeSeed(edicionId: string): Promise<string> {
-    const hitos = await this.hitoRepo.find({ where: { edicionId }, order: { fechaInicio: 'ASC' } });
-    if (hitos.length === 0) return 'Informe final de la edición.';
+  private cuerpoInforme(hitos: Hito[]): string {
     const cuerpos = hitos.map(
       (h, i) =>
         `${i + 1}. ${h.titulo}\nCategoría: ${h.categoria}\n` +
