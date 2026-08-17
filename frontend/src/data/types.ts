@@ -941,3 +941,11 @@ export const estadoInformeLabel: Record<string, string> = {
   [EstadoInforme.Borrador]: 'Borrador',
   [EstadoInforme.Confirmado]: 'Confirmado',
 }
+
+export const tipoPreguntaLabel: Record<string, string> = {
+  texto: 'Texto',
+  booleano: 'Sí / No',
+  escalaNumerica: 'Escala numérica',
+  select: 'Lista / Selección',
+  checkbox: 'Casillas (checkbox)',
+}
