@@ -1040,7 +1040,14 @@ export function ProyectoDetail() {
 
         <TabsContent value="informe-final" className="mt-4">
           {edicion?.estado === EstadoEdicion.EnEjecucion || edicion?.estado === EstadoEdicion.Cerrado ? (
-            <InformeFinalTab edicionId={edicion?.id} estado={edicion?.estado} puedeEditar={puedeEditarEjecucion} />
+            <InformeFinalTab
+                  edicionId={edicion?.id}
+                  estado={edicion?.estado}
+                  puedeEditar={puedeEditarEjecucion}
+                  convocatoria={edicion?.convocatoria}
+                  proyectoNombre={proyecto?.nombre}
+                  unidadAcademicaNombre={edicion?.unidadAcademica?.nombre}
+                />
           ) : (
             <Card>
               <CardContent>
