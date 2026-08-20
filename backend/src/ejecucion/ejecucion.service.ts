@@ -115,6 +115,7 @@ export class EjecucionService {
     const edicion = await this.obtenerEdicion(edicionId);
     await this.validarDirectorOCreador(edicion, usuario);
     this.validarEtapaEjecucion(edicion);
+    this.validarFechasHito(edicion, dto);
 
     const hito = await this.hitoRepo.save(
       this.hitoRepo.create({
@@ -147,6 +148,10 @@ export class EjecucionService {
     const edicion = await this.obtenerEdicion(hito.edicionId);
     await this.validarDirectorOCreador(edicion, usuario);
     this.validarEtapaEjecucion(edicion);
+    this.validarFechasHito(edicion, {
+      fechaInicio: dto.fechaInicio ?? hito.fechaInicio ?? undefined,
+      fechaFin: dto.fechaFin ?? hito.fechaFin ?? undefined,
+    });
 
     if (dto.titulo !== undefined) hito.titulo = dto.titulo;
     if (dto.descripcion !== undefined) hito.descripcion = dto.descripcion;
@@ -430,7 +435,6 @@ export class EjecucionService {
 
   /** Determina si el usuario es creador o director de la edición (acceso de escritura). */
   private async validarDirectorOCreador(edicion: Edicion, usuario: Usuario) {
-    if (this.esRectorado(usuario)) return;
     if (edicion.creadoPorId === usuario.id) return;
     const esDirector = await this.participacionRepo.findOneBy({
       edicionId: edicion.id,
@@ -469,6 +473,42 @@ export class EjecucionService {
       edicion.convocatoria?.estado === EstadoConvocatoria.Cierre;
     if (!esEjecucionOCierre || !convocatoriaEnEjecucion) {
       throw new BadRequestException('La edición no está en etapa de ejecución');
+    }
+  }
+
+  /**
+   * Valida las fechas de un hito: la de inicio debe ser anterior o igual a la de fin,
+   * y ambas deben caer dentro del período de ejecución de la convocatoria cuando éste esté definido.
+   */
+  private validarFechasHito(
+    edicion: Edicion,
+    fechas: { fechaInicio?: string; fechaFin?: string },
+  ): void {
+    const inicio = fechas.fechaInicio;
+    const fin = fechas.fechaFin;
+
+    if (inicio && fin && inicio > fin) {
+      throw new BadRequestException(
+        'La fecha de inicio del hito debe ser anterior o igual a la fecha de fin',
+      );
+    }
+
+    const { fechaInicioEjecucion, fechaFinEjecucion } = edicion.convocatoria ?? {};
+    const dentroDeEjecucion = (fecha: string): boolean => {
+      if (fechaInicioEjecucion && fecha < fechaInicioEjecucion) return false;
+      if (fechaFinEjecucion && fecha > fechaFinEjecucion) return false;
+      return true;
+    };
+
+    if (inicio && !dentroDeEjecucion(inicio)) {
+      throw new BadRequestException(
+        'La fecha de inicio del hito debe estar dentro del período de ejecución de la convocatoria',
+      );
+    }
+    if (fin && !dentroDeEjecucion(fin)) {
+      throw new BadRequestException(
+        'La fecha de fin del hito debe estar dentro del período de ejecución de la convocatoria',
+      );
     }
   }
 }
