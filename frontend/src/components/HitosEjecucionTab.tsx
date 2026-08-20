@@ -29,12 +29,13 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import type { Hito, CrearHitoDto } from '@/data/types'
+import type { Hito, CrearHitoDto, Convocatoria } from '@/data/types'
 import {
   CategoriaHito,
   categoriaHitoLabel,
   EstadoEdicion,
 } from '@/data/types'
+import { TextoLargoColapsable } from '@/components/CampoFormularioInput'
 import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -62,10 +63,12 @@ export function HitosEjecucionTab({
   edicionId,
   estado,
   puedeEditar,
+  convocatoria,
 }: {
   edicionId?: string
   estado?: EstadoEdicion
   puedeEditar: boolean
+  convocatoria?: Convocatoria | null
 }) {
   const [hitos, setHitos] = useState<Hito[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,6 +97,10 @@ export function HitosEjecucionTab({
   const enEjecucion =
     estado === EstadoEdicion.EnEjecucion || estado === EstadoEdicion.Cerrado
   const permitidoEditar = enEjecucion && puedeEditar
+  const limiteFechas = {
+    min: convocatoria?.fechaInicioEjecucion ?? undefined,
+    max: convocatoria?.fechaFinEjecucion ?? undefined,
+  }
 
   const abrirNuevo = () => {
     setEditandoId(null)
@@ -117,6 +124,18 @@ export function HitosEjecucionTab({
   const guardar = async () => {
     if (!form.titulo.trim()) {
       toast.error('El título del hito es obligatorio')
+      return
+    }
+    if (form.fechaInicio && form.fechaFin && form.fechaInicio > form.fechaFin) {
+      toast.error('La fecha de inicio debe ser anterior o igual a la fecha de fin')
+      return
+    }
+    if (limiteFechas.min && form.fechaInicio && form.fechaInicio < limiteFechas.min) {
+      toast.error('La fecha de inicio debe estar dentro del período de ejecución de la convocatoria')
+      return
+    }
+    if (limiteFechas.max && form.fechaFin && form.fechaFin > limiteFechas.max) {
+      toast.error('La fecha de fin debe estar dentro del período de ejecución de la convocatoria')
       return
     }
     setGuardando(true)
@@ -196,9 +215,9 @@ export function HitosEjecucionTab({
                   <TableCell>
                     <p className="font-medium">{hito.titulo}</p>
                     {hito.descripcion && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                        {hito.descripcion}
-                      </p>
+                      <div className="mt-0.5">
+                        <TextoLargoColapsable texto={hito.descripcion} />
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>
@@ -279,6 +298,8 @@ export function HitosEjecucionTab({
                     <label className="text-xs font-medium">Fecha de inicio</label>
                     <Input
                       type="date"
+                      min={limiteFechas.min}
+                      max={limiteFechas.max}
                       value={form.fechaInicio}
                       onChange={(e) => actualizarCampo('fechaInicio', e.target.value)}
                     />
@@ -287,6 +308,8 @@ export function HitosEjecucionTab({
                     <label className="text-xs font-medium">Fecha de fin</label>
                     <Input
                       type="date"
+                      min={limiteFechas.min}
+                      max={limiteFechas.max}
                       value={form.fechaFin}
                       onChange={(e) => actualizarCampo('fechaFin', e.target.value)}
                     />
