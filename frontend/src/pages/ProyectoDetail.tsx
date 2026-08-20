@@ -183,11 +183,8 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
-  const esRectorado = user?.roles.some(r =>
-    r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
-  )
   const esDirector = directores.some(d => d.usuarioId === user?.id)
-  const puedeEditarEjecucion = esRectorado || esPropietario || esDirector
+  const puedeEditarEjecucion = esPropietario || esDirector
 
   const nombreUnidadesAcademicas = () => {
     const principal = edicion?.unidadAcademica?.nombre
@@ -794,7 +791,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="ejecucion-hitos" className="mt-4">
           {edicion?.estado === EstadoEdicion.EnEjecucion || edicion?.estado === EstadoEdicion.Cerrado ? (
-            <HitosEjecucionTab edicionId={edicion?.id} estado={edicion?.estado} puedeEditar={puedeEditarEjecucion} />
+            <HitosEjecucionTab edicionId={edicion?.id} estado={edicion?.estado} puedeEditar={puedeEditarEjecucion} convocatoria={edicion?.convocatoria} />
           ) : (
             <Card>
               <CardContent>
