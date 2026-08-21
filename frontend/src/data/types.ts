@@ -785,6 +785,7 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Rechazada: 'destructive',
   MasInformacion: 'outline',
   Confirmada: 'default',
+  Completada: 'default',
 }
 
 export const estadoConvocatoriaLabel: Record<string, string> = {
@@ -804,4 +805,147 @@ export const estadoEdicionLabel: Record<string, string> = {
   NoAdjudicado: 'No adjudicado',
   EnEjecucion: 'En ejecución',
   Cerrado: 'Cerrado',
+}
+
+export enum CategoriaHito {
+  Organizacion = 'Organizacion',
+  Capacitacion = 'Capacitacion',
+  ActividadConLaComunidad = 'ActividadConLaComunidad',
+  Articulacion = 'Articulacion',
+  Difusion = 'Difusion',
+  InformeParcial = 'InformeParcial',
+}
+
+export const categoriaHitoLabel: Record<string, string> = {
+  [CategoriaHito.Organizacion]: 'Organización',
+  [CategoriaHito.Capacitacion]: 'Capacitación',
+  [CategoriaHito.ActividadConLaComunidad]: 'Actividad con la comunidad',
+  [CategoriaHito.Articulacion]: 'Articulación',
+  [CategoriaHito.Difusion]: 'Difusión',
+  [CategoriaHito.InformeParcial]: 'Informe parcial',
+}
+
+export enum EstadoAutoevaluacion {
+  Borrador = 'Borrador',
+  Completada = 'Completada',
+}
+
+export enum EstadoInforme {
+  Borrador = 'Borrador',
+  Confirmado = 'Confirmado',
+}
+
+export interface Hito {
+  id: string
+  edicionId: string
+  titulo: string
+  descripcion: string | null
+  fechaInicio: string | null
+  fechaFin: string | null
+  integrantes: string | null
+  categoria: CategoriaHito
+  creadoPorId: string
+  creadoEn: string
+  actualizadoEn: string
+}
+
+export type TipoPregunta = 'texto' | 'booleano' | 'escalaNumerica' | 'select' | 'checkbox'
+
+export interface PreguntaAutoevaluacion {
+  id: string
+  tipo: TipoPregunta
+  texto: string
+  esObligatorio: boolean
+  orden: number
+  opciones: string[] | null
+  escalaMin: number | null
+  escalaMax: number | null
+}
+
+export interface EstructuraTemplateAutoevaluacion {
+  preguntas: PreguntaAutoevaluacion[]
+}
+
+export interface TemplateAutoevaluacionImpacto {
+  id: string
+  nombre: string
+  esDefault: boolean
+  esPlantilla: boolean
+  estructura: EstructuraTemplateAutoevaluacion | null
+}
+
+export interface AutoevaluacionImpacto {
+  id: string
+  edicionId: string
+  convocatoriaId: string
+  templateId: string
+  estado: EstadoAutoevaluacion
+  respuestas: Record<string, unknown> | null
+  realizadoPor?: Usuario
+  actualizadoPor?: Usuario
+  confirmadoPor?: Usuario
+  realizadoPorId?: string
+  actualizadoPorId?: string
+  confirmadoPorId?: string
+}
+
+export interface InformeFinal {
+  id: string
+  edicionId: string
+  convocatoriaId: string
+  estado: EstadoInforme
+  contenido: string | null
+  archivoAdjuntoUrl: string | null
+  actualizadoPor?: Usuario
+  confirmadoPor?: Usuario
+  actualizadoPorId?: string
+  confirmadoPorId?: string
+  creadoEn: string
+  actualizadoEn: string
+  confirmadoEn: string | null
+}
+
+export interface CrearHitoDto {
+  titulo: string
+  descripcion?: string
+  fechaInicio?: string
+  fechaFin?: string
+  integrantes?: string
+  categoria: CategoriaHito
+}
+
+export interface ActualizarHitoDto {
+  titulo?: string
+  descripcion?: string
+  fechaInicio?: string
+  fechaFin?: string
+  integrantes?: string
+  categoria?: CategoriaHito
+}
+
+export interface GuardarAutoevaluacionDto {
+  respuestas?: Record<string, unknown>
+}
+
+export interface GuardarInformeFinalDto {
+  contenido?: string
+  archivoAdjuntoUrl?: string
+}
+
+export const estadoAutoevaluacionLabel: Record<string, string> = {
+  [EstadoAutoevaluacion.Borrador]: 'Borrador',
+  [EstadoAutoevaluacion.Completada]: 'Completada',
+}
+
+export const estadoInformeLabel: Record<string, string> = {
+  [EstadoInforme.Borrador]: 'Borrador',
+  [EstadoInforme.Confirmado]: 'Confirmado',
+}
+
+export const tipoPreguntaLabel: Record<string, string> = {
+  texto: 'Texto',
+  booleano: 'Sí / No',
+  escalaNumerica: 'Escala numérica',
+  select: 'Lista / Selección',
+  checkbox: 'Casillas (checkbox)',
 }
