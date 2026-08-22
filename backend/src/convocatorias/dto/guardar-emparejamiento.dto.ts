@@ -1,4 +1,5 @@
-import { IsArray, ArrayNotEmpty, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, ArrayNotEmpty, IsUUID, ValidateNested } from 'class-validator';
 
 export class ParEmparejamientoDto {
   @IsUUID()
@@ -11,5 +12,7 @@ export class ParEmparejamientoDto {
 export class GuardarEmparejamientoDto {
   @IsArray()
   @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => ParEmparejamientoDto)
   pares: ParEmparejamientoDto[];
 }

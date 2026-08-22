@@ -3,6 +3,7 @@ import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { Formulario } from '../formularios/formulario.entity';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
+import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
 
 @Entity()
 export class Convocatoria {
@@ -59,6 +60,13 @@ export class Convocatoria {
 
   @Column({ nullable: true })
   templateEvaluacionCruzadaId: string | null;
+
+  @ManyToOne(() => TemplateAutoevaluacionImpacto, { nullable: true })
+  @JoinColumn({ name: 'templateAutoevaluacionImpactoId' })
+  templateAutoevaluacionImpacto: TemplateAutoevaluacionImpacto | null;
+
+  @Column({ nullable: true })
+  templateAutoevaluacionImpactoId: string | null;
 
   // Diferencia de puntaje (en puntos de la evaluación cruzada) a partir de la
   // cual la edición se marca como inconsistente y puede requerir la tercera

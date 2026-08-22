@@ -79,7 +79,7 @@ export function NotificacionesDropdown() {
     }
     const edicion = notif.sugerencia?.edicion
     if (edicion) {
-      navigate(`/proyectos/${edicion.proyectoId}?tab=sugerencias`)
+      navigate(`/proyectos/${edicion.proyectoId}?convocatoria=${edicion.convocatoriaId}&tab=sugerencias`)
       setOpen(false)
     }
   }

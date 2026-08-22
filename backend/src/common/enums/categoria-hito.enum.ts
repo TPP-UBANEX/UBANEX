@@ -1,3 +1,8 @@
 export enum CategoriaHito {
-  /* Valores por definir según requerimientos */
+  Organizacion = 'Organizacion',
+  Capacitacion = 'Capacitacion',
+  ActividadConLaComunidad = 'ActividadConLaComunidad',
+  Articulacion = 'Articulacion',
+  Difusion = 'Difusion',
+  InformeParcial = 'InformeParcial',
 }

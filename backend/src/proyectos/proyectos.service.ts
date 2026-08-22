@@ -6,9 +6,11 @@ import { Repository, In, IsNull } from 'typeorm';
 import { Proyecto } from './proyecto.entity';
 import { Edicion } from './edicion.entity';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
+import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
+import { Formulario } from '../formularios/formulario.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
@@ -23,6 +25,13 @@ import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formula
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
 
+const CAMPOS_EDICION_AUTORIDAD = ['esInterfacultad', 'unidadAcademicaAdicionalId'];
+const ESTADOS_EDITABLES_AUTORIDAD = [
+  EstadoEdicion.Borrador,
+  EstadoEdicion.Presentado,
+  EstadoEdicion.PendienteDeCambios,
+];
+
 @Injectable()
 export class ProyectosService {
   constructor(
@@ -34,6 +43,8 @@ export class ProyectosService {
     private readonly participacionRepo: Repository<ParticipacionConvocatoria>,
     @InjectRepository(Emparejamiento)
     private readonly emparejamientoRepo: Repository<Emparejamiento>,
+    @InjectRepository(Formulario)
+    private readonly formularioRepo: Repository<Formulario>,
   ) {}
 
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
@@ -78,6 +89,127 @@ export class ProyectosService {
     );
 
     return this.obtenerProyecto(proyecto.id);
+  }
+
+  async resubirProyecto(proyectoId: string, dto: ResubirProyectoDto, usuario: Usuario) {
+    const proyecto = await this.proyectoRepo.findOne({ where: { id: proyectoId } });
+    if (!proyecto) throw new NotFoundException('Proyecto no encontrado');
+
+    await this.validarConvocatoriaPresentacion(dto.convocatoriaId);
+
+    const edicionExistente = await this.edicionRepo.findOne({
+      where: { proyectoId, convocatoriaId: dto.convocatoriaId },
+    });
+    if (edicionExistente) {
+      throw new BadRequestException('Este proyecto ya tiene una edición en esta convocatoria');
+    }
+
+    const evaluador = await this.participacionRepo.findOne({
+      where: {
+        usuarioId: usuario.id,
+        convocatoriaId: dto.convocatoriaId,
+        rol: RolEjecucion.Evaluador,
+      },
+    });
+    const estadosQueBloquean = [
+      EstadoPropuestaEvaluador.Propuesto,
+      EstadoPropuestaEvaluador.Aceptada,
+      EstadoPropuestaEvaluador.Aprobado,
+    ];
+    if (evaluador?.estado && estadosQueBloquean.includes(evaluador.estado)) {
+      throw new ForbiddenException(
+        'No podés resubir proyectos en una convocatoria donde sos evaluador',
+      );
+    }
+
+    const ultimaEdicion = await this.edicionRepo.findOne({
+      where: { proyectoId },
+      order: { anioEdicion: 'DESC', actualizadoEn: 'DESC' },
+    });
+
+    let datosFormularioMapeados: Record<string, unknown> | null = null;
+    if (ultimaEdicion?.datosFormulario) {
+      const convNueva = await this.edicionRepo.manager.findOne(Convocatoria, {
+        where: { id: dto.convocatoriaId },
+        relations: { formulario: true },
+      });
+      const convVieja = await this.edicionRepo.manager.findOne(Convocatoria, {
+        where: { id: ultimaEdicion.convocatoriaId },
+        relations: { formulario: true },
+      });
+      if (convNueva?.formulario?.campos && convVieja?.formulario?.campos) {
+        datosFormularioMapeados = this.mapearDatosFormulario(
+          ultimaEdicion.datosFormulario as Record<string, unknown>,
+          convVieja.formulario.campos,
+          convNueva.formulario.campos,
+        );
+      }
+    }
+
+    const nuevaEdicion = await this.edicionRepo.save(
+      this.edicionRepo.create({
+        proyectoId,
+        convocatoriaId: dto.convocatoriaId,
+        estado: EstadoEdicion.Borrador,
+        creadoPorId: usuario.id,
+        unidadAcademicaId: usuario.unidadAcademicaId,
+        anioEdicion: dto.anioEdicion || new Date().getFullYear(),
+        presupuesto: ultimaEdicion?.presupuesto ?? null,
+        datosFormulario: datosFormularioMapeados,
+      }),
+    );
+
+    if (ultimaEdicion) {
+      const directoresPrevios = await this.participacionRepo.find({
+        where: {
+          edicionId: ultimaEdicion.id,
+          rol: RolEjecucion.DirectorDeProyecto,
+        },
+      });
+
+      for (const dir of directoresPrevios) {
+        const yaTieneParticipacion = await this.participacionRepo.findOne({
+          where: {
+            usuarioId: dir.usuarioId,
+            convocatoriaId: dto.convocatoriaId,
+          },
+        });
+        if (yaTieneParticipacion) continue;
+
+        await this.participacionRepo.save(
+          this.participacionRepo.create({
+            usuarioId: dir.usuarioId,
+            convocatoriaId: dto.convocatoriaId,
+            rol: RolEjecucion.DirectorDeProyecto,
+            edicionId: nuevaEdicion.id,
+            esDirectorPrincipal: dir.esDirectorPrincipal,
+            asignadoPorId: usuario.id,
+          }),
+        );
+      }
+    }
+
+    return this.obtenerProyecto(proyectoId);
+  }
+
+  private mapearDatosFormulario(
+    datosViejos: Record<string, unknown>,
+    camposViejos: CampoFormulario[],
+    camposNuevos: CampoFormulario[],
+  ): Record<string, unknown> {
+    const mapaViejo = new Map(camposViejos.map(c => [c.id, c]));
+    const mapaNuevo = new Map(camposNuevos.map(c => [c.nombre, c]));
+
+    const resultado: Record<string, unknown> = {};
+    for (const [idVieja, valor] of Object.entries(datosViejos)) {
+      const campoViejo = mapaViejo.get(idVieja);
+      if (!campoViejo) continue;
+      if (campoViejo.tipo === 'tabla') continue;
+      const campoNuevo = mapaNuevo.get(campoViejo.nombre);
+      if (!campoNuevo) continue;
+      resultado[campoNuevo.id] = valor;
+    }
+    return resultado;
   }
 
   private async buildListado(
@@ -160,6 +292,49 @@ export class ProyectosService {
   async listarTodas(usuario: Usuario, convocatoriaId?: string): Promise<Edicion[]> {
     const query = await this.buildListado(usuario, { convocatoriaId });
     return query.getMany();
+  }
+
+  async proyectosDisponiblesParaResubir(usuario: Usuario, convocatoriaId: string, search?: string) {
+    const query = this.edicionRepo.createQueryBuilder('edicion')
+      .innerJoin('edicion.proyecto', 'proyecto')
+      .leftJoinAndSelect('edicion.unidadAcademica', 'unidadAcademica')
+      .where('edicion.eliminadoEn IS NULL')
+      .andWhere('proyecto.id NOT IN (SELECT e2."proyectoId" FROM edicion e2 WHERE e2."convocatoriaId" = :convId AND e2."eliminadoEn" IS NULL)', { convId: convocatoriaId })
+      .orderBy('proyecto.nombre', 'ASC')
+      .select(['proyecto.id AS "proyectoId"', 'proyecto.nombre AS "proyectoNombre"', 'proyecto."esConsolidado" AS "esConsolidado"']);
+
+    const esRectorado = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado].includes(r),
+    );
+    const esSecretaria = usuario.roles.some(r =>
+      [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+    );
+
+    if (!esRectorado && !esSecretaria) {
+      const participaciones = await this.participacionRepo.find({
+        where: { usuarioId: usuario.id },
+        select: { edicionId: true },
+      });
+      const edicionIds = participaciones.map(p => p.edicionId).filter(Boolean) as string[];
+
+      const condiciones: string[] = ['edicion.creadoPorId = :userId'];
+      const params: Record<string, unknown> = { userId: usuario.id };
+      if (edicionIds.length > 0) {
+        condiciones.push('edicion.id IN (:...edicionIds)');
+        params.edicionIds = edicionIds;
+      }
+      query.andWhere(`(${condiciones.join(' OR ')})`, params);
+    }
+
+    if (search) {
+      query.andWhere('proyecto.nombre ILIKE :search', { search: `%${search}%` });
+    }
+
+    query.groupBy('proyecto.id')
+      .addGroupBy('proyecto.nombre')
+      .addGroupBy('proyecto."esConsolidado"');
+
+    return query.getRawMany();
   }
 
   // Ediciones que un evaluador aprobado puede ver para evaluar: las de su Unidad
@@ -245,8 +420,25 @@ export class ProyectosService {
   ) {
     const edicion = await this.obtenerEdicion(proyectoId, edicionId);
 
-    await this.validarAccesoEdicion(edicion, usuario);
-    this.validarEstadoEditable(edicion);
+    if (await this.esCreadorODirector(edicion, usuario)) {
+      this.validarEstadoEditable(edicion);
+    } else if (this.esAutoridad(usuario)) {
+      const camposNoPermitidos = Object.keys(dto).filter(
+        campo => !CAMPOS_EDICION_AUTORIDAD.includes(campo),
+      );
+      if (camposNoPermitidos.length > 0) {
+        throw new ForbiddenException(
+          'Las autoridades solo pueden modificar si es interfacultad y las direcciones; el resto requiere una sugerencia de cambio',
+        );
+      }
+      if (!ESTADOS_EDITABLES_AUTORIDAD.includes(edicion.estado)) {
+        throw new BadRequestException(
+          `No se puede modificar una edición en estado ${edicion.estado}`,
+        );
+      }
+    } else {
+      throw new ForbiddenException('No tenés permisos sobre esta edición');
+    }
 
     if (dto.nombre !== undefined) {
       await this.proyectoRepo.update(proyectoId, { nombre: dto.nombre });
@@ -357,8 +549,8 @@ export class ProyectosService {
     return edicion;
   }
 
-  private async validarAccesoEdicion(edicion: Edicion, usuario: Usuario) {
-    if (edicion.creadoPorId === usuario.id) return;
+  private async esCreadorODirector(edicion: Edicion, usuario: Usuario): Promise<boolean> {
+    if (edicion.creadoPorId === usuario.id) return true;
 
     const participacion = await this.participacionRepo.findOne({
       where: {
@@ -367,7 +559,22 @@ export class ProyectosService {
         rol: RolEjecucion.DirectorDeProyecto,
       },
     });
-    if (!participacion) {
+    return !!participacion;
+  }
+
+  private esAutoridad(usuario: Usuario): boolean {
+    return usuario.roles.some(r =>
+      [
+        RolUsuario.AutoridadDeRectorado,
+        RolUsuario.AsistenteDeRectorado,
+        RolUsuario.AutoridadDeSecretaria,
+        RolUsuario.AsistenteDeSecretaria,
+      ].includes(r),
+    );
+  }
+
+  private async validarAccesoEdicion(edicion: Edicion, usuario: Usuario) {
+    if (!(await this.esCreadorODirector(edicion, usuario))) {
       throw new ForbiddenException('No tenés permisos sobre esta edición');
     }
   }

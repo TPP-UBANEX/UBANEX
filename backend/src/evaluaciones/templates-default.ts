@@ -3,6 +3,8 @@
 // y como referencia del dominio.
 
 import { EstructuraTemplateInstitucional, EstructuraTemplateCruzada } from '../templates-evaluacion/estructura-template';
+import { EstructuraTemplateAutoevaluacion } from '../ejecucion/estructura-autoevaluacion';
+import { TipoPregunta } from '../common/enums/tipo-pregunta.enum';
 
 export const TEMPLATE_INSTITUCIONAL_DEFAULT: EstructuraTemplateInstitucional = {
   categorias: [
@@ -195,6 +197,61 @@ export const TEMPLATE_CRUZADA_DEFAULT: EstructuraTemplateCruzada = {
           puntajeMaximo: 7,
         },
       ],
+    },
+  ],
+};
+
+export const TEMPLATE_AUTOEVALUACION_DEFAULT: EstructuraTemplateAutoevaluacion = {
+  preguntas: [
+    {
+      id: 'preg-objetivos',
+      tipo: TipoPregunta.Texto,
+      texto: '¿En qué medida se cumplieron los objetivos planteados en el proyecto?',
+      esObligatorio: true,
+      orden: 0,
+      opciones: null,
+      escalaMin: null,
+      escalaMax: null,
+    },
+    {
+      id: 'preg-impacto',
+      tipo: TipoPregunta.EscalaNumerica,
+      texto: 'Grado de impacto logrado en la comunidad destinataria',
+      esObligatorio: true,
+      orden: 1,
+      opciones: null,
+      escalaMin: 1,
+      escalaMax: 10,
+    },
+    {
+      id: 'preg-participacion',
+      tipo: TipoPregunta.Booleano,
+      texto: '¿Se sostuvo la participación de estudiantes durante toda la ejecución?',
+      esObligatorio: true,
+      orden: 2,
+      opciones: null,
+      escalaMin: null,
+      escalaMax: null,
+    },
+    {
+      id: 'preg-continuidad',
+      tipo: TipoPregunta.Select,
+      texto: '¿Pensás dar continuidad al proyecto en próximas convocatorias?',
+      esObligatorio: false,
+      orden: 3,
+      opciones: ['Sí', 'No', 'No aún'],
+      escalaMin: null,
+      escalaMax: null,
+    },
+    {
+      id: 'preg-aprendizajes',
+      tipo: TipoPregunta.Checkbox,
+      texto: '¿Qué aprendizajes destacás de la experiencia?',
+      esObligatorio: false,
+      orden: 4,
+      opciones: ['Formación en extensión', 'Articulación con la comunidad', 'Trabajo en equipo', 'Gestión de proyectos'],
+      escalaMin: null,
+      escalaMax: null,
     },
   ],
 };

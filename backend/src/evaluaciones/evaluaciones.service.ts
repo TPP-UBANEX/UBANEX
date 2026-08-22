@@ -38,10 +38,7 @@ const PESO_CRUZADA = 0.5;
 const PUNTAJE_BOOLEANO = 10;
 const UMBRAL_ADJUDICACION = 60;
 
-// Inconsistencia extraordinaria: cuando una edición tiene confirmadas las
-// evaluaciones Propia y Ajena y la diferencia de puntaje supera el umbral de
-// la convocatoria, el Rectorado puede designar una tercera Unidad Académica.
-const UMBRAL_INCONSISTENCIA_DEFAULT = 20;
+const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
 
 @Injectable()
 export class EvaluacionesService {

@@ -16,6 +16,10 @@ import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-eval
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
 import { Notificacion } from '../sugerencias/notificacion.entity';
+import { Hito } from '../ejecucion/hito.entity';
+import { AutoevaluacionImpacto } from '../ejecucion/autoevaluacion-impacto.entity';
+import { InformeFinal } from '../ejecucion/informe-final.entity';
+import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
 
 @Module({
   imports: [
@@ -35,6 +39,10 @@ import { Notificacion } from '../sugerencias/notificacion.entity';
       EvaluacionInstitucional,
       EvaluacionCruzada,
       Notificacion,
+      Hito,
+      AutoevaluacionImpacto,
+      InformeFinal,
+      TemplateAutoevaluacionImpacto,
     ]),
   ],
   providers: [SeedService],
