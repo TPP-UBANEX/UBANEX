@@ -86,7 +86,7 @@ export function ConvocatoriaDetail() {
   const [loadingTabla, setLoadingTabla] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
+  const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '', umbralInconsistenciaCruzada: '' })
   const [guardando, setGuardando] = useState(false)
   const [confirmEditOpen, setConfirmEditOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
@@ -182,6 +182,7 @@ export function ConvocatoriaDetail() {
       fechaFinEvaluacion: conv.fechaFinEvaluacion || '',
       fechaInicioEjecucion: conv.fechaInicioEjecucion || '',
       fechaFinEjecucion: conv.fechaFinEjecucion || '',
+      umbralInconsistenciaCruzada: conv.umbralInconsistenciaCruzada != null ? String(conv.umbralInconsistenciaCruzada) : '',
     })
     setEditOpen(true)
   }
@@ -202,7 +203,11 @@ export function ConvocatoriaDetail() {
     setConfirmEditOpen(false)
     setGuardando(true)
     try {
-      const actualizada = await api.convocatorias.actualizar(id!, editForm)
+      const umbral = editForm.umbralInconsistenciaCruzada.trim()
+      const actualizada = await api.convocatorias.actualizar(id!, {
+        ...editForm,
+        umbralInconsistenciaCruzada: umbral === '' ? null : parseInt(umbral, 10),
+      })
       setConv(actualizada)
       toast.success('Convocatoria actualizada correctamente')
       setEditOpen(false)
@@ -321,6 +326,19 @@ export function ConvocatoriaDetail() {
                         <Input type="date" className="mt-1" value={editForm.fechaFinEvaluacion} onChange={e => setEditForm(f => ({ ...f, fechaFinEvaluacion: e.target.value }))} />
                         {errores.fechaFinEvaluacion && <p className="text-xs text-destructive mt-2">{errores.fechaFinEvaluacion}</p>}
                       </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Umbral de inconsistencia (3ra UA) · vacío = default 20 pts
+                      </p>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="mt-1"
+                        placeholder="20"
+                        value={editForm.umbralInconsistenciaCruzada}
+                        onChange={e => setEditForm(f => ({ ...f, umbralInconsistenciaCruzada: e.target.value }))}
+                      />
                     </div>
                   </div>
                   <div className="border rounded-lg p-3 space-y-3">
