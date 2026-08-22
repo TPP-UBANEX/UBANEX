@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +41,7 @@ import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores'
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab'
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab'
 import { formatearMoneda } from '@/lib/presupuesto'
-import { ArrowLeft, Pencil, Plus, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Pencil, Plus, Trash2, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 function erroresFechas(f: {
@@ -81,15 +81,17 @@ export function ConvocatoriaDetail() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filtroEtapa, setFiltroEtapa] = useState('todas')
   const [filtroAnio, setFiltroAnio] = useState('todas')
+  const [filtroUA, setFiltroUA] = useState('todas')
   const [invitacionEvaluador, setInvitacionEvaluador] = useState<ParticipacionConvocatoria | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingTabla, setLoadingTabla] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '' })
+  const [editForm, setEditForm] = useState({ nombre: '', descripcion: '', anio: new Date().getFullYear(), estado: '', fechaInicioPresentacion: '', fechaFinPresentacion: '', fechaInicioEvaluacion: '', fechaFinEvaluacion: '', fechaInicioEjecucion: '', fechaFinEjecucion: '', cupoMinimoPorUnidadAcademica: 0, presupuestoTotal: 0 })
   const [guardando, setGuardando] = useState(false)
   const [confirmEditOpen, setConfirmEditOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [generando, setGenerando] = useState(false)
 
   const esUsuarioEjecucion = user?.roles.some(
     r => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
@@ -155,6 +157,37 @@ export function ConvocatoriaDetail() {
 
   const cambiarEtapa = (v: string) => { setFiltroEtapa(v); setPage(1) }
   const cambiarAnio = (v: string) => { setFiltroAnio(v); setPage(1) }
+  const cambiarUA = (v: string) => { setFiltroUA(v) }
+
+  const edicionesOrdenadas = [...ediciones].sort((a, b) => {
+    const oa = a.ordenMerito ?? null
+    const ob = b.ordenMerito ?? null
+    if (oa === null && ob === null) return 0
+    if (oa === null) return 1
+    if (ob === null) return -1
+    return oa - ob
+  })
+
+  const unidadesAcademicas = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const e of todasEdiciones) {
+      if (e.unidadAcademica?.id && e.unidadAcademica?.nombre) {
+        map.set(e.unidadAcademica.id, e.unidadAcademica.nombre)
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+  }, [todasEdiciones])
+
+  const edicionesMeritoFiltradas = useMemo(
+    () =>
+      [...todasEdiciones]
+        .filter(e => e.ordenMerito != null)
+        .filter(e => filtroUA === 'todas' || e.unidadAcademicaId === filtroUA)
+        .sort((a, b) => (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0)),
+    [todasEdiciones, filtroUA],
+  )
 
   const responderInvitacion = async (aceptada: boolean) => {
     if (!invitacionEvaluador) return
@@ -166,6 +199,37 @@ export function ConvocatoriaDetail() {
       cargarDatos()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al responder la propuesta')
+    }
+  }
+
+  const aplicarOrdenMerito = (actualizadas: Edicion[]) => {
+    const map = new Map(actualizadas.map(e => [e.id, e]))
+    setEdiciones(prev => prev.map(e => map.get(e.id) ?? e))
+    setTodasEdiciones(prev => prev.map(e => map.get(e.id) ?? e))
+  }
+
+  const generarOrdenMerito = async () => {
+    if (!conv?.id) return
+    try {
+      setGenerando(true)
+      const actualizadas = await api.evaluaciones.generarOrdenMerito(conv.id)
+      aplicarOrdenMerito(actualizadas)
+      toast.success('Orden de mérito generado')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al generar el orden de mérito')
+    } finally {
+      setGenerando(false)
+    }
+  }
+
+  const toggleAdjudicacion = async (e: Edicion) => {
+    if (!esRectorado) return
+    const nuevo = !(e.adjudicacionPropuesta ?? false)
+    try {
+      const actualizada = await api.evaluaciones.actualizarPropuestaAdjudicacion(e.id, nuevo)
+      aplicarOrdenMerito([actualizada])
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar la propuesta de adjudicación')
     }
   }
 
@@ -182,6 +246,8 @@ export function ConvocatoriaDetail() {
       fechaFinEvaluacion: conv.fechaFinEvaluacion || '',
       fechaInicioEjecucion: conv.fechaInicioEjecucion || '',
       fechaFinEjecucion: conv.fechaFinEjecucion || '',
+      cupoMinimoPorUnidadAcademica: conv.cupoMinimoPorUnidadAcademica ?? 0,
+      presupuestoTotal: conv.presupuestoTotal ?? 0,
     })
     setEditOpen(true)
   }
@@ -202,7 +268,10 @@ export function ConvocatoriaDetail() {
     setConfirmEditOpen(false)
     setGuardando(true)
     try {
-      const actualizada = await api.convocatorias.actualizar(id!, editForm)
+      const actualizada = await api.convocatorias.actualizar(id!, {
+        ...editForm,
+        presupuestoTotal: editForm.presupuestoTotal > 0 ? editForm.presupuestoTotal : null,
+      })
       setConv(actualizada)
       toast.success('Convocatoria actualizada correctamente')
       setEditOpen(false)
@@ -279,6 +348,26 @@ export function ConvocatoriaDetail() {
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Año</p>
                     <Input type="number" value={editForm.anio} onChange={e => setEditForm(f => ({ ...f, anio: parseInt(e.target.value) || 0 }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Cupo mínimo por unidad académica</p>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={editForm.cupoMinimoPorUnidadAcademica}
+                      onChange={e => setEditForm(f => ({ ...f, cupoMinimoPorUnidadAcademica: Math.max(0, parseInt(e.target.value) || 0) }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Cantidad mínima de proyectos adjudicados que debe tener cada unidad académica.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Presupuesto total de la convocatoria</p>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={editForm.presupuestoTotal}
+                      onChange={e => setEditForm(f => ({ ...f, presupuestoTotal: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Tope global de presupuesto. Limita la cantidad de proyectos que se pueden adjudicar (en orden de mérito). Dejar en 0 para no acotar.</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Estado</p>
@@ -391,6 +480,7 @@ export function ConvocatoriaDetail() {
       <Tabs defaultValue="proyectos">
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
+          <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>
           {!esUsuarioEjecucion && (
             <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>
           )}
@@ -403,27 +493,44 @@ export function ConvocatoriaDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Proyectos Presentados</CardTitle>
-              {esUsuarioEjecucion && !tieneInvPendiente && !esEvaluadorActivo && (
-                <div className="flex gap-2">
-                  <NuevoProyectoDialog
-                    onCreated={cargarDatos}
-                    convocatoriaId={conv?.id}
-                    convocatoriaNombre={conv?.nombre}
-                    trigger={
-                      <Button><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
-                    }
-                  />
-                  <ResubirProyectoDialog
-                    onResubido={cargarDatos}
-                    convocatoriaId={conv?.id}
-                    convocatoriaNombre={conv?.nombre}
-                    trigger={
-                      <Button variant="outline">Resubir Proyecto</Button>
-                    }
-                  />
-                </div>
-              )}
+              <div className="flex gap-2">
+                {esUsuarioEjecucion && !tieneInvPendiente && !esEvaluadorActivo && (
+                  <>
+                    <NuevoProyectoDialog
+                      onCreated={cargarDatos}
+                      convocatoriaId={conv?.id}
+                      convocatoriaNombre={conv?.nombre}
+                      trigger={
+                        <Button><Plus className="h-4 w-4 mr-2" />Nuevo Proyecto</Button>
+                      }
+                    />
+                    <ResubirProyectoDialog
+                      onResubido={cargarDatos}
+                      convocatoriaId={conv?.id}
+                      convocatoriaNombre={conv?.nombre}
+                      trigger={
+                        <Button variant="outline">Resubir Proyecto</Button>
+                      }
+                    />
+                  </>
+                )}
+              </div>
             </CardHeader>
+            {esRectorado && (
+              <div className="px-6 pb-2 -mt-2 text-xs text-muted-foreground space-y-1">
+                <div>
+                  Cupo mínimo por unidad académica: <span className="font-medium text-foreground">{conv?.cupoMinimoPorUnidadAcademica ?? 0}</span> proyecto(s).
+                  La propuesta de adjudicación es un borrador y puede ajustarse manualmente.
+                </div>
+                {conv?.presupuestoTotal != null && conv.presupuestoTotal > 0 && (
+                  <div>
+                    Presupuesto total: <span className="font-medium text-foreground">{formatearMoneda(Number(conv.presupuestoTotal ?? 0))}</span>
+                    {' · '}Adjudicado: <span className="font-medium text-foreground">{formatearMoneda(todasEdiciones.filter(e => e.adjudicacionPropuesta).reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0))}</span>
+                    {' · '}Restante: <span className="font-medium text-foreground">{formatearMoneda(Math.max(0, Number(conv.presupuestoTotal ?? 0) - todasEdiciones.filter(e => e.adjudicacionPropuesta).reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0)))}</span>
+                  </div>
+                )}
+              </div>
+            )}
             {esUsuarioEjecucion && tieneInvPendiente && (
               <div className="px-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-muted rounded-md px-3 py-3">
@@ -486,21 +593,43 @@ export function ConvocatoriaDetail() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Orden</TableHead>
                         <TableHead>Proyecto</TableHead>
                         <TableHead>Creado por</TableHead>
                         <TableHead>Facultad</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Adjudicación propuesta</TableHead>
                         <TableHead>Presupuesto</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ediciones.map(e => (
+                      {edicionesOrdenadas.map(e => (
                         <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`)}>
+                          <TableCell className="font-medium text-muted-foreground">{e.ordenMerito ?? '—'}</TableCell>
                           <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
+                          <TableCell>
+                            {e.adjudicacionPropuesta === null ? (
+                              <span className="text-xs text-muted-foreground">Sin evaluación</span>
+                            ) : esRectorado ? (
+                              <button
+                                type="button"
+                                onClick={ev => { ev.stopPropagation(); toggleAdjudicacion(e) }}
+                                title="Clic para alternar la propuesta de adjudicación"
+                              >
+                                <Badge variant={e.adjudicacionPropuesta ? 'default' : 'outline'}>
+                                  {e.adjudicacionPropuesta ? 'Adjudicado' : 'No adjudicado'}
+                                </Badge>
+                              </button>
+                            ) : (
+                              <Badge variant={e.adjudicacionPropuesta ? 'default' : 'outline'}>
+                                {e.adjudicacionPropuesta ? 'Adjudicado' : 'No adjudicado'}
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
@@ -547,6 +676,82 @@ export function ConvocatoriaDetail() {
                     </div>
                   )}
                 </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="merito" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium">Orden de Mérito</CardTitle>
+              <div className="flex gap-2">
+                {esRectorado && (
+                  <Button variant="secondary" onClick={generarOrdenMerito} disabled={generando}>
+                    {generando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Generar orden de mérito automático
+                  </Button>
+                )}
+                <Select value={filtroUA} onValueChange={cambiarUA}>
+                  <SelectTrigger className="w-72"><SelectValue placeholder="Unidad académica" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas las unidades académicas</SelectItem>
+                    {unidadesAcademicas.map(ua => (
+                      <SelectItem key={ua.id} value={ua.id}>{ua.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {edicionesMeritoFiltradas.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  {todasEdiciones.some(e => e.ordenMerito != null)
+                    ? 'No hay proyectos para la unidad académica seleccionada.'
+                    : 'Generá el orden de mérito automático para ver el puntaje de cada proyecto.'}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Orden</TableHead>
+                      <TableHead>Proyecto</TableHead>
+                      <TableHead>Unidad académica</TableHead>
+                      <TableHead className="text-right">Puntaje</TableHead>
+                      <TableHead className="text-right">Presupuesto</TableHead>
+                      <TableHead>Adjudicación propuesta</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {edicionesMeritoFiltradas.map(e => (
+                      <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`)}>
+                        <TableCell className="font-medium text-muted-foreground">{e.ordenMerito}</TableCell>
+                        <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{e.unidadAcademica?.nombre || '-'}</TableCell>
+                        <TableCell className="text-right font-medium">{e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1) : '-'}</TableCell>
+                        <TableCell className="text-right">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
+                        <TableCell>
+                          {e.adjudicacionPropuesta === null ? (
+                            <span className="text-xs text-muted-foreground">Sin evaluación</span>
+                          ) : esRectorado ? (
+                            <button
+                              type="button"
+                              onClick={ev => { ev.stopPropagation(); toggleAdjudicacion(e) }}
+                              title="Clic para alternar la propuesta de adjudicación"
+                            >
+                              <Badge variant={e.adjudicacionPropuesta ? 'default' : 'outline'}>
+                                {e.adjudicacionPropuesta ? 'Adjudicado' : 'No adjudicado'}
+                              </Badge>
+                            </button>
+                          ) : (
+                            <Badge variant={e.adjudicacionPropuesta ? 'default' : 'outline'}>
+                              {e.adjudicacionPropuesta ? 'Adjudicado' : 'No adjudicado'}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

@@ -54,6 +54,24 @@ export class Edicion {
   @Column({ type: 'json', nullable: true })
   datosFormulario: object | null;
 
+  @Column({ type: 'int', nullable: true })
+  ordenMerito: number | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  adjudicacionPropuesta: boolean | null;
+
+  @Column({
+    type: 'numeric',
+    precision: 6,
+    scale: 2,
+    nullable: true,
+    transformer: {
+      to: (v: number | null) => v,
+      from: (v: string | null) => (v == null ? null : Number(v)),
+    },
+  })
+  puntajeMerito: number | null;
+
   @CreateDateColumn()
   creadoEn: Date;
 

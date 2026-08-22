@@ -35,6 +35,7 @@ import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity'
 import { EMPAREJAMIENTO_DEFAULT } from '../convocatorias/emparejamiento-default';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
+import { EstructuraTemplateInstitucional } from '../templates-evaluacion/estructura-template';
 import {
   TEMPLATE_INSTITUCIONAL_DEFAULT,
   TEMPLATE_CRUZADA_DEFAULT,
@@ -151,6 +152,7 @@ export class SeedService {
   private readonly uas: UnidadAcademica[] = [];
   private readonly convs = new Map<number, Convocatoria>();
   private readonly usuariosPorUa = new Map<string, PoolUa>();
+  private readonly docentesPruebaCache = new Map<string, Usuario[]>();
   private readonly parMap = new Map<string, string>();
   private readonly titulosUsados = new Set<string>();
   private readonly aprobadosPorConvUa = new Map<string, Map<string, Set<string>>>();
@@ -294,6 +296,9 @@ export class SeedService {
     console.log('\n=== SEED: Evaluaciones ===');
     await this.seedEvaluacionesCanonicas();
     await this.seedEvaluacionesMasivas([2023, 2024, 2025, 2026]);
+
+    console.log('\n=== SEED: Convocatoria de prueba (orden de mérito) ===');
+    await this.seedConvocatoriaPruebaOrdenMerito();
 
     console.log('\n=== SEED: Sugerencias ===');
     await this.seedSugerencias();
@@ -1278,6 +1283,7 @@ export class SeedService {
         fechaInicioEjecucion: this.crearFecha(anio, 8, 1),
         fechaFinEjecucion: this.crearFecha(anio + 1, 2, 28),
         formularioId,
+        cupoMinimoPorUnidadAcademica: 1,
       });
       await this.asegurarTemplatesConvocatoria(conv);
       this.convs.set(anio, conv);
@@ -1665,6 +1671,26 @@ export class SeedService {
       }
     }
     return undefined;
+  }
+
+  /** Docente real de la UA (con cargo) para autorar proyectos de prueba; las
+   *  pools de algunas UAs no traen docentes, así que se consulta la BD. */
+  private async docenteParaPrueba(uaId: string, usados: Set<string>): Promise<Usuario | undefined> {
+    let lista = this.docentesPruebaCache.get(uaId);
+    if (!lista) {
+      lista = await this.usuarioRepo
+        .createQueryBuilder('u')
+        .where('u."unidadAcademicaId" = :uaId', { uaId })
+        .andWhere('u.roles LIKE :rol', { rol: `%${RolUsuario.Docente}%` })
+        .andWhere('u."cargoDocente" IS NOT NULL')
+        .getMany();
+      this.docentesPruebaCache.set(uaId, lista);
+    }
+    const disponibles = lista.filter(d => !usados.has(d.id));
+    if (disponibles.length === 0) return undefined;
+    const u = disponibles[this.rng.entero(0, disponibles.length - 1)];
+    usados.add(u.id);
+    return u;
   }
 
   /** Codirector de la UA adicional si el proyecto es interfacultad, sino del pool propio. */
@@ -2554,6 +2580,214 @@ export class SeedService {
       }
       await drenarAuditoria();
     }
+  }
+
+  // ─────────── Convocatoria de prueba: orden de mérito ───────────
+  // Convocatoria pequeña y realista con TODAS las UAs, evaluaciones confirmadas
+  // y cupo mínimo por UA = 2, para probar el "Generar orden de mérito automático".
+  private async seedConvocatoriaPruebaOrdenMerito(): Promise<void> {
+    const NOMBRE = 'Convocatoria de Prueba - Orden de Mérito';
+    const existe = await this.convocatoriaRepo.findOne({ where: { nombre: NOMBRE } });
+    if (existe) {
+      console.log(`  (ya existe) ${NOMBRE}`);
+      return;
+    }
+
+    const nombreForm = 'Formulario de Prueba - Orden de Mérito';
+    let formularioId = (await this.formularioRepo.findOne({ where: { nombre: nombreForm } }))?.id;
+    if (!formularioId) {
+      const copia = await this.formularioRepo.save(
+        this.formularioRepo.create({
+          nombre: nombreForm,
+          esDefault: false,
+          esPlantilla: false,
+          campos: this.formularioDefault.campos
+            ? clonarCamposConIdsNuevos(this.formularioDefault.campos)
+            : null,
+        }),
+      );
+      formularioId = copia.id;
+    }
+    const conv = await this.seedConvocatoria({
+      nombre: NOMBRE,
+      descripcion:
+        'Convocatoria de prueba con todas las UAs y evaluaciones confirmadas para validar el orden de mérito automático.',
+      anio: 2026,
+      estado: EstadoConvocatoria.Evaluacion,
+      fechaInicioPresentacion: this.crearFecha(2026, 3, 1),
+      fechaFinPresentacion: this.crearFecha(2026, 4, 30),
+      fechaInicioEvaluacion: this.crearFecha(2026, 5, 15),
+      fechaFinEvaluacion: this.crearFecha(2026, 7, 15),
+      fechaInicioEjecucion: this.crearFecha(2026, 8, 1),
+      fechaFinEjecucion: this.crearFecha(2027, 2, 28),
+      formularioId: formularioId ?? undefined,
+      cupoMinimoPorUnidadAcademica: 2,
+    });
+    await this.asegurarTemplatesConvocatoria(conv);
+
+    const convConTemplates = await this.convocatoriaRepo.findOne({
+      where: { id: conv.id },
+      relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+    });
+    const estructuraInst = convConTemplates?.templateEvaluacionInstitucional?.estructura;
+    const estructuraCruzada = convConTemplates?.templateEvaluacionCruzada?.estructura;
+    if (
+      !estructuraInst ||
+      !estructuraCruzada ||
+      !convConTemplates?.templateEvaluacionInstitucionalId ||
+      !convConTemplates?.templateEvaluacionCruzadaId
+    ) {
+      console.log('  No se pudieron cargar los templates de evaluación; se omite la convocatoria de prueba');
+      return;
+    }
+
+    console.log(`  ${NOMBRE}: generando proyectos y evaluaciones por UA`);
+    const PROYECTOS_POR_UA = 4;
+    let montoTotalAcumulado = 0;
+    const usadosTest = new Set<string>();
+
+    for (const ua of this.uas) {
+      const pool = this.usuariosPorUa.get(ua.id);
+      if (!pool || pool.evaluadores.length === 0) continue;
+
+      for (let i = 0; i < PROYECTOS_POR_UA; i++) {
+        // Autor docente del proyecto de prueba (no la secretaría), para reflejar
+        // el equipo real. Se evita reusar al mismo docente dentro de la prueba.
+        const docente = (await this.docenteParaPrueba(ua.id, usadosTest)) ?? pool.secretaria;
+        const nombreProyecto = `${ua.nombre} - Proyecto de Prueba ${i + 1}`;
+        const presupuesto = generarPresupuesto(this.rng, 2026);
+        montoTotalAcumulado += Number(presupuesto.montoTotal ?? 0);
+        const edicion = await this.seedProyectoConEdicion(
+          nombreProyecto,
+          docente,
+          ua,
+          conv,
+          EstadoEdicion.EnEvaluacion,
+          presupuesto,
+        );
+        if (!edicion) continue;
+
+        // Participación del director (docente) del proyecto de prueba.
+        await this.participacionRepo.save(
+          this.participacionRepo.create({
+            usuarioId: docente.id,
+            convocatoriaId: conv.id,
+            rol: RolEjecucion.DirectorDeProyecto,
+            edicionId: edicion.id,
+            esDirectorPrincipal: true,
+            asignadoPorId: pool.secretaria.id,
+            estado: null,
+          }),
+        );
+
+        // Banda de puntaje por UA para probar el orden de mérito:
+        //  - alta:  ningún proyecto < 80  (Ingeniería, Derecho, Odontología)
+        //  - baja:  ningún proyecto > 20  (CBC, Medicina, Agronomía)
+        //  - mixta: comportamiento original (2 al azar + 2 bajos)
+        const esAlta =
+          ua.nombre === 'Facultad de Ingeniería' ||
+          ua.nombre === 'Facultad de Derecho' ||
+          ua.nombre === 'Facultad de Odontología';
+        const esBaja =
+          ua.nombre === 'Ciclo Básico Común (CBC)' ||
+          ua.nombre === 'Facultad de Medicina' ||
+          ua.nombre === 'Facultad de Agronomía';
+        // Las UA no afectadas por las bandas alta/baja: 1 proyecto > 90 y el
+        // resto < 50 (usa el proyecto i=0 para el puntaje alto).
+        const esMixtaAlta = !esAlta && !esBaja && i === 0;
+
+        const generadaInst = esAlta || esMixtaAlta
+          ? this.generarCategoriasAltas(estructuraInst)
+          : this.generarCategoriasBajas(estructuraInst);
+        await this.institucionalEvalRepo.save(
+          this.institucionalEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            templateId: convConTemplates.templateEvaluacionInstitucionalId,
+            estado: EstadoEvaluacion.Confirmada,
+            realizadoPorId: pool.secretaria.id,
+            confirmadoPorId: pool.secretaria.id,
+            categorias: generadaInst.categorias,
+            checklist: generadaInst.checklist,
+            observaciones: generadaInst.observaciones,
+          }),
+        );
+
+        // Cruzada confirmada (ajena) con un evaluador de la UA.
+        const evaluador = pool.evaluadores[i % pool.evaluadores.length];
+        const generadaCruz = esAlta
+          ? generarEvaluacionCruzada(estructuraCruzada, this.rng, 'alta')
+          : esBaja
+            ? generarEvaluacionCruzada(estructuraCruzada, this.rng, 'baja')
+            : esMixtaAlta
+              ? generarEvaluacionCruzada(estructuraCruzada, this.rng, 'alta90')
+              : generarEvaluacionCruzada(estructuraCruzada, this.rng, 'media');
+        await this.cruzadaEvalRepo.save(
+          this.cruzadaEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            evaluadorId: evaluador.id,
+            tipo: TipoEvaluacionCruzada.Ajena,
+            templateId: convConTemplates.templateEvaluacionCruzadaId,
+            estado: EstadoEvaluacion.Confirmada,
+            items: generadaCruz.items,
+            observaciones: generadaCruz.observaciones,
+          }),
+        );
+      }
+    }
+
+    // Presupuesto global: se fija por debajo del 70% anterior para admitir
+    // menos proyectos y dejar en evidencia el tope presupuestario (el cupo
+    // mínimo de 2×14=28 igualmente garantiza al menos 2 por UA).
+    const presupuestoTotalConvocatoria = Math.round(montoTotalAcumulado * 0.52 * 100) / 100;
+    await this.convocatoriaRepo.update(conv.id, { presupuestoTotal: presupuestoTotalConvocatoria });
+    console.log(
+      `  ${NOMBRE}: presupuesto total ${presupuestoTotalConvocatoria} (cubre ~${Math.round(
+        (presupuestoTotalConvocatoria / montoTotalAcumulado) * 100,
+      )}% del costo total de los proyectos)`,
+    );
+    console.log(`  ${NOMBRE}: lista para probar el orden de mérito`);
+  }
+
+  private generarCategoriasAltas(estructura: EstructuraTemplateInstitucional): {
+    categorias: Record<string, unknown>;
+    checklist: Record<string, unknown>;
+    observaciones: string;
+  } {
+    const categorias: Record<string, unknown> = {};
+    for (const categoria of estructura.categorias ?? []) {
+      for (const sub of categoria.subcategorias ?? []) {
+        if (sub.tipoValor === 'numerico') {
+          categorias[sub.id] = { valor: sub.maximo ?? 10, fundamentacion: 'Prueba puntaje alto' };
+        } else {
+          categorias[sub.id] = { valor: true, fundamentacion: '' };
+        }
+      }
+    }
+    const checklist: Record<string, unknown> = {};
+    for (const item of estructura.checklist ?? []) checklist[item.id] = true;
+    return { categorias, checklist, observaciones: 'Evaluación de prueba con puntaje alto' };
+  }
+
+  private generarCategoriasBajas(estructura: EstructuraTemplateInstitucional): {
+    categorias: Record<string, unknown>;
+    checklist: Record<string, unknown>;
+    observaciones: string;
+  } {
+    const categorias: Record<string, unknown> = {};
+    for (const categoria of estructura.categorias ?? []) {
+      for (const sub of categoria.subcategorias ?? []) {
+        if (sub.tipoValor === 'numerico') {
+          categorias[sub.id] = { valor: 0, fundamentacion: 'Prueba puntaje bajo' };
+        } else {
+          categorias[sub.id] = { valor: false, fundamentacion: '' };
+        }
+      }
+    }
+    const checklist: Record<string, unknown> = {};
+    for (const item of estructura.checklist ?? []) checklist[item.id] = false;
+    return { categorias, checklist, observaciones: 'Evaluación de prueba con puntaje bajo' };
   }
 
   // ─────────────────── Sugerencias ───────────────────

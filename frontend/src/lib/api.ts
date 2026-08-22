@@ -133,9 +133,9 @@ export const api = {
     },
     todas: () => get<import('@/data/types').Convocatoria[]>('/convocatorias/todas'),
     get: (id: string) => get<import('@/data/types').Convocatoria>(`/convocatorias/${id}`),
-    crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    crear: (data: { nombre: string; descripcion?: string; anio: number; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string; cupoMinimoPorUnidadAcademica?: number; presupuestoTotal?: number | null }) =>
       post<import('@/data/types').Convocatoria>('/convocatorias', data),
-    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string }) =>
+    actualizar: (id: string, data: { nombre?: string; descripcion?: string; anio?: number; estado?: string; fechaInicioPresentacion?: string; fechaFinPresentacion?: string; fechaInicioEvaluacion?: string; fechaFinEvaluacion?: string; fechaInicioEjecucion?: string; fechaFinEjecucion?: string; cupoMinimoPorUnidadAcademica?: number; presupuestoTotal?: number | null }) =>
       patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
     eliminar: (id: string) => del(`/convocatorias/${id}`),
     emparejamientos: {
@@ -197,6 +197,10 @@ export const api = {
   evaluaciones: {
     monitoreo: (convocatoriaId: string, params?: { page?: number; limit?: number; search?: string; estado?: string; unidadAcademicaId?: string }) =>
       get<import('@/data/types').MonitoreoEvaluacion>(`/evaluaciones?convocatoriaId=${encodeURIComponent(convocatoriaId)}${params?.page ? `&page=${params.page}` : ''}${params?.limit ? `&limit=${params.limit}` : ''}${params?.search ? `&search=${encodeURIComponent(params.search)}` : ''}${params?.estado ? `&estado=${params.estado}` : ''}${params?.unidadAcademicaId ? `&unidadAcademicaId=${params.unidadAcademicaId}` : ''}`),
+    generarOrdenMerito: (convocatoriaId: string) =>
+      post<import('@/data/types').Edicion[]>(`/evaluaciones/convocatoria/${convocatoriaId}/orden-merito`, {}),
+    actualizarPropuestaAdjudicacion: (edicionId: string, adjudicado: boolean) =>
+      patch<import('@/data/types').Edicion>(`/evaluaciones/edicion/${edicionId}/adjudicacion-propuesta`, { adjudicado }),
     edicion: (edicionId: string) =>
       get<import('@/data/types').EvaluacionEdicionDetalle>(`/evaluaciones/edicion/${edicionId}`),
     institucionales: {

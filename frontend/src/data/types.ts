@@ -258,6 +258,8 @@ export interface Convocatoria {
   fechaInicioEjecucion: string | null
   fechaFinEjecucion: string | null
   formularioId: string | null
+  cupoMinimoPorUnidadAcademica?: number | null
+  presupuestoTotal?: number | null
   formulario?: Formulario
 }
 
@@ -288,6 +290,9 @@ export interface Edicion {
   presupuesto?: Presupuesto
   anioEdicion?: number
   datosFormulario?: Record<string, unknown>
+  ordenMerito?: number | null
+  adjudicacionPropuesta?: boolean | null
+  puntajeMerito?: number | null
   creadoEn: string
   actualizadoEn: string
 }

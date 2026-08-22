@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsDateString, IsInt, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDateString, IsInt, IsNumber, Min } from 'class-validator';
 
 export class CrearConvocatoriaDto {
   @IsString()
@@ -36,4 +36,14 @@ export class CrearConvocatoriaDto {
   @IsDateString()
   @IsOptional()
   fechaFinEjecucion?: string;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  cupoMinimoPorUnidadAcademica?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  presupuestoTotal?: number;
 }

@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Put, Query, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Query, Body, Param, UseGuards } from '@nestjs/common';
 import { EvaluacionesService } from './evaluaciones.service';
 import { GuardarEvaluacionInstitucionalDto } from './dto/guardar-evaluacion-institucional.dto';
 import { GuardarEvaluacionCruzadaDto } from './dto/guardar-evaluacion-cruzada.dto';
 import { DesignarTerceraEvaluadorDto } from './dto/designar-tercera-evaluador.dto';
 import { ListarEvaluacionesDto } from './dto/listar-evaluaciones.dto';
+import { ActualizarPropuestaAdjudicacionDto } from './dto/actualizar-propuesta-adjudicacion.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -20,6 +21,25 @@ export class EvaluacionesController {
   @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
   monitoreo(@Query() dto: ListarEvaluacionesDto) {
     return this.service.monitoreo(dto.convocatoriaId ?? '', dto);
+  }
+
+  @Post('convocatoria/:convocatoriaId/orden-merito')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  generarOrdenMerito(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.generarOrdenMerito(convocatoriaId, usuario);
+  }
+
+  @Patch('edicion/:edicionId/adjudicacion-propuesta')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  actualizarPropuestaAdjudicacion(
+    @Param('edicionId') edicionId: string,
+    @Body() dto: ActualizarPropuestaAdjudicacionDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.actualizarPropuestaAdjudicacion(edicionId, dto.adjudicado, usuario);
   }
 
   @Get('edicion/:edicionId')

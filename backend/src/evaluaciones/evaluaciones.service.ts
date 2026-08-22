@@ -242,20 +242,28 @@ export class EvaluacionesService {
     };
   }
 
-  // Resumen final de la evaluación: se calcula cuando la edición ya está en
-  // ejecución (o cerrada) y tanto la evaluación institucional como al menos
-  // una cruzada fueron confirmadas. Es determinista: las evaluaciones
-  // confirmadas son inmutables, así que no hace falta persistirlo.
-  private calcularResumen(
+  // Puntaje final de la evaluación a partir de la institucional confirmada y
+  // las cruzadas confirmadas. Es estado-agnóstico: no exige que la edición
+  // esté en ejecución, así se puede usar para rankear durante la evaluación
+  // (p.ej. para generar el orden de mérito). Devuelve null si falta
+  // información para calcularlo.
+  private calcularPuntaje(
     institucional: EvaluacionInstitucional | null,
     cruzadasConfirmadas: EvaluacionCruzada[],
     edicion: Edicion,
-  ) {
+  ): {
+    puntajeInstitucional: number;
+    puntajeInstitucionalMaximo: number;
+    puntajeCruzadaPromedio: number;
+    puntajeCruzadaMaximo: number;
+    notaFinal: number;
+    adjudicado: boolean;
+    checklistCompleto: boolean;
+  } | null {
     if (
       !institucional ||
       institucional.estado !== EstadoEvaluacion.Confirmada ||
-      cruzadasConfirmadas.length === 0 ||
-      (edicion.estado !== EstadoEdicion.EnEjecucion && edicion.estado !== EstadoEdicion.Cerrado)
+      cruzadasConfirmadas.length === 0
     ) {
       return null;
     }
@@ -302,7 +310,300 @@ export class EvaluacionesService {
       puntajeCruzadaMaximo: maxCruzada,
       notaFinal: Math.round(notaFinal * 10) / 10,
       adjudicado: notaFinal >= UMBRAL_ADJUDICACION && checklistCompleto,
+      checklistCompleto,
     };
+  }
+
+  // Resumen final de la evaluación: se calcula cuando la edición ya está en
+  // ejecución (o cerrada) y tanto la evaluación institucional como al menos
+  // una cruzada fueron confirmadas. Es determinista: las evaluaciones
+  // confirmadas son inmutables, así que no hace falta persistirlo.
+  private calcularResumen(
+    institucional: EvaluacionInstitucional | null,
+    cruzadasConfirmadas: EvaluacionCruzada[],
+    edicion: Edicion,
+  ) {
+    if (edicion.estado !== EstadoEdicion.EnEjecucion && edicion.estado !== EstadoEdicion.Cerrado) {
+      return null;
+    }
+    return this.calcularPuntaje(institucional, cruzadasConfirmadas, edicion);
+  }
+
+  // Genera el orden de mérito automático de una convocatoria: rankea las
+  // ediciones por notaFinal (promedio de evaluación interna y externa) y
+  // propone una adjudicación borrador (no definitiva) respetando el cupo
+  // mínimo por unidad académica. No pisa el ordenMerito ya seteado a mano.
+  async generarOrdenMerito(convocatoriaId: string, usuario: Usuario): Promise<Edicion[]> {
+    this.validarEsRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+      },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId },
+      relations: {
+        unidadAcademica: true,
+        convocatoria: {
+          templateEvaluacionInstitucional: true,
+          templateEvaluacionCruzada: true,
+        },
+      },
+    });
+    const institucionales = await this.institucionalRepo.find({ where: { convocatoriaId } });
+    const cruzadas = await this.cruzadaRepo.find({ where: { convocatoriaId } });
+
+    const instPorEdicion = new Map(institucionales.map(i => [i.edicionId, i]));
+    const cruzadasPorEdicion = new Map<string, EvaluacionCruzada[]>();
+    for (const c of cruzadas) {
+      const arr = cruzadasPorEdicion.get(c.edicionId) ?? [];
+      arr.push(c);
+      cruzadasPorEdicion.set(c.edicionId, arr);
+    }
+
+    // El orden de mérito solo se genera si TODAS las ediciones que están en la
+    // etapa de evaluación fueron evaluadas (institucional confirmada + al
+    // menos una cruzada confirmada). Si falta alguna, se bloquea la operación.
+    const sinEvaluar = ediciones.filter(ed => {
+      if (ed.estado !== EstadoEdicion.EnEvaluacion) return false;
+      const inst = instPorEdicion.get(ed.id) ?? null;
+      const tieneInst = !!inst && inst.estado === EstadoEvaluacion.Confirmada;
+      const tieneCruzada = (cruzadasPorEdicion.get(ed.id) ?? []).some(
+        c => c.estado === EstadoEvaluacion.Confirmada,
+      );
+      return !tieneInst || !tieneCruzada;
+    });
+    if (sinEvaluar.length > 0) {
+      throw new BadRequestException(
+        'No se puede generar el orden de mérito: hay proyectos en evaluación que aún no fueron evaluados',
+      );
+    }
+
+    // Puntaje por edición (solo las que tienen evaluaciones confirmadas).
+    const puntajes = new Map<
+      string,
+      { notaFinal: number; checklistCompleto: boolean; adjudicado: boolean }
+    >();
+    for (const ed of ediciones) {
+      const inst = instPorEdicion.get(ed.id) ?? null;
+      const cruzadasConf = (cruzadasPorEdicion.get(ed.id) ?? []).filter(
+        c => c.estado === EstadoEvaluacion.Confirmada,
+      );
+      const p = this.calcularPuntaje(inst, cruzadasConf, ed);
+      if (p) {
+        puntajes.set(ed.id, {
+          notaFinal: p.notaFinal,
+          checklistCompleto: p.checklistCompleto,
+          adjudicado: p.adjudicado,
+        });
+      }
+    }
+
+    const ordenCmp = (a: number | null, b: number | null): number => {
+      if (a === null && b === null) return 0;
+      if (a === null) return 1;
+      if (b === null) return -1;
+      return a - b;
+    };
+
+    // Rankear por notaFinal desc (tie-break: checklist completo, luego id),
+    // solo las ediciones sin ordenMerito seteado (preserva los manuales).
+    const elegibles = ediciones
+      .filter(ed => ed.ordenMerito === null)
+      .map(ed => ({ ed, p: puntajes.get(ed.id) ?? null }))
+      .sort((a, b) => {
+        const pa = a.p;
+        const pb = b.p;
+        if (pa && pb) {
+          if (pb.notaFinal !== pa.notaFinal) return pb.notaFinal - pa.notaFinal;
+          if (pa.checklistCompleto !== pb.checklistCompleto) return pa.checklistCompleto ? -1 : 1;
+          return a.ed.id < b.ed.id ? -1 : 1;
+        }
+        if (pa) return -1;
+        if (pb) return 1;
+        return 0;
+      });
+
+    // Ediciones con ordenMerito ya asignado al inicio: son manuales y no deben
+    // ser pisadas por el cálculo automático (se capturan antes de reordenar).
+    const manuales = new Set(ediciones.filter(e => e.ordenMerito !== null).map(e => e.id));
+
+    let posicion = 1;
+    for (const { ed, p } of elegibles) {
+      if (p) {
+        ed.ordenMerito = posicion++;
+        ed.puntajeMerito = p.notaFinal;
+      } else {
+        ed.ordenMerito = null;
+        ed.puntajeMerito = null;
+      }
+    }
+
+    // Propuesta de adjudicación borrador, limitada por el presupuesto, con
+    // prioridad de MÉRITO GLOBAL y un piso de CUPO por unidad académica.
+    //
+    // Algoritmo en 3 fases:
+    //   Fase A — Mérito global: se financian los mejores proyectos de toda la
+    //            convocatoria (sin importar UA) MIENTRAS el saldo restante siga
+    //            alcanzando para cubrir el cupo pendiente de todas las UAs.
+    //   Fase B — Cupo balanceado: si hace falta, se garantiza el piso de
+    //            `cupo` proyectos por UA vía round-robin rotado.
+    //   Fase C — Mérito global para el excedente que quede tras cubrir cupos.
+    const propuesta = new Map<string, boolean>();
+    const costo = (ed: Edicion): number => Number(ed.presupuesto?.montoTotal ?? 0);
+
+    // Solo las ediciones automáticas (ordenMerito === null) con evaluación
+    // confirmada participan del cálculo; las manuales se preservan.
+    const elegiblesConPuntaje = elegibles.filter(({ p }) => p !== null).map(({ ed }) => ed);
+
+    // Listas por UA ordenadas por mérito (mejor primero).
+    const listasPorUA = new Map<string, Edicion[]>();
+    for (const ed of elegiblesConPuntaje) {
+      const arr = listasPorUA.get(ed.unidadAcademicaId) ?? [];
+      arr.push(ed);
+      listasPorUA.set(ed.unidadAcademicaId, arr);
+    }
+    for (const lista of listasPorUA.values()) {
+      lista.sort((a, b) => ordenCmp(a.ordenMerito, b.ordenMerito));
+    }
+    const uas = [...listasPorUA.keys()];
+
+    // Presupuesto disponible: null significa "sin límite" (comportamiento previo).
+    const presupuestoTotal = convocatoria.presupuestoTotal;
+    let disponible: number | null = presupuestoTotal != null ? Number(presupuestoTotal) : null;
+    const descontar = (monto: number): void => {
+      if (disponible != null) {
+        disponible = Math.max(0, Math.round((disponible - monto) * 100) / 100);
+      }
+    };
+    // Cantidad de proyectos admitidos por UA (para saber cupos pendientes).
+    const admitidosUA = new Map<string, number>();
+    for (const ua of uas) admitidosUA.set(ua, 0);
+
+    const cupo = convocatoria.cupoMinimoPorUnidadAcademica ?? 0;
+
+    const admitir = (ed: Edicion): void => {
+      propuesta.set(ed.id, true);
+      descontar(costo(ed));
+      admitidosUA.set(ed.unidadAcademicaId, (admitidosUA.get(ed.unidadAcademicaId) ?? 0) + 1);
+    };
+
+    // Reserva de cupo (peor caso): por cada UA con cupo pendiente, se suma el
+    // costo de sus `cupo - yaAdmitidos` proyectos MÁS CAROS aún disponibles. Así
+    // se garantiza el piso aunque el proyecto de mayor mérito sea el más caro.
+    const reservaCupos = (): number => {
+      let total = 0;
+      for (const ua of uas) {
+        const pend = cupo - (admitidosUA.get(ua) ?? 0);
+        if (pend <= 0) continue;
+        const costos = listasPorUA
+          .get(ua)!
+          .filter(ed => !propuesta.get(ed.id))
+          .map(ed => costo(ed))
+          .sort((a, b) => b - a)
+          .slice(0, pend);
+        total += costos.reduce((s, v) => s + v, 0);
+      }
+      return total;
+    };
+
+    // FASE A — Mérito global mientras alcance la reserva de cupo (peor caso).
+    const porMerito = [...elegiblesConPuntaje].sort(
+      (a, b) => (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0),
+    );
+    for (const ed of porMerito) {
+      const costoEd = costo(ed);
+      if (disponible == null) {
+        admitir(ed);
+        continue;
+      }
+      // Probar admisión y verificar que aún se pueda cubrir el cupo (peor caso).
+      propuesta.set(ed.id, true);
+      admitidosUA.set(ed.unidadAcademicaId, (admitidosUA.get(ed.unidadAcademicaId) ?? 0) + 1);
+      const ok = disponible - costoEd >= reservaCupos();
+      if (!ok) {
+        propuesta.delete(ed.id);
+        admitidosUA.set(ed.unidadAcademicaId, (admitidosUA.get(ed.unidadAcademicaId) ?? 0) - 1);
+        continue;
+      }
+      descontar(costoEd);
+    }
+
+    // FASE B — Cupo balanceado (round-robin rotado, tope `cupo`).
+    if (cupo > 0) {
+      const ptr = new Map<string, number>();
+      for (const ua of uas) ptr.set(ua, 0);
+      let inicio = 0;
+      let hayCambios = true;
+      while (hayCambios) {
+        hayCambios = false;
+        const orden = [...uas.slice(inicio), ...uas.slice(0, inicio)];
+        for (const ua of orden) {
+          const lista = listasPorUA.get(ua)!;
+          const yaAdmitidos = lista.filter(e => propuesta.get(e.id)).length;
+          if (yaAdmitidos >= cupo) continue;
+          let i = ptr.get(ua)!;
+          let ed: Edicion | undefined;
+          while (i < lista.length) {
+            const candidato = lista[i];
+            const costoEd = costo(candidato);
+            if (disponible == null || costoEd <= disponible) {
+              ed = candidato;
+              break;
+            }
+            i++;
+          }
+          if (!ed) {
+            ptr.set(ua, lista.length);
+            continue;
+          }
+          admitir(ed);
+          ptr.set(ua, i + 1);
+          hayCambios = true;
+        }
+        inicio = (inicio + 1) % uas.length;
+      }
+    }
+
+    // FASE C — Mérito global para el excedente restante.
+    const restantes = [...elegiblesConPuntaje]
+      .filter(ed => !propuesta.get(ed.id))
+      .sort((a, b) => (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0));
+    for (const ed of restantes) {
+      const costoEd = costo(ed);
+      if (disponible != null && costoEd > disponible) continue;
+      admitir(ed);
+    }
+
+    // Aplicar: automáticas según la propuesta; manuales (ya tenían ordenMerito
+    // asignado al inicio) se preservan; sin evaluación -> null.
+    for (const ed of ediciones) {
+      if (manuales.has(ed.id)) continue;
+      ed.adjudicacionPropuesta = puntajes.has(ed.id) ? (propuesta.get(ed.id) ?? false) : null;
+    }
+
+    await this.edicionRepo.save(ediciones);
+    return ediciones;
+  }
+
+  // Ajusta manualmente la adjudicación propuesta (borrador) de una edición.
+  // Solo el Rectorado puede hacerlo para resolver empates o corregir la
+  // propuesta generada automáticamente.
+  async actualizarPropuestaAdjudicacion(
+    edicionId: string,
+    adjudicado: boolean,
+    usuario: Usuario,
+  ): Promise<Edicion> {
+    this.validarEsRectorado(usuario);
+    const edicion = await this.edicionRepo.findOne({ where: { id: edicionId } });
+    if (!edicion) throw new NotFoundException('Edición no encontrada');
+    edicion.adjudicacionPropuesta = adjudicado;
+    return this.edicionRepo.save(edicion);
   }
 
   // ───────────── Evaluación Institucional ─────────────
@@ -539,6 +840,15 @@ export class EvaluacionesService {
     );
     if (!esSecretaria) {
       throw new ForbiddenException('Solo el personal de Secretaría puede evaluar institucionalmente');
+    }
+  }
+
+  private validarEsRectorado(usuario: Usuario): void {
+    const esRectorado = usuario.roles.some(
+      r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+    );
+    if (!esRectorado) {
+      throw new ForbiddenException('Solo el Rectorado puede generar el orden de mérito');
     }
   }
 
