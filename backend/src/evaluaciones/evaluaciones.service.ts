@@ -602,6 +602,23 @@ export class EvaluacionesService {
     this.validarEsRectorado(usuario);
     const edicion = await this.edicionRepo.findOne({ where: { id: edicionId } });
     if (!edicion) throw new NotFoundException('Edición no encontrada');
+
+    // Guarda de presupuesto: no se puede adjudicar si no alcanza para este proyecto.
+    if (adjudicado && edicion.adjudicacionPropuesta !== true) {
+      const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: edicion.convocatoriaId } });
+      const tope = convocatoria?.presupuestoTotal != null ? Number(convocatoria.presupuestoTotal) : null;
+      if (tope != null) {
+        const todas = await this.edicionRepo.find({ where: { convocatoriaId: edicion.convocatoriaId } });
+        const adjudicadoSum = todas
+          .filter(e => e.adjudicacionPropuesta === true)
+          .reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0);
+        const costo = Number(edicion.presupuesto?.montoTotal ?? 0);
+        if (adjudicadoSum + costo > tope + 0.001) {
+          throw new BadRequestException('No hay presupuesto disponible para adjudicar este proyecto');
+        }
+      }
+    }
+
     edicion.adjudicacionPropuesta = adjudicado;
     return this.edicionRepo.save(edicion);
   }
