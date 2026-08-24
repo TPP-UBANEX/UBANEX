@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -51,6 +52,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const [candidatos, setCandidatos] = useState<Usuario[]>([])
   const [loadingCandidatos, setLoadingCandidatos] = useState(false)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [busqueda, setBusqueda] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const abrirPerfil = (usuarioId?: string) => {
@@ -97,6 +99,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const cargarCandidatos = async (uaId: string) => {
     setLoadingCandidatos(true)
     setSelectedUserIds([])
+    setBusqueda('')
     try {
       const cands = await api.participaciones.candidatos({ unidadAcademicaId: uaId, convocatoriaId })
       // El endpoint ya excluye directores/codirectores y evaluadores existentes;
@@ -131,8 +134,22 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     setUaSeleccionadaId('')
     setCandidatos([])
     setSelectedUserIds([])
+    setBusqueda('')
     setDialogOpen(true)
   }
+
+  // Disponibles para agregar (perfil completo) primero, luego los no habilitados
+  // (perfil incompleto); cada grupo por orden alfabético. Filtra por nombre.
+  const candidatosOrdenados = useMemo(() => {
+    const termino = busqueda.trim().toLowerCase()
+    return candidatos
+      .map(d => ({ usuario: d, perfilIncompleto: camposPerfilFaltantes(d).length > 0 }))
+      .filter(c => c.usuario.nombreCompleto?.toLowerCase().includes(termino))
+      .sort((a, b) => {
+        if (a.perfilIncompleto !== b.perfilIncompleto) return a.perfilIncompleto ? 1 : -1
+        return (a.usuario.nombreCompleto || '').localeCompare(b.usuario.nombreCompleto || '', 'es')
+      })
+  }, [candidatos, busqueda])
 
   const handleDarAlta = async () => {
     if (selectedUserIds.length === 0) return
@@ -252,34 +269,46 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                     proyectos en esta convocatoria no pueden ser evaluadores.
                   </p>
                 ) : (
-                  <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border p-2">
-                    {candidatos.map(d => {
-                      const seleccionado = selectedUserIds.includes(d.id)
-                      const perfilIncompleto = camposPerfilFaltantes(d).length > 0
-                      const deshabilitado = perfilIncompleto || (!seleccionado && selectedUserIds.length >= cupoDisponible)
-                      return (
-                        <label
-                          key={d.id}
-                          className={`flex items-center gap-3 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors ${
-                            seleccionado ? 'bg-primary/10' : 'hover:bg-muted'
-                          } ${deshabilitado ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 accent-primary"
-                            checked={seleccionado}
-                            disabled={deshabilitado}
-                            onChange={() => toggleSeleccion(d.id)}
-                          />
-                          <span className="truncate">
-                            {d.nombreCompleto}
-                            {perfilIncompleto && (
-                              <span className="ml-2 text-xs text-muted-foreground">— perfil incompleto</span>
-                            )}
-                          </span>
-                        </label>
-                      )
-                    })}
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Buscar por nombre..."
+                      value={busqueda}
+                      onChange={e => setBusqueda(e.target.value)}
+                    />
+                    {candidatosOrdenados.length === 0 ? (
+                      <p className="text-xs text-muted-foreground px-1">
+                        Ningún docente coincide con la búsqueda.
+                      </p>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border p-2">
+                        {candidatosOrdenados.map(({ usuario: d, perfilIncompleto }) => {
+                          const seleccionado = selectedUserIds.includes(d.id)
+                          const deshabilitado = perfilIncompleto || (!seleccionado && selectedUserIds.length >= cupoDisponible)
+                          return (
+                            <label
+                              key={d.id}
+                              className={`flex items-center gap-3 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors ${
+                                seleccionado ? 'bg-primary/10' : 'hover:bg-muted'
+                              } ${deshabilitado ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-primary"
+                                checked={seleccionado}
+                                disabled={deshabilitado}
+                                onChange={() => toggleSeleccion(d.id)}
+                              />
+                              <span className="truncate">
+                                {d.nombreCompleto}
+                                {perfilIncompleto && (
+                                  <span className="ml-2 text-xs text-muted-foreground">— perfil incompleto</span>
+                                )}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
