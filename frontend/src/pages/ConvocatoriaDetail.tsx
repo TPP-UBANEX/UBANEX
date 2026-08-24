@@ -138,7 +138,7 @@ export function ConvocatoriaDetail() {
   const [generando, setGenerando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [confirmarMeritoOpen, setConfirmarMeritoOpen] = useState(false);
-  const [ordenMeritoSort, setOrdenMeritoSort] = useState('orden');
+  const [ordenMeritoSort, setOrdenMeritoSort] = useState('puntaje-desc');
 
   const esUsuarioEjecucion = user?.roles.some(
     (r) => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
@@ -254,6 +254,11 @@ export function ConvocatoriaDetail() {
       case 'presupuesto-desc':
         base.sort(
           (a, b) => Number(b.presupuesto?.montoTotal ?? 0) - Number(a.presupuesto?.montoTotal ?? 0),
+        );
+        break;
+      case 'presupuesto-asc':
+        base.sort(
+          (a, b) => Number(a.presupuesto?.montoTotal ?? 0) - Number(b.presupuesto?.montoTotal ?? 0),
         );
         break;
       default:
@@ -1018,53 +1023,57 @@ export function ConvocatoriaDetail() {
         </TabsContent>
         <TabsContent value="merito" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col gap-3 space-y-0">
               <CardTitle className="text-sm font-medium">Orden de Mérito</CardTitle>
-              <div className="flex gap-2">
-                {esRectorado && (
-                  <Button
-                    variant="secondary"
-                    onClick={generarOrdenMerito}
-                    disabled={generando || !!conv?.ordenMeritoConfirmado}
-                  >
-                    {generando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Generar orden de mérito automático
-                  </Button>
-                )}
-                {esAutoridadRectorado &&
-                  (conv?.ordenMeritoConfirmado ? (
-                    <Badge variant="default" className="bg-green-600 hover:bg-green-600">
-                      Orden de mérito confirmado
-                    </Badge>
-                  ) : todasEdiciones.some((e) => e.ordenMerito != null) ? (
-                    <Button variant="default" onClick={() => setConfirmarMeritoOpen(true)}>
-                      Confirmar orden de mérito
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  <Select value={filtroUA} onValueChange={cambiarUA}>
+                    <SelectTrigger className="w-72">
+                      <SelectValue placeholder="Unidad académica" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas las unidades académicas</SelectItem>
+                      {unidadesAcademicas.map((ua) => (
+                        <SelectItem key={ua.id} value={ua.id}>
+                          {ua.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={ordenMeritoSort} onValueChange={setOrdenMeritoSort}>
+                    <SelectTrigger className="w-60">
+                      <SelectValue placeholder="Ordenar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="puntaje-desc">Puntaje (mayor a menor)</SelectItem>
+                      <SelectItem value="puntaje-asc">Puntaje (menor a mayor)</SelectItem>
+                      <SelectItem value="presupuesto-desc">Presupuesto (mayor a menor)</SelectItem>
+                      <SelectItem value="presupuesto-asc">Presupuesto (menor a mayor)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                  {esRectorado && (
+                    <Button
+                      variant="secondary"
+                      onClick={generarOrdenMerito}
+                      disabled={generando || !!conv?.ordenMeritoConfirmado}
+                    >
+                      {generando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Generar orden de mérito automático
                     </Button>
-                  ) : null)}
-                <Select value={filtroUA} onValueChange={cambiarUA}>
-                  <SelectTrigger className="w-72">
-                    <SelectValue placeholder="Unidad académica" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas las unidades académicas</SelectItem>
-                    {unidadesAcademicas.map((ua) => (
-                      <SelectItem key={ua.id} value={ua.id}>
-                        {ua.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={ordenMeritoSort} onValueChange={setOrdenMeritoSort}>
-                  <SelectTrigger className="w-60">
-                    <SelectValue placeholder="Ordenar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="orden">Orden de mérito (mayor a menor)</SelectItem>
-                    <SelectItem value="puntaje-desc">Puntaje (mayor a menor)</SelectItem>
-                    <SelectItem value="puntaje-asc">Puntaje (menor a mayor)</SelectItem>
-                    <SelectItem value="presupuesto-desc">Presupuesto (mayor a menor)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  )}
+                  {esAutoridadRectorado &&
+                    (conv?.ordenMeritoConfirmado ? (
+                      <Badge variant="default" className="bg-green-600 hover:bg-green-600">
+                        Orden de mérito confirmado
+                      </Badge>
+                    ) : todasEdiciones.some((e) => e.ordenMerito != null) ? (
+                      <Button variant="default" onClick={() => setConfirmarMeritoOpen(true)}>
+                        Confirmar orden de mérito
+                      </Button>
+                    ) : null)}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
