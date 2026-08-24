@@ -95,6 +95,39 @@ export class MailService {
     });
   }
 
+  async enviarAltaEvaluador(
+    destino: string,
+    docenteNombre: string,
+    convocatoriaNombre: string,
+  ): Promise<void> {
+    const from = this.config.get<string>('SMTP_FROM') || 'UBANEX <noreplyubanex@gmail.com>';
+    await sgMail.send({
+      from,
+      to: destino,
+      subject: `UBANEX — Fuiste dado de alta como evaluador en "${convocatoriaNombre}"`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; border: 1px solid #e4e4e7; border-radius: 8px; overflow: hidden;">
+          <div style="background: #1a1a2e; padding: 24px 20px; text-align: center;">
+            <div style="font-size: 22px; font-weight: bold; color: #ffffff;">UBANEX</div>
+            <div style="color: #b8b8cc; font-size: 13px; margin-top: 4px;">
+              Alta de evaluador · <strong>${convocatoriaNombre}</strong>
+            </div>
+          </div>
+          <div style="padding: 24px 20px; background: #ffffff;">
+            <p style="margin: 0 0 12px;">Hola <strong>${docenteNombre}</strong>,</p>
+            <p style="margin: 0;">
+              La Dirección de Rectorado te dio de alta como <strong>evaluador</strong> en la convocatoria
+              <strong>${convocatoriaNombre}</strong>. Ya podés cumplir funciones de evaluador.
+            </p>
+          </div>
+          <div style="padding: 12px 20px; text-align: center; border-top: 1px solid #e4e4e7; font-size: 12px; color: #999;">
+            Sistema de Gestión UBANEX
+          </div>
+        </div>
+      `,
+    });
+  }
+
   async enviarEstadoEvaluador(
     destinos: string[],
     secretariaNombre: string,

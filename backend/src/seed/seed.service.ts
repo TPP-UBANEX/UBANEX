@@ -2062,7 +2062,7 @@ export class SeedService {
         usuarioId,
         tipo: TipoNotificacion.RESULTADO_EVALUADOR,
         participacionId: p.id,
-        mensaje: `Tu propuesta como evaluador en la convocatoria "${convocatoriaNombre}" fue aprobada`,
+        mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${convocatoriaNombre}"`,
         leida: false,
       }),
     );
@@ -2145,22 +2145,6 @@ export class SeedService {
 
         const cupoRestante = Math.max(0, 3 - aprobadosEnUa.length);
         const aAprobar = tomar(cupoRestante);
-        // Igual que el cupo de aprobados: se crea uno por estado sólo si la UA
-        // todavía no tiene ninguno, para no sumar una tanda en cada arranque.
-        const yaTieneEstado = (estado: EstadoPropuestaEvaluador): boolean =>
-          existentes.some(
-            (p) =>
-              p.rol === RolEjecucion.Evaluador &&
-              p.estado === estado &&
-              p.usuario?.unidadAcademicaId === ua.id,
-          );
-        const propuesto = yaTieneEstado(EstadoPropuestaEvaluador.Propuesto)
-          ? undefined
-          : tomar(1)[0];
-        const aceptada = yaTieneEstado(EstadoPropuestaEvaluador.Aceptada) ? undefined : tomar(1)[0];
-        const declinada = yaTieneEstado(EstadoPropuestaEvaluador.Declinada)
-          ? undefined
-          : tomar(1)[0];
 
         for (const evaluador of aAprobar) {
           evaluadorRows.push(
@@ -2175,62 +2159,10 @@ export class SeedService {
           notifMeta.push({
             usuarioId: evaluador.id,
             tipo: TipoNotificacion.RESULTADO_EVALUADOR,
-            mensaje: `Tu propuesta como evaluador en la convocatoria "${conv.nombre}" fue aprobada`,
+            mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${conv.nombre}"`,
             leida: false,
           });
           aprobadosUa.get(ua.id)?.add(evaluador.id);
-        }
-
-        if (propuesto) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: propuesto.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Propuesto,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: propuesto.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: false,
-          });
-        }
-        if (aceptada) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: aceptada.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Aceptada,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: aceptada.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: true,
-          });
-        }
-        if (declinada) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: declinada.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Declinada,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: declinada.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: true,
-          });
         }
       }
 

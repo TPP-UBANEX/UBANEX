@@ -119,17 +119,12 @@ export class ParticipacionConvocatoriaService {
         throw new BadRequestException('Evaluador no puede tener edicionId ni esDirectorPrincipal');
       }
 
-      const esSecretaria = asignadoPor.roles.some(
-        r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
-      );
-      if (!esSecretaria) {
-        throw new BadRequestException('Solo la Secretaría de la Unidad Académica puede proponer evaluadores');
+      const esRectorado = asignadoPor.roles.includes(RolUsuario.AutoridadDeRectorado);
+      if (!esRectorado) {
+        throw new BadRequestException('Solo una Autoridad de Rectorado puede dar de alta evaluadores');
       }
-      if (!asignadoPor.unidadAcademicaId) {
-        throw new BadRequestException('La Secretaría debe pertenecer a una Unidad Académica');
-      }
-      if (usuario.unidadAcademicaId !== asignadoPor.unidadAcademicaId) {
-        throw new BadRequestException('Solo se pueden proponer docentes de la propia Unidad Académica');
+      if (!usuario.unidadAcademicaId) {
+        throw new BadRequestException('El docente debe pertenecer a una Unidad Académica');
       }
 
       const proyectosEnConvocatoria = await this.edicionRepo.count({
@@ -144,19 +139,13 @@ export class ParticipacionConvocatoriaService {
         .innerJoin('p.usuario', 'u')
         .where('p.convocatoriaId = :convocatoriaId', { convocatoriaId: dto.convocatoriaId })
         .andWhere('p.rol = :rol', { rol: RolEjecucion.Evaluador })
-        .andWhere('p.estado IN (:...estados)', {
-          estados: [
-            EstadoPropuestaEvaluador.Propuesto,
-            EstadoPropuestaEvaluador.Aceptada,
-            EstadoPropuestaEvaluador.Aprobado,
-          ],
-        })
-        .andWhere('u.unidadAcademicaId = :uaId', { uaId: asignadoPor.unidadAcademicaId })
+        .andWhere('p.estado = :estado', { estado: EstadoPropuestaEvaluador.Aprobado })
+        .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuario.unidadAcademicaId })
         .getCount();
 
       if (activos >= CANTIDAD_EVALUADORES_POR_UA) {
         throw new BadRequestException(
-          `La Unidad Académica ya alcanzó el límite de ${CANTIDAD_EVALUADORES_POR_UA} evaluadores activos en esta convocatoria`,
+          `La Unidad Académica ya alcanzó el límite de ${CANTIDAD_EVALUADORES_POR_UA} evaluadores en esta convocatoria`,
         );
       }
     }
@@ -169,18 +158,18 @@ export class ParticipacionConvocatoriaService {
       esDirectorPrincipal: dto.esDirectorPrincipal ?? null,
       asignadoPorId: asignadoPor.id,
       estado: dto.rol === RolEjecucion.Evaluador
-        ? EstadoPropuestaEvaluador.Propuesto
+        ? EstadoPropuestaEvaluador.Aprobado
         : null,
     });
 
     const saved = await this.repo.save(entity);
 
     if (dto.rol === RolEjecucion.Evaluador) {
-      await this.notificarDocentePropuesto(usuario, convocatoria, saved.id);
+      await this.notificarDocenteAlta(usuario, convocatoria, saved.id);
       await this.auditoria.registrar({
         usuarioId: usuario.id,
         accion: TipoAccionAuditoria.PROPUESTA_EVALUADOR,
-        descripcion: `Propuesto como evaluador en la convocatoria "${convocatoria.nombre}"`,
+        descripcion: `Dado de alta como evaluador en la convocatoria "${convocatoria.nombre}"`,
         responsableId: asignadoPor.id,
         responsableNombre: asignadoPor.nombreCompleto,
       });
@@ -189,20 +178,20 @@ export class ParticipacionConvocatoriaService {
     return saved;
   }
 
-  private async notificarDocentePropuesto(
+  private async notificarDocenteAlta(
     usuario: Usuario,
     convocatoria: Convocatoria,
     participacionId: string,
   ): Promise<void> {
     try {
-      await this.mail.enviarPropuestaEvaluador(
+      await this.mail.enviarAltaEvaluador(
         usuario.email,
         usuario.nombreCompleto,
         convocatoria.nombre,
       );
     } catch (err) {
       this.logger.error(
-        `No se pudo enviar el mail de propuesta a ${usuario.email}: ${err instanceof Error ? err.message : err}`,
+        `No se pudo enviar el mail de alta a ${usuario.email}: ${err instanceof Error ? err.message : err}`,
       );
     }
 
@@ -210,14 +199,14 @@ export class ParticipacionConvocatoriaService {
       await this.notificacionRepo.save(
         this.notificacionRepo.create({
           usuarioId: usuario.id,
-          tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
+          tipo: TipoNotificacion.RESULTADO_EVALUADOR,
           participacionId,
-          mensaje: `Fuiste propuesto como evaluador en la convocatoria "${convocatoria.nombre}"`,
+          mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${convocatoria.nombre}"`,
         }),
       );
     } catch (err) {
       this.logger.error(
-        `No se pudo crear la notificación de propuesta para ${usuario.email}: ${err instanceof Error ? err.message : err}`,
+        `No se pudo crear la notificación de alta para ${usuario.email}: ${err instanceof Error ? err.message : err}`,
       );
     }
   }
