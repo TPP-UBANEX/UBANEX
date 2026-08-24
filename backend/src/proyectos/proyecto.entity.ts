@@ -13,8 +13,10 @@ export class Proyecto {
   @Column()
   nombre: string;
 
-  @Column({ default: false })
-  esConsolidado: boolean;
+  // Override manual del estado consolidado: null = automático (derivado del
+  // historial de adjudicaciones), true/false = forzado por Rectorado.
+  @Column({ type: 'boolean', nullable: true, default: null })
+  esConsolidado: boolean | null;
 
   @Column({ default: false })
   esInterfacultad: boolean;

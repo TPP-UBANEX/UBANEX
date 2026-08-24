@@ -25,7 +25,7 @@ import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formula
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
 
-const CAMPOS_EDICION_AUTORIDAD = ['esInterfacultad', 'unidadAcademicaAdicionalId'];
+const CAMPOS_EDICION_AUTORIDAD = ['esConsolidado', 'esInterfacultad', 'unidadAcademicaAdicionalId'];
 const ESTADOS_EDITABLES_AUTORIDAD = [
   EstadoEdicion.Borrador,
   EstadoEdicion.Presentado,
@@ -66,7 +66,7 @@ export class ProyectosService {
     const proyecto = await this.proyectoRepo.save(
       this.proyectoRepo.create({
         nombre: dto.nombre,
-        esConsolidado: dto.esConsolidado ?? false,
+        esConsolidado: null,
         esInterfacultad: dto.esInterfacultad ?? false,
         creadoPorId: usuario.id,
       }),
@@ -434,10 +434,14 @@ export class ProyectosService {
       await this.proyectoRepo.update(proyectoId, { nombre: dto.nombre });
     }
 
-    if (dto.esConsolidado !== undefined || dto.esInterfacultad !== undefined) {
-      const updateData: Partial<Proyecto> = {};
-      if (dto.esConsolidado !== undefined) updateData.esConsolidado = dto.esConsolidado;
-      if (dto.esInterfacultad !== undefined) updateData.esInterfacultad = dto.esInterfacultad;
+    // El consolidado es un override administrativo: solo lo puede tocar una autoridad.
+    const puedeOverrideConsolidado = this.esAutoridad(usuario);
+    const updateData: Partial<Proyecto> = {};
+    if (dto.esConsolidado !== undefined && puedeOverrideConsolidado) {
+      updateData.esConsolidado = dto.esConsolidado;
+    }
+    if (dto.esInterfacultad !== undefined) updateData.esInterfacultad = dto.esInterfacultad;
+    if (Object.keys(updateData).length > 0) {
       await this.proyectoRepo.update(proyectoId, updateData);
     }
 
