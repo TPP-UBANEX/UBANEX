@@ -1,5 +1,8 @@
 import {
-  Injectable, NotFoundException, BadRequestException, ForbiddenException,
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -22,21 +25,23 @@ import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evalu
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
-import { validarRespuestasInstitucionales, validarRespuestasCruzadas } from './validar-respuestas-evaluacion';
+import {
+  validarRespuestasInstitucionales,
+  validarRespuestasCruzadas,
+} from './validar-respuestas-evaluacion';
 import { ListarEvaluacionesDto } from './dto/listar-evaluaciones.dto';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
-import { EstructuraTemplateInstitucional, EstructuraTemplateCruzada } from '../templates-evaluacion/estructura-template';
+import {
+  EstructuraTemplateInstitucional,
+  EstructuraTemplateCruzada,
+} from '../templates-evaluacion/estructura-template';
 
 // ── Fórmula del resumen final de evaluación ─────────────────────────────
-// Ajustar acá los pesos, el puntaje de los Sí y el umbral de adjudicación
-// cuando se quiera cambiar la regla de cálculo del resumen final de los
-// proyectos en ejecución. Por ahora: 50% institucional + 50% cruzada (en
-// porcentaje sobre el máximo del template), cada "Sí" del formulario suma 10
-// puntos, y se adjudica con notaFinal >= 60 y todo el checklist en "Sí".
-const PESO_INSTITUCIONAL = 0.5;
-const PESO_CRUZADA = 0.5;
+// El puntaje final (mérito) es la suma cruda del promedio de las evaluaciones
+// cruzadas confirmadas más la evaluación institucional confirmada. Cada "Sí"
+// del formulario suma PUNTAJE_BOOLEANO puntos. La asignación de fondos la
+// define el presupuesto + cupo, no un umbral de nota.
 const PUNTAJE_BOOLEANO = 10;
-const UMBRAL_ADJUDICACION = 60;
 
 @Injectable()
 export class EvaluacionesService {
@@ -91,7 +96,7 @@ export class EvaluacionesService {
       relations: { evaluador: true },
     });
 
-    const instPorEdicion = new Map(institucionales.map(i => [i.edicionId, i]));
+    const instPorEdicion = new Map(institucionales.map((i) => [i.edicionId, i]));
     const cruzadasPorEdicion = new Map<string, EvaluacionCruzada[]>();
     for (const c of cruzadas) {
       const arr = cruzadasPorEdicion.get(c.edicionId) ?? [];
@@ -102,7 +107,7 @@ export class EvaluacionesService {
     return {
       convocatoria,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-      ediciones: ediciones.map(ed => {
+      ediciones: ediciones.map((ed) => {
         const inst = instPorEdicion.get(ed.id) ?? null;
         return {
           edicion: ed,
@@ -119,7 +124,7 @@ export class EvaluacionesService {
                   : null,
               }
             : null,
-          cruzadas: (cruzadasPorEdicion.get(ed.id) ?? []).map(c => ({
+          cruzadas: (cruzadasPorEdicion.get(ed.id) ?? []).map((c) => ({
             id: c.id,
             tipo: c.tipo,
             estado: c.estado,
@@ -148,11 +153,11 @@ export class EvaluacionesService {
 
     const roles = usuario.roles ?? [];
     const esRectorado = roles.some(
-      r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+      (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
     );
     const esSecretariaUA =
       roles.some(
-        r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+        (r) => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
       ) && edicion.unidadAcademicaId === usuario.unidadAcademicaId;
     const esDirector =
       edicion.creadoPorId === usuario.id ||
@@ -181,7 +186,7 @@ export class EvaluacionesService {
     const estructuraCruzada = edicion.convocatoria?.templateEvaluacionCruzada?.estructura ?? null;
     const maxCruzada = estructuraCruzada
       ? (estructuraCruzada.categorias ?? [])
-          .flatMap(c => c.items ?? [])
+          .flatMap((c) => c.items ?? [])
           .reduce((suma, item) => suma + (item.puntajeMaximo ?? 0), 0)
       : null;
 
@@ -189,9 +194,9 @@ export class EvaluacionesService {
       esSecretariaUA || esRectorado || institucional?.estado === EstadoEvaluacion.Confirmada;
     const verDetalleCruz = (c: EvaluacionCruzada) =>
       esSecretariaUA || esRectorado || c.estado === EstadoEvaluacion.Confirmada;
-    const algunaCruzadaConfirmada = cruzadas.some(c => c.estado === EstadoEvaluacion.Confirmada);
+    const algunaCruzadaConfirmada = cruzadas.some((c) => c.estado === EstadoEvaluacion.Confirmada);
 
-    const cruzadasConfirmadas = cruzadas.filter(c => c.estado === EstadoEvaluacion.Confirmada);
+    const cruzadasConfirmadas = cruzadas.filter((c) => c.estado === EstadoEvaluacion.Confirmada);
     const resumen = this.calcularResumen(institucional, cruzadasConfirmadas, edicion);
 
     return {
@@ -206,16 +211,22 @@ export class EvaluacionesService {
             estado: institucional.estado,
             observaciones: verDetalleInst ? institucional.observaciones : null,
             realizadoPor: institucional.realizadoPor
-              ? { id: institucional.realizadoPor.id, nombreCompleto: institucional.realizadoPor.nombreCompleto }
+              ? {
+                  id: institucional.realizadoPor.id,
+                  nombreCompleto: institucional.realizadoPor.nombreCompleto,
+                }
               : null,
             confirmadoPor: institucional.confirmadoPor
-              ? { id: institucional.confirmadoPor.id, nombreCompleto: institucional.confirmadoPor.nombreCompleto }
+              ? {
+                  id: institucional.confirmadoPor.id,
+                  nombreCompleto: institucional.confirmadoPor.nombreCompleto,
+                }
               : null,
             categorias: verDetalleInst ? institucional.categorias : null,
             checklist: verDetalleInst ? institucional.checklist : null,
           }
         : null,
-      cruzadas: cruzadas.map(c => {
+      cruzadas: cruzadas.map((c) => {
         const ver = verDetalleCruz(c);
         return {
           id: c.id,
@@ -235,9 +246,8 @@ export class EvaluacionesService {
       estructuraInstitucional: verDetalleInst
         ? (edicion.convocatoria?.templateEvaluacionInstitucional?.estructura ?? null)
         : null,
-      estructuraCruzada: esSecretariaUA || esRectorado || algunaCruzadaConfirmada
-        ? estructuraCruzada
-        : null,
+      estructuraCruzada:
+        esSecretariaUA || esRectorado || algunaCruzadaConfirmada ? estructuraCruzada : null,
       resumen,
     };
   }
@@ -257,7 +267,6 @@ export class EvaluacionesService {
     puntajeCruzadaPromedio: number;
     puntajeCruzadaMaximo: number;
     notaFinal: number;
-    adjudicado: boolean;
     checklistCompleto: boolean;
   } | null {
     if (
@@ -268,11 +277,12 @@ export class EvaluacionesService {
       return null;
     }
 
-    const estructuraInst = edicion.convocatoria?.templateEvaluacionInstitucional?.estructura ?? null;
+    const estructuraInst =
+      edicion.convocatoria?.templateEvaluacionInstitucional?.estructura ?? null;
     const estructuraCruzada = edicion.convocatoria?.templateEvaluacionCruzada?.estructura ?? null;
     if (!estructuraInst || !estructuraCruzada) return null;
 
-    const subcategorias = (estructuraInst.categorias ?? []).flatMap(c => c.subcategorias ?? []);
+    const subcategorias = (estructuraInst.categorias ?? []).flatMap((c) => c.subcategorias ?? []);
     const respuestas = (institucional.categorias ?? {}) as Record<string, { valor?: unknown }>;
     const maxInst = subcategorias.reduce<number>((suma, sub) => {
       if (sub.tipoValor === 'numerico') return suma + (sub.maximo ?? PUNTAJE_BOOLEANO);
@@ -285,31 +295,28 @@ export class EvaluacionesService {
     }, 0);
 
     const maxCruzada = (estructuraCruzada.categorias ?? [])
-      .flatMap(c => c.items ?? [])
+      .flatMap((c) => c.items ?? [])
       .reduce<number>((suma, item) => suma + (item.puntajeMaximo ?? 0), 0);
-    const promedioCruzada = cruzadasConfirmadas.reduce<number>((suma, c) => {
-      const items = (c.items ?? {}) as Record<string, number>;
-      const total = Object.values(items).reduce<number>((acc, v) => acc + Number(v), 0);
-      return suma + total;
-    }, 0) / cruzadasConfirmadas.length;
+    const promedioCruzada =
+      cruzadasConfirmadas.reduce<number>((suma, c) => {
+        const items = (c.items ?? {}) as Record<string, number>;
+        const total = Object.values(items).reduce<number>((acc, v) => acc + Number(v), 0);
+        return suma + total;
+      }, 0) / cruzadasConfirmadas.length;
 
     const checklist = (institucional.checklist ?? {}) as Record<string, boolean>;
     const checklistCompleto = (estructuraInst.checklist ?? []).every(
-      item => checklist[item.id] === true,
+      (item) => checklist[item.id] === true,
     );
 
-    const notaFinal =
-      (PESO_INSTITUCIONAL * (puntajeInst / maxInst) +
-        PESO_CRUZADA * (promedioCruzada / maxCruzada)) *
-      100;
+    const notaFinal = Math.round((promedioCruzada + puntajeInst) * 10) / 10;
 
     return {
       puntajeInstitucional: puntajeInst,
       puntajeInstitucionalMaximo: maxInst,
       puntajeCruzadaPromedio: Math.round(promedioCruzada * 10) / 10,
       puntajeCruzadaMaximo: maxCruzada,
-      notaFinal: Math.round(notaFinal * 10) / 10,
-      adjudicado: notaFinal >= UMBRAL_ADJUDICACION && checklistCompleto,
+      notaFinal,
       checklistCompleto,
     };
   }
@@ -330,8 +337,9 @@ export class EvaluacionesService {
   }
 
   // Genera el orden de mérito automático de una convocatoria: rankea las
-  // ediciones por notaFinal (promedio de evaluación interna y externa) y
-  // propone una adjudicación borrador (no definitiva) respetando el cupo
+  // ediciones por notaFinal (suma del promedio de evaluaciones cruzadas y la
+  // evaluación institucional) y propone una adjudicación borrador (no
+  // definitiva) respetando el cupo
   // mínimo por unidad académica. No pisa el ordenMerito ya seteado a mano.
   async generarOrdenMerito(convocatoriaId: string, usuario: Usuario): Promise<Edicion[]> {
     this.validarEsRectorado(usuario);
@@ -348,6 +356,7 @@ export class EvaluacionesService {
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId },
       relations: {
+        proyecto: true,
         unidadAcademica: true,
         convocatoria: {
           templateEvaluacionInstitucional: true,
@@ -358,7 +367,7 @@ export class EvaluacionesService {
     const institucionales = await this.institucionalRepo.find({ where: { convocatoriaId } });
     const cruzadas = await this.cruzadaRepo.find({ where: { convocatoriaId } });
 
-    const instPorEdicion = new Map(institucionales.map(i => [i.edicionId, i]));
+    const instPorEdicion = new Map(institucionales.map((i) => [i.edicionId, i]));
     const cruzadasPorEdicion = new Map<string, EvaluacionCruzada[]>();
     for (const c of cruzadas) {
       const arr = cruzadasPorEdicion.get(c.edicionId) ?? [];
@@ -369,12 +378,12 @@ export class EvaluacionesService {
     // El orden de mérito solo se genera si TODAS las ediciones que están en la
     // etapa de evaluación fueron evaluadas (institucional confirmada + al
     // menos una cruzada confirmada). Si falta alguna, se bloquea la operación.
-    const sinEvaluar = ediciones.filter(ed => {
+    const sinEvaluar = ediciones.filter((ed) => {
       if (ed.estado !== EstadoEdicion.EnEvaluacion) return false;
       const inst = instPorEdicion.get(ed.id) ?? null;
       const tieneInst = !!inst && inst.estado === EstadoEvaluacion.Confirmada;
       const tieneCruzada = (cruzadasPorEdicion.get(ed.id) ?? []).some(
-        c => c.estado === EstadoEvaluacion.Confirmada,
+        (c) => c.estado === EstadoEvaluacion.Confirmada,
       );
       return !tieneInst || !tieneCruzada;
     });
@@ -385,21 +394,17 @@ export class EvaluacionesService {
     }
 
     // Puntaje por edición (solo las que tienen evaluaciones confirmadas).
-    const puntajes = new Map<
-      string,
-      { notaFinal: number; checklistCompleto: boolean; adjudicado: boolean }
-    >();
+    const puntajes = new Map<string, { notaFinal: number; checklistCompleto: boolean }>();
     for (const ed of ediciones) {
       const inst = instPorEdicion.get(ed.id) ?? null;
       const cruzadasConf = (cruzadasPorEdicion.get(ed.id) ?? []).filter(
-        c => c.estado === EstadoEvaluacion.Confirmada,
+        (c) => c.estado === EstadoEvaluacion.Confirmada,
       );
       const p = this.calcularPuntaje(inst, cruzadasConf, ed);
       if (p) {
         puntajes.set(ed.id, {
           notaFinal: p.notaFinal,
           checklistCompleto: p.checklistCompleto,
-          adjudicado: p.adjudicado,
         });
       }
     }
@@ -414,8 +419,8 @@ export class EvaluacionesService {
     // Rankear por notaFinal desc (tie-break: checklist completo, luego id),
     // solo las ediciones sin ordenMerito seteado (preserva los manuales).
     const elegibles = ediciones
-      .filter(ed => ed.ordenMerito === null)
-      .map(ed => ({ ed, p: puntajes.get(ed.id) ?? null }))
+      .filter((ed) => ed.ordenMerito === null)
+      .map((ed) => ({ ed, p: puntajes.get(ed.id) ?? null }))
       .sort((a, b) => {
         const pa = a.p;
         const pb = b.p;
@@ -431,7 +436,7 @@ export class EvaluacionesService {
 
     // Ediciones con ordenMerito ya asignado al inicio: son manuales y no deben
     // ser pisadas por el cálculo automático (se capturan antes de reordenar).
-    const manuales = new Set(ediciones.filter(e => e.ordenMerito !== null).map(e => e.id));
+    const manuales = new Set(ediciones.filter((e) => e.ordenMerito !== null).map((e) => e.id));
 
     let posicion = 1;
     for (const { ed, p } of elegibles) {
@@ -503,8 +508,8 @@ export class EvaluacionesService {
         if (pend <= 0) continue;
         const costos = listasPorUA
           .get(ua)!
-          .filter(ed => !propuesta.get(ed.id))
-          .map(ed => costo(ed))
+          .filter((ed) => !propuesta.get(ed.id))
+          .map((ed) => costo(ed))
           .sort((a, b) => b - a)
           .slice(0, pend);
         total += costos.reduce((s, v) => s + v, 0);
@@ -545,7 +550,7 @@ export class EvaluacionesService {
         const orden = [...uas.slice(inicio), ...uas.slice(0, inicio)];
         for (const ua of orden) {
           const lista = listasPorUA.get(ua)!;
-          const yaAdmitidos = lista.filter(e => propuesta.get(e.id)).length;
+          const yaAdmitidos = lista.filter((e) => propuesta.get(e.id)).length;
           if (yaAdmitidos >= cupo) continue;
           let i = ptr.get(ua)!;
           let ed: Edicion | undefined;
@@ -572,7 +577,7 @@ export class EvaluacionesService {
 
     // FASE C — Mérito global para el excedente restante.
     const restantes = [...elegiblesConPuntaje]
-      .filter(ed => !propuesta.get(ed.id))
+      .filter((ed) => !propuesta.get(ed.id))
       .sort((a, b) => (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0));
     for (const ed of restantes) {
       const costoEd = costo(ed);
@@ -600,21 +605,31 @@ export class EvaluacionesService {
     usuario: Usuario,
   ): Promise<Edicion> {
     this.validarEsRectorado(usuario);
-    const edicion = await this.edicionRepo.findOne({ where: { id: edicionId } });
+    const edicion = await this.edicionRepo.findOne({
+      where: { id: edicionId },
+      relations: { proyecto: true, unidadAcademica: true },
+    });
     if (!edicion) throw new NotFoundException('Edición no encontrada');
 
     // Guarda de presupuesto: no se puede adjudicar si no alcanza para este proyecto.
     if (adjudicado && edicion.adjudicacionPropuesta !== true) {
-      const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: edicion.convocatoriaId } });
-      const tope = convocatoria?.presupuestoTotal != null ? Number(convocatoria.presupuestoTotal) : null;
+      const convocatoria = await this.convocatoriaRepo.findOne({
+        where: { id: edicion.convocatoriaId },
+      });
+      const tope =
+        convocatoria?.presupuestoTotal != null ? Number(convocatoria.presupuestoTotal) : null;
       if (tope != null) {
-        const todas = await this.edicionRepo.find({ where: { convocatoriaId: edicion.convocatoriaId } });
+        const todas = await this.edicionRepo.find({
+          where: { convocatoriaId: edicion.convocatoriaId },
+        });
         const adjudicadoSum = todas
-          .filter(e => e.adjudicacionPropuesta === true)
+          .filter((e) => e.adjudicacionPropuesta === true)
           .reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0);
         const costo = Number(edicion.presupuesto?.montoTotal ?? 0);
         if (adjudicadoSum + costo > tope + 0.001) {
-          throw new BadRequestException('No hay presupuesto disponible para adjudicar este proyecto');
+          throw new BadRequestException(
+            'No hay presupuesto disponible para adjudicar este proyecto',
+          );
         }
       }
     }
@@ -641,7 +656,11 @@ export class EvaluacionesService {
         unidadAcademicaId: usuario.unidadAcademicaId,
         estado: EstadoEdicion.EnEvaluacion,
       },
-      relations: { proyecto: { unidadAcademicaAdicional: true }, unidadAcademica: true, creadoPor: true },
+      relations: {
+        proyecto: { unidadAcademicaAdicional: true },
+        unidadAcademica: true,
+        creadoPor: true,
+      },
       order: { actualizadoEn: 'DESC' },
     });
 
@@ -649,24 +668,26 @@ export class EvaluacionesService {
       where: { convocatoriaId },
       relations: { confirmadoPor: true },
     });
-    const evaluacionPorEdicion = new Map(evaluaciones.map(e => [e.edicionId, e]));
+    const evaluacionPorEdicion = new Map(evaluaciones.map((e) => [e.edicionId, e]));
 
-    let items: Array<{ edicion: Edicion; evaluacion: EvaluacionInstitucional | null }> = ediciones.map(ed => ({
-      edicion: ed,
-      evaluacion: evaluacionPorEdicion.get(ed.id) ?? null,
-    }));
+    let items: Array<{ edicion: Edicion; evaluacion: EvaluacionInstitucional | null }> =
+      ediciones.map((ed) => ({
+        edicion: ed,
+        evaluacion: evaluacionPorEdicion.get(ed.id) ?? null,
+      }));
 
     if (dto.search) {
       const termino = dto.search.toLowerCase();
-      items = items.filter(i =>
+      items = items.filter((i) =>
         (i.edicion.proyecto?.nombre ?? '').toLowerCase().includes(termino),
       );
     }
     if (dto.estado) {
-      items = items.filter(i => {
+      items = items.filter((i) => {
         if (dto.estado === 'sin_evaluar') return i.evaluacion === null;
         if (dto.estado === 'borrador') return i.evaluacion?.estado === EstadoEvaluacion.Borrador;
-        if (dto.estado === 'confirmada') return i.evaluacion?.estado === EstadoEvaluacion.Confirmada;
+        if (dto.estado === 'confirmada')
+          return i.evaluacion?.estado === EstadoEvaluacion.Confirmada;
         return true;
       });
     }
@@ -680,12 +701,12 @@ export class EvaluacionesService {
     };
   }
 
-  async obtenerInstitucional(
-    convocatoriaId: string,
-    edicionId: string,
-    usuario: Usuario,
-  ) {
-    const { convocatoria } = await this.validarEdicionParaInstitucional(convocatoriaId, edicionId, usuario);
+  async obtenerInstitucional(convocatoriaId: string, edicionId: string, usuario: Usuario) {
+    const { convocatoria } = await this.validarEdicionParaInstitucional(
+      convocatoriaId,
+      edicionId,
+      usuario,
+    );
 
     const evaluacion = await this.institucionalRepo.findOne({
       where: { edicionId },
@@ -698,11 +719,7 @@ export class EvaluacionesService {
     };
   }
 
-  async historialInstitucional(
-    convocatoriaId: string,
-    edicionId: string,
-    usuario: Usuario,
-  ) {
+  async historialInstitucional(convocatoriaId: string, edicionId: string, usuario: Usuario) {
     await this.validarEdicionParaInstitucional(convocatoriaId, edicionId, usuario);
 
     const evaluacion = await this.institucionalRepo.findOne({
@@ -730,7 +747,11 @@ export class EvaluacionesService {
     dto: GuardarEvaluacionInstitucionalDto,
     usuario: Usuario,
   ) {
-    const { convocatoria, edicion } = await this.validarEdicionParaInstitucional(convocatoriaId, edicionId, usuario);
+    const { convocatoria, edicion } = await this.validarEdicionParaInstitucional(
+      convocatoriaId,
+      edicionId,
+      usuario,
+    );
 
     const template = convocatoria.templateEvaluacionInstitucional;
     if (!template) {
@@ -778,16 +799,18 @@ export class EvaluacionesService {
     };
   }
 
-  async confirmarInstitucional(
-    convocatoriaId: string,
-    edicionId: string,
-    usuario: Usuario,
-  ) {
+  async confirmarInstitucional(convocatoriaId: string, edicionId: string, usuario: Usuario) {
     if (!usuario.roles.includes(RolUsuario.AutoridadDeSecretaria)) {
-      throw new ForbiddenException('Solo una Autoridad de Secretaría puede confirmar la evaluación institucional');
+      throw new ForbiddenException(
+        'Solo una Autoridad de Secretaría puede confirmar la evaluación institucional',
+      );
     }
 
-    const { convocatoria } = await this.validarEdicionParaInstitucional(convocatoriaId, edicionId, usuario);
+    const { convocatoria } = await this.validarEdicionParaInstitucional(
+      convocatoriaId,
+      edicionId,
+      usuario,
+    );
 
     const template = convocatoria.templateEvaluacionInstitucional;
     if (!template) {
@@ -852,17 +875,19 @@ export class EvaluacionesService {
   }
 
   private validarEsSecretaria(usuario: Usuario): void {
-    const esSecretaria = usuario.roles.some(r =>
-      r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+    const esSecretaria = usuario.roles.some(
+      (r) => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
     );
     if (!esSecretaria) {
-      throw new ForbiddenException('Solo el personal de Secretaría puede evaluar institucionalmente');
+      throw new ForbiddenException(
+        'Solo el personal de Secretaría puede evaluar institucionalmente',
+      );
     }
   }
 
   private validarEsRectorado(usuario: Usuario): void {
     const esRectorado = usuario.roles.some(
-      r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+      (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
     );
     if (!esRectorado) {
       throw new ForbiddenException('Solo el Rectorado puede generar el orden de mérito');
@@ -902,7 +927,13 @@ export class EvaluacionesService {
     convocatoriaId: string,
     usuario: Usuario,
     dto: ListarEvaluacionesDto,
-  ): Promise<PaginatedResponse<{ edicion: Edicion; tipo: TipoEvaluacionCruzada; evaluacion: EvaluacionCruzada | null }>> {
+  ): Promise<
+    PaginatedResponse<{
+      edicion: Edicion;
+      tipo: TipoEvaluacionCruzada;
+      evaluacion: EvaluacionCruzada | null;
+    }>
+  > {
     const { page = 1, limit = 10 } = dto;
     const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
@@ -914,34 +945,44 @@ export class EvaluacionesService {
     const uaEmparejada = await this.obtenerUaEmparejada(convocatoriaId, usuario.unidadAcademicaId);
     const conflictos = await this.edicionesConConflicto(usuario.id, convocatoriaId);
 
-    const misEvaluaciones = await this.cruzadaRepo.find({ where: { evaluadorId: usuario.id, convocatoriaId } });
-    const misEdicionesEvaluadas = new Set(misEvaluaciones.map(e => e.edicionId));
+    const misEvaluaciones = await this.cruzadaRepo.find({
+      where: { evaluadorId: usuario.id, convocatoriaId },
+    });
+    const misEdicionesEvaluadas = new Set(misEvaluaciones.map((e) => e.edicionId));
 
     const evaluacionesConvocatoria = await this.cruzadaRepo.find({ where: { convocatoriaId } });
     const propiosEvaluados = new Set(
       evaluacionesConvocatoria
-        .filter(e => e.tipo === TipoEvaluacionCruzada.Propia)
-        .map(e => e.edicionId),
+        .filter((e) => e.tipo === TipoEvaluacionCruzada.Propia)
+        .map((e) => e.edicionId),
     );
     const ajenosEvaluados = new Set(
       evaluacionesConvocatoria
-        .filter(e => e.tipo === TipoEvaluacionCruzada.Ajena)
-        .map(e => e.edicionId),
+        .filter((e) => e.tipo === TipoEvaluacionCruzada.Ajena)
+        .map((e) => e.edicionId),
     );
 
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion },
-      relations: { proyecto: { unidadAcademicaAdicional: true }, unidadAcademica: true, creadoPor: true },
+      relations: {
+        proyecto: { unidadAcademicaAdicional: true },
+        unidadAcademica: true,
+        creadoPor: true,
+      },
       order: { actualizadoEn: 'DESC' },
     });
 
-    const resultado: Array<{ edicion: Edicion; tipo: TipoEvaluacionCruzada; evaluacion: EvaluacionCruzada | null }> = [];
+    const resultado: Array<{
+      edicion: Edicion;
+      tipo: TipoEvaluacionCruzada;
+      evaluacion: EvaluacionCruzada | null;
+    }> = [];
 
     for (const ed of ediciones) {
       if (conflictos.has(ed.id)) continue;
 
       if (misEdicionesEvaluadas.has(ed.id)) {
-        const miEvaluacion = misEvaluaciones.find(e => e.edicionId === ed.id);
+        const miEvaluacion = misEvaluaciones.find((e) => e.edicionId === ed.id);
         if (miEvaluacion) {
           resultado.push({ edicion: ed, tipo: miEvaluacion.tipo, evaluacion: miEvaluacion });
         }
@@ -961,8 +1002,8 @@ export class EvaluacionesService {
 
     for (const evaluacion of misEvaluaciones) {
       if (evaluacion.tipo !== TipoEvaluacionCruzada.TerceraUa) continue;
-      if (resultado.some(r => r.edicion.id === evaluacion.edicionId)) continue;
-      const ed = ediciones.find(x => x.id === evaluacion.edicionId);
+      if (resultado.some((r) => r.edicion.id === evaluacion.edicionId)) continue;
+      const ed = ediciones.find((x) => x.id === evaluacion.edicionId);
       if (ed) {
         resultado.push({ edicion: ed, tipo: TipoEvaluacionCruzada.TerceraUa, evaluacion });
       }
@@ -972,15 +1013,16 @@ export class EvaluacionesService {
 
     if (dto.search) {
       const termino = dto.search.toLowerCase();
-      filtradas = filtradas.filter(r =>
+      filtradas = filtradas.filter((r) =>
         (r.edicion.proyecto?.nombre ?? '').toLowerCase().includes(termino),
       );
     }
     if (dto.estado) {
-      filtradas = filtradas.filter(r => {
+      filtradas = filtradas.filter((r) => {
         if (dto.estado === 'sin_evaluar') return r.evaluacion === null;
         if (dto.estado === 'borrador') return r.evaluacion?.estado === EstadoEvaluacion.Borrador;
-        if (dto.estado === 'confirmada') return r.evaluacion?.estado === EstadoEvaluacion.Confirmada;
+        if (dto.estado === 'confirmada')
+          return r.evaluacion?.estado === EstadoEvaluacion.Confirmada;
         return true;
       });
     }
@@ -995,7 +1037,11 @@ export class EvaluacionesService {
   }
 
   async obtenerCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {
-    const { convocatoria } = await this.validarEdicionParaCruzada(convocatoriaId, edicionId, usuario);
+    const { convocatoria } = await this.validarEdicionParaCruzada(
+      convocatoriaId,
+      edicionId,
+      usuario,
+    );
 
     const template = convocatoria.templateEvaluacionCruzada;
     if (!template) {
@@ -1012,11 +1058,7 @@ export class EvaluacionesService {
     return { evaluacion, template };
   }
 
-  async historialCruzada(
-    convocatoriaId: string,
-    edicionId: string,
-    usuario: Usuario,
-  ) {
+  async historialCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {
     await this.validarEdicionParaCruzada(convocatoriaId, edicionId, usuario);
 
     const evaluacion = await this.cruzadaRepo.findOne({
@@ -1072,14 +1114,18 @@ export class EvaluacionesService {
           where: { edicionId, tipo: TipoEvaluacionCruzada.Propia },
         });
         if (otra) {
-          throw new BadRequestException('La edición ya tiene una evaluación propia de tu Unidad Académica');
+          throw new BadRequestException(
+            'La edición ya tiene una evaluación propia de tu Unidad Académica',
+          );
         }
       } else if (tipo === TipoEvaluacionCruzada.Ajena) {
         const otra = await this.cruzadaRepo.findOne({
           where: { edicionId, tipo: TipoEvaluacionCruzada.Ajena },
         });
         if (otra) {
-          throw new BadRequestException('La edición ya tiene una evaluación ajena de la Unidad Académica emparejada');
+          throw new BadRequestException(
+            'La edición ya tiene una evaluación ajena de la Unidad Académica emparejada',
+          );
         }
       }
 
@@ -1190,7 +1236,7 @@ export class EvaluacionesService {
       where: { usuarioId, convocatoriaId },
       select: { edicionId: true },
     });
-    const ids = new Set<string>(creadas.map(e => e.id));
+    const ids = new Set<string>(creadas.map((e) => e.id));
     for (const p of participaciones) {
       if (p.edicionId) ids.add(p.edicionId);
     }
@@ -1285,9 +1331,11 @@ export class EvaluacionesService {
     evaluadorId: string,
     usuario: Usuario,
   ) {
-    if (!usuario.roles.some(r =>
-      r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
-    )) {
+    if (
+      !usuario.roles.some(
+        (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+      )
+    ) {
       throw new ForbiddenException('Solo el Rectorado puede designar la tercera Unidad Académica');
     }
 
@@ -1311,7 +1359,9 @@ export class EvaluacionesService {
     });
     if (!edicion) throw new NotFoundException('Edición no encontrada');
     if (edicion.estado !== EstadoEdicion.EnEvaluacion) {
-      throw new BadRequestException('Solo las ediciones en evaluación pueden recibir una tercera designación');
+      throw new BadRequestException(
+        'Solo las ediciones en evaluación pueden recibir una tercera designación',
+      );
     }
 
     await this.validarEvaluadorAprobado(convocatoriaId, evaluadorId);
@@ -1327,7 +1377,9 @@ export class EvaluacionesService {
       where: { edicionId, evaluadorId },
     });
     if (previa) {
-      throw new BadRequestException('El evaluador ya tiene una evaluación asignada sobre esta edición');
+      throw new BadRequestException(
+        'El evaluador ya tiene una evaluación asignada sobre esta edición',
+      );
     }
 
     const evaluacion = await this.cruzadaRepo.save(

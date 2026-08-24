@@ -286,8 +286,20 @@ export function ConvocatoriaDetail() {
 
   const aplicarOrdenMerito = (actualizadas: Edicion[]) => {
     const map = new Map(actualizadas.map((e) => [e.id, e]));
-    setEdiciones((prev) => prev.map((e) => map.get(e.id) ?? e));
-    setTodasEdiciones((prev) => prev.map((e) => map.get(e.id) ?? e));
+    const fusionar = (prev: Edicion[]): Edicion[] =>
+      prev.map((e) => {
+        const u = map.get(e.id);
+        return u
+          ? {
+              ...e,
+              ordenMerito: u.ordenMerito,
+              puntajeMerito: u.puntajeMerito,
+              adjudicacionPropuesta: u.adjudicacionPropuesta,
+            }
+          : e;
+      });
+    setEdiciones(fusionar);
+    setTodasEdiciones(fusionar);
   };
 
   const generarOrdenMerito = async () => {
