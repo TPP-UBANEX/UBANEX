@@ -9,6 +9,13 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -17,8 +24,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { api } from '@/lib/api'
-import { RolUsuario, RolEjecucion, EstadoValidacionDocente } from '@/data/types'
-import type { ParticipacionConvocatoria, Usuario } from '@/data/types'
+import { RolUsuario, RolEjecucion } from '@/data/types'
+import type { ParticipacionConvocatoria, Usuario, UnidadAcademica } from '@/data/types'
 import { camposPerfilFaltantes } from '@/data/perfil'
 import { useAuth } from '@/lib/auth-context'
 import { EvaluadorPerfilDialog } from '@/components/EvaluadorPerfilDialog'
@@ -32,14 +39,19 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const esRectorado = user?.roles.some(r => r === RolUsuario.AutoridadDeRectorado)
 
   const [participaciones, setParticipaciones] = useState<ParticipacionConvocatoria[]>([])
-  const [docentes, setDocentes] = useState<Usuario[]>([])
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [unidades, setUnidades] = useState<UnidadAcademica[]>([])
+  const [idsConProyecto, setIdsConProyecto] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState<ParticipacionConvocatoria | null>(null)
   const [perfilUsuarioId, setPerfilUsuarioId] = useState<string | null>(null)
   const [perfilOpen, setPerfilOpen] = useState(false)
+
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [uaSeleccionadaId, setUaSeleccionadaId] = useState<string>('')
+  const [candidatos, setCandidatos] = useState<Usuario[]>([])
+  const [loadingCandidatos, setLoadingCandidatos] = useState(false)
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [submitting, setSubmitting] = useState(false)
 
   const abrirPerfil = (usuarioId?: string) => {
     if (!usuarioId) return
@@ -49,7 +61,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
 
   const evaluadores = participaciones.filter(p => p.rol === RolEjecucion.Evaluador)
 
-  // Cantidad de evaluadores dados de alta por Unidad Académica.
+  // Evaluadores dados de alta por Unidad Académica.
   const altasPorUa = useMemo(() => {
     const map = new Map<string, number>()
     evaluadores.forEach(p => {
@@ -60,41 +72,17 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     return map
   }, [evaluadores])
 
-  // Seleccionados por UA en el diálogo, para no exceder el cupo al elegir en lote.
-  const seleccionadosPorUa = useMemo(() => {
-    const map = new Map<string, number>()
-    selectedUserIds.forEach(id => {
-      const uaId = docentes.find(d => d.id === id)?.unidadAcademicaId
-      if (!uaId) return
-      map.set(uaId, (map.get(uaId) ?? 0) + 1)
-    })
-    return map
-  }, [selectedUserIds, docentes])
-
-  const cupoLlenoParaUa = (uaId?: string | null) => {
-    if (!uaId) return true
-    return (altasPorUa.get(uaId) ?? 0) + (seleccionadosPorUa.get(uaId) ?? 0) >= CANTIDAD_EVALUADORES_POR_UA
-  }
-
   const cargarDatos = async () => {
     setLoading(true)
     try {
-      const [parts, usersRes, ediciones] = await Promise.all([
+      const [parts, ediciones, uas] = await Promise.all([
         api.participaciones.listar(convocatoriaId),
-        api.usuarios.list({ rol: RolUsuario.Docente, limit: 500 }),
         api.proyectos.todas({ convocatoriaId }),
+        esRectorado ? api.unidadesAcademicas.list() : Promise.resolve([] as UnidadAcademica[]),
       ])
       setParticipaciones(parts)
-      const idsConProyecto = new Set(ediciones.map(e => e.creadoPorId))
-      setDocentes(
-        usersRes.data.filter(
-          (u: Usuario) =>
-            u.estadoValidacionDocente === EstadoValidacionDocente.Validado &&
-            u.habilitado !== false &&
-            !idsConProyecto.has(u.id) &&
-            !parts.some((p: ParticipacionConvocatoria) => p.usuarioId === u.id),
-        ),
-      )
+      setIdsConProyecto(new Set(ediciones.map(e => e.creadoPorId)))
+      setUnidades(uas)
     } catch {
       toast.error('Error al cargar datos')
     } finally {
@@ -106,12 +94,44 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     if (convocatoriaId) cargarDatos()
   }, [convocatoriaId])
 
-  const toggleSeleccion = (d: Usuario) => {
+  const cargarCandidatos = async (uaId: string) => {
+    setLoadingCandidatos(true)
+    setSelectedUserIds([])
+    try {
+      const cands = await api.participaciones.candidatos({ unidadAcademicaId: uaId, convocatoriaId })
+      // El endpoint ya excluye directores/codirectores y evaluadores existentes;
+      // acá removemos además a quienes crearon proyectos en la convocatoria.
+      setCandidatos(cands.filter(c => !idsConProyecto.has(c.id)))
+    } catch {
+      toast.error('Error al cargar los candidatos')
+      setCandidatos([])
+    } finally {
+      setLoadingCandidatos(false)
+    }
+  }
+
+  const seleccionarUa = (uaId: string) => {
+    setUaSeleccionadaId(uaId)
+    cargarCandidatos(uaId)
+  }
+
+  const cupoDisponible = uaSeleccionadaId
+    ? Math.max(0, CANTIDAD_EVALUADORES_POR_UA - (altasPorUa.get(uaSeleccionadaId) ?? 0))
+    : 0
+
+  const toggleSeleccion = (id: string) => {
     setSelectedUserIds(prev => {
-      if (prev.includes(d.id)) return prev.filter(x => x !== d.id)
-      if (cupoLlenoParaUa(d.unidadAcademicaId)) return prev
-      return [...prev, d.id]
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      if (prev.length >= cupoDisponible) return prev
+      return [...prev, id]
     })
+  }
+
+  const abrirDialogo = () => {
+    setUaSeleccionadaId('')
+    setCandidatos([])
+    setSelectedUserIds([])
+    setDialogOpen(true)
   }
 
   const handleDarAlta = async () => {
@@ -137,7 +157,6 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
       } else {
         toast.success(`${exitos} evaluadores dados de alta correctamente`)
       }
-      setSelectedUserIds([])
       setDialogOpen(false)
       cargarDatos()
     } finally {
@@ -175,12 +194,12 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
     <div className="space-y-6">
       {esRectorado && (
         <div className="space-y-4">
-          <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Button size="sm" onClick={abrirDialogo}>
             <Plus className="h-4 w-4 mr-2" />Dar de alta evaluadores
           </Button>
           <p className="text-sm text-muted-foreground">
-            Según la resolución, seleccioná los docentes a dar de alta como evaluadores. Cada Unidad
-            Académica admite hasta {CANTIDAD_EVALUADORES_POR_UA} evaluadores.
+            Según la resolución, seleccioná la Unidad Académica y los docentes a dar de alta como
+            evaluadores. Cada Unidad Académica admite hasta {CANTIDAD_EVALUADORES_POR_UA}.
           </p>
 
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -188,26 +207,56 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
               <DialogHeader>
                 <DialogTitle>Dar de alta evaluadores</DialogTitle>
                 <DialogDescription>
-                  Seleccioná los docentes validados a dar de alta como evaluadores. Cada Unidad
-                  Académica admite hasta {CANTIDAD_EVALUADORES_POR_UA}.
+                  Elegí una Unidad Académica y seleccioná los docentes validados a dar de alta como
+                  evaluadores. Cada Unidad Académica admite hasta {CANTIDAD_EVALUADORES_POR_UA}.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3 pt-2">
-                <p className="text-sm font-medium">
-                  Seleccionados: <span className="font-bold">{selectedUserIds.length}</span>
-                </p>
-                {docentes.length === 0 ? (
+                <Select value={uaSeleccionadaId} onValueChange={seleccionarUa}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elegí una Unidad Académica" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unidades.map(ua => {
+                      const altas = altasPorUa.get(ua.id) ?? 0
+                      return (
+                        <SelectItem key={ua.id} value={ua.id}>
+                          {ua.nombre} — {altas}/{CANTIDAD_EVALUADORES_POR_UA}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+
+                {uaSeleccionadaId && (
+                  <p className="text-sm font-medium">
+                    Seleccionados: <span className="font-bold">{selectedUserIds.length}</span> / {cupoDisponible}
+                  </p>
+                )}
+
+                {!uaSeleccionadaId ? (
                   <p className="text-xs text-muted-foreground">
-                    No hay docentes validados disponibles. Los docentes con proyectos en esta
-                    convocatoria no pueden ser evaluadores.
+                    Elegí una Unidad Académica para ver sus docentes disponibles.
+                  </p>
+                ) : loadingCandidatos ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : cupoDisponible === 0 ? (
+                  <p className="text-xs text-destructive">
+                    Esta Unidad Académica ya alcanzó el límite de {CANTIDAD_EVALUADORES_POR_UA} evaluadores.
+                  </p>
+                ) : candidatos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No hay docentes validados disponibles en esta Unidad Académica. Los docentes con
+                    proyectos en esta convocatoria no pueden ser evaluadores.
                   </p>
                 ) : (
                   <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border p-2">
-                    {docentes.map(d => {
+                    {candidatos.map(d => {
                       const seleccionado = selectedUserIds.includes(d.id)
                       const perfilIncompleto = camposPerfilFaltantes(d).length > 0
-                      const cupoLleno = !seleccionado && cupoLlenoParaUa(d.unidadAcademicaId)
-                      const deshabilitado = perfilIncompleto || cupoLleno
+                      const deshabilitado = perfilIncompleto || (!seleccionado && selectedUserIds.length >= cupoDisponible)
                       return (
                         <label
                           key={d.id}
@@ -220,18 +269,12 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                             className="h-4 w-4 accent-primary"
                             checked={seleccionado}
                             disabled={deshabilitado}
-                            onChange={() => toggleSeleccion(d)}
+                            onChange={() => toggleSeleccion(d.id)}
                           />
                           <span className="truncate">
                             {d.nombreCompleto}
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              — {d.unidadAcademica?.nombre || 'sin UA'}
-                            </span>
                             {perfilIncompleto && (
                               <span className="ml-2 text-xs text-muted-foreground">— perfil incompleto</span>
-                            )}
-                            {cupoLleno && (
-                              <span className="ml-2 text-xs text-destructive">— cupo lleno</span>
                             )}
                           </span>
                         </label>
