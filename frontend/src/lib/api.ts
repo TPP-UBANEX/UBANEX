@@ -185,7 +185,7 @@ export const api = {
       post<import('@/data/types').Proyecto>(`/proyectos/${id}/resubir`, data),
     disponiblesParaResubir: (convocatoriaId: string, search?: string) => {
       const qs = `?convocatoriaId=${encodeURIComponent(convocatoriaId)}${search ? `&search=${encodeURIComponent(search)}` : ''}`
-      return get<{ proyectoId: string; proyectoNombre: string; esConsolidado: boolean }[]>(`/proyectos/disponibles-para-resubir${qs}`)
+      return get<{ proyectoId: string; proyectoNombre: string; esConsolidado: boolean | null }[]>(`/proyectos/disponibles-para-resubir${qs}`)
     },
   },
   evaluaciones: {

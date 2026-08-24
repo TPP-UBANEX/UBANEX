@@ -78,7 +78,6 @@ export function ProyectoDetail() {
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
-  const [editEsConsolidado, setEditEsConsolidado] = useState(false)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
@@ -160,6 +159,7 @@ export function ProyectoDetail() {
   const esSecretaria = user?.roles.some(
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
   )
+  const esRectorado = user?.roles.some(r => r === RolUsuario.AutoridadDeRectorado)
   const puedeAsignarDirector = user?.roles.some(r =>
     [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado].includes(r),
   )
@@ -272,7 +272,6 @@ export function ProyectoDetail() {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
     setEditAnioEdicion(edicion.anioEdicion ?? null)
-    setEditEsConsolidado(proyecto.esConsolidado)
     setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
@@ -281,6 +280,18 @@ export function ProyectoDetail() {
 
   const cancelarEdicion = () => {
     setEditando(false)
+  }
+
+  // Override administrativo del consolidado (solo Rectorado): null = automático.
+  const cambiarOverrideConsolidado = async (valor: boolean | null) => {
+    if (!id || !edicion) return
+    try {
+      await api.proyectos.actualizarEdicion(id, edicion.id, { esConsolidado: valor })
+      toast.success('Consolidado actualizado')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar el consolidado')
+    }
   }
 
   const handleGuardar = async () => {
@@ -294,7 +305,6 @@ export function ProyectoDetail() {
       await api.proyectos.actualizarEdicion(id, edicion.id, {
         nombre: editNombre,
         anioEdicion: editAnioEdicion ?? undefined,
-        esConsolidado: editEsConsolidado,
         esInterfacultad: direccion.esInterfacultad,
         unidadAcademicaAdicionalId: direccion.unidadAcademicaAdicionalId,
         presupuesto: editPresupuesto || undefined,
@@ -641,13 +651,6 @@ export function ProyectoDetail() {
                       onChange={e => setEditAnioEdicion(e.target.value ? Number(e.target.value) : null)}
                     />
                   </div>
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">¿Es consolidado?</p>
-                      <div className="flex gap-2">
-                        <Button type="button" variant={editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(true)}>Sí</Button>
-                        <Button type="button" variant={!editEsConsolidado ? 'default' : 'outline'} size="sm" onClick={() => setEditEsConsolidado(false)}>No</Button>
-                      </div>
-                    </div>
                   {renderCamposEdicion(seccionResumen.campos)}
                 </CardContent>
               </Card>
@@ -683,9 +686,19 @@ export function ProyectoDetail() {
                     <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Consolidado:</span>{' '}
-                      <CampoSugerible campo="esConsolidado" valorActual={String(proyecto.esConsolidado)} label="Es consolidado" activo={modoSugerencia} onClick={handleSugerirClick}>
-                        {proyecto.esConsolidado ? 'Sí' : 'No'}
-                      </CampoSugerible>
+                      {proyecto.esConsolidadoEfectivo ? 'Sí' : 'No'}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({proyecto.esConsolidado == null
+                          ? `automático · racha ${proyecto.rachaAdjudicaciones ?? 0}`
+                          : 'definido por Rectorado'})
+                      </span>
+                      {esRectorado && (
+                        <div className="flex gap-1 mt-1">
+                          <Button type="button" size="sm" variant={proyecto.esConsolidado == null ? 'default' : 'outline'} onClick={() => cambiarOverrideConsolidado(null)}>Automático</Button>
+                          <Button type="button" size="sm" variant={proyecto.esConsolidado === true ? 'default' : 'outline'} onClick={() => cambiarOverrideConsolidado(true)}>Sí</Button>
+                          <Button type="button" size="sm" variant={proyecto.esConsolidado === false ? 'default' : 'outline'} onClick={() => cambiarOverrideConsolidado(false)}>No</Button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <span className="text-muted-foreground">Interfacultad:</span>{' '}

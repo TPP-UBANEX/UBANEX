@@ -264,7 +264,8 @@ export interface Convocatoria {
 export interface Proyecto {
   id: string
   nombre: string
-  esConsolidado: boolean
+  // Override manual: null = automático (derivado del historial), true/false = forzado.
+  esConsolidado: boolean | null
   esInterfacultad: boolean
   unidadAcademicaAdicional?: UnidadAcademica
   unidadAcademicaAdicionalId?: string
@@ -272,6 +273,10 @@ export interface Proyecto {
   creadoPorId: string
   creadoEn: string
   ediciones?: Edicion[]
+  // Calculados en el backend (no persistidos), presentes en obtenerProyecto.
+  esConsolidadoDerivado?: boolean
+  esConsolidadoEfectivo?: boolean
+  rachaAdjudicaciones?: number
 }
 
 export interface Edicion {
@@ -290,6 +295,10 @@ export interface Edicion {
   datosFormulario?: Record<string, unknown>
   creadoEn: string
   actualizadoEn: string
+  // Calculados en el backend (no persistidos).
+  esConsolidadoDerivado?: boolean
+  salteaEvaluacion?: boolean
+  rachaAdjudicaciones?: number
 }
 
 export interface Presupuesto {
@@ -322,14 +331,13 @@ export interface CrearProyectoDto {
   nombre: string
   convocatoriaId: string
   anioEdicion?: number
-  esConsolidado?: boolean
   esInterfacultad?: boolean
 }
 
 export interface ActualizarEdicionDto {
   nombre?: string
   anioEdicion?: number
-  esConsolidado?: boolean
+  esConsolidado?: boolean | null
   esInterfacultad?: boolean
   unidadAcademicaAdicionalId?: string | null
   presupuesto?: Presupuesto
