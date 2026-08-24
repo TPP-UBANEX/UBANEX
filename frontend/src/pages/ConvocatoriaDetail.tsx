@@ -63,6 +63,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -337,6 +338,39 @@ export function ConvocatoriaDetail() {
     } finally {
       setConfirmando(false);
     }
+  };
+
+  const descargarMeritoCsv = () => {
+    const filas = todasEdiciones
+      .filter((e) => e.ordenMerito != null)
+      .sort((a, b) => (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0))
+      .map((e) => [
+        String(e.ordenMerito ?? ''),
+        e.proyecto?.nombre || 'Sin nombre',
+        e.unidadAcademica?.nombre || '-',
+        e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1).replace('.', ',') : '-',
+        e.presupuesto?.montoTotal != null
+          ? Number(e.presupuesto.montoTotal).toFixed(2).replace('.', ',')
+          : '0,00',
+        e.adjudicacionPropuesta === true
+          ? 'Adjudicado'
+          : e.adjudicacionPropuesta === false
+            ? 'No adjudicado'
+            : 'Sin evaluación',
+      ]);
+    const cabecera = ['Orden', 'Proyecto', 'Unidad Académica', 'Puntaje', 'Presupuesto', 'Adjudicación'];
+    const contenido = [cabecera, ...filas]
+      .map((f) => f.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';'))
+      .join('\r\n');
+    const blob = new Blob(['﻿' + contenido], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `orden-de-merito-${conv?.id ?? 'convocatoria'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const toggleAdjudicacion = async (e: Edicion) => {
@@ -1073,6 +1107,12 @@ export function ConvocatoriaDetail() {
                         Confirmar orden de mérito
                       </Button>
                     ) : null)}
+                  {conv?.ordenMeritoConfirmado && (
+                    <Button variant="outline" onClick={descargarMeritoCsv}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Descargar Excel
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
