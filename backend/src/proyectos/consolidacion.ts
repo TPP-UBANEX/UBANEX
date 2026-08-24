@@ -19,7 +19,6 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 export interface ConvocatoriaOrden {
   id: string;
   anio: number | null;
-  creadoEn: Date;
 }
 
 export interface EdicionHistorial {
@@ -33,13 +32,13 @@ export interface DatosConsolidacion {
   salteaEvaluacion: boolean;
 }
 
-/** Ordena las convocatorias cronológicamente (año, y creación como desempate). */
+/** Ordena las convocatorias por año, con el id como desempate estable. */
 export function ordenarConvocatorias(convocatorias: ConvocatoriaOrden[]): ConvocatoriaOrden[] {
   return [...convocatorias].sort((a, b) => {
     const anioA = a.anio ?? 0;
     const anioB = b.anio ?? 0;
     if (anioA !== anioB) return anioA - anioB;
-    return new Date(a.creadoEn).getTime() - new Date(b.creadoEn).getTime();
+    return a.id.localeCompare(b.id);
   });
 }
 

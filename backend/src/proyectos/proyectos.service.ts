@@ -24,6 +24,13 @@ import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
+import {
+  ordenarConvocatorias,
+  calcularConsolidacion,
+  esConsolidadoEfectivo,
+  salteaEvaluacionEfectivo,
+  EdicionHistorial,
+} from './consolidacion';
 
 const CAMPOS_EDICION_AUTORIDAD = ['esConsolidado', 'esInterfacultad', 'unidadAcademicaAdicionalId'];
 const ESTADOS_EDITABLES_AUTORIDAD = [
@@ -399,7 +406,42 @@ export class ProyectosService {
       order: { actualizadoEn: 'DESC' },
     });
 
-    return { ...proyecto, ediciones };
+    const convocatorias = await this.edicionRepo.manager.find(Convocatoria, {
+      select: { id: true, anio: true },
+    });
+    const convocatoriasOrdenadas = ordenarConvocatorias(convocatorias);
+    const historial: EdicionHistorial[] = ediciones.map(e => ({
+      convocatoriaId: e.convocatoriaId,
+      estado: e.estado,
+    }));
+
+    const indice = (convId: string) => convocatoriasOrdenadas.findIndex(c => c.id === convId);
+    const edicionesEnriquecidas = ediciones.map(e => {
+      const datos = calcularConsolidacion(convocatoriasOrdenadas, historial, e.convocatoriaId);
+      return {
+        ...e,
+        rachaAdjudicaciones: datos.rachaAdjudicaciones,
+        esConsolidadoDerivado: datos.esConsolidadoDerivado,
+        salteaEvaluacion: salteaEvaluacionEfectivo(datos, proyecto.esConsolidado),
+      };
+    });
+
+    // Estado del proyecto según su participación en la convocatoria más reciente.
+    const datosUltima = ediciones.length > 0
+      ? calcularConsolidacion(
+          convocatoriasOrdenadas,
+          historial,
+          ediciones.reduce((a, b) => (indice(b.convocatoriaId) > indice(a.convocatoriaId) ? b : a)).convocatoriaId,
+        )
+      : { rachaAdjudicaciones: 0, esConsolidadoDerivado: false, salteaEvaluacion: false };
+
+    return {
+      ...proyecto,
+      esConsolidadoDerivado: datosUltima.esConsolidadoDerivado,
+      esConsolidadoEfectivo: esConsolidadoEfectivo(datosUltima, proyecto.esConsolidado),
+      rachaAdjudicaciones: datosUltima.rachaAdjudicaciones,
+      ediciones: edicionesEnriquecidas,
+    };
   }
 
   async actualizarEdicion(
