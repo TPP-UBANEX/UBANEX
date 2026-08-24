@@ -189,4 +189,39 @@ export class MailService {
       `,
     });
   }
+
+  async enviarResultadoAdjudicacion(
+    destino: string,
+    nombre: string,
+    convocatoriaNombre: string,
+    proyectoNombre: string,
+    adjudicado: boolean,
+  ): Promise<void> {
+    const from = this.config.get<string>('SMTP_FROM') || 'UBANEX <noreplyubanex@gmail.com>';
+    const estadoTexto = adjudicado ? 'fue adjudicado' : 'NO fue adjudicado';
+    const subject = adjudicado
+      ? `UBANEX — Tu proyecto fue adjudicado en "${convocatoriaNombre}"`
+      : `UBANEX — Tu proyecto no fue adjudicado en "${convocatoriaNombre}"`;
+    await sgMail.send({
+      from,
+      to: destino,
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #1a1a2e;">UBANEX</h2>
+          <p>Hola <strong>${nombre}</strong>,</p>
+          <p>
+            Te informamos el resultado de la convocatoria
+            <strong>${convocatoriaNombre}</strong> para tu proyecto
+            <strong>${proyectoNombre}</strong>:
+          </p>
+          <div style="margin-top: 16px; padding: 12px 16px; background: #f4f4f5; border-left: 4px solid ${adjudicado ? '#16a34a' : '#dc2626'}; border-radius: 4px; color: #444;">
+            <p style="margin: 0;"><strong>Tu proyecto ${estadoTexto}.</strong></p>
+          </div>
+          <hr style="border: none; border-top: 1px solid #e4e4e7;" />
+          <p style="color: #999; font-size: 12px;">Sistema de Gestión UBANEX</p>
+        </div>
+      `,
+    });
+  }
 }

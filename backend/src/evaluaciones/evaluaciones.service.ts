@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
@@ -15,6 +16,8 @@ import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
+import { Notificacion } from '../sugerencias/notificacion.entity';
+import { MailService } from '../common/mail/mail.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
@@ -22,6 +25,7 @@ import { EstadoEvaluacion } from '../common/enums/estado-evaluacion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
+import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
@@ -45,6 +49,8 @@ const PUNTAJE_BOOLEANO = 10;
 
 @Injectable()
 export class EvaluacionesService {
+  private readonly logger = new Logger(EvaluacionesService.name);
+
   constructor(
     @InjectRepository(EvaluacionInstitucional)
     private readonly institucionalRepo: Repository<EvaluacionInstitucional>,
@@ -58,6 +64,9 @@ export class EvaluacionesService {
     private readonly emparejamientoRepo: Repository<Emparejamiento>,
     @InjectRepository(ParticipacionConvocatoria)
     private readonly participacionRepo: Repository<ParticipacionConvocatoria>,
+    @InjectRepository(Notificacion)
+    private readonly notificacionRepo: Repository<Notificacion>,
+    private readonly mail: MailService,
     private readonly auditoria: AuditoriaService,
   ) {}
 
@@ -679,7 +688,69 @@ export class EvaluacionesService {
     }
 
     convocatoria.ordenMeritoConfirmado = true;
-    return this.convocatoriaRepo.save(convocatoria);
+    const guardada = await this.convocatoriaRepo.save(convocatoria);
+    void this.notificarResultadoAdjudicacion(guardada).catch((err) =>
+      this.logger.error(`Error enviando notificaciones de adjudicación: ${String(err)}`),
+    );
+    return guardada;
+  }
+
+  // Al confirmar el orden de mérito (cierre definitivo de la convocatoria) se
+  // notifica a cada director de proyecto (creadoPor) si su proyecto fue
+  // adjudicado o no, vía mail y notificación en el sitio. Cada envío está en su
+  // propio try/catch para que un fallo no impida el resto ni la confirmación.
+  // Al confirmar el orden de mérito (cierre definitivo de la convocatoria) se
+  // notifica a cada director de proyecto (creadoPor) si su proyecto fue
+  // adjudicado o no, vía mail y notificación en el sitio. Cada envío está en su
+  // propio try/catch para que un fallo no impida el resto ni la confirmación.
+  // Se ejecuta en paralelo (Promise.allSettled) y se despacha en background
+  // desde confirmarOrdenMerito, para no bloquear la respuesta del endpoint.
+  private async notificarResultadoAdjudicacion(convocatoria: Convocatoria): Promise<void> {
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId: convocatoria.id },
+      relations: { creadoPor: true, proyecto: true },
+    });
+
+    const tareas = ediciones.map(async (ed) => {
+      const director = ed.creadoPor;
+      if (!director?.email) return;
+
+      const adjudicado = !!ed.adjudicacionPropuesta;
+      const nombreProyecto = ed.proyecto?.nombre ?? 'tu proyecto';
+      const mensaje = adjudicado
+        ? `Tu proyecto "${nombreProyecto}" fue adjudicado en la convocatoria "${convocatoria.nombre}".`
+        : `Tu proyecto "${nombreProyecto}" no fue adjudicado en la convocatoria "${convocatoria.nombre}".`;
+
+      try {
+        await this.mail.enviarResultadoAdjudicacion(
+          director.email,
+          director.nombreCompleto,
+          convocatoria.nombre,
+          nombreProyecto,
+          adjudicado,
+        );
+      } catch (err) {
+        this.logger.error(
+          `No se pudo enviar el mail de adjudicación a ${director.email}: ${String(err)}`,
+        );
+      }
+
+      try {
+        await this.notificacionRepo.save(
+          this.notificacionRepo.create({
+            usuarioId: director.id,
+            tipo: TipoNotificacion.RESULTADO_ADJUDICACION,
+            mensaje,
+          }),
+        );
+      } catch (err) {
+        this.logger.error(
+          `No se pudo crear la notificación de adjudicación para ${director.id}: ${String(err)}`,
+        );
+      }
+    });
+
+    await Promise.allSettled(tareas);
   }
 
   // ───────────── Evaluación Institucional ─────────────
