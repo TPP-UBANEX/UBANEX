@@ -121,7 +121,7 @@ classDiagram
     class Proyecto {
         +id: string
         +nombre: string
-        +esConsolidado: boolean
+        +esConsolidado: boolean | null
         +esInterfacultad: boolean
     }
 
@@ -211,7 +211,12 @@ classDiagram
 ### Notas
 
 - `Proyecto` es una entidad raíz con datos estables que persisten entre años (ej: nombre, `esConsolidado`, `esInterfacultad`).
-- `esConsolidado = true` indica que el proyecto tiene el mismo equipo directivo 2 años consecutivos. Su Edición saltea la etapa `Evaluacion` en la convocatoria actual.
+- **Consolidación** (ver `backend/src/proyectos/consolidacion.ts`): un proyecto se consolida al **adjudicarse en 3 convocatorias consecutivas**. Con `A` = convocatorias inmediatamente anteriores (sin huecos) en las que la edición quedó `Adjudicado`:
+  - `esConsolidadoDerivado = A >= 3` (la 4ta participación consecutiva ya está consolidada, pero **igual se evalúa**).
+  - `salteaEvaluacion = A >= 4 && A par`: desde la 5ta participación alterna (5ta saltea, 6ta evalúa, 7ma saltea…). Un hueco (no participó o `NoAdjudicado`) reinicia `A`.
+  - Al pasar la convocatoria a `Evaluacion`, las ediciones que saltean van directo a `Adjudicado` (no entran a `EnEvaluacion`); esto alimenta la racha de las convocatorias siguientes.
+- `esConsolidado` es un **override manual tri-estado**: `null` = automático (derivado del historial), `true`/`false` = forzado por Rectorado. El estado efectivo es `override ?? derivado`; un `false` forzado nunca saltea. Un proyecto nuevo nace en `null`; solo Rectorado edita el override.
+- Pendiente: el flujo real que setea `Adjudicado` tras evaluar y el orden de mérito aún no están construidos; hoy la señal `Adjudicado` proviene del salteo auto-adjudicado y del seed.
 - `esInterfacultad = true` indica que el proyecto involucra a más de una unidad académica. Es un dato autodeclarado al crear el proyecto; no tiene reglas de negocio asociadas todavía.
 - `Edicion` representa la instancia de un proyecto dentro de una convocatoria específica. Un proyecto puede tener múltiples ediciones a lo largo del tiempo.
 - El estado `NoAdjudicado` es terminal (no hay suplencia).
