@@ -1360,7 +1360,7 @@ export class SeedService {
     datosFormulario?: object,
     esInterfacultad = false,
     unidadAcademicaAdicionalId?: string,
-    esConsolidado = false,
+    esConsolidado: boolean | null = null,
   ): Promise<Edicion> {
     const existeProyecto = await this.proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
     if (existeProyecto) {
@@ -1881,6 +1881,8 @@ export class SeedService {
         if ((edicionesPorUa.get(ua.id) ?? 0) >= PROYECTOS_MASIVOS_MINIMO) continue;
 
         // 1) Consolidados de 2025 → en 2026 pasan directo a la adjudicación (saltean evaluación).
+        // Se fuerza el override manual `esConsolidado = true` como demo del salteo; el cálculo
+        // automático por historial de adjudicaciones se deriva aparte (ver consolidacion.ts).
         if (anio === 2026) {
           const candidatos = this.consolidados2025.get(ua.id) ?? [];
           for (const cand of candidatos) {
@@ -1945,7 +1947,7 @@ export class SeedService {
           const proyecto = this.proyectoRepo.create({
             nombre: titulo,
             creadoPorId: director.id,
-            esConsolidado: false,
+            esConsolidado: null,
             esInterfacultad,
             unidadAcademicaAdicionalId: uaAdicionalId,
           });
