@@ -57,12 +57,7 @@ export class ProyectosService {
         rol: RolEjecucion.Evaluador,
       },
     });
-    const estadosQueBloquean = [
-      EstadoPropuestaEvaluador.Propuesto,
-      EstadoPropuestaEvaluador.Aceptada,
-      EstadoPropuestaEvaluador.Aprobado,
-    ];
-    if (evaluador?.estado && estadosQueBloquean.includes(evaluador.estado)) {
+    if (evaluador) {
       throw new ForbiddenException(
         'No podés crear proyectos en una convocatoria donde sos evaluador',
       );
@@ -111,12 +106,7 @@ export class ProyectosService {
         rol: RolEjecucion.Evaluador,
       },
     });
-    const estadosQueBloquean = [
-      EstadoPropuestaEvaluador.Propuesto,
-      EstadoPropuestaEvaluador.Aceptada,
-      EstadoPropuestaEvaluador.Aprobado,
-    ];
-    if (evaluador?.estado && estadosQueBloquean.includes(evaluador.estado)) {
+    if (evaluador) {
       throw new ForbiddenException(
         'No podés resubir proyectos en una convocatoria donde sos evaluador',
       );
