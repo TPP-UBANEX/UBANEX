@@ -411,7 +411,7 @@ classDiagram
 - **Estudiante**: 0 a N. Se registra solo. Puede crear proyectos. Completa datos de perfil académico: `carrera`, `direccionLocalidad`, `genero`, `personaConDiscapacidad`, `porcentajeCarrera`.
 - **Docente**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Su perfil docente incluye `cargoDocente`, `tipoDesignacionDocente` y `areaDocente`. Puede ser asignado como Director o Evaluador en una convocatoria mediante `ParticipacionConvocatoria`.
 - **Director de Proyecto**: rol de ejecución asignado por convocatoria. Máximo 2 participaciones como director por convocatoria.
-- **Evaluador**: rol de ejecución por convocatoria. No se asigna de forma directa: lo **propone** una Autoridad o un Asistente de Secretaría, y la propuesta recorre el circuito descrito más abajo hasta quedar `Aprobado`.
+- **Evaluador**: rol de ejecución por convocatoria. Lo **da de alta directamente una Autoridad de Rectorado**, según la resolución oficial: la participación se crea ya en estado `Aprobado` (ver más abajo).
 - Los roles se dividen en dos **grupos** excluyentes:
   - **Gestión**: AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria
   - **Ejecución**: Estudiante, Docente (roles globales en `RolUsuario`), DirectorDeProyecto, Evaluador (roles por convocatoria en `RolEjecucion` vía `ParticipacionConvocatoria`)
@@ -420,17 +420,14 @@ classDiagram
 - `ParticipacionConvocatoria` asigna un `RolEjecucion` (DirectorDeProyecto o Evaluador) a un usuario dentro de una convocatoria específica. Un usuario puede tener múltiples participaciones en distintas convocatorias, pero solo un rol por convocatoria.
 - `creadoPor` referencia al Usuario que creó la cuenta (aplica para todo tipo de usuarios).
 
-#### Propuesta de evaluadores
+#### Alta de evaluadores
 
 - `estado` solo aplica cuando el `rol` de la participación es `Evaluador`. Para `DirectorDeProyecto` no tiene valor.
-- Al proponer un evaluador, la participación se crea en estado `Propuesto`. El ciclo de vida es:
-  - `Propuesto → Aceptada | Declinada`: responde **únicamente el docente propuesto**, nadie puede responder por él.
-  - `Aceptada → Aprobado | Rechazado`: decide una **Autoridad de Rectorado**. Solo las propuestas ya aceptadas por el docente pueden aprobarse o rechazarse.
-  - `Declinada` y `Rechazado` son terminales. Un evaluador cuenta como tal recién cuando llega a `Aprobado`.
-- Cada paso del circuito notifica a los involucrados (mail + notificación en la aplicación): al docente cuando se lo propone y cuando Rectorado resuelve, y a la Secretaría de su UA cuando el docente responde y cuando Rectorado resuelve.
-- Solo la Secretaría puede proponer, y únicamente a docentes validados **de su propia Unidad Académica**.
-- Cada Unidad Académica tiene un cupo de **3 evaluadores activos** por convocatoria. Cuentan como activos los estados `Propuesto`, `Aceptada` y `Aprobado`; `Declinada` y `Rechazado` no ocupan cupo.
-- Ser evaluador y presentar proyectos en la misma convocatoria es **incompatible en ambos sentidos**: no se puede proponer como evaluador a un docente que ya creó ediciones en esa convocatoria, ni un docente con una propuesta de evaluador activa puede crear proyectos en ella.
+- Una **Autoridad de Rectorado** da de alta a los evaluadores directamente, leyendo la resolución oficial (decidida fuera del sistema). La participación se crea ya en estado `Aprobado`: no hay pasos de propuesta ni de aceptación por parte del docente. El docente recibe una notificación in-app + mail informativa del alta, sin acción que responder.
+- La **baja** de un evaluador también la realiza exclusivamente una Autoridad de Rectorado (elimina la participación). La Secretaría solo **consulta** los evaluadores de su UA; no los gestiona.
+- Cada Unidad Académica tiene un cupo de **3 evaluadores** por convocatoria.
+- Ser evaluador y presentar proyectos en la misma convocatoria es **incompatible en ambos sentidos**: no se puede dar de alta como evaluador a un docente que ya creó ediciones en esa convocatoria, ni un docente que ya es evaluador en ella puede crear proyectos. Por eso el listado de candidatos excluye a quienes ya son director/codirector o crearon proyectos en la convocatoria — el conflicto no llega a producirse.
+- Los valores `Propuesto`, `Aceptada`, `Declinada` y `Rechazado` del enum `EstadoPropuestaEvaluador` corresponden al circuito anterior (Secretaría proponía → docente aceptaba → Rectorado aprobaba) y ya no se producen; se conservan solo por compatibilidad de datos históricos.
 
 ---
 
@@ -500,10 +497,9 @@ classDiagram
 - Destinatarios según el tipo:
   - `NUEVA_SUGERENCIA`: el creador de la edición y sus directores, salvo quien haya hecho la sugerencia.
   - `RESPUESTA_SUGERENCIA`: quien había hecho la sugerencia.
-  - `PROPUESTA_EVALUADOR` y `RESULTADO_EVALUADOR`: el docente propuesto como evaluador.
-- Las notificaciones del circuito de sugerencias existen **solo dentro de la aplicación**; las del circuito de evaluadores se acompañan además de un mail.
-- En el circuito de evaluadores la Secretaría recibe **mail pero no notificación en la aplicación** cuando el docente responde y cuando Rectorado resuelve. La notificación in-app es siempre para el docente.
-- El destinatario puede marcar sus notificaciones como leídas (de a una o todas) o eliminarlas. Cuando el docente responde una propuesta, su notificación `PROPUESTA_EVALUADOR` queda marcada como leída automáticamente, y si se desasigna una participación se eliminan las notificaciones asociadas a ella.
+  - `RESULTADO_EVALUADOR`: el docente dado de alta como evaluador. Al darlo de alta se le crea esta notificación in-app y se le envía además un mail informativo. (`PROPUESTA_EVALUADOR` corresponde al circuito anterior y ya no se produce.)
+- Las notificaciones del circuito de sugerencias existen **solo dentro de la aplicación**; la de alta de evaluador se acompaña además de un mail al docente.
+- El destinatario puede marcar sus notificaciones como leídas (de a una o todas) o eliminarlas. Si se da de baja una participación de evaluador se eliminan las notificaciones asociadas a ella.
 
 ---
 
