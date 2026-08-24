@@ -399,6 +399,13 @@ export class ParticipacionConvocatoriaService {
     const entity = await this.repo.findOne({ where: { id } });
     if (!entity) throw new NotFoundException('Participacion no encontrada');
 
+    if (
+      entity.rol === RolEjecucion.Evaluador &&
+      !usuario.roles.includes(RolUsuario.AutoridadDeRectorado)
+    ) {
+      throw new ForbiddenException('Solo una Autoridad de Rectorado puede dar de baja evaluadores');
+    }
+
     if (!this.esAutoridad(usuario)) {
       const edicion = await this.edicionRepo.findOne({ where: { id: entity.edicionId ?? '' } });
       if (!edicion || edicion.creadoPorId !== usuario.id || edicion.estado !== EstadoEdicion.Borrador) {
