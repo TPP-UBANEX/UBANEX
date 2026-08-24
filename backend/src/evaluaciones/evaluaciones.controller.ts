@@ -42,6 +42,15 @@ export class EvaluacionesController {
     return this.service.actualizarPropuestaAdjudicacion(edicionId, dto.adjudicado, usuario);
   }
 
+  @Post('convocatoria/:convocatoriaId/confirmar-orden-merito')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  confirmarOrdenMerito(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.confirmarOrdenMerito(convocatoriaId, usuario);
+  }
+
   @Get('edicion/:edicionId')
   evaluacionDeEdicion(@Param('edicionId') edicionId: string, @CurrentUser() usuario: Usuario) {
     return this.service.evaluacionDeEdicion(edicionId, usuario);

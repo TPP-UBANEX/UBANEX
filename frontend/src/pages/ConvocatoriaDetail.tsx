@@ -136,6 +136,8 @@ export function ConvocatoriaDetail() {
   const [confirmEditOpen, setConfirmEditOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [generando, setGenerando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [confirmarMeritoOpen, setConfirmarMeritoOpen] = useState(false);
   const [ordenMeritoSort, setOrdenMeritoSort] = useState('orden');
 
   const esUsuarioEjecucion = user?.roles.some(
@@ -144,6 +146,7 @@ export function ConvocatoriaDetail() {
   const esRectorado = user?.roles.some(
     (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   );
+  const esAutoridadRectorado = user?.roles.includes(RolUsuario.AutoridadDeRectorado);
   const errores = erroresFechas(editForm);
 
   const tieneInvPendiente = invitacionEvaluador?.estado === EstadoPropuestaEvaluador.Propuesto;
@@ -313,6 +316,21 @@ export function ConvocatoriaDetail() {
       toast.error(err instanceof Error ? err.message : 'Error al generar el orden de mérito');
     } finally {
       setGenerando(false);
+    }
+  };
+
+  const confirmarOrdenMerito = async () => {
+    if (!conv?.id) return;
+    try {
+      setConfirmando(true);
+      const actualizada = await api.evaluaciones.confirmarOrdenMerito(conv.id);
+      setConv(actualizada);
+      setConfirmarMeritoOpen(false);
+      toast.success('Orden de mérito confirmado y fijado');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al confirmar el orden de mérito');
+    } finally {
+      setConfirmando(false);
     }
   };
 
@@ -689,6 +707,28 @@ export function ConvocatoriaDetail() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            <Dialog open={confirmarMeritoOpen} onOpenChange={setConfirmarMeritoOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Confirmar orden de mérito</DialogTitle>
+                  <DialogDescription>
+                    Al confirmar, el orden de mérito y la adjudicación propuesta de todos los
+                    proyectos de esta convocatoria quedarán fijos y no podrán volver a modificarse.
+                    Esta acción no se puede deshacer.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmarMeritoOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button variant="default" onClick={confirmarOrdenMerito} disabled={confirmando}>
+                    {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Confirmar y fijar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </div>
@@ -982,11 +1022,25 @@ export function ConvocatoriaDetail() {
               <CardTitle className="text-sm font-medium">Orden de Mérito</CardTitle>
               <div className="flex gap-2">
                 {esRectorado && (
-                  <Button variant="secondary" onClick={generarOrdenMerito} disabled={generando}>
+                  <Button
+                    variant="secondary"
+                    onClick={generarOrdenMerito}
+                    disabled={generando || !!conv?.ordenMeritoConfirmado}
+                  >
                     {generando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Generar orden de mérito automático
                   </Button>
                 )}
+                {esAutoridadRectorado &&
+                  (conv?.ordenMeritoConfirmado ? (
+                    <Badge variant="default" className="bg-green-600 hover:bg-green-600">
+                      Orden de mérito confirmado
+                    </Badge>
+                  ) : todasEdiciones.some((e) => e.ordenMerito != null) ? (
+                    <Button variant="default" onClick={() => setConfirmarMeritoOpen(true)}>
+                      Confirmar orden de mérito
+                    </Button>
+                  ) : null)}
                 <Select value={filtroUA} onValueChange={cambiarUA}>
                   <SelectTrigger className="w-72">
                     <SelectValue placeholder="Unidad académica" />
@@ -1087,7 +1141,7 @@ export function ConvocatoriaDetail() {
                         <TableCell>
                           {e.adjudicacionPropuesta === null ? (
                             <span className="text-xs text-muted-foreground">Sin evaluación</span>
-                          ) : esRectorado ? (
+                          ) : esRectorado && !conv?.ordenMeritoConfirmado ? (
                             <Button
                               type="button"
                               variant={e.adjudicacionPropuesta ? 'default' : 'outline'}

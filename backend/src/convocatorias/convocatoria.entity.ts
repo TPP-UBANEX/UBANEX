@@ -65,4 +65,7 @@ export class Convocatoria {
 
   @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
   presupuestoTotal: number | null;
+
+  @Column({ type: 'boolean', default: false })
+  ordenMeritoConfirmado: boolean;
 }

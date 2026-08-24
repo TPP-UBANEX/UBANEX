@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
 import { EvaluacionCruzada } from './evaluacion-cruzada.entity';
 import { GuardarEvaluacionInstitucionalDto } from './dto/guardar-evaluacion-institucional.dto';
@@ -352,6 +352,11 @@ export class EvaluacionesService {
       },
     });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.ordenMeritoConfirmado) {
+      throw new BadRequestException(
+        'El orden de mérito ya está confirmado y no puede volver a generarse',
+      );
+    }
 
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId },
@@ -611,6 +616,15 @@ export class EvaluacionesService {
     });
     if (!edicion) throw new NotFoundException('Edición no encontrada');
 
+    const convocatoriaAdjudicacion = await this.convocatoriaRepo.findOne({
+      where: { id: edicion.convocatoriaId },
+    });
+    if (convocatoriaAdjudicacion?.ordenMeritoConfirmado) {
+      throw new BadRequestException(
+        'El orden de mérito está confirmado y la adjudicación no puede modificarse',
+      );
+    }
+
     // Guarda de presupuesto: no se puede adjudicar si no alcanza para este proyecto.
     if (adjudicado && edicion.adjudicacionPropuesta !== true) {
       const convocatoria = await this.convocatoriaRepo.findOne({
@@ -636,6 +650,36 @@ export class EvaluacionesService {
 
     edicion.adjudicacionPropuesta = adjudicado;
     return this.edicionRepo.save(edicion);
+  }
+
+  async confirmarOrdenMerito(
+    convocatoriaId: string,
+    usuario: Usuario,
+  ): Promise<Convocatoria> {
+    this.validarEsAutoridadRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    if (convocatoria.ordenMeritoConfirmado) {
+      return convocatoria;
+    }
+
+    const sinOrden = await this.edicionRepo.count({
+      where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion, ordenMerito: IsNull() },
+    });
+    if (sinOrden > 0) {
+      throw new BadRequestException(
+        'No se puede confirmar: hay proyectos en evaluación sin orden de mérito asignado. Generá el orden de mérito para todas las ediciones primero.',
+      );
+    }
+
+    convocatoria.ordenMeritoConfirmado = true;
+    return this.convocatoriaRepo.save(convocatoria);
   }
 
   // ───────────── Evaluación Institucional ─────────────
@@ -891,6 +935,14 @@ export class EvaluacionesService {
     );
     if (!esRectorado) {
       throw new ForbiddenException('Solo el Rectorado puede generar el orden de mérito');
+    }
+  }
+
+  private validarEsAutoridadRectorado(usuario: Usuario): void {
+    if (!usuario.roles.includes(RolUsuario.AutoridadDeRectorado)) {
+      throw new ForbiddenException(
+        'Solo la Autoridad de Rectorado puede confirmar el orden de mérito',
+      );
     }
   }
 

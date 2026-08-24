@@ -260,6 +260,7 @@ export interface Convocatoria {
   formularioId: string | null;
   cupoMinimoPorUnidadAcademica?: number | null;
   presupuestoTotal?: number | null;
+  ordenMeritoConfirmado: boolean;
   formulario?: Formulario;
 }
 
