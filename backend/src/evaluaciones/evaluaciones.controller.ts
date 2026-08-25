@@ -23,6 +23,24 @@ export class EvaluacionesController {
     return this.service.monitoreo(dto.convocatoriaId ?? '', dto);
   }
 
+  @Get('convocatoria/:convocatoriaId/orden-merito/ua')
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
+  ordenMeritoUa(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.ordenMeritoPorUa(convocatoriaId, usuario);
+  }
+
+  @Get('convocatoria/:convocatoriaId/orden-merito/docente')
+  @Roles(RolUsuario.Docente)
+  ordenMeritoDocente(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.ordenMeritoPorDocente(convocatoriaId, usuario);
+  }
+
   @Post('convocatoria/:convocatoriaId/orden-merito')
   @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
   generarOrdenMerito(

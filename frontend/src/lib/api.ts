@@ -331,6 +331,37 @@ export const api = {
         `/evaluaciones/convocatoria/${convocatoriaId}/confirmar-orden-merito`,
         {},
       ),
+    ordenMeritoUa: (convocatoriaId: string) =>
+      get<{
+        convocatoria: import('@/data/types').Convocatoria;
+        meta: { total: number; page: number; limit: number; totalPages: number };
+        ediciones: Array<{
+          edicion: import('@/data/types').Edicion;
+          institucional: {
+            id: string;
+            estado: string;
+            observaciones: string | null;
+            realizadoPor: { id: string; nombreCompleto: string } | null;
+            confirmadoPor: { id: string; nombreCompleto: string } | null;
+          } | null;
+          cruzadas: Array<{
+            id: string;
+            tipo: string;
+            estado: string;
+            evaluador: { id: string; nombreCompleto: string } | null;
+          }>;
+        }>;
+      }>(`/evaluaciones/convocatoria/${convocatoriaId}/orden-merito/ua`),
+    ordenMeritoDocente: (convocatoriaId: string) =>
+      get<{
+        convocatoria: import('@/data/types').Convocatoria;
+        ediciones: Array<{
+          edicionId: string;
+          proyecto: { nombre: string } | null;
+          unidadAcademica: { nombre: string } | null;
+          adjudicado: boolean;
+        }>;
+      }>(`/evaluaciones/convocatoria/${convocatoriaId}/orden-merito/docente`),
     actualizarPropuestaAdjudicacion: (edicionId: string, adjudicado: boolean) =>
       patch<import('@/data/types').Edicion>(
         `/evaluaciones/edicion/${edicionId}/adjudicacion-propuesta`,

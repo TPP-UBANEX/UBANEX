@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, Not } from 'typeorm';
 import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
 import { EvaluacionCruzada } from './evaluacion-cruzada.entity';
 import { GuardarEvaluacionInstitucionalDto } from './dto/guardar-evaluacion-institucional.dto';
@@ -117,39 +117,122 @@ export class EvaluacionesService {
     return {
       convocatoria,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-      ediciones: ediciones.map((ed) => {
-        const inst = instPorEdicion.get(ed.id) ?? null;
-        return {
-          edicion: ed,
-          institucional: inst
-            ? {
-                id: inst.id,
-                estado: inst.estado,
-                observaciones: inst.observaciones,
-                realizadoPor: inst.realizadoPor
-                  ? { id: inst.realizadoPor.id, nombreCompleto: inst.realizadoPor.nombreCompleto }
-                  : null,
-                confirmadoPor: inst.confirmadoPor
-                  ? { id: inst.confirmadoPor.id, nombreCompleto: inst.confirmadoPor.nombreCompleto }
-                  : null,
-              }
-            : null,
-          cruzadas: (cruzadasPorEdicion.get(ed.id) ?? []).map((c) => ({
-            id: c.id,
-            tipo: c.tipo,
-            estado: c.estado,
-            evaluador: c.evaluador
-              ? { id: c.evaluador.id, nombreCompleto: c.evaluador.nombreCompleto }
+      ediciones: ediciones.map((ed) => this.mapearFilaOrden(ed, instPorEdicion, cruzadasPorEdicion)),
+    };
+  }
+
+  private mapearFilaOrden(
+    ed: Edicion,
+    instPorEdicion: Map<string, EvaluacionInstitucional>,
+    cruzadasPorEdicion: Map<string, EvaluacionCruzada[]>,
+  ) {
+    const inst = instPorEdicion.get(ed.id) ?? null;
+    return {
+      edicion: ed,
+      institucional: inst
+        ? {
+            id: inst.id,
+            estado: inst.estado,
+            observaciones: inst.observaciones,
+            realizadoPor: inst.realizadoPor
+              ? { id: inst.realizadoPor.id, nombreCompleto: inst.realizadoPor.nombreCompleto }
               : null,
-          })),
-        };
-      }),
+            confirmadoPor: inst.confirmadoPor
+              ? { id: inst.confirmadoPor.id, nombreCompleto: inst.confirmadoPor.nombreCompleto }
+              : null,
+          }
+        : null,
+      cruzadas: (cruzadasPorEdicion.get(ed.id) ?? []).map((c) => ({
+        id: c.id,
+        tipo: c.tipo,
+        estado: c.estado,
+        evaluador: c.evaluador
+          ? { id: c.evaluador.id, nombreCompleto: c.evaluador.nombreCompleto }
+          : null,
+      })),
     };
   }
 
   // Resumen de la evaluación de una edición para su director y las autoridades.
   // Durante el proceso solo se expone el estado; los detalles (valoraciones,
   // fundamentaciones, observaciones y puntajes) se muestran una vez confirmados.
+  /** Orden de mérito confirmado, visible únicamente para la Secretaría de la UA.
+   *  Solo devuelve los proyectos de la unidad académica del usuario autenticado. */
+  async ordenMeritoPorUa(convocatoriaId: string, usuario: Usuario) {
+    this.validarEsSecretaria(usuario);
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (!convocatoria.ordenMeritoConfirmado || !usuario.unidadAcademicaId) {
+      return {
+        convocatoria,
+        meta: { total: 0, page: 1, limit: 0, totalPages: 0 },
+        ediciones: [],
+      };
+    }
+
+    const ediciones = await this.edicionRepo.find({
+      where: {
+        convocatoriaId,
+        unidadAcademicaId: usuario.unidadAcademicaId,
+        eliminadoEn: IsNull(),
+      },
+      relations: { proyecto: true, unidadAcademica: true },
+      order: { ordenMerito: 'ASC' },
+    });
+    const institucionales = await this.institucionalRepo.find({
+      where: { convocatoriaId },
+      relations: { realizadoPor: true, confirmadoPor: true },
+    });
+    const cruzadas = await this.cruzadaRepo.find({
+      where: { convocatoriaId },
+      relations: { evaluador: true },
+    });
+    const instPorEdicion = new Map(institucionales.map((i) => [i.edicionId, i]));
+    const cruzadasPorEdicion = new Map<string, EvaluacionCruzada[]>();
+    for (const c of cruzadas) {
+      const arr = cruzadasPorEdicion.get(c.edicionId) ?? [];
+      arr.push(c);
+      cruzadasPorEdicion.set(c.edicionId, arr);
+    }
+    return {
+      convocatoria,
+      meta: { total: ediciones.length, page: 1, limit: ediciones.length, totalPages: 1 },
+      ediciones: ediciones.map((ed) => this.mapearFilaOrden(ed, instPorEdicion, cruzadasPorEdicion)),
+    };
+  }
+
+  /** Resultado mínimo para docentes: solo si sus proyectos fueron adjudicados.
+   *  Visible únicamente cuando el orden de mérito está confirmado. */
+  async ordenMeritoPorDocente(convocatoriaId: string, usuario: Usuario) {
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (!convocatoria.ordenMeritoConfirmado) return { convocatoria, ediciones: [] };
+
+    const participaciones = await this.participacionRepo.find({
+      where: { usuarioId: usuario.id, convocatoriaId, edicionId: Not(IsNull()) },
+      select: { edicionId: true },
+    });
+    const edicionIds = participaciones
+      .map((p) => p.edicionId)
+      .filter((id): id is string => id !== null && id !== undefined);
+    if (edicionIds.length === 0) return { convocatoria, ediciones: [] };
+
+    const ediciones = await this.edicionRepo.find({
+      where: edicionIds.map((id) => ({ id, convocatoriaId, eliminadoEn: IsNull() })),
+      relations: { proyecto: true, unidadAcademica: true },
+      order: { ordenMerito: 'ASC' },
+    });
+    return {
+      convocatoria,
+      ediciones: ediciones.map((ed) => ({
+        edicionId: ed.id,
+        proyecto: ed.proyecto ? { nombre: ed.proyecto.nombre } : null,
+        unidadAcademica: ed.unidadAcademica ? { nombre: ed.unidadAcademica.nombre } : null,
+        adjudicado: ed.adjudicacionPropuesta ?? false,
+      })),
+    };
+  }
+
   async evaluacionDeEdicion(edicionId: string, usuario: Usuario) {
     const edicion = await this.edicionRepo.findOne({
       where: { id: edicionId },
