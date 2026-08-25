@@ -57,7 +57,12 @@ export class EvaluacionesController {
     @Body() dto: ActualizarPropuestaAdjudicacionDto,
     @CurrentUser() usuario: Usuario,
   ) {
-    return this.service.actualizarPropuestaAdjudicacion(edicionId, dto.adjudicado, usuario);
+    return this.service.actualizarPropuestaAdjudicacion(
+      edicionId,
+      dto.adjudicado,
+      dto.mecanismo,
+      usuario,
+    );
   }
 
   @Post('convocatoria/:convocatoriaId/confirmar-orden-merito')

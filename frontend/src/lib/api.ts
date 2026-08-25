@@ -362,10 +362,14 @@ export const api = {
           adjudicado: boolean;
         }>;
       }>(`/evaluaciones/convocatoria/${convocatoriaId}/orden-merito/docente`),
-    actualizarPropuestaAdjudicacion: (edicionId: string, adjudicado: boolean) =>
+    actualizarPropuestaAdjudicacion: (
+      edicionId: string,
+      adjudicado: boolean,
+      mecanismo?: 'MERITO' | 'CUPO',
+    ) =>
       patch<import('@/data/types').Edicion>(
         `/evaluaciones/edicion/${edicionId}/adjudicacion-propuesta`,
-        { adjudicado },
+        { adjudicado, mecanismo },
       ),
     edicion: (edicionId: string) =>
       get<import('@/data/types').EvaluacionEdicionDetalle>(`/evaluaciones/edicion/${edicionId}`),

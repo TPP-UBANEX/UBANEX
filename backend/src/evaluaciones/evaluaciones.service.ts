@@ -520,10 +520,11 @@ export class EvaluacionesService {
       }
     }
 
-    // Rankear por notaFinal desc (tie-break: checklist completo, luego id),
-    // solo las ediciones sin ordenMerito seteado (preserva los manuales).
+    // Rankear por notaFinal desc (tie-break: checklist completo, luego id).
+    // Se recomputa el orden de TODAS las ediciones en cada generación:
+    // las que tienen evaluación confirmada reciben su posición y las demás
+    // quedan sin orden (null).
     const elegibles = ediciones
-      .filter((ed) => ed.ordenMerito === null)
       .map((ed) => ({ ed, p: puntajes.get(ed.id) ?? null }))
       .sort((a, b) => {
         const pa = a.p;
@@ -537,10 +538,6 @@ export class EvaluacionesService {
         if (pb) return 1;
         return 0;
       });
-
-    // Ediciones con ordenMerito ya asignado al inicio: son manuales y no deben
-    // ser pisadas por el cálculo automático (se capturan antes de reordenar).
-    const manuales = new Set(ediciones.filter((e) => e.ordenMerito !== null).map((e) => e.id));
 
     let posicion = 1;
     for (const { ed, p } of elegibles) {
@@ -568,8 +565,7 @@ export class EvaluacionesService {
     const mecanismo = new Map<string, MecanismoAdjudicacion>();
     const costo = (ed: Edicion): number => Number(ed.presupuesto?.montoTotal ?? 0);
 
-    // Solo las ediciones automáticas (ordenMerito === null) con evaluación
-    // confirmada participan del cálculo; las manuales se preservan.
+    // Todas las ediciones con evaluación confirmada participan del cálculo.
     const elegiblesConPuntaje = elegibles.filter(({ p }) => p !== null).map(({ ed }) => ed);
 
     // Listas por UA ordenadas por puntaje de mérito (mejor primero).
@@ -703,10 +699,9 @@ export class EvaluacionesService {
       descontar(costoU);
     }
 
-    // Aplicar: automáticas según la propuesta; manuales (ya tenían ordenMerito
-    // asignado al inicio) se preservan; sin evaluación -> null.
+    // Aplicar: todas las ediciones se recalculan según la propuesta automática;
+    // las que no tienen evaluación confirmada quedan sin adjudicación (null).
     for (const ed of ediciones) {
-      if (manuales.has(ed.id)) continue;
       ed.adjudicacionPropuesta = puntajes.has(ed.id) ? (propuesta.get(ed.id) ?? false) : null;
       ed.mecanismoAdjudicacion =
         ed.adjudicacionPropuesta && mecanismo.has(ed.id) ? mecanismo.get(ed.id)! : null;
@@ -722,6 +717,7 @@ export class EvaluacionesService {
   async actualizarPropuestaAdjudicacion(
     edicionId: string,
     adjudicado: boolean,
+    mecanismo: MecanismoAdjudicacion | undefined,
     usuario: Usuario,
   ): Promise<Edicion> {
     this.validarEsRectorado(usuario);
@@ -764,7 +760,9 @@ export class EvaluacionesService {
     }
 
     edicion.adjudicacionPropuesta = adjudicado;
-    edicion.mecanismoAdjudicacion = null;
+    edicion.mecanismoAdjudicacion = adjudicado
+      ? mecanismo ?? MecanismoAdjudicacion.Merito
+      : null;
     return this.edicionRepo.save(edicion);
   }
 

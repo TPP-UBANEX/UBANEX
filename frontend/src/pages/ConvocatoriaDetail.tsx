@@ -422,10 +422,13 @@ export function ConvocatoriaDetail() {
     URL.revokeObjectURL(url);
   };
 
-  const toggleAdjudicacion = async (e: Edicion) => {
+  const setAdjudicacion = async (
+    e: Edicion,
+    adjudicado: boolean,
+    mecanismo?: 'MERITO' | 'CUPO',
+  ) => {
     if (!esRectorado) return;
-    const nuevo = !(e.adjudicacionPropuesta ?? false);
-    if (nuevo) {
+    if (adjudicado) {
       const restanteReal = resumenPresupuesto.total - resumenPresupuesto.adjudicado;
       const costo = Number(e.presupuesto?.montoTotal ?? 0);
       if (restanteReal < costo) {
@@ -436,7 +439,11 @@ export function ConvocatoriaDetail() {
       }
     }
     try {
-      const actualizada = await api.evaluaciones.actualizarPropuestaAdjudicacion(e.id, nuevo);
+      const actualizada = await api.evaluaciones.actualizarPropuestaAdjudicacion(
+        e.id,
+        adjudicado,
+        mecanismo,
+      );
       aplicarOrdenMerito([actualizada]);
     } catch (err) {
       toast.error(
@@ -1301,7 +1308,7 @@ export function ConvocatoriaDetail() {
                               }
                               onClick={(ev) => {
                                 ev.stopPropagation();
-                                toggleAdjudicacion(e);
+                                setAdjudicacion(e, !e.adjudicacionPropuesta);
                               }}
                             >
                               {e.adjudicacionPropuesta ? 'Desadjudicar' : 'Adjudicar'}
@@ -1313,11 +1320,30 @@ export function ConvocatoriaDetail() {
                           )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {e.mecanismoAdjudicacion === 'MERITO'
-                            ? 'Mérito'
-                            : e.mecanismoAdjudicacion === 'CUPO'
-                              ? 'Cupo'
-                              : '—'}
+                          {esRectorado && !conv?.ordenMeritoConfirmado && e.adjudicacionPropuesta ? (
+                            <span onClick={(ev) => ev.stopPropagation()}>
+                              <Select
+                                value={e.mecanismoAdjudicacion ?? 'MERITO'}
+                                onValueChange={(v) =>
+                                  setAdjudicacion(e, true, v as 'MERITO' | 'CUPO')
+                                }
+                              >
+                                <SelectTrigger className="h-8 w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="MERITO">Mérito</SelectItem>
+                                  <SelectItem value="CUPO">Cupo</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </span>
+                          ) : e.mecanismoAdjudicacion === 'MERITO' ? (
+                            'Mérito'
+                          ) : e.mecanismoAdjudicacion === 'CUPO' ? (
+                            'Cupo'
+                          ) : (
+                            '—'
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
