@@ -14,6 +14,7 @@ import { Proyectos } from '@/pages/Proyectos'
 import { ProyectoDetail } from '@/pages/ProyectoDetail'
 import { Evaluacion } from '@/pages/Evaluacion'
 import { PlantillasEvaluacion } from '@/pages/PlantillasEvaluacion'
+import { PlantillasAutoevaluacion } from '@/pages/PlantillasAutoevaluacion'
 import { Usuarios } from '@/pages/Usuarios'
 import { UsuarioDetail } from '@/pages/UsuarioDetail'
 import { ValidacionDocente } from '@/pages/ValidacionDocente'
@@ -71,6 +72,7 @@ function App() {
                   <Route path="/proyectos/:id" element={<ProyectoDetail />} />
                   <Route path="/evaluacion" element={<Evaluacion />} />
                   <Route path="/plantillas-evaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasEvaluacion /></ProtectedRoute>} />
+                  <Route path="/plantillas-autoevaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasAutoevaluacion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<ProtectedRoute roles={ROLES_GESTION}><Usuarios /></ProtectedRoute>} />
                   <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION} allowOwnId><UsuarioDetail /></ProtectedRoute>} />
                   <Route path="/validacion-docente" element={<ValidacionDocente />} />

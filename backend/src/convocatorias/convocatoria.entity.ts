@@ -3,6 +3,7 @@ import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { Formulario } from '../formularios/formulario.entity';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
+import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
 
 @Entity()
 export class Convocatoria {
@@ -68,4 +69,11 @@ export class Convocatoria {
 
   @Column({ type: 'boolean', default: false })
   ordenMeritoConfirmado: boolean;
+
+  @ManyToOne(() => TemplateAutoevaluacionImpacto, { nullable: true })
+  @JoinColumn({ name: 'templateAutoevaluacionImpactoId' })
+  templateAutoevaluacionImpacto: TemplateAutoevaluacionImpacto | null;
+
+  @Column({ nullable: true })
+  templateAutoevaluacionImpactoId: string | null;
 }

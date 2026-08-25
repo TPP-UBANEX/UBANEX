@@ -63,7 +63,7 @@ export class Rng {
   }
 
   proyectosPorUa(): number {
-    return 20 + Math.floor(Math.pow(this.siguienteFloat(), 0.5) * 80);
+    return 10 + Math.floor(Math.pow(this.siguienteFloat(), 0.5) * 40);
   }
 }
 

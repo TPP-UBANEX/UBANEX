@@ -24,6 +24,9 @@ import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
+import { HitosEjecucionTab } from '@/components/HitosEjecucionTab'
+import { AutoevaluacionTab } from '@/components/AutoevaluacionTab'
+import { InformeFinalTab } from '@/components/InformeFinalTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
 import { useDireccionEdicion, DireccionEditor } from '@/components/DireccionEditor'
 import { GestionarDireccionModal } from '@/components/GestionarDireccionModal'
@@ -45,7 +48,7 @@ const OPCIONES_TIPO_PERSONA = [
   { value: TipoPersona.Estudiante, label: 'Estudiante' },
 ]
 
-const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'rendiciones', 'cierre', 'sugerencias']
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'autoevaluacion', 'informe-final', 'sugerencias']
 
 interface ModalConfigSugerencia {
   multilinea?: boolean
@@ -180,6 +183,8 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
+  const esDirector = directores.some(d => d.usuarioId === user?.id)
+  const puedeEditarEjecucion = esPropietario || esDirector
 
   const nombreUnidadesAcademicas = () => {
     const principal = edicion?.unidadAcademica?.nombre
@@ -610,8 +615,9 @@ export function ProyectoDetail() {
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
           <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
-          <TabsTrigger value="rendiciones">Rendiciones</TabsTrigger>
-          <TabsTrigger value="cierre">Cierre</TabsTrigger>
+          <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
+          <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
+          <TabsTrigger value="informe-final">Informe final</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
         </TabsList>
 
@@ -783,17 +789,53 @@ export function ProyectoDetail() {
           <EvaluacionesProyectoTab edicionId={edicion?.id} estado={edicion?.estado} />
         </TabsContent>
 
-        <TabsContent value="rendiciones" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium">Rendiciones</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {edicion?.estado !== EstadoEdicion.EnEjecucion && edicion?.estado !== EstadoEdicion.Cerrado
-                  ? 'El proyecto aún no está en etapa de ejecución.'
-                  : 'Módulo de rendiciones próximamente.'}
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="ejecucion-hitos" className="mt-4">
+          {edicion?.estado === EstadoEdicion.EnEjecucion || edicion?.estado === EstadoEdicion.Cerrado ? (
+            <HitosEjecucionTab edicionId={edicion?.id} estado={edicion?.estado} puedeEditar={puedeEditarEjecucion} convocatoria={edicion?.convocatoria} />
+          ) : (
+            <Card>
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  El proyecto aún no está en etapa de ejecución.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="autoevaluacion" className="mt-4">
+          {edicion?.estado === EstadoEdicion.EnEjecucion || edicion?.estado === EstadoEdicion.Cerrado ? (
+            <AutoevaluacionTab edicionId={edicion?.id} estado={edicion?.estado} puedeEditar={puedeEditarEjecucion} />
+          ) : (
+            <Card>
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  El proyecto aún no está en etapa de ejecución.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="informe-final" className="mt-4">
+          {edicion?.estado === EstadoEdicion.EnEjecucion || edicion?.estado === EstadoEdicion.Cerrado ? (
+            <InformeFinalTab
+                  edicionId={edicion?.id}
+                  estado={edicion?.estado}
+                  puedeEditar={puedeEditarEjecucion}
+                  convocatoria={edicion?.convocatoria}
+                  proyectoNombre={proyecto?.nombre}
+                  unidadAcademicaNombre={edicion?.unidadAcademica?.nombre}
+                />
+          ) : (
+            <Card>
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  El proyecto aún no está en etapa de ejecución.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="sugerencias" className="mt-4">
@@ -802,19 +844,6 @@ export function ProyectoDetail() {
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
-        </TabsContent>
-
-        <TabsContent value="cierre" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium">Cierre</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {edicion?.estado === EstadoEdicion.Cerrado
-                  ? 'Proyecto cerrado.'
-                  : 'El cierre estará disponible cuando corresponda.'}
-              </p>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 

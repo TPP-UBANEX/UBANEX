@@ -44,6 +44,7 @@ import {
 import {
   TEMPLATE_INSTITUCIONAL_DEFAULT,
   TEMPLATE_CRUZADA_DEFAULT,
+  TEMPLATE_AUTOEVALUACION_DEFAULT,
 } from '../evaluaciones/templates-default';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
@@ -52,6 +53,14 @@ import { SugerenciaCambio } from '../sugerencias/sugerencia-cambio.entity';
 import { EstadoSugerencia } from '../common/enums/estado-sugerencia.enum';
 import { Auditoria } from '../auditoria/auditoria.entity';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
+import { Hito } from '../ejecucion/hito.entity';
+import { AutoevaluacionImpacto } from '../ejecucion/autoevaluacion-impacto.entity';
+import { InformeFinal } from '../ejecucion/informe-final.entity';
+import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
+import { CategoriaHito } from '../common/enums/categoria-hito.enum';
+import { EstadoAutoevaluacion } from '../common/enums/estado-autoevaluacion.enum';
+import { EstadoInforme } from '../common/enums/estado-informe.enum';
+import { TipoPregunta } from '../common/enums/tipo-pregunta.enum';
 import {
   UAS_NOMBRES,
   CARRERAS_POR_UA,
@@ -151,6 +160,10 @@ export class SeedService {
   private readonly notificacionRepo: Repository<Notificacion>;
   private readonly sugerenciaRepo: Repository<SugerenciaCambio>;
   private readonly auditoriaRepo: Repository<Auditoria>;
+  private readonly hitoRepo: Repository<Hito>;
+  private readonly autoevaluacionRepo: Repository<AutoevaluacionImpacto>;
+  private readonly informeRepo: Repository<InformeFinal>;
+  private readonly templateAutoevalRepo: Repository<TemplateAutoevaluacionImpacto>;
 
   private readonly rng = new Rng(20260810);
   private readonly uaMap = new Map<string, UnidadAcademica>();
@@ -163,12 +176,14 @@ export class SeedService {
   private readonly aprobadosPorConvUa = new Map<string, Map<string, Set<string>>>();
   // Proyectos masivos de 2025 elegibles para consolidarse en 2026 (mismo equipo, esConsolidado).
   private readonly consolidados2025 = new Map<string, Array<{ proyecto: Proyecto; directorId: string }>>();
+  private readonly hitosPorEdicion = new Map<string, Hito[]>();
   private readonly progreso = new Progreso(42_000);
 
   private camposFormularioEstandar: CampoFormulario[];
   private formularioDefault!: Formulario;
   private templateInst!: TemplateEvaluacionInstitucional;
   private templateCruzada!: TemplateEvaluacionCruzada;
+  private templateAutoeval!: TemplateAutoevaluacionImpacto;
   private passwordHashCache: string | null = null;
 
   private admin!: Usuario;
@@ -219,6 +234,10 @@ export class SeedService {
     this.notificacionRepo = dataSource.getRepository(Notificacion);
     this.sugerenciaRepo = dataSource.getRepository(SugerenciaCambio);
     this.auditoriaRepo = dataSource.getRepository(Auditoria);
+    this.hitoRepo = dataSource.getRepository(Hito);
+    this.autoevaluacionRepo = dataSource.getRepository(AutoevaluacionImpacto);
+    this.informeRepo = dataSource.getRepository(InformeFinal);
+    this.templateAutoevalRepo = dataSource.getRepository(TemplateAutoevaluacionImpacto);
 
     this.camposFormularioEstandar = [
       {
@@ -310,6 +329,9 @@ export class SeedService {
 
     console.log('\n=== SEED: Sugerencias ===');
     await this.seedSugerencias();
+
+    console.log('\n=== SEED: Ejecución (hitos, autoevaluación, informe) ===');
+    await this.seedEjecucion();
 
     console.log('\n=== SEED COMPLETADO ===\n');
     await this.mostrarResumen();
@@ -1106,6 +1128,23 @@ export class SeedService {
           estructura: TEMPLATE_CRUZADA_DEFAULT,
         }),
       ));
+
+    const nombreAutoeval = 'Plantilla de autoevaluación UBANEX';
+    const existenteAutoeval = await this.templateAutoevalRepo.findOne({ where: { esDefault: true } });
+    if (existenteAutoeval && existenteAutoeval.nombre !== nombreAutoeval) {
+      existenteAutoeval.nombre = nombreAutoeval;
+      await this.templateAutoevalRepo.save(existenteAutoeval);
+    }
+    this.templateAutoeval =
+      existenteAutoeval ??
+      (await this.templateAutoevalRepo.save(
+        this.templateAutoevalRepo.create({
+          nombre: nombreAutoeval,
+          esDefault: true,
+          esPlantilla: true,
+          estructura: TEMPLATE_AUTOEVALUACION_DEFAULT,
+        }),
+      ));
   }
 
   // ─────────────────── Convocatorias ───────────────────
@@ -1154,7 +1193,11 @@ export class SeedService {
   private async asegurarTemplatesConvocatoria(convocatoria: Convocatoria): Promise<void> {
     const conv = await this.convocatoriaRepo.findOne({
       where: { id: convocatoria.id },
-      relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+        templateAutoevaluacionImpacto: true,
+      },
     });
     if (!conv) return;
 
@@ -1257,6 +1300,27 @@ export class SeedService {
       conv.templateEvaluacionCruzada = copia;
       huboCambios = true;
       console.log(`  ${conv.nombre} — formulario cruzada congelado (copia privada)`);
+    }
+
+    const autoeval = conv.templateAutoevaluacionImpacto;
+    if (!autoeval) {
+      if (congelada) {
+        const copia = await this.templateAutoevalRepo.save(
+          this.templateAutoevalRepo.create({
+            nombre: `Autoevaluación de impacto ${conv.nombre}`,
+            esDefault: false,
+            esPlantilla: false,
+            estructura: this.templateAutoeval.estructura,
+          }),
+        );
+        conv.templateAutoevaluacionImpactoId = copia.id;
+        conv.templateAutoevaluacionImpacto = copia;
+        console.log(`  ${conv.nombre} — template de autoevaluación congelado (copia privada)`);
+      } else {
+        conv.templateAutoevaluacionImpactoId = this.templateAutoeval.id;
+        conv.templateAutoevaluacionImpacto = this.templateAutoeval;
+      }
+      huboCambios = true;
     }
 
     if (huboCambios) {
@@ -3127,6 +3191,206 @@ export class SeedService {
     return campo;
   }
 
+  // ─────────────────── Ejecución (hitos, autoevaluación, informe) ───────────────────
+
+  private async seedEjecucion(): Promise<void> {
+    await this.seedHitos();
+    await this.seedAutoevaluaciones();
+    await this.seedInformesFinales();
+  }
+
+  /** Plantillas de hitos usadas para sembrar ejecución de forma determinista. */
+  private static readonly TITULOS_HITOS: Array<{
+    categoria: CategoriaHito;
+    titulo: string;
+    descripcion: string;
+    integrantes: string;
+  }> = [
+    { categoria: CategoriaHito.Organizacion, titulo: 'Constitución del equipo y plan de trabajo', descripcion: 'Reuniones iniciales y definición del cronograma.', integrantes: 'Dirección y docentes' },
+    { categoria: CategoriaHito.ActividadConLaComunidad, titulo: 'Actividad con la comunidad destinataria', descripcion: 'Jornadas de trabajo en el territorio.', integrantes: 'Equipo completo y estudiantes' },
+    { categoria: CategoriaHito.Capacitacion, titulo: 'Taller de capacitación para participantes', descripcion: 'Formación práctica para el equipo y beneficiarios.', integrantes: 'Docentes y estudiantes' },
+    { categoria: CategoriaHito.Articulacion, titulo: 'Jornada de articulación institucional', descripcion: 'Acuerdos con organizaciones del territorio.', integrantes: 'Dirección' },
+    { categoria: CategoriaHito.Difusion, titulo: 'Difusión de resultados parciales', descripcion: 'Presentación de avances a la comunidad.', integrantes: 'Dirección y equipo' },
+    { categoria: CategoriaHito.InformeParcial, titulo: 'Informe parcial de gestión', descripcion: 'Sistematización de actividades y resultados.', integrantes: 'Dirección' },
+  ];
+
+  private hashDeId(id: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  private rngDeEdicion(id: string): Rng {
+    return new Rng(this.hashDeId(id));
+  }
+
+  private async edicionesCalificadasEjecucion(): Promise<Edicion[]> {
+    return this.edicionRepo.find({
+      where: {
+        estado: In([EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado]),
+      },
+      relations: { convocatoria: true },
+    });
+  }
+
+  private async seedHitos(): Promise<void> {
+    const ediciones = await this.edicionesCalificadasEjecucion();
+    const yaSembradas = new Set((await this.hitoRepo.find({ select: { edicionId: true } })).map((h) => h.edicionId));
+
+    const filas: Hito[] = [];
+    for (const edicion of ediciones) {
+      if (yaSembradas.has(edicion.id)) continue;
+      const rng = this.rngDeEdicion(edicion.id);
+      const anio = edicion.anioEdicion ?? edicion.convocatoria.anio ?? 2025;
+      const inicio = edicion.convocatoria.fechaInicioEjecucion ?? this.crearFecha(anio, 8, 1);
+      const cantidad = rng.entero(2, 4);
+      for (let i = 0; i < cantidad; i++) {
+        const t = SeedService.TITULOS_HITOS[rng.entero(0, SeedService.TITULOS_HITOS.length - 1)];
+        const diaInicio = rng.entero(0, 60) + i * 40;
+        const diaFin = diaInicio + rng.entero(20, 80);
+        const h = this.hitoRepo.create({
+          edicionId: edicion.id,
+          titulo: t.titulo,
+          descripcion: t.descripcion,
+          fechaInicio: this.sumarDias(inicio, diaInicio),
+          fechaFin: this.sumarDias(inicio, diaFin),
+          integrantes: t.integrantes,
+          categoria: t.categoria,
+          creadoPorId: edicion.creadoPorId,
+        });
+        filas.push(h);
+      }
+    }
+
+    for (let i = 0; i < filas.length; i += TAMANIO_LOTE) {
+      const chunk = filas.slice(i, i + TAMANIO_LOTE);
+      await this.hitoRepo.insert(chunk.map((h) => h));
+      this.progreso.sumar(chunk.length);
+    }
+  }
+
+  private sumarDias(fecha: string, dias: number): string {
+    const d = new Date(`${fecha}T00:00:00`);
+    d.setDate(d.getDate() + dias);
+    return d.toISOString().slice(0, 10);
+  }
+
+  private async seedAutoevaluaciones(): Promise<void> {
+    const ediciones = await this.edicionesCalificadasEjecucion();
+    const convocatorias = await this.convocatoriaRepo.find({
+      where: { id: In([...new Set(ediciones.map((e) => e.convocatoriaId))]) },
+      relations: { templateAutoevaluacionImpacto: true },
+    });
+    const convPorId = new Map(convocatorias.map((c) => [c.id, c]));
+
+    const filas: AutoevaluacionImpacto[] = [];
+    for (const edicion of ediciones) {
+      const existente = await this.autoevaluacionRepo.findOne({ where: { edicionId: edicion.id } });
+      if (existente) continue;
+      const conv = convPorId.get(edicion.convocatoriaId);
+      const template = conv?.templateAutoevaluacionImpacto;
+      if (!template?.estructura) continue;
+
+      const rng = this.rngDeEdicion(`${edicion.id}:auto`);
+      const respuestas: Record<string, unknown> = {};
+      for (const pregunta of template.estructura.preguntas) {
+        respuestas[pregunta.id] = this.respuestaParaPregunta(pregunta, rng);
+      }
+
+      filas.push(
+        this.autoevaluacionRepo.create({
+          edicionId: edicion.id,
+          convocatoriaId: edicion.convocatoriaId,
+          templateId: template.id,
+          estado: EstadoAutoevaluacion.Completada,
+          realizadoPorId: edicion.creadoPorId,
+          confirmadoPorId: edicion.creadoPorId,
+          respuestas,
+        }),
+      );
+    }
+
+    for (let i = 0; i < filas.length; i += TAMANIO_LOTE) {
+      const chunk = filas.slice(i, i + TAMANIO_LOTE);
+      await this.autoevaluacionRepo.insert(
+        chunk as Parameters<(typeof this.autoevaluacionRepo)['insert']>[0],
+      );
+      this.progreso.sumar(chunk.length);
+    }
+  }
+
+  private respuestaParaPregunta(
+    pregunta: { tipo: TipoPregunta; opciones: string[] | null; escalaMin: number | null; escalaMax: number | null },
+    rng: Rng,
+  ): unknown {
+    switch (pregunta.tipo) {
+      case TipoPregunta.EscalaNumerica: {
+        const min = pregunta.escalaMin ?? 1;
+        const max = pregunta.escalaMax ?? 10;
+        return rng.entero(min, max);
+      }
+      case TipoPregunta.Booleano:
+        return rng.bool(0.75);
+      case TipoPregunta.Select:
+        return pregunta.opciones && pregunta.opciones.length > 0
+          ? pregunta.opciones[rng.entero(0, pregunta.opciones.length - 1)]
+          : null;
+      case TipoPregunta.Checkbox: {
+        const opciones = pregunta.opciones ?? [];
+        return opciones.filter(() => rng.bool(0.5));
+      }
+      case TipoPregunta.Texto:
+      default:
+        return 'Se cumplieron los objetivos centrales del proyecto, con resultados positivos en la comunidad destinataria.';
+    }
+  }
+
+  private async seedInformesFinales(): Promise<void> {
+    const ediciones = await this.edicionesCalificadasEjecucion();
+    const filas: InformeFinal[] = [];
+    const ahora = new Date();
+
+    for (const edicion of ediciones) {
+      const existente = await this.informeRepo.findOne({ where: { edicionId: edicion.id } });
+      if (existente) continue;
+      const hitos = await this.hitoRepo.find({ where: { edicionId: edicion.id }, order: { fechaInicio: 'ASC' } });
+      if (hitos.length === 0) continue;
+
+      const esCerrada = edicion.estado === EstadoEdicion.Cerrado;
+      const contenido = this.cuerpoInforme(hitos);
+      filas.push(
+        this.informeRepo.create({
+          edicionId: edicion.id,
+          convocatoriaId: edicion.convocatoriaId,
+          estado: esCerrada ? EstadoInforme.Confirmado : EstadoInforme.Borrador,
+          contenido,
+          actualizadoPorId: edicion.creadoPorId,
+          confirmadoPorId: esCerrada ? edicion.creadoPorId : null,
+          confirmadoEn: esCerrada ? ahora : null,
+        }),
+      );
+    }
+
+    for (let i = 0; i < filas.length; i += TAMANIO_LOTE) {
+      const chunk = filas.slice(i, i + TAMANIO_LOTE);
+      await this.informeRepo.insert(chunk);
+      this.progreso.sumar(chunk.length);
+    }
+  }
+
+  private cuerpoInforme(hitos: Hito[]): string {
+    const cuerpos = hitos.map(
+      (h, i) =>
+        `${i + 1}. ${h.titulo}\nCategoría: ${h.categoria}\n` +
+        `Período: ${h.fechaInicio ?? '—'} a ${h.fechaFin ?? '—'}\n` +
+        `Integrantes: ${h.integrantes ?? '—'}\n${h.descripcion ?? ''}`.trim(),
+    );
+    return 'Informe final de la edición.\n\nActividades ejecutadas:\n\n' + cuerpos.join('\n\n');
+  }
+
   // ─────────────────── Resumen ───────────────────
 
   private async mostrarResumen(): Promise<void> {
@@ -3140,5 +3404,8 @@ export class SeedService {
     await contar('Emparejamientos', this.emparejamientoRepo);
     await contar('Evaluaciones institucionales', this.institucionalEvalRepo);
     await contar('Evaluaciones cruzadas', this.cruzadaEvalRepo);
+    await contar('Hitos', this.hitoRepo);
+    await contar('Autoevaluaciones de impacto', this.autoevaluacionRepo);
+    await contar('Informes finales', this.informeRepo);
   }
 }
