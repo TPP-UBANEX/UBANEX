@@ -293,6 +293,7 @@ export interface Edicion {
   datosFormulario?: Record<string, unknown>;
   ordenMerito?: number | null;
   adjudicacionPropuesta?: boolean | null;
+  mecanismoAdjudicacion?: 'MERITO' | 'CUPO' | null;
   puntajeMerito?: number | null;
   creadoEn: string;
   actualizadoEn: string;

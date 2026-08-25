@@ -26,6 +26,7 @@ import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
+import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
@@ -369,6 +370,7 @@ export class EvaluacionesService {
 
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId },
+      order: { id: 'ASC' },
       relations: {
         proyecto: true,
         unidadAcademica: true,
@@ -378,10 +380,22 @@ export class EvaluacionesService {
         },
       },
     });
-    const institucionales = await this.institucionalRepo.find({ where: { convocatoriaId } });
-    const cruzadas = await this.cruzadaRepo.find({ where: { convocatoriaId } });
+    const institucionales = await this.institucionalRepo.find({
+      where: { convocatoriaId },
+      order: { id: 'ASC' },
+    });
+    const cruzadas = await this.cruzadaRepo.find({
+      where: { convocatoriaId },
+      order: { id: 'ASC' },
+    });
 
-    const instPorEdicion = new Map(institucionales.map((i) => [i.edicionId, i]));
+    // Selección determinista: si una edición tuviera más de una evaluación
+    // institucional, se queda con la de mayor id (reproducible entre corridas).
+    const instPorEdicion = new Map<string, EvaluacionInstitucional>();
+    for (const i of institucionales) {
+      const actual = instPorEdicion.get(i.edicionId);
+      if (!actual || i.id > actual.id) instPorEdicion.set(i.edicionId, i);
+    }
     const cruzadasPorEdicion = new Map<string, EvaluacionCruzada[]>();
     for (const c of cruzadas) {
       const arr = cruzadasPorEdicion.get(c.edicionId) ?? [];
@@ -423,13 +437,6 @@ export class EvaluacionesService {
       }
     }
 
-    const ordenCmp = (a: number | null, b: number | null): number => {
-      if (a === null && b === null) return 0;
-      if (a === null) return 1;
-      if (b === null) return -1;
-      return a - b;
-    };
-
     // Rankear por notaFinal desc (tie-break: checklist completo, luego id),
     // solo las ediciones sin ordenMerito seteado (preserva los manuales).
     const elegibles = ediciones
@@ -466,33 +473,42 @@ export class EvaluacionesService {
     // Propuesta de adjudicación borrador, limitada por el presupuesto, con
     // prioridad de MÉRITO GLOBAL y un piso de CUPO por unidad académica.
     //
-    // Algoritmo en 3 fases:
-    //   Fase A — Mérito global: se financian los mejores proyectos de toda la
-    //            convocatoria (sin importar UA) MIENTRAS el saldo restante siga
-    //            alcanzando para cubrir el cupo pendiente de todas las UAs.
-    //   Fase B — Cupo balanceado: si hace falta, se garantiza el piso de
-    //            `cupo` proyectos por UA vía round-robin rotado.
-    //   Fase C — Mérito global para el excedente que quede tras cubrir cupos.
+    // Algoritmo dirigido por financiamiento (presupuesto general, no por UA):
+    //   Paso 1 — MERITO global: se financian los mejores proyectos por mérito
+    //            global (tope de MERITO por UA = n - cupo, y reserva de piso).
+    //   Paso 2 — CUPO (piso): por cada UA se financian como CUPO los `cupo`
+    //            proyectos NO financiados de MENOR puntaje (CUPO = menor puntaje).
+    //   Paso 3 — Excedente (swap): con el presupuesto general remanente, promover
+    //            el CUPO de mayor puntaje a MERITO y financiar como CUPO el
+    //            no-financiado de menor puntaje de esa UA (iterativo, round-robin).
     const propuesta = new Map<string, boolean>();
+    const mecanismo = new Map<string, MecanismoAdjudicacion>();
     const costo = (ed: Edicion): number => Number(ed.presupuesto?.montoTotal ?? 0);
 
     // Solo las ediciones automáticas (ordenMerito === null) con evaluación
     // confirmada participan del cálculo; las manuales se preservan.
     const elegiblesConPuntaje = elegibles.filter(({ p }) => p !== null).map(({ ed }) => ed);
 
-    // Listas por UA ordenadas por mérito (mejor primero).
+    // Listas por UA ordenadas por puntaje de mérito (mejor primero).
     const listasPorUA = new Map<string, Edicion[]>();
     for (const ed of elegiblesConPuntaje) {
       const arr = listasPorUA.get(ed.unidadAcademicaId) ?? [];
       arr.push(ed);
       listasPorUA.set(ed.unidadAcademicaId, arr);
     }
-    for (const lista of listasPorUA.values()) {
-      lista.sort((a, b) => ordenCmp(a.ordenMerito, b.ordenMerito));
-    }
+    const porPuntajeDesc = (a: Edicion, b: Edicion): number => {
+      const diff = (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0);
+      if (diff !== 0) return diff;
+      if (a.id === b.id) return 0;
+      return a.id < b.id ? -1 : 1;
+    };
+    for (const lista of listasPorUA.values()) lista.sort(porPuntajeDesc);
     const uas = [...listasPorUA.keys()];
 
+    const cupo = convocatoria.cupoMinimoPorUnidadAcademica ?? 0;
+
     // Presupuesto disponible: null significa "sin límite" (comportamiento previo).
+    // El presupuesto es GENERAL (único para toda la convocatoria, no por UA).
     const presupuestoTotal = convocatoria.presupuestoTotal;
     let disponible: number | null = presupuestoTotal != null ? Number(presupuestoTotal) : null;
     const descontar = (monto: number): void => {
@@ -500,103 +516,108 @@ export class EvaluacionesService {
         disponible = Math.max(0, Math.round((disponible - monto) * 100) / 100);
       }
     };
-    // Cantidad de proyectos admitidos por UA (para saber cupos pendientes).
-    const admitidosUA = new Map<string, number>();
-    for (const ua of uas) admitidosUA.set(ua, 0);
 
-    const cupo = convocatoria.cupoMinimoPorUnidadAcademica ?? 0;
+    // Tope de MERITO por UA: protege a las UAs con pocos proyectos y deja el piso
+    // de CUPO libre (MERITO = top (n - cupo) por UA).
+    const meritoMaxUA = new Map<string, number>();
+    for (const ua of uas) {
+      const n = listasPorUA.get(ua)!.length;
+      meritoMaxUA.set(ua, Math.max(0, n - Math.min(cupo, n)));
+    }
+    const meritoHechoUA = new Map<string, number>();
+    for (const ua of uas) meritoHechoUA.set(ua, 0);
 
-    const admitir = (ed: Edicion): void => {
-      propuesta.set(ed.id, true);
-      descontar(costo(ed));
-      admitidosUA.set(ed.unidadAcademicaId, (admitidosUA.get(ed.unidadAcademicaId) ?? 0) + 1);
-    };
-
-    // Reserva de cupo (peor caso): por cada UA con cupo pendiente, se suma el
-    // costo de sus `cupo - yaAdmitidos` proyectos MÁS CAROS aún disponibles. Así
-    // se garantiza el piso aunque el proyecto de mayor mérito sea el más caro.
+    // Reserva de piso: costo de los `cupo` proyectos AÚN NO financiados más caros
+    // de cada UA (peor caso), para garantizar que el piso de CUPO sea financiable.
     const reservaCupos = (): number => {
       let total = 0;
       for (const ua of uas) {
-        const pend = cupo - (admitidosUA.get(ua) ?? 0);
-        if (pend <= 0) continue;
-        const costos = listasPorUA
-          .get(ua)!
-          .filter((ed) => !propuesta.get(ed.id))
+        const c = Math.min(cupo, listasPorUA.get(ua)!.length);
+        const costos = elegiblesConPuntaje
+          .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
           .map((ed) => costo(ed))
           .sort((a, b) => b - a)
-          .slice(0, pend);
+          .slice(0, c);
         total += costos.reduce((s, v) => s + v, 0);
       }
       return total;
     };
 
-    // FASE A — Mérito global mientras alcance la reserva de cupo (peor caso).
-    const porMerito = [...elegiblesConPuntaje].sort(
-      (a, b) => (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0),
-    );
+    // PASO 1 — MERITO global (con tope por UA y reserva de piso). Los mejores
+    // proyectos por mérito global entran como MERITO y NUNCA pasan a CUPO.
+    const porMerito = [...elegiblesConPuntaje].sort(porPuntajeDesc);
     for (const ed of porMerito) {
+      const ua = ed.unidadAcademicaId;
+      if ((meritoHechoUA.get(ua) ?? 0) >= (meritoMaxUA.get(ua) ?? 0)) continue;
       const costoEd = costo(ed);
       if (disponible == null) {
-        admitir(ed);
+        propuesta.set(ed.id, true);
+        mecanismo.set(ed.id, MecanismoAdjudicacion.Merito);
+        meritoHechoUA.set(ua, (meritoHechoUA.get(ua) ?? 0) + 1);
         continue;
       }
-      // Probar admisión y verificar que aún se pueda cubrir el cupo (peor caso).
       propuesta.set(ed.id, true);
-      admitidosUA.set(ed.unidadAcademicaId, (admitidosUA.get(ed.unidadAcademicaId) ?? 0) + 1);
-      const ok = disponible - costoEd >= reservaCupos();
-      if (!ok) {
+      if (disponible - costoEd >= reservaCupos()) {
+        mecanismo.set(ed.id, MecanismoAdjudicacion.Merito);
+        meritoHechoUA.set(ua, (meritoHechoUA.get(ua) ?? 0) + 1);
+        descontar(costoEd);
+      } else {
         propuesta.delete(ed.id);
-        admitidosUA.set(ed.unidadAcademicaId, (admitidosUA.get(ed.unidadAcademicaId) ?? 0) - 1);
-        continue;
-      }
-      descontar(costoEd);
-    }
-
-    // FASE B — Cupo balanceado (round-robin rotado, tope `cupo`).
-    if (cupo > 0) {
-      const ptr = new Map<string, number>();
-      for (const ua of uas) ptr.set(ua, 0);
-      let inicio = 0;
-      let hayCambios = true;
-      while (hayCambios) {
-        hayCambios = false;
-        const orden = [...uas.slice(inicio), ...uas.slice(0, inicio)];
-        for (const ua of orden) {
-          const lista = listasPorUA.get(ua)!;
-          const yaAdmitidos = lista.filter((e) => propuesta.get(e.id)).length;
-          if (yaAdmitidos >= cupo) continue;
-          let i = ptr.get(ua)!;
-          let ed: Edicion | undefined;
-          while (i < lista.length) {
-            const candidato = lista[i];
-            const costoEd = costo(candidato);
-            if (disponible == null || costoEd <= disponible) {
-              ed = candidato;
-              break;
-            }
-            i++;
-          }
-          if (!ed) {
-            ptr.set(ua, lista.length);
-            continue;
-          }
-          admitir(ed);
-          ptr.set(ua, i + 1);
-          hayCambios = true;
-        }
-        inicio = (inicio + 1) % uas.length;
       }
     }
 
-    // FASE C — Mérito global para el excedente restante.
-    const restantes = [...elegiblesConPuntaje]
-      .filter((ed) => !propuesta.get(ed.id))
-      .sort((a, b) => (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0));
-    for (const ed of restantes) {
-      const costoEd = costo(ed);
-      if (disponible != null && costoEd > disponible) continue;
-      admitir(ed);
+    // PASO 2 — CUPO (piso): por cada UA se financian como CUPO los `cupo` proyectos
+    // NO financiados de MAYOR puntaje. Así CUPO arranca justo donde termina el
+    // MERITO (bloque contiguo), no al final del ranking.
+    for (const ua of uas) {
+      const c = Math.min(cupo, listasPorUA.get(ua)!.length);
+      const candidatos = elegiblesConPuntaje
+        .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
+        .sort(porPuntajeDesc); // desc: CUPO = mayor puntaje no financiado (contiguo a MERITO)
+      let hechos = 0;
+      for (const ed of candidatos) {
+        if (hechos >= c) break;
+        const costoEd = costo(ed);
+        if (disponible != null && costoEd > disponible) continue;
+        propuesta.set(ed.id, true);
+        mecanismo.set(ed.id, MecanismoAdjudicacion.Cupo);
+        descontar(costoEd);
+        hechos++;
+      }
+    }
+
+    // PASO 3 — Excedente (swap), presupuesto GENERAL. Selección GREEDY por mérito:
+    // en cada iteración se toma el CUPO financiado de MAYOR puntaje de TODA la
+    // convocatoria cuya UA aún tenga un proyecto no financiado; se promueve a
+    // MERITO y se financia como CUPO el no-financiado de mayor puntaje de ESA MISMA
+    // UA. Si el reemplazo no cabe en el presupuesto, se corta (no se promueve un
+    // CUPO de menor mérito mientras exista uno mayor sin promover).
+    while (true) {
+      const uasConNoFinanciado = new Set(
+        elegiblesConPuntaje
+          .filter((ed) => !propuesta.get(ed.id))
+          .map((ed) => ed.unidadAcademicaId),
+      );
+      const mejorCupo = elegiblesConPuntaje
+        .filter(
+          (ed) =>
+            propuesta.get(ed.id) &&
+            mecanismo.get(ed.id) === MecanismoAdjudicacion.Cupo &&
+            uasConNoFinanciado.has(ed.unidadAcademicaId),
+        )
+        .sort(porPuntajeDesc)[0];
+      if (!mejorCupo) break;
+      const ua = mejorCupo.unidadAcademicaId;
+      const u = elegiblesConPuntaje
+        .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
+        .sort(porPuntajeDesc)[0]; // mayor puntaje -> nuevo CUPO (contiguo a MERITO)
+      if (!u) break;
+      const costoU = costo(u);
+      if (disponible != null && costoU > disponible) break;
+      mecanismo.set(mejorCupo.id, MecanismoAdjudicacion.Merito); // promover el CUPO de mayor mérito
+      propuesta.set(u.id, true);
+      mecanismo.set(u.id, MecanismoAdjudicacion.Cupo); // nuevo CUPO de la misma UA
+      descontar(costoU);
     }
 
     // Aplicar: automáticas según la propuesta; manuales (ya tenían ordenMerito
@@ -604,6 +625,8 @@ export class EvaluacionesService {
     for (const ed of ediciones) {
       if (manuales.has(ed.id)) continue;
       ed.adjudicacionPropuesta = puntajes.has(ed.id) ? (propuesta.get(ed.id) ?? false) : null;
+      ed.mecanismoAdjudicacion =
+        ed.adjudicacionPropuesta && mecanismo.has(ed.id) ? mecanismo.get(ed.id)! : null;
     }
 
     await this.edicionRepo.save(ediciones);
@@ -658,6 +681,7 @@ export class EvaluacionesService {
     }
 
     edicion.adjudicacionPropuesta = adjudicado;
+    edicion.mecanismoAdjudicacion = null;
     return this.edicionRepo.save(edicion);
   }
 

@@ -7,6 +7,7 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
+import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { Presupuesto } from './presupuesto.interface';
 
 @Entity()
@@ -59,6 +60,9 @@ export class Edicion {
 
   @Column({ type: 'boolean', nullable: true })
   adjudicacionPropuesta: boolean | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  mecanismoAdjudicacion?: MecanismoAdjudicacion | null;
 
   @Column({
     type: 'numeric',

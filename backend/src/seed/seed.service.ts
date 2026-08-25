@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DataSource, In, Not, Repository } from 'typeorm';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { UnidadesAcademicasService } from '../unidades-academicas/unidades-academicas.service';
@@ -35,7 +37,10 @@ import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity'
 import { EMPAREJAMIENTO_DEFAULT } from '../convocatorias/emparejamiento-default';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
-import { EstructuraTemplateInstitucional } from '../templates-evaluacion/estructura-template';
+import {
+  EstructuraTemplateInstitucional,
+  EstructuraTemplateCruzada,
+} from '../templates-evaluacion/estructura-template';
 import {
   TEMPLATE_INSTITUCIONAL_DEFAULT,
   TEMPLATE_CRUZADA_DEFAULT,
@@ -299,6 +304,9 @@ export class SeedService {
 
     console.log('\n=== SEED: Convocatoria de prueba (orden de mérito) ===');
     await this.seedConvocatoriaPruebaOrdenMerito();
+
+    console.log('\n=== SEED: Escenario Excel (orden de mérito con datos reales) ===');
+    await this.seedEscenarioExcel();
 
     console.log('\n=== SEED: Sugerencias ===');
     await this.seedSugerencias();
@@ -2407,6 +2415,7 @@ export class SeedService {
       const ediciones = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id, estado: Not(EstadoEdicion.Borrador) },
         relations: { proyecto: true },
+        order: { id: 'ASC' },
       });
       const [instExistentes, cruzadaExistentes] = await Promise.all([
         this.institucionalEvalRepo.find({ where: { convocatoriaId: conv.id }, select: { edicionId: true } }),
@@ -2750,6 +2759,164 @@ export class SeedService {
     console.log(`  ${NOMBRE}: lista para probar el orden de mérito`);
   }
 
+  // ─────────────────── Escenario desde Excel (orden de mérito real) ───────────────────
+  // Carga las filas de "ORDEN DE MERITO 7 11.xlsx" (extraídas a data/escenario-excel.json)
+  // como proyectos candidatos con su puntaje (columna O) y su costo (columna R = total
+  // monetario). El presupuesto de la convocatoria es 148.605.613,50, menor que la suma de
+  // los costos (≈181M), de modo que el algoritmo debe recortar y aplicar el cupo por UA.
+  private async seedEscenarioExcel(): Promise<void> {
+    const NOMBRE = 'Convocatoria de Prueba - Escenario Excel';
+    const existe = await this.convocatoriaRepo.findOne({ where: { nombre: NOMBRE } });
+    if (existe) {
+      console.log(`  (ya existe) ${NOMBRE}`);
+      return;
+    }
+
+    let filas: Array<{
+      ua: string;
+      director: string;
+      codirector: string;
+      nombre: string;
+      importeG: number;
+      totalR: number;
+      puntajeO: number;
+    }>;
+    try {
+      const dataPath = fs.existsSync(path.join(__dirname, 'data', 'escenario-excel.json'))
+        ? path.join(__dirname, 'data', 'escenario-excel.json')
+        : path.join(process.cwd(), 'src', 'seed', 'data', 'escenario-excel.json');
+      filas = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    } catch {
+      console.log('  No se encontró data/escenario-excel.json; se omite el escenario Excel');
+      return;
+    }
+    if (!filas.length) return;
+
+    const uaRepo = this.dataSource.getRepository(UnidadAcademica);
+    const uaPorNombre = new Map<string, UnidadAcademica>();
+    for (const f of filas) {
+      const nombreUa = (f.ua ?? 'Sin UA').trim() || 'Sin UA';
+      if (!uaPorNombre.has(nombreUa)) {
+        const existente = await uaRepo.findOne({ where: { nombre: nombreUa } });
+        const ua = existente ?? (await uaRepo.save(uaRepo.create({ nombre: nombreUa })));
+        uaPorNombre.set(nombreUa, ua);
+      }
+    }
+
+    // Plantillas simples: 1 subcategoría institucional numérica (máx 100) y 1 ítem de
+    // cruzada (máx 100). Así notaFinal = puntajeInstitucional + 0 = puntajeO exacto.
+    const idSub = 'sub-inst-excel';
+    const idItem = 'item-cruz-excel';
+    const estructuraInst: EstructuraTemplateInstitucional = {
+      categorias: [
+        {
+          id: 'cat-inst-excel',
+          nombre: 'Evaluación',
+          subcategorias: [
+            {
+              id: idSub,
+              texto: 'Puntaje total',
+              tipoValor: 'numerico',
+              minimo: 0,
+              maximo: 100,
+              fundamentacion: null,
+            },
+          ],
+        },
+      ],
+      checklist: [],
+    };
+    const estructuraCruz: EstructuraTemplateCruzada = {
+      categorias: [
+        {
+          id: 'cat-cruz-excel',
+          nombre: 'Evaluación',
+          puntajeMaximo: 100,
+          items: [{ id: idItem, nombre: 'Puntaje total', puntajeMaximo: 100 }],
+        },
+      ],
+    };
+    const templateInst = await this.templateInstRepo.save(
+      this.templateInstRepo.create({
+        nombre: `Evaluación institucional ${NOMBRE}`,
+        esDefault: false,
+        esPlantilla: false,
+        estructura: estructuraInst,
+      }),
+    );
+    const templateCruz = await this.templateCruzadaRepo.save(
+      this.templateCruzadaRepo.create({
+        nombre: `Evaluación cruzada ${NOMBRE}`,
+        esDefault: false,
+        esPlantilla: false,
+        estructura: estructuraCruz,
+      }),
+    );
+
+    const conv = await this.seedConvocatoria({
+      nombre: NOMBRE,
+      descripcion:
+        'Escenario de prueba cargado desde el Excel "ORDEN DE MERITO 7 11" para validar el orden de mérito automático con datos reales.',
+      anio: 2026,
+      estado: EstadoConvocatoria.Evaluacion,
+      fechaInicioPresentacion: this.crearFecha(2026, 3, 1),
+      fechaFinPresentacion: this.crearFecha(2026, 4, 30),
+      fechaInicioEvaluacion: this.crearFecha(2026, 5, 15),
+      fechaFinEvaluacion: this.crearFecha(2026, 7, 15),
+      fechaInicioEjecucion: this.crearFecha(2026, 8, 1),
+      fechaFinEjecucion: this.crearFecha(2027, 2, 28),
+      formularioId: this.formularioDefault?.id,
+      cupoMinimoPorUnidadAcademica: 6,
+      templateEvaluacionInstitucionalId: templateInst.id,
+      templateEvaluacionCruzadaId: templateCruz.id,
+      presupuestoTotal: 148605613.5,
+    });
+
+    const autor = this.admin;
+    let generados = 0;
+    for (const f of filas) {
+      const ua = uaPorNombre.get((f.ua ?? 'Sin UA').trim() || 'Sin UA')!;
+      const presupuesto: Presupuesto = { montoTotal: f.totalR, rubros: [] };
+      const edicion = await this.seedProyectoConEdicion(
+        f.nombre,
+        autor,
+        ua,
+        conv,
+        EstadoEdicion.EnEvaluacion,
+        presupuesto,
+      );
+      if (!edicion) continue;
+
+      await this.institucionalEvalRepo.save(
+        this.institucionalEvalRepo.create({
+          convocatoriaId: conv.id,
+          edicionId: edicion.id,
+          templateId: templateInst.id,
+          estado: EstadoEvaluacion.Confirmada,
+          realizadoPorId: autor.id,
+          confirmadoPorId: autor.id,
+          categorias: { [idSub]: { valor: f.puntajeO, fundamentacion: '' } },
+          checklist: {},
+          observaciones: 'Evaluación de prueba (escenario Excel)',
+        }),
+      );
+      await this.cruzadaEvalRepo.save(
+        this.cruzadaEvalRepo.create({
+          convocatoriaId: conv.id,
+          edicionId: edicion.id,
+          evaluadorId: autor.id,
+          tipo: TipoEvaluacionCruzada.Ajena,
+          templateId: templateCruz.id,
+          estado: EstadoEvaluacion.Confirmada,
+          items: { [idItem]: 0 },
+          observaciones: 'Evaluación de prueba (escenario Excel)',
+        }),
+      );
+      generados++;
+    }
+    console.log(`  ${NOMBRE}: ${generados} proyectos generados (presupuesto 148605613.50)`);
+  }
+
   private generarCategoriasAltas(estructura: EstructuraTemplateInstitucional): {
     categorias: Record<string, unknown>;
     checklist: Record<string, unknown>;
@@ -2801,6 +2968,7 @@ export class SeedService {
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId: conv.id, estado: EstadoEdicion.PendienteDeCambios },
       relations: { proyecto: true, creadoPor: true },
+      order: { id: 'ASC' },
     });
 
     for (const ed of ediciones) {

@@ -304,6 +304,7 @@ export function ConvocatoriaDetail() {
               ordenMerito: u.ordenMerito,
               puntajeMerito: u.puntajeMerito,
               adjudicacionPropuesta: u.adjudicacionPropuesta,
+              mecanismoAdjudicacion: u.mecanismoAdjudicacion,
             }
           : e;
       });
@@ -357,8 +358,21 @@ export function ConvocatoriaDetail() {
           : e.adjudicacionPropuesta === false
             ? 'No adjudicado'
             : 'Sin evaluación',
+        e.mecanismoAdjudicacion === 'MERITO'
+          ? 'Mérito'
+          : e.mecanismoAdjudicacion === 'CUPO'
+            ? 'Cupo'
+            : '—',
       ]);
-    const cabecera = ['Orden', 'Proyecto', 'Unidad Académica', 'Puntaje', 'Presupuesto', 'Adjudicación'];
+    const cabecera = [
+      'Orden',
+      'Proyecto',
+      'Unidad Académica',
+      'Puntaje',
+      'Presupuesto',
+      'Adjudicación',
+      'Mecanismo',
+    ];
     const contenido = [cabecera, ...filas]
       .map((f) => f.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';'))
       .join('\r\n');
@@ -1160,8 +1174,9 @@ export function ConvocatoriaDetail() {
                       <TableHead>Unidad académica</TableHead>
                       <TableHead className="text-right">Puntaje</TableHead>
                       <TableHead className="text-right">Presupuesto</TableHead>
-                      <TableHead>Adjudicación propuesta</TableHead>
-                    </TableRow>
+                        <TableHead>Adjudicación propuesta</TableHead>
+                        <TableHead>Mecanismo</TableHead>
+                      </TableRow>
                   </TableHeader>
                   <TableBody>
                     {edicionesMeritoFiltradas.map((e) => (
@@ -1212,6 +1227,13 @@ export function ConvocatoriaDetail() {
                               {e.adjudicacionPropuesta ? 'Adjudicado' : 'No adjudicado'}
                             </Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {e.mecanismoAdjudicacion === 'MERITO'
+                            ? 'Mérito'
+                            : e.mecanismoAdjudicacion === 'CUPO'
+                              ? 'Cupo'
+                              : '—'}
                         </TableCell>
                       </TableRow>
                     ))}
