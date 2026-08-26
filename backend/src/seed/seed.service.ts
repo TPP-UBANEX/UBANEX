@@ -2829,6 +2829,23 @@ export class SeedService {
   // monetario). El presupuesto de la convocatoria es 148.605.613,50, menor que la suma de
   // los costos (≈181M), de modo que el algoritmo debe recortar y aplicar el cupo por UA.
   private async seedEscenarioExcel(): Promise<void> {
+    const MAPA_UA_EXCEL: Record<string, string> = {
+      Derecho: 'Facultad de Derecho',
+      Economicas: 'Facultad de Ciencias Económicas',
+      Sociales: 'Facultad de Ciencias Sociales',
+      'Filosofia y Letras': 'Facultad de Filosofía y Letras',
+      Ingenieria: 'Facultad de Ingeniería',
+      Medicina: 'Facultad de Medicina',
+      'Exactas Y Naturales': 'Facultad de Ciencias Exactas y Naturales',
+      'Arquitectura Diseño y Urbanismo': 'Facultad de Arquitectura, Diseño y Urbanismo',
+      Agronomía: 'Facultad de Agronomía',
+      'Farmacia y Bioquimíca': 'Facultad de Farmacia y Bioquímica',
+      Odontología: 'Facultad de Odontología',
+      Psicologia: 'Facultad de Psicología',
+      Veterinaria: 'Facultad de Ciencias Veterinarias',
+      'Ciclo Basico Comun': 'Ciclo Básico Común (CBC)',
+    };
+    const normalizarUa = (n: string): string => MAPA_UA_EXCEL[n] ?? n;
     const NOMBRE = 'Convocatoria de Prueba - Escenario Excel';
     const existe = await this.convocatoriaRepo.findOne({ where: { nombre: NOMBRE } });
     if (existe) {
@@ -2859,7 +2876,7 @@ export class SeedService {
     const uaRepo = this.dataSource.getRepository(UnidadAcademica);
     const uaPorNombre = new Map<string, UnidadAcademica>();
     for (const f of filas) {
-      const nombreUa = (f.ua ?? 'Sin UA').trim() || 'Sin UA';
+      const nombreUa = normalizarUa((f.ua ?? 'Sin UA').trim() || 'Sin UA');
       if (!uaPorNombre.has(nombreUa)) {
         const existente = await uaRepo.findOne({ where: { nombre: nombreUa } });
         const ua = existente ?? (await uaRepo.save(uaRepo.create({ nombre: nombreUa })));
@@ -2939,7 +2956,7 @@ export class SeedService {
     const autor = this.admin;
     let generados = 0;
     for (const f of filas) {
-      const ua = uaPorNombre.get((f.ua ?? 'Sin UA').trim() || 'Sin UA')!;
+      const ua = uaPorNombre.get(normalizarUa((f.ua ?? 'Sin UA').trim() || 'Sin UA'))!;
       const presupuesto: Presupuesto = { montoTotal: f.totalR, rubros: [] };
       const edicion = await this.seedProyectoConEdicion(
         f.nombre,

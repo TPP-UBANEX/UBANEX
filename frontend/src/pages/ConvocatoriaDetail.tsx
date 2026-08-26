@@ -140,13 +140,6 @@ export function ConvocatoriaDetail() {
   const [confirmando, setConfirmando] = useState(false);
   const [confirmarMeritoOpen, setConfirmarMeritoOpen] = useState(false);
   const [ordenMeritoSort, setOrdenMeritoSort] = useState('puntaje-desc');
-  const [ordenMeritoUa, setOrdenMeritoUa] = useState<
-    Awaited<ReturnType<typeof api.evaluaciones.ordenMeritoUa>> | null
-  >(null);
-  const [resultadoDocente, setResultadoDocente] = useState<
-    Awaited<ReturnType<typeof api.evaluaciones.ordenMeritoDocente>> | null
-  >(null);
-  const [cargandoMerito, setCargandoMerito] = useState(false);
   const [tab, setTab] = useState('proyectos');
 
   const esUsuarioEjecucion = user?.roles.some(
@@ -155,10 +148,6 @@ export function ConvocatoriaDetail() {
   const esRectorado = user?.roles.some(
     (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   );
-  const esSecretaria = user?.roles.some(
-    (r) => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
-  );
-  const esDocente = user?.roles.includes(RolUsuario.Docente);
   const esAutoridadRectorado = user?.roles.includes(RolUsuario.AutoridadDeRectorado);
   const errores = erroresFechas(editForm);
 
@@ -220,25 +209,6 @@ export function ConvocatoriaDetail() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    if (!id || tab !== 'merito') return;
-    if (esSecretaria) {
-      setCargandoMerito(true);
-      api.evaluaciones
-        .ordenMeritoUa(id)
-        .then(setOrdenMeritoUa)
-        .catch(() => setOrdenMeritoUa(null))
-        .finally(() => setCargandoMerito(false));
-    } else if (esDocente) {
-      setCargandoMerito(true);
-      api.evaluaciones
-        .ordenMeritoDocente(id)
-        .then(setResultadoDocente)
-        .catch(() => setResultadoDocente(null))
-        .finally(() => setCargandoMerito(false));
-    }
-  }, [id, tab, esSecretaria, esDocente]);
-
   const cambiarEtapa = (v: string) => {
     setFiltroEtapa(v);
     setPage(1);
@@ -272,9 +242,7 @@ export function ConvocatoriaDetail() {
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [todasEdiciones]);
 
-  const edicionesMeritoFuente = esSecretaria
-    ? (ordenMeritoUa?.ediciones ?? []).map((x) => x.edicion)
-    : todasEdiciones;
+  const edicionesMeritoFuente = todasEdiciones;
 
   const edicionesMeritoFiltradas = useMemo(() => {
     const base = [...edicionesMeritoFuente]
@@ -846,7 +814,7 @@ export function ConvocatoriaDetail() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
-          <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>
+          {esRectorado && <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>}
           {!esUsuarioEjecucion && <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>}
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
@@ -1008,7 +976,7 @@ export function ConvocatoriaDetail() {
                         <TableHead>Creado por</TableHead>
                         <TableHead>Facultad</TableHead>
                         <TableHead>Estado</TableHead>
-                        <TableHead>Adjudicación propuesta</TableHead>
+                        {conv?.ordenMeritoConfirmado && <TableHead>Adjudicación</TableHead>}
                         <TableHead>Presupuesto</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
@@ -1039,15 +1007,17 @@ export function ConvocatoriaDetail() {
                               {estadoEdicionLabel[e.estado] || e.estado}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            {e.adjudicacionPropuesta === null ? (
-                              <span className="text-xs text-muted-foreground">Sin evaluación</span>
-                            ) : (
-                              <Badge variant={e.adjudicacionPropuesta ? 'default' : 'outline'}>
-                                {e.adjudicacionPropuesta ? 'Adjudicado' : 'No adjudicado'}
-                              </Badge>
-                            )}
-                          </TableCell>
+                          {conv?.ordenMeritoConfirmado && (
+                            <TableCell>
+                              {e.adjudicacionPropuesta === null ? (
+                                <span className="text-xs text-muted-foreground">Sin evaluación</span>
+                              ) : (
+                                <Badge variant={e.adjudicacionPropuesta ? 'default' : 'outline'}>
+                                  {e.adjudicacionPropuesta ? 'Adjudicado' : 'No adjudicado'}
+                                </Badge>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell className="text-sm">
                             {formatearMoneda(e.presupuesto?.montoTotal)}
                           </TableCell>
@@ -1111,13 +1081,13 @@ export function ConvocatoriaDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="merito" className="mt-4">
-          <Card>
-            <CardHeader className="flex flex-col gap-3 space-y-0">
-              <CardTitle className="text-sm font-medium">Orden de Mérito</CardTitle>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {!esSecretaria && (
+        {esRectorado && (
+          <TabsContent value="merito" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-col gap-3 space-y-0">
+                <CardTitle className="text-sm font-medium">Orden de Mérito</CardTitle>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap gap-2">
                     <Select value={filtroUA} onValueChange={cambiarUA}>
                       <SelectTrigger className="w-72">
                         <SelectValue placeholder="Unidad académica" />
@@ -1131,7 +1101,6 @@ export function ConvocatoriaDetail() {
                         ))}
                       </SelectContent>
                     </Select>
-                  )}
                   <Select value={ordenMeritoSort} onValueChange={setOrdenMeritoSort}>
                     <SelectTrigger className="w-60">
                       <SelectValue placeholder="Ordenar" />
@@ -1203,60 +1172,13 @@ export function ConvocatoriaDetail() {
                   </div>
                 </div>
               )}
-              {esDocente ? (
-                <div className="space-y-3">
-                  {!conv?.ordenMeritoConfirmado ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      El orden de mérito aún no fue confirmado.
-                    </div>
-                  ) : cargandoMerito ? (
-                    <div className="text-center text-muted-foreground py-8">Cargando…</div>
-                  ) : (resultadoDocente?.ediciones ?? []).length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      No participás en proyectos adjudicados en esta convocatoria.
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Proyecto</TableHead>
-                          <TableHead>Unidad académica</TableHead>
-                          <TableHead>Resultado</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(resultadoDocente?.ediciones ?? []).map((d) => (
-                          <TableRow key={d.edicionId}>
-                            <TableCell className="font-medium">
-                              {d.proyecto?.nombre || 'Sin nombre'}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {d.unidadAcademica?.nombre || '-'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={d.adjudicado ? 'default' : 'outline'}>
-                                {d.adjudicado ? 'Adjudicado' : 'No adjudicado'}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
+              {edicionesMeritoFiltradas.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  {edicionesMeritoFuente.some((e) => e.ordenMerito != null)
+                    ? 'No hay proyectos para la unidad académica seleccionada.'
+                    : 'Generá el orden de mérito automático para ver el puntaje de cada proyecto.'}
                 </div>
               ) : (
-                <>
-                  {edicionesMeritoFiltradas.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      {cargandoMerito
-                        ? 'Cargando…'
-                        : edicionesMeritoFuente.some((e) => e.ordenMerito != null)
-                          ? esSecretaria
-                            ? 'Tu unidad académica no tiene proyectos en el orden de mérito.'
-                            : 'No hay proyectos para la unidad académica seleccionada.'
-                          : 'Generá el orden de mérito automático para ver el puntaje de cada proyecto.'}
-                    </div>
-                  ) : (
                     <Table>
                   <TableHeader>
                     <TableRow>
@@ -1350,11 +1272,10 @@ export function ConvocatoriaDetail() {
                   </TableBody>
                 </Table>
                   )}
-                </>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
+        )}
         <TabsContent value="emparejamiento" className="mt-4">
           {id && conv && <EmparejamientoTab convocatoriaId={id} estadoConvocatoria={conv.estado} />}
         </TabsContent>
