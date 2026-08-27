@@ -59,7 +59,11 @@ export function ProyectoEvaluablePanel({
             </div>
             <div>
               <span className="text-muted-foreground">Consolidado:</span>{' '}
-              {edicion.proyecto?.esConsolidado ? 'Sí' : 'No'}
+              {edicion.proyecto?.esConsolidado === true
+                ? 'Sí'
+                : edicion.proyecto?.esConsolidado === false
+                  ? 'No'
+                  : 'Automático'}
             </div>
             <div>
               <span className="text-muted-foreground">Interfacultad:</span>{' '}

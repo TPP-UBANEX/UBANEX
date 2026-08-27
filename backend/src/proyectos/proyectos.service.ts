@@ -24,8 +24,15 @@ import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
+import {
+  ordenarConvocatorias,
+  calcularConsolidacion,
+  esConsolidadoEfectivo,
+  salteaEvaluacionEfectivo,
+  EdicionHistorial,
+} from './consolidacion';
 
-const CAMPOS_EDICION_AUTORIDAD = ['esInterfacultad', 'unidadAcademicaAdicionalId'];
+const CAMPOS_EDICION_AUTORIDAD = ['esConsolidado', 'esInterfacultad', 'unidadAcademicaAdicionalId'];
 const ESTADOS_EDITABLES_AUTORIDAD = [
   EstadoEdicion.Borrador,
   EstadoEdicion.Presentado,
@@ -57,12 +64,7 @@ export class ProyectosService {
         rol: RolEjecucion.Evaluador,
       },
     });
-    const estadosQueBloquean = [
-      EstadoPropuestaEvaluador.Propuesto,
-      EstadoPropuestaEvaluador.Aceptada,
-      EstadoPropuestaEvaluador.Aprobado,
-    ];
-    if (evaluador?.estado && estadosQueBloquean.includes(evaluador.estado)) {
+    if (evaluador) {
       throw new ForbiddenException(
         'No podés crear proyectos en una convocatoria donde sos evaluador',
       );
@@ -71,7 +73,7 @@ export class ProyectosService {
     const proyecto = await this.proyectoRepo.save(
       this.proyectoRepo.create({
         nombre: dto.nombre,
-        esConsolidado: dto.esConsolidado ?? false,
+        esConsolidado: null,
         esInterfacultad: dto.esInterfacultad ?? false,
         creadoPorId: usuario.id,
       }),
@@ -111,12 +113,7 @@ export class ProyectosService {
         rol: RolEjecucion.Evaluador,
       },
     });
-    const estadosQueBloquean = [
-      EstadoPropuestaEvaluador.Propuesto,
-      EstadoPropuestaEvaluador.Aceptada,
-      EstadoPropuestaEvaluador.Aprobado,
-    ];
-    if (evaluador?.estado && estadosQueBloquean.includes(evaluador.estado)) {
+    if (evaluador) {
       throw new ForbiddenException(
         'No podés resubir proyectos en una convocatoria donde sos evaluador',
       );
@@ -409,7 +406,42 @@ export class ProyectosService {
       order: { actualizadoEn: 'DESC' },
     });
 
-    return { ...proyecto, ediciones };
+    const convocatorias = await this.edicionRepo.manager.find(Convocatoria, {
+      select: { id: true, anio: true },
+    });
+    const convocatoriasOrdenadas = ordenarConvocatorias(convocatorias);
+    const historial: EdicionHistorial[] = ediciones.map(e => ({
+      convocatoriaId: e.convocatoriaId,
+      estado: e.estado,
+    }));
+
+    const indice = (convId: string) => convocatoriasOrdenadas.findIndex(c => c.id === convId);
+    const edicionesEnriquecidas = ediciones.map(e => {
+      const datos = calcularConsolidacion(convocatoriasOrdenadas, historial, e.convocatoriaId);
+      return {
+        ...e,
+        rachaAdjudicaciones: datos.rachaAdjudicaciones,
+        esConsolidadoDerivado: datos.esConsolidadoDerivado,
+        salteaEvaluacion: salteaEvaluacionEfectivo(datos, proyecto.esConsolidado),
+      };
+    });
+
+    // Estado del proyecto según su participación en la convocatoria más reciente.
+    const datosUltima = ediciones.length > 0
+      ? calcularConsolidacion(
+          convocatoriasOrdenadas,
+          historial,
+          ediciones.reduce((a, b) => (indice(b.convocatoriaId) > indice(a.convocatoriaId) ? b : a)).convocatoriaId,
+        )
+      : { rachaAdjudicaciones: 0, esConsolidadoDerivado: false, salteaEvaluacion: false };
+
+    return {
+      ...proyecto,
+      esConsolidadoDerivado: datosUltima.esConsolidadoDerivado,
+      esConsolidadoEfectivo: esConsolidadoEfectivo(datosUltima, proyecto.esConsolidado),
+      rachaAdjudicaciones: datosUltima.rachaAdjudicaciones,
+      ediciones: edicionesEnriquecidas,
+    };
   }
 
   async actualizarEdicion(
@@ -444,10 +476,14 @@ export class ProyectosService {
       await this.proyectoRepo.update(proyectoId, { nombre: dto.nombre });
     }
 
-    if (dto.esConsolidado !== undefined || dto.esInterfacultad !== undefined) {
-      const updateData: Partial<Proyecto> = {};
-      if (dto.esConsolidado !== undefined) updateData.esConsolidado = dto.esConsolidado;
-      if (dto.esInterfacultad !== undefined) updateData.esInterfacultad = dto.esInterfacultad;
+    // El consolidado es un override administrativo: solo lo puede tocar una autoridad.
+    const puedeOverrideConsolidado = this.esAutoridad(usuario);
+    const updateData: Partial<Proyecto> = {};
+    if (dto.esConsolidado !== undefined && puedeOverrideConsolidado) {
+      updateData.esConsolidado = dto.esConsolidado;
+    }
+    if (dto.esInterfacultad !== undefined) updateData.esInterfacultad = dto.esInterfacultad;
+    if (Object.keys(updateData).length > 0) {
       await this.proyectoRepo.update(proyectoId, updateData);
     }
 

@@ -1,7 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Convocatoria } from './convocatoria.entity';
+import { Proyecto } from '../proyectos/proyecto.entity';
+import {
+  ordenarConvocatorias,
+  calcularConsolidacion,
+  salteaEvaluacionEfectivo,
+  EdicionHistorial,
+} from '../proyectos/consolidacion';
 import { CrearConvocatoriaDto } from './dto/crear-convocatoria.dto';
 import { ActualizarConvocatoriaDto } from './dto/actualizar-convocatoria.dto';
 import { GuardarEmparejamientoDto } from './dto/guardar-emparejamiento.dto';
@@ -154,19 +161,73 @@ export class ConvocatoriasService {
       convocatoriaGuardada.estado === EstadoConvocatoria.Evaluacion &&
       estadoAnterior !== EstadoConvocatoria.Evaluacion
     ) {
-      await this.edicionRepo
-        .createQueryBuilder()
-        .update(Edicion)
-        .set({ estado: EstadoEdicion.EnEvaluacion })
-        .where('convocatoriaId = :convocatoriaId', { convocatoriaId: convocatoria.id })
-        .andWhere('estado IN (:...estados)', {
-          estados: [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios],
-        })
-        .andWhere('eliminadoEn IS NULL')
-        .execute();
+      await this.aplicarTransicionEvaluacion(convocatoria.id);
     }
 
     return convocatoriaGuardada;
+  }
+
+  /**
+   * Al pasar a Evaluación, las ediciones presentadas van a `EnEvaluacion`, salvo las
+   * de proyectos consolidados que este año saltean la etapa: esas pasan directo a
+   * `Adjudicado` (fiel a "saltean evaluación y van directo a adjudicación"), lo que
+   * a su vez alimenta la racha de adjudicaciones de las convocatorias siguientes.
+   */
+  private async aplicarTransicionEvaluacion(convocatoriaId: string): Promise<void> {
+    const edicionesAEvaluar = await this.edicionRepo.find({
+      where: {
+        convocatoriaId,
+        estado: In([EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios]),
+      },
+      select: { id: true, proyectoId: true },
+    });
+    if (edicionesAEvaluar.length === 0) return;
+
+    const manager = this.edicionRepo.manager;
+    const convocatorias = await manager.find(Convocatoria, {
+      select: { id: true, anio: true },
+    });
+    const convocatoriasOrdenadas = ordenarConvocatorias(convocatorias);
+
+    const proyectoIds = [...new Set(edicionesAEvaluar.map(e => e.proyectoId))];
+    const proyectos = await manager.find(Proyecto, {
+      where: { id: In(proyectoIds) },
+      select: { id: true, esConsolidado: true },
+    });
+    const overridePorProyecto = new Map(proyectos.map(p => [p.id, p.esConsolidado]));
+
+    const historial = await this.edicionRepo.find({
+      where: { proyectoId: In(proyectoIds) },
+      select: { proyectoId: true, convocatoriaId: true, estado: true },
+    });
+    const historialPorProyecto = new Map<string, EdicionHistorial[]>();
+    for (const e of historial) {
+      const arr = historialPorProyecto.get(e.proyectoId) ?? [];
+      arr.push({ convocatoriaId: e.convocatoriaId, estado: e.estado });
+      historialPorProyecto.set(e.proyectoId, arr);
+    }
+
+    const idsSaltean: string[] = [];
+    const idsEvaluan: string[] = [];
+    for (const ed of edicionesAEvaluar) {
+      const datos = calcularConsolidacion(
+        convocatoriasOrdenadas,
+        historialPorProyecto.get(ed.proyectoId) ?? [],
+        convocatoriaId,
+      );
+      if (salteaEvaluacionEfectivo(datos, overridePorProyecto.get(ed.proyectoId) ?? null)) {
+        idsSaltean.push(ed.id);
+      } else {
+        idsEvaluan.push(ed.id);
+      }
+    }
+
+    if (idsEvaluan.length > 0) {
+      await this.edicionRepo.update({ id: In(idsEvaluan) }, { estado: EstadoEdicion.EnEvaluacion });
+    }
+    if (idsSaltean.length > 0) {
+      await this.edicionRepo.update({ id: In(idsSaltean) }, { estado: EstadoEdicion.Adjudicado });
+    }
   }
 
   async eliminar(id: string, _usuario: Usuario) {

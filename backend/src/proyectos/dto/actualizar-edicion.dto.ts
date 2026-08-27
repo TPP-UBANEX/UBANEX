@@ -1,5 +1,5 @@
 import {
-  IsString, IsOptional, IsObject, IsInt, IsBoolean, IsUUID,
+  IsString, IsOptional, IsObject, IsInt, IsBoolean, IsUUID, ValidateIf,
 } from 'class-validator';
 
 export class ActualizarEdicionDto {
@@ -11,9 +11,11 @@ export class ActualizarEdicionDto {
   @IsInt()
   anioEdicion?: number;
 
+  // Override manual del consolidado (solo Rectorado): true/false fuerzan, null vuelve a automático.
   @IsOptional()
+  @ValidateIf((o) => o.esConsolidado !== null)
   @IsBoolean()
-  esConsolidado?: boolean;
+  esConsolidado?: boolean | null;
 
   @IsOptional()
   @IsBoolean()
