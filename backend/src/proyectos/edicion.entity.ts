@@ -54,6 +54,11 @@ export class Edicion {
   @Column({ type: 'json', nullable: true })
   datosFormulario: object | null;
 
+  // Link al aval (PDF firmado por el decano). Lo carga la Secretaría de la UA de
+  // la edición. Requisito para la adjudicación; no bloquea el pase a evaluación.
+  @Column({ type: 'text', nullable: true })
+  avalUrl: string | null;
+
   @CreateDateColumn()
   creadoEn: Date;
 

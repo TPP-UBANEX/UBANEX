@@ -8,6 +8,7 @@ import { Edicion } from './edicion.entity';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
+import { ActualizarAvalDto } from './dto/actualizar-aval.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Formulario } from '../formularios/formulario.entity';
@@ -423,6 +424,7 @@ export class ProyectosService {
         rachaAdjudicaciones: datos.rachaAdjudicaciones,
         esConsolidadoDerivado: datos.esConsolidadoDerivado,
         salteaEvaluacion: salteaEvaluacionEfectivo(datos, proyecto.esConsolidado),
+        tieneAval: !!e.avalUrl,
       };
     });
 
@@ -686,6 +688,41 @@ export class ProyectosService {
     }
 
     edicion.estado = EstadoEdicion.EnEvaluacion;
+    await this.edicionRepo.save(edicion);
+
+    return this.obtenerProyecto(proyectoId);
+  }
+
+  async actualizarAval(
+    proyectoId: string,
+    edicionId: string,
+    dto: ActualizarAvalDto,
+    usuario: Usuario,
+  ) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+
+    const esSecretariaMismaUA =
+      usuario.roles.some(r =>
+        [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+      ) && usuario.unidadAcademicaId === edicion.unidadAcademicaId;
+    if (!esSecretariaMismaUA) {
+      throw new ForbiddenException(
+        'Solo la Secretaría de la Unidad Académica del proyecto puede cargar el aval',
+      );
+    }
+
+    const estadosPermitidos = [
+      EstadoEdicion.Presentado,
+      EstadoEdicion.PendienteDeCambios,
+      EstadoEdicion.EnEvaluacion,
+    ];
+    if (!estadosPermitidos.includes(edicion.estado)) {
+      throw new BadRequestException(
+        `No se puede cargar el aval de una edición en estado ${edicion.estado}`,
+      );
+    }
+
+    edicion.avalUrl = dto.avalUrl?.trim() || null;
     await this.edicionRepo.save(edicion);
 
     return this.obtenerProyecto(proyectoId);

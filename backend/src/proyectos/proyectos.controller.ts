@@ -6,6 +6,7 @@ import { ProyectosService } from './proyectos.service';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
+import { ActualizarAvalDto } from './dto/actualizar-aval.dto';
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -79,6 +80,16 @@ export class ProyectosController {
     @CurrentUser() usuario: Usuario,
   ) {
     return this.service.enviarEdicion(id, edicionId, usuario);
+  }
+
+  @Patch(':id/ediciones/:edicionId/aval')
+  actualizarAval(
+    @Param('id') id: string,
+    @Param('edicionId') edicionId: string,
+    @Body() dto: ActualizarAvalDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.actualizarAval(id, edicionId, dto, usuario);
   }
 
   @Post(':id/ediciones/:edicionId/iniciar-evaluacion')
