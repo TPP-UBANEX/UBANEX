@@ -650,12 +650,9 @@ export class ProyectosService {
     const esRectorado = usuario.roles.some(r =>
       [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado].includes(r),
     );
-    const esSecretariaMismaUA = usuario.roles.some(r =>
-      [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
-    ) && usuario.unidadAcademicaId === edicion.unidadAcademicaId;
-    if (!esRectorado && !esSecretariaMismaUA) {
+    if (!esRectorado) {
       throw new ForbiddenException(
-        'Solo la Secretaría de la Unidad Académica del proyecto o el Rectorado pueden iniciar la evaluación',
+        'Solo el Rectorado puede pasar una edición a evaluación',
       );
     }
 
@@ -681,7 +678,7 @@ export class ProyectosService {
       );
     }
 
-    if (edicion.estado !== EstadoEdicion.Presentado && edicion.estado !== EstadoEdicion.PendienteDeCambios) {
+    if (edicion.estado !== EstadoEdicion.Presentado) {
       throw new BadRequestException(
         `No se puede iniciar la evaluación de una edición en estado ${edicion.estado}`,
       );
