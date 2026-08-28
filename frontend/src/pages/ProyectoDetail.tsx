@@ -558,7 +558,7 @@ export function ProyectoDetail() {
               </TooltipProvider>
             </>
           )}
-          {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
+          {!editando && (esSecretariaMismaUA || esRectoradoAmplio) && !modoSugerencia && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios].includes(edicion?.estado as EstadoEdicion) && (
             <Button variant="outline" onClick={() => setModoSugerencia(true)}>
               <MessageSquare className="h-4 w-4 mr-2" />Sugerir
             </Button>
