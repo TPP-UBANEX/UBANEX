@@ -48,7 +48,10 @@ export class SugerenciasService {
     const edicion = await this.obtenerEdicion(edicionId);
     await this.validarSecretariaMismaUA(edicion, usuario);
 
-    if (edicion.estado !== EstadoEdicion.Presentado) {
+    if (
+      edicion.estado !== EstadoEdicion.Presentado &&
+      edicion.estado !== EstadoEdicion.PendienteDeCambios
+    ) {
       throw new BadRequestException(
         `Solo se pueden sugerir cambios cuando la edición está en estado ${EstadoEdicion.Presentado}`,
       );
@@ -60,6 +63,12 @@ export class SugerenciasService {
     const valorActual = this.obtenerValorActual(edicion, proyecto, dto.campo);
     const valorSugerido = dto.valorSugerido?.trim() ? dto.valorSugerido.trim() : null;
     await this.validarValorSugerido(edicion, dto.campo, valorSugerido);
+
+    // Mientras haya sugerencias abiertas, la edición queda en revisión.
+    if (edicion.estado === EstadoEdicion.Presentado) {
+      edicion.estado = EstadoEdicion.PendienteDeCambios;
+      await this.edicionRepo.save(edicion);
+    }
 
     const pendienteExistente = await this.sugerenciaRepo.findOne({
       where: {
@@ -139,6 +148,18 @@ export class SugerenciasService {
     }
 
     await this.sugerenciaRepo.save(sugerencia);
+
+    // Si ya no quedan sugerencias abiertas, la edición vuelve a Presentado.
+    const quedanPendientes = await this.sugerenciaRepo.count({
+      where: { edicionId: sugerencia.edicionId, estado: EstadoSugerencia.Pendiente },
+    });
+    if (
+      quedanPendientes === 0 &&
+      sugerencia.edicion.estado === EstadoEdicion.PendienteDeCambios
+    ) {
+      sugerencia.edicion.estado = EstadoEdicion.Presentado;
+      await this.edicionRepo.save(sugerencia.edicion);
+    }
 
     await this.notificarRespuesta(sugerencia, usuario);
 
