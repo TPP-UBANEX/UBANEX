@@ -82,6 +82,8 @@ export function ProyectoDetail() {
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
   const [iniciandoEvaluacion, setIniciandoEvaluacion] = useState(false)
+  const [avalInput, setAvalInput] = useState('')
+  const [guardandoAval, setGuardandoAval] = useState(false)
 
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
@@ -266,6 +268,10 @@ export function ProyectoDetail() {
       .catch(() => toast.error('Error al cargar sugerencias'))
   }, [modoSugerencia, edicion?.id, user?.id])
 
+  useEffect(() => {
+    setAvalInput(edicion?.avalUrl ?? '')
+  }, [edicion?.id, edicion?.avalUrl])
+
   const direccion = useDireccionEdicion({ proyecto, edicion, directores, uas })
 
   const iniciarEdicion = () => {
@@ -291,6 +297,20 @@ export function ProyectoDetail() {
       cargarDatos()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al actualizar el consolidado')
+    }
+  }
+
+  const guardarAval = async () => {
+    if (!id || !edicion) return
+    setGuardandoAval(true)
+    try {
+      await api.proyectos.actualizarAval(id, edicion.id, { avalUrl: avalInput.trim() || null })
+      toast.success('Aval actualizado')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar el aval')
+    } finally {
+      setGuardandoAval(false)
     }
   }
 
@@ -684,6 +704,27 @@ export function ProyectoDetail() {
                       </CampoSugerible>
                     </div>
                     <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
+                    <div>
+                      <span className="text-muted-foreground">Tiene aval:</span>{' '}
+                      {edicion?.tieneAval
+                        ? (edicion.avalUrl
+                            ? <a href={edicion.avalUrl} target="_blank" rel="noreferrer" className="text-primary underline">Sí — ver aval</a>
+                            : 'Sí')
+                        : 'No'}
+                      {esSecretariaMismaUA && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios, EstadoEdicion.EnEvaluacion].includes(edicion?.estado as EstadoEdicion) && (
+                        <div className="flex gap-1 mt-1">
+                          <Input
+                            className="h-8 text-xs"
+                            placeholder="https://..."
+                            value={avalInput}
+                            onChange={e => setAvalInput(e.target.value)}
+                          />
+                          <Button type="button" size="sm" onClick={guardarAval} disabled={guardandoAval}>
+                            {guardandoAval ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <span className="text-muted-foreground">Consolidado:</span>{' '}
                       {proyecto.esConsolidadoEfectivo ? 'Sí' : 'No'}

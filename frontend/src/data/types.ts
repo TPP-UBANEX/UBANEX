@@ -293,12 +293,14 @@ export interface Edicion {
   presupuesto?: Presupuesto
   anioEdicion?: number
   datosFormulario?: Record<string, unknown>
+  avalUrl?: string | null
   creadoEn: string
   actualizadoEn: string
   // Calculados en el backend (no persistidos).
   esConsolidadoDerivado?: boolean
   salteaEvaluacion?: boolean
   rachaAdjudicaciones?: number
+  tieneAval?: boolean
 }
 
 export interface Presupuesto {
