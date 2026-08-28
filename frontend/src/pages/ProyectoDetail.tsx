@@ -162,6 +162,9 @@ export function ProyectoDetail() {
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
   )
   const esRectorado = user?.roles.some(r => r === RolUsuario.AutoridadDeRectorado)
+  const esRectoradoAmplio = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+  )
   const puedeAsignarDirector = user?.roles.some(r =>
     [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado].includes(r),
   )
@@ -565,7 +568,7 @@ export function ProyectoDetail() {
               <X className="h-4 w-4 mr-2" />Cancelar sugerencia
             </Button>
           )}
-          {!editando && esSecretariaMismaUA && edicion?.estado === EstadoEdicion.Presentado && edicion.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
+          {!editando && esRectoradoAmplio && edicion?.estado === EstadoEdicion.Presentado && edicion.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
             <>
               <Button
                 onClick={async () => {
@@ -573,10 +576,10 @@ export function ProyectoDetail() {
                   try {
                     setIniciandoEvaluacion(true)
                     await api.proyectos.iniciarEvaluacion(id, edicion.id)
-                    toast.success('Evaluación iniciada')
+                    toast.success('Edición pasada a evaluación')
                     cargarDatos()
                   } catch {
-                    toast.error('No se pudo iniciar la evaluación')
+                    toast.error('No se pudo pasar la edición a evaluación')
                   } finally {
                     setIniciandoEvaluacion(false)
                   }
@@ -584,7 +587,7 @@ export function ProyectoDetail() {
                 disabled={iniciandoEvaluacion}
               >
                 {iniciandoEvaluacion ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Iniciar evaluación
+                Pasar a evaluación
               </Button>
             </>
           )}

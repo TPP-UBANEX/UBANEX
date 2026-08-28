@@ -33,7 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Convocatoria, Edicion, ParticipacionConvocatoria, PaginatedResponse } from '@/data/types'
-import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, RolUsuario, RolEjecucion } from '@/data/types'
+import { estadoBadge, estadoConvocatoriaLabel, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario, RolEjecucion } from '@/data/types'
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog'
 import { ResubirProyectoDialog } from '@/components/ResubirProyectoDialog'
 import { EmparejamientoTab } from '@/components/EmparejamientoTab'
@@ -97,6 +97,20 @@ export function ConvocatoriaDetail() {
   const esRectorado = user?.roles.some(
     r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   )
+  const [pasandoEvaluacionId, setPasandoEvaluacionId] = useState<string | null>(null)
+
+  const pasarAEvaluacion = async (e: Edicion) => {
+    setPasandoEvaluacionId(e.id)
+    try {
+      await api.proyectos.iniciarEvaluacion(e.proyectoId, e.id)
+      toast.success('Edición pasada a evaluación')
+      setRefreshKey(k => k + 1)
+    } catch {
+      toast.error('No se pudo pasar la edición a evaluación')
+    } finally {
+      setPasandoEvaluacionId(null)
+    }
+  }
   const errores = erroresFechas(editForm)
 
   const esEvaluadorActivo = invitacionEvaluador !== null
@@ -474,7 +488,19 @@ export function ConvocatoriaDetail() {
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                           <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
+                            <div className="flex gap-1 justify-end">
+                              {esRectorado && conv?.estado === EstadoConvocatoria.Evaluacion && e.estado === EstadoEdicion.Presentado && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={pasandoEvaluacionId === e.id}
+                                  onClick={e2 => { e2.stopPropagation(); pasarAEvaluacion(e) }}
+                                >
+                                  Pasar a evaluación
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
