@@ -302,6 +302,7 @@ export class SeedService {
     console.log('\n=== SEED: Proyectos y Ediciones ===');
     await this.seedProyectosCanonicos();
     await this.seedProyectosMasivos([2023, 2024, 2025, 2026, 2027]);
+    await this.seedAvales();
 
     console.log('\n=== SEED: Participaciones ===');
     await this.seedParticipacionesCanonicas();
@@ -2657,6 +2658,34 @@ export class SeedService {
     }
   }
 
+  // ─────────────────── Avales ───────────────────
+
+  /**
+   * El aval (link al PDF firmado por el decano) lo carga la Secretaría mientras la
+   * edición está presentada o en evaluación. Se siembra en ~la mitad de esas
+   * ediciones para que "Tiene aval: Sí/No" se vea en ambos casos.
+   */
+  private async seedAvales(): Promise<void> {
+    const ediciones = await this.edicionRepo.find({
+      where: {
+        estado: In([
+          EstadoEdicion.Presentado,
+          EstadoEdicion.PendienteDeCambios,
+          EstadoEdicion.EnEvaluacion,
+        ]),
+      },
+    });
+    let cargados = 0;
+    for (const ed of ediciones) {
+      if (ed.avalUrl) continue;
+      if (!this.rngDeEdicion(`${ed.id}:aval`).bool(0.5)) continue;
+      ed.avalUrl = `https://drive.google.com/file/d/aval-${ed.id.slice(0, 8)}/view`;
+      await this.edicionRepo.save(ed);
+      cargados++;
+    }
+    console.log(`  ${cargados} avales cargados`);
+  }
+
   // ─────────────────── Sugerencias ───────────────────
 
   /** Sugerencias de Secretaría para ediciones en PendienteDeCambios (sólo 2027). */
@@ -2695,6 +2724,15 @@ export class SeedService {
         );
         await this.notificarSugerencia(ed, pool.secretaria, sugerencia, campos);
         this.progreso.sumar(1);
+      }
+    }
+
+    // Invariante: una edición en PendienteDeCambios tiene al menos una sugerencia
+    // abierta. Si alguna quedó sin sugerencias, vuelve a Presentado.
+    for (const ed of ediciones) {
+      if ((await this.sugerenciaRepo.count({ where: { edicionId: ed.id } })) === 0) {
+        ed.estado = EstadoEdicion.Presentado;
+        await this.edicionRepo.save(ed);
       }
     }
   }
