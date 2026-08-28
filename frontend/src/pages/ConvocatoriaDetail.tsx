@@ -364,7 +364,7 @@ export function ConvocatoriaDetail() {
         e.mecanismoAdjudicacion === 'MERITO'
           ? 'Mérito'
           : e.mecanismoAdjudicacion === 'CUPO'
-            ? 'Cupo'
+            ? 'Cuota federativa'
             : '—',
       ]);
     const cabecera = [
@@ -561,7 +561,7 @@ export function ConvocatoriaDetail() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Cupo mínimo por unidad académica</p>
+                    <p className="text-sm font-medium">Cuota federativa mínima por unidad académica</p>
                     <Input
                       type="number"
                       min={0}
@@ -849,46 +849,6 @@ export function ConvocatoriaDetail() {
                 )}
               </div>
             </CardHeader>
-            {esRectorado && (
-              <div className="px-6 pb-2 -mt-2 text-xs text-muted-foreground space-y-1">
-                <div>
-                  Cupo mínimo por unidad académica:{' '}
-                  <span className="font-medium text-foreground">
-                    {conv?.cupoMinimoPorUnidadAcademica ?? 0}
-                  </span>{' '}
-                  proyecto(s). La propuesta de adjudicación es un borrador y puede ajustarse
-                  manualmente.
-                </div>
-                {conv?.presupuestoTotal != null && conv.presupuestoTotal > 0 && (
-                  <div>
-                    Presupuesto total:{' '}
-                    <span className="font-medium text-foreground">
-                      {formatearMoneda(Number(conv.presupuestoTotal ?? 0))}
-                    </span>
-                    {' · '}Adjudicado:{' '}
-                    <span className="font-medium text-foreground">
-                      {formatearMoneda(
-                        todasEdiciones
-                          .filter((e) => e.adjudicacionPropuesta)
-                          .reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0),
-                      )}
-                    </span>
-                    {' · '}Restante:{' '}
-                    <span className="font-medium text-foreground">
-                      {formatearMoneda(
-                        Math.max(
-                          0,
-                          Number(conv.presupuestoTotal ?? 0) -
-                            todasEdiciones
-                              .filter((e) => e.adjudicacionPropuesta)
-                              .reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0),
-                        ),
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
             {esUsuarioEjecucion && tieneInvPendiente && (
               <div className="px-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-muted rounded-md px-3 py-3">
@@ -1165,7 +1125,7 @@ export function ConvocatoriaDetail() {
                     <span className="font-medium text-foreground">
                       {resumenPresupuesto.cantidad}
                     </span>
-                    {' · '}Cupo mínimo por unidad académica:{' '}
+                    {' · '}Cuota federativa mínima por unidad académica:{' '}
                     <span className="font-medium text-foreground">
                       {conv?.cupoMinimoPorUnidadAcademica ?? 0}
                     </span>
@@ -1255,14 +1215,14 @@ export function ConvocatoriaDetail() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="MERITO">Mérito</SelectItem>
-                                  <SelectItem value="CUPO">Cupo</SelectItem>
+                                  <SelectItem value="CUPO">Cuota federativa</SelectItem>
                                 </SelectContent>
                               </Select>
                             </span>
                           ) : e.mecanismoAdjudicacion === 'MERITO' ? (
                             'Mérito'
                           ) : e.mecanismoAdjudicacion === 'CUPO' ? (
-                            'Cupo'
+                            'Cuota federativa'
                           ) : (
                             '—'
                           )}
