@@ -54,13 +54,16 @@ export function NotificacionesDropdown() {
     n.tipo === TipoNotificacion.PROPUESTA_EVALUADOR ||
     n.tipo === TipoNotificacion.RESULTADO_EVALUADOR
 
-  const visibles = notificaciones.filter(n => esEvaluador(n) || !n.leida)
+  const esPersistente = (n: Notificacion) =>
+    esEvaluador(n) || n.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+
+  const visibles = notificaciones.filter(n => esPersistente(n) || !n.leida)
 
   const handleClick = async (notif: Notificacion) => {
     if (!notif.leida) {
       await api.notificaciones.leer(notif.id).catch(() => {})
       setNotificaciones(prev =>
-        esEvaluador(notif)
+        esPersistente(notif)
           ? prev.map(n => (n.id === notif.id ? { ...n, leida: true } : n))
           : prev.filter(n => n.id !== notif.id),
       )
@@ -150,14 +153,18 @@ export function NotificacionesDropdown() {
                     ? UserCheck
                     : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
                       ? CheckCircle2
-                      : MessageSquare
+                      : notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+                        ? CheckCircle2
+                        : MessageSquare
                   const color = notif.tipo === TipoNotificacion.NUEVA_SUGERENCIA
                     ? 'text-blue-500'
                     : notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR
                       ? 'text-amber-500'
                       : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
                         ? 'text-green-500'
-                        : 'text-green-500'
+                        : notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+                          ? 'text-green-500'
+                          : 'text-green-500'
                   return <Icono className={cn('h-4 w-4 mt-0.5 shrink-0', color)} />
                 })()}
                 <div className="flex-1 min-w-0">
@@ -165,7 +172,7 @@ export function NotificacionesDropdown() {
                   <p className="text-xs text-muted-foreground mt-0.5">{tiempoRelativo(notif.creadoEn)}</p>
                 </div>
                 {!notif.leida && <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />}
-                {esEvaluador(notif) && (
+                {esPersistente(notif) && (
                   <Button
                     variant="ghost"
                     size="icon"

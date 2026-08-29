@@ -161,12 +161,26 @@ export function generarEvaluacionInstitucional(
 export function generarEvaluacionCruzada(
   estructura: EstructuraTemplateCruzada,
   rng: Rng,
+  modo?: 'alta' | 'baja' | 'alta90' | 'media',
 ): { items: Record<string, number>; observaciones: string } {
   const items: Record<string, number> = {};
   for (const categoria of estructura.categorias ?? []) {
     for (const item of categoria.items ?? []) {
-      const minimo = Math.max(0, item.puntajeMaximo - 4);
-      items[item.id] = rng.entero(minimo, item.puntajeMaximo);
+      const maximo = item.puntajeMaximo;
+      let minimo = Math.max(0, maximo - 4);
+      let tope = maximo;
+      if (modo === 'alta') {
+        minimo = Math.ceil(maximo * 0.6);
+      } else if (modo === 'alta90') {
+        minimo = Math.ceil(maximo * 0.82);
+      } else if (modo === 'media') {
+        minimo = Math.ceil(maximo * 0.6);
+        tope = Math.floor(maximo * 0.98);
+      } else if (modo === 'baja') {
+        minimo = 0;
+        tope = Math.floor(maximo * 0.4);
+      }
+      items[item.id] = rng.entero(Math.min(minimo, tope), tope);
     }
   }
   return { items, observaciones: rng.pick(OBSERVACIONES_CRUZADA) };

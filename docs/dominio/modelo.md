@@ -111,6 +111,7 @@ classDiagram
 - Tanto `AutoridadDeRectorado` como `AsistenteDeRectorado` pueden configurar el `Formulario` de una convocatoria.
 - El `Formulario` de una convocatoria es siempre propio (`esPlantilla: false`) y se crea recién la primera vez que se guardan campos; hasta ese momento la convocatoria no tiene formulario asociado. Elegir una plantilla como punto de partida copia sus `CampoFormulario` (con `id` regenerados) sin referenciar ni modificar la plantilla original, y esos campos se siguen editando libremente antes de guardar.
 - `cuotaFederativa` define el mínimo de proyectos a adjudicar por unidad académica en esa convocatoria.
+- El mecanismo de adjudicación de una edición (`Edicion.mecanismoAdjudicacion`) es `MERITO` o `CUOTA_FEDERATIVA` (enum `MecanismoAdjudicacion`): indica si el proyecto fue adjudicado por mérito global o porque cubría el piso de cuota federativa de su unidad académica.
 
 ---
 
