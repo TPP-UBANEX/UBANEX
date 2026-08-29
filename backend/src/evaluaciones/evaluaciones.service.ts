@@ -827,20 +827,6 @@ export class EvaluacionesService {
         : `Tu proyecto "${nombreProyecto}" no fue adjudicado en la convocatoria "${convocatoria.nombre}".`;
 
       try {
-        await this.mail.enviarResultadoAdjudicacion(
-          director.email,
-          director.nombreCompleto,
-          convocatoria.nombre,
-          nombreProyecto,
-          adjudicado,
-        );
-      } catch (err) {
-        this.logger.error(
-          `No se pudo enviar el mail de adjudicación a ${director.email}: ${String(err)}`,
-        );
-      }
-
-      try {
         await this.notificacionRepo.save(
           this.notificacionRepo.create({
             usuarioId: director.id,
