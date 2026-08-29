@@ -124,6 +124,108 @@ function resumen(ediciones: Edicion[], ordenCreacion: number[]): Record<number, 
   return map;
 }
 
+function construirEscenarioFlex(
+  uaProyectos: Array<{ clave: string; cantidad: number; puntaje?: number }>,
+  cupo: number,
+  presupuestoTotal: number,
+): Fixture {
+  const estructuraInst = {
+    categorias: [
+      {
+        id: 'c1',
+        nombre: 'Evaluación',
+        subcategorias: [
+          {
+            id: 'sub1',
+            texto: 'Puntaje total',
+            tipoValor: 'numerico',
+            minimo: 0,
+            maximo: 100,
+            fundamentacion: null,
+          },
+        ],
+      },
+    ],
+    checklist: [],
+  };
+  const estructuraCruz = {
+    categorias: [
+      {
+        id: 'cc1',
+        nombre: 'Evaluación',
+        puntajeMaximo: 100,
+        items: [{ id: 'item1', nombre: 'Puntaje total', puntajeMaximo: 100 }],
+      },
+    ],
+  };
+  const convocatoria = {
+    id: 'conv1',
+    ordenMeritoConfirmado: false,
+    presupuestoTotal,
+    cupoMinimoPorUnidadAcademica: cupo,
+    templateEvaluacionInstitucional: { estructura: estructuraInst },
+    templateEvaluacionCruzada: { estructura: estructuraCruz },
+  } as unknown as Convocatoria;
+
+  const nombres: Record<string, string> = {
+    A: 'Facultad A',
+    B: 'Facultad B',
+    C: 'Facultad C',
+  };
+  const ediciones: Edicion[] = [];
+  const institucionales: EvaluacionInstitucional[] = [];
+  const cruzadas: EvaluacionCruzada[] = [];
+  let n = 0;
+  for (const { clave, cantidad, puntaje = 50 } of uaProyectos) {
+    const ua = { id: `ua${clave}`, nombre: nombres[clave] ?? `Facultad ${clave}` };
+    for (let k = 0; k < cantidad; k++) {
+      const id = `e${n}`;
+      ediciones.push({
+        id,
+        unidadAcademicaId: ua.id,
+        unidadAcademica: { id: ua.id, nombre: ua.nombre } as any,
+        convocatoria,
+        presupuesto: { montoTotal: 80 } as any,
+        estado: EstadoEdicion.EnEvaluacion,
+        proyecto: {} as any,
+        ordenMerito: null,
+        puntajeMerito: null,
+        adjudicacionPropuesta: null,
+        mecanismoAdjudicacion: null,
+      } as unknown as Edicion);
+      institucionales.push({
+        id: `i${n}`,
+        edicionId: id,
+        estado: EstadoEvaluacion.Confirmada,
+        categorias: { sub1: { valor: puntaje, fundamentacion: '' } },
+        checklist: {},
+      } as unknown as EvaluacionInstitucional);
+      cruzadas.push({
+        id: `cz${n}`,
+        edicionId: id,
+        estado: EstadoEvaluacion.Confirmada,
+        items: { item1: 0 },
+      } as unknown as EvaluacionCruzada);
+      n++;
+    }
+  }
+  return { convocatoria, ediciones, institucionales, cruzadas };
+}
+
+function conteoPorUa(
+  ediciones: Edicion[],
+): Record<string, { cupo: number; merito: number; financiados: number }> {
+  const r: Record<string, { cupo: number; merito: number; financiados: number }> = {};
+  for (const e of ediciones) {
+    const ua = e.unidadAcademicaId;
+    if (!r[ua]) r[ua] = { cupo: 0, merito: 0, financiados: 0 };
+    if (e.adjudicacionPropuesta) r[ua].financiados++;
+    if (e.mecanismoAdjudicacion === 'CUPO') r[ua].cupo++;
+    if (e.mecanismoAdjudicacion === 'MERITO') r[ua].merito++;
+  }
+  return r;
+}
+
 describe('EvaluacionesService.generarOrdenMerito - reproducibilidad', () => {
   function armarService(fixture: Fixture): EvaluacionesService {
     const institucionalRepo = {
@@ -184,5 +286,78 @@ describe('EvaluacionesService.generarOrdenMerito - reproducibilidad', () => {
     const a = resumen(await servicio.generarOrdenMerito('conv1', usuario), [0, 1, 2, 3, 4, 5]);
     const b = resumen(await servicio.generarOrdenMerito('conv1', usuario), [0, 1, 2, 3, 4, 5]);
     expect(b).toEqual(a);
+  });
+});
+
+describe('EvaluacionesService.generarOrdenMerito - Fase 2 global por puntaje', () => {
+  function armarService(fixture: Fixture): EvaluacionesService {
+    const institucionalRepo = { find: jest.fn().mockResolvedValue(fixture.institucionales) };
+    const cruzadaRepo = { find: jest.fn().mockResolvedValue(fixture.cruzadas) };
+    const convocatoriaRepo = { findOne: jest.fn().mockResolvedValue(fixture.convocatoria) };
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue(fixture.ediciones),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      institucionalRepo as any,
+      cruzadaRepo as any,
+      convocatoriaRepo as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    return svc;
+  }
+
+  it('con presupuesto holgado cada UA recibe su cuota (min(cupo, n)) y las chicas todas', async () => {
+    const usuario = { id: 'u1' } as any;
+    // A:3, B:2 (n < cupo), C:4 proyectos; cupo 2; presupuesto holgado.
+    const fixture = construirEscenarioFlex(
+      [
+        { clave: 'A', cantidad: 3 },
+        { clave: 'B', cantidad: 2 },
+        { clave: 'C', cantidad: 4 },
+      ],
+      2,
+      1000,
+    );
+    const c = conteoPorUa(await armarService(fixture).generarOrdenMerito('conv1', usuario));
+
+    expect(c['uaA'].cupo).toBe(2);
+    expect(c['uaB'].cupo).toBe(2);
+    expect(c['uaC'].cupo).toBe(2);
+    // UA B presentó menos que el cupo: todos sus proyectos son CUPO, 0 mérito.
+    expect(c['uaB'].merito).toBe(0);
+    expect(c['uaB'].financiados).toBe(2);
+    // Presupuesto holgado: todo financiado.
+    expect(c['uaA'].financiados).toBe(3);
+    expect(c['uaC'].financiados).toBe(4);
+  });
+
+  it('con presupuesto ajustado el orden GLOBAL por puntaje decide la cuota (no el alfabético)', async () => {
+    const usuario = { id: 'u1' } as any;
+    // 3 UAs, 2 proyectos cada una, cupo 2. Costo 80 c/u -> 4 proyectos = 320
+    // cubren solo 2 UAs. UA C tiene puntaje alto: con orden global debe llevarse
+    // su cuota pese a ser alfabéticamente la última.
+    const fixture = construirEscenarioFlex(
+      [
+        { clave: 'A', cantidad: 2, puntaje: 50 },
+        { clave: 'B', cantidad: 2, puntaje: 50 },
+        { clave: 'C', cantidad: 2, puntaje: 90 },
+      ],
+      2,
+      320,
+    );
+    const c = conteoPorUa(await armarService(fixture).generarOrdenMerito('conv1', usuario));
+
+    expect(c['uaC'].cupo).toBe(2); // gana por puntaje global
+    expect(c['uaA'].cupo).toBe(2); // le alcanza el presupuesto
+    expect(c['uaB'].cupo).toBe(0); // se queda sin cuota (orden global, no alfabético)
+    expect(c['uaB'].financiados).toBe(0);
   });
 });

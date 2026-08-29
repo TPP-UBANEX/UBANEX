@@ -581,6 +581,18 @@ export class EvaluacionesService {
       if (a.id === b.id) return 0;
       return a.id < b.id ? -1 : 1;
     };
+    // Comparador estable para selecciones GLOBALES: el puntaje define el orden,
+    // y los empates se resuelven por nombre de UA y luego id, NUNCA solo por id.
+    // Así el corte de presupuesto no depende del orden de inserción de los datos
+    // (evita el no-determinismo entre reset-seed con puntajes iguales).
+    const porPuntajeEstable = (a: Edicion, b: Edicion): number => {
+      const diff = (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0);
+      if (diff !== 0) return diff;
+      const na = a.unidadAcademica?.nombre ?? '';
+      const nb = b.unidadAcademica?.nombre ?? '';
+      if (na !== nb) return na < nb ? -1 : 1;
+      return a.id < b.id ? -1 : 1;
+    };
     for (const lista of listasPorUA.values()) lista.sort(porPuntajeDesc);
 
     // Orden de las UAs explícito y determinista (alfabético por nombre). El
@@ -658,24 +670,39 @@ export class EvaluacionesService {
       }
     }
 
-    // PASO 2 — CUPO (piso): por cada UA se financian como CUPO los `cupo` proyectos
-    // NO financiados de MAYOR puntaje. Así CUPO arranca justo donde termina el
-    // MERITO (bloque contiguo), no al final del ranking.
+    // PASO 2 — CUPO en orden GLOBAL por puntaje, garantizando la cuota de cada UA.
+    // Para cada UA se reserva su cuota (min(cupo, n) mejores proyectos por puntaje).
+    // Luego se recorre la lista GLOBAL por puntaje y se financia como CUPO todo
+    // proyecto reservado cuya UA aún no llegó a su cuota y quepa en el presupuesto.
+    // Así el orden de financiación es global (ya no es UA por UA) pero la cuota de
+    // cada UA tiene prioridad sobre el excedente: ningún proyecto por encima de la
+    // cuota se financia como CUPO antes de cubrir las cuotas reservadas. Las UAs
+    // que presentaron menos de `cupo` proyectos reservan todos los suyos. El
+    // excedente (no reservado) se financia por MÉRITO global en la Fase 3 (swap),
+    // que se ejecuta tal cual está.
+    const cupoPorUa = new Map<string, number>();
+    for (const ua of uas) cupoPorUa.set(ua, 0);
+    const reservaCuota = new Set<string>();
     for (const ua of uas) {
       const c = Math.min(cupo, listasPorUA.get(ua)!.length);
-      const candidatos = elegiblesConPuntaje
-        .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
-        .sort(porPuntajeDesc); // desc: CUPO = mayor puntaje no financiado (contiguo a MERITO)
-      let hechos = 0;
-      for (const ed of candidatos) {
-        if (hechos >= c) break;
-        const costoEd = costo(ed);
-        if (disponible != null && costoEd > disponible) continue;
-        propuesta.set(ed.id, true);
-        mecanismo.set(ed.id, MecanismoAdjudicacion.Cupo);
-        descontar(costoEd);
-        hechos++;
-      }
+      listasPorUA
+        .get(ua)!
+        .filter((ed) => !propuesta.get(ed.id))
+        .sort(porPuntajeDesc)
+        .slice(0, c)
+        .forEach((ed) => reservaCuota.add(ed.id));
+    }
+    const globalCupo = [...elegiblesConPuntaje].sort(porPuntajeEstable);
+    for (const ed of globalCupo) {
+      if (!reservaCuota.has(ed.id)) continue;
+      const ua = ed.unidadAcademicaId;
+      if (cupoPorUa.get(ua)! >= Math.min(cupo, listasPorUA.get(ua)!.length)) continue;
+      const costoEd = costo(ed);
+      if (disponible != null && costoEd > disponible) continue;
+      propuesta.set(ed.id, true);
+      mecanismo.set(ed.id, MecanismoAdjudicacion.Cupo);
+      descontar(costoEd);
+      cupoPorUa.set(ua, cupoPorUa.get(ua)! + 1);
     }
 
     // PASO 3 — Excedente (swap), presupuesto GENERAL. Selección GREEDY por mérito:
@@ -697,7 +724,7 @@ export class EvaluacionesService {
             mecanismo.get(ed.id) === MecanismoAdjudicacion.Cupo &&
             uasConNoFinanciado.has(ed.unidadAcademicaId),
         )
-        .sort(porPuntajeDesc)[0];
+        .sort(porPuntajeEstable)[0];
       if (!mejorCupo) break;
       const ua = mejorCupo.unidadAcademicaId;
       const u = elegiblesConPuntaje
