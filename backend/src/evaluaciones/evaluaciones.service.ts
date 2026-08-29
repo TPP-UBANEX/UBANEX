@@ -582,7 +582,20 @@ export class EvaluacionesService {
       return a.id < b.id ? -1 : 1;
     };
     for (const lista of listasPorUA.values()) lista.sort(porPuntajeDesc);
-    const uas = [...listasPorUA.keys()];
+
+    // Orden de las UAs explícito y determinista (alfabético por nombre). El
+    // corte de presupuesto de los Pasos 2 y 3 depende de este orden cuando el
+    // presupuesto es ajustado, así que fijarlo evita resultados distintos entre
+    // corridas con los mismos datos.
+    const nombreUaPorId = new Map<string, string>();
+    for (const ed of elegiblesConPuntaje) {
+      if (ed.unidadAcademicaId && ed.unidadAcademica?.nombre) {
+        nombreUaPorId.set(ed.unidadAcademicaId, ed.unidadAcademica.nombre);
+      }
+    }
+    const uas = [...listasPorUA.keys()].sort((a, b) =>
+      (nombreUaPorId.get(a) ?? a).localeCompare(nombreUaPorId.get(b) ?? b),
+    );
 
     const cupo = convocatoria.cupoMinimoPorUnidadAcademica ?? 0;
 

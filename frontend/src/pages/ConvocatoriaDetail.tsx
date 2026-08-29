@@ -246,19 +246,35 @@ export function ConvocatoriaDetail() {
       .filter((e) => filtroUA === 'todas' || e.unidadAcademicaId === filtroUA);
     switch (ordenMeritoSort) {
       case 'puntaje-desc':
-        base.sort((a, b) => (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0));
+        base.sort(
+          (a, b) =>
+            (b.puntajeMerito ?? 0) - (a.puntajeMerito ?? 0) ||
+            (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
+            (a.id < b.id ? -1 : 1),
+        );
         break;
       case 'puntaje-asc':
-        base.sort((a, b) => (a.puntajeMerito ?? 0) - (b.puntajeMerito ?? 0));
+        base.sort(
+          (a, b) =>
+            (a.puntajeMerito ?? 0) - (b.puntajeMerito ?? 0) ||
+            (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
+            (a.id < b.id ? -1 : 1),
+        );
         break;
       case 'presupuesto-desc':
         base.sort(
-          (a, b) => Number(b.presupuesto?.montoTotal ?? 0) - Number(a.presupuesto?.montoTotal ?? 0),
+          (a, b) =>
+            Number(b.presupuesto?.montoTotal ?? 0) - Number(a.presupuesto?.montoTotal ?? 0) ||
+            (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
+            (a.id < b.id ? -1 : 1),
         );
         break;
       case 'presupuesto-asc':
         base.sort(
-          (a, b) => Number(a.presupuesto?.montoTotal ?? 0) - Number(b.presupuesto?.montoTotal ?? 0),
+          (a, b) =>
+            Number(a.presupuesto?.montoTotal ?? 0) - Number(b.presupuesto?.montoTotal ?? 0) ||
+            (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
+            (a.id < b.id ? -1 : 1),
         );
         break;
       default:
