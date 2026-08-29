@@ -129,7 +129,7 @@ export function ConvocatoriaDetail() {
     fechaFinEvaluacion: '',
     fechaInicioEjecucion: '',
     fechaFinEjecucion: '',
-    cupoMinimoPorUnidadAcademica: 0,
+    cuotaFederativa: 0,
     presupuestoTotal: 0,
   });
   const [guardando, setGuardando] = useState(false);
@@ -363,7 +363,7 @@ export function ConvocatoriaDetail() {
             : 'Sin evaluación',
         e.mecanismoAdjudicacion === 'MERITO'
           ? 'Mérito'
-          : e.mecanismoAdjudicacion === 'CUPO'
+          : e.mecanismoAdjudicacion === 'CUOTA_FEDERATIVA'
             ? 'Cuota federativa'
             : '—',
       ]);
@@ -393,7 +393,7 @@ export function ConvocatoriaDetail() {
   const setAdjudicacion = async (
     e: Edicion,
     adjudicado: boolean,
-    mecanismo?: 'MERITO' | 'CUPO',
+    mecanismo?: 'MERITO' | 'CUOTA_FEDERATIVA',
   ) => {
     if (!esRectorado) return;
     if (adjudicado) {
@@ -438,7 +438,7 @@ export function ConvocatoriaDetail() {
       fechaFinEvaluacion: conv.fechaFinEvaluacion || '',
       fechaInicioEjecucion: conv.fechaInicioEjecucion || '',
       fechaFinEjecucion: conv.fechaFinEjecucion || '',
-      cupoMinimoPorUnidadAcademica: conv.cupoMinimoPorUnidadAcademica ?? 0,
+      cuotaFederativa: conv.cuotaFederativa ?? 0,
       presupuestoTotal: conv.presupuestoTotal ?? 0,
     });
     setEditOpen(true);
@@ -570,11 +570,11 @@ export function ConvocatoriaDetail() {
                     <Input
                       type="number"
                       min={0}
-                      value={editForm.cupoMinimoPorUnidadAcademica}
+                      value={editForm.cuotaFederativa}
                       onChange={(e) =>
                         setEditForm((f) => ({
                           ...f,
-                          cupoMinimoPorUnidadAcademica: Math.max(0, parseInt(e.target.value) || 0),
+                          cuotaFederativa: Math.max(0, parseInt(e.target.value) || 0),
                         }))
                       }
                     />
@@ -1114,7 +1114,7 @@ export function ConvocatoriaDetail() {
                     </span>
                     {' · '}Cuota federativa mínima por unidad académica:{' '}
                     <span className="font-medium text-foreground">
-                      {conv?.cupoMinimoPorUnidadAcademica ?? 0}
+                      {conv?.cuotaFederativa ?? 0}
                     </span>
                   </div>
                 </div>
@@ -1194,7 +1194,7 @@ export function ConvocatoriaDetail() {
                               <Select
                                 value={e.mecanismoAdjudicacion ?? 'MERITO'}
                                 onValueChange={(v) =>
-                                  setAdjudicacion(e, true, v as 'MERITO' | 'CUPO')
+                                  setAdjudicacion(e, true, v as 'MERITO' | 'CUOTA_FEDERATIVA')
                                 }
                               >
                                 <SelectTrigger className="h-8 w-28">
@@ -1202,13 +1202,13 @@ export function ConvocatoriaDetail() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="MERITO">Mérito</SelectItem>
-                                  <SelectItem value="CUPO">Cuota federativa</SelectItem>
+                                  <SelectItem value="CUOTA_FEDERATIVA">Cuota federativa</SelectItem>
                                 </SelectContent>
                               </Select>
                             </span>
                           ) : e.mecanismoAdjudicacion === 'MERITO' ? (
                             'Mérito'
-                          ) : e.mecanismoAdjudicacion === 'CUPO' ? (
+                          ) : e.mecanismoAdjudicacion === 'CUOTA_FEDERATIVA' ? (
                             'Cuota federativa'
                           ) : (
                             '—'

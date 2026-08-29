@@ -62,7 +62,7 @@ export class Convocatoria {
   templateEvaluacionCruzadaId: string | null;
 
   @Column({ type: 'int', nullable: true, default: 0 })
-  cupoMinimoPorUnidadAcademica: number | null;
+  cuotaFederativa: number | null;
 
   @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
   presupuestoTotal: number | null;

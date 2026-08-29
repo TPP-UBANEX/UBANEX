@@ -1370,7 +1370,7 @@ export class SeedService {
         fechaInicioEjecucion: this.crearFecha(anio, 8, 1),
         fechaFinEjecucion: this.crearFecha(anio + 1, 2, 28),
         formularioId,
-        cupoMinimoPorUnidadAcademica: 1,
+        cuotaFederativa: 1,
       });
       await this.asegurarTemplatesConvocatoria(conv);
       this.convs.set(anio, conv);
@@ -2694,7 +2694,7 @@ export class SeedService {
 
   // ─────────── Convocatoria de prueba: orden de mérito ───────────
   // Convocatoria pequeña y realista con TODAS las UAs, evaluaciones confirmadas
-  // y cupo mínimo por UA = 2, para probar el "Generar orden de mérito automático".
+  // y cuota federativa mínima por UA = 2, para probar el "Generar orden de mérito automático".
   private async seedConvocatoriaPruebaOrdenMerito(): Promise<void> {
     const NOMBRE = 'Convocatoria de Prueba - Orden de Mérito';
     const existe = await this.convocatoriaRepo.findOne({ where: { nombre: NOMBRE } });
@@ -2731,7 +2731,7 @@ export class SeedService {
       fechaInicioEjecucion: this.crearFecha(2026, 8, 1),
       fechaFinEjecucion: this.crearFecha(2027, 2, 28),
       formularioId: formularioId ?? undefined,
-      cupoMinimoPorUnidadAcademica: 2,
+      cuotaFederativa: 2,
     });
     await this.asegurarTemplatesConvocatoria(conv);
 
@@ -2848,7 +2848,7 @@ export class SeedService {
     }
 
     // Presupuesto global: se fija por debajo del 70% anterior para admitir
-    // menos proyectos y dejar en evidencia el tope presupuestario (el cupo
+    // menos proyectos y dejar en evidencia el tope presupuestario (la cuota
     // mínimo de 2×14=28 igualmente garantiza al menos 2 por UA).
     const presupuestoTotalConvocatoria = Math.round(montoTotalAcumulado * 0.52 * 100) / 100;
     await this.convocatoriaRepo.update(conv.id, { presupuestoTotal: presupuestoTotalConvocatoria });
@@ -2864,7 +2864,7 @@ export class SeedService {
   // Carga las filas de "ORDEN DE MERITO 7 11.xlsx" (extraídas a data/escenario-excel.json)
   // como proyectos candidatos con su puntaje (columna O) y su costo (columna R = total
   // monetario). El presupuesto de la convocatoria es 148.605.613,50, menor que la suma de
-  // los costos (≈181M), de modo que el algoritmo debe recortar y aplicar el cupo por UA.
+  // los costos (≈181M), de modo que el algoritmo debe recortar y aplicar la cuota federativa por UA.
   private async seedEscenarioExcel(): Promise<void> {
     const MAPA_UA_EXCEL: Record<string, string> = {
       Derecho: 'Facultad de Derecho',
@@ -2984,7 +2984,7 @@ export class SeedService {
       fechaInicioEjecucion: this.crearFecha(2026, 8, 1),
       fechaFinEjecucion: this.crearFecha(2027, 2, 28),
       formularioId: this.formularioDefault?.id,
-      cupoMinimoPorUnidadAcademica: 6,
+      cuotaFederativa: 6,
       templateEvaluacionInstitucionalId: templateInst.id,
       templateEvaluacionCruzadaId: templateCruz.id,
       presupuestoTotal: 148605613.5,

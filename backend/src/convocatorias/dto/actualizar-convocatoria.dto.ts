@@ -46,7 +46,7 @@ export class ActualizarConvocatoriaDto {
   @IsInt()
   @Min(0)
   @IsOptional()
-  cupoMinimoPorUnidadAcademica?: number;
+  cuotaFederativa?: number;
 
   @IsNumber()
   @Min(0)

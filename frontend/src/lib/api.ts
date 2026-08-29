@@ -165,7 +165,7 @@ export const api = {
       fechaFinEvaluacion?: string;
       fechaInicioEjecucion?: string;
       fechaFinEjecucion?: string;
-      cupoMinimoPorUnidadAcademica?: number;
+      cuotaFederativa?: number;
       presupuestoTotal?: number | null;
     }) => post<import('@/data/types').Convocatoria>('/convocatorias', data),
     actualizar: (
@@ -181,7 +181,7 @@ export const api = {
         fechaFinEvaluacion?: string;
         fechaInicioEjecucion?: string;
         fechaFinEjecucion?: string;
-        cupoMinimoPorUnidadAcademica?: number;
+        cuotaFederativa?: number;
         presupuestoTotal?: number | null;
       },
     ) => patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
@@ -348,7 +348,7 @@ export const api = {
     actualizarPropuestaAdjudicacion: (
       edicionId: string,
       adjudicado: boolean,
-      mecanismo?: 'MERITO' | 'CUPO',
+      mecanismo?: 'MERITO' | 'CUOTA_FEDERATIVA',
     ) =>
       patch<import('@/data/types').Edicion>(
         `/evaluaciones/edicion/${edicionId}/adjudicacion-propuesta`,

@@ -45,7 +45,7 @@ import {
 // El puntaje final (mérito) es la suma cruda del promedio de las evaluaciones
 // cruzadas confirmadas más la evaluación institucional confirmada. Cada "Sí"
 // del formulario suma PUNTAJE_BOOLEANO puntos. La asignación de fondos la
-// define el presupuesto + cupo, no un umbral de nota.
+// define el presupuesto + cuota federativa, no un umbral de nota.
 const PUNTAJE_BOOLEANO = 10;
 
 @Injectable()
@@ -432,8 +432,8 @@ export class EvaluacionesService {
   // Genera el orden de mérito automático de una convocatoria: rankea las
   // ediciones por notaFinal (suma del promedio de evaluaciones cruzadas y la
   // evaluación institucional) y propone una adjudicación borrador (no
-  // definitiva) respetando el cupo
-  // mínimo por unidad académica. No pisa el ordenMerito ya seteado a mano.
+  // definitiva) respetando la cuota federativa
+  // mínima por unidad académica. No pisa el ordenMerito ya seteado a mano.
   async generarOrdenMerito(convocatoriaId: string, usuario: Usuario): Promise<Edicion[]> {
     this.validarEsRectorado(usuario);
 
@@ -551,16 +551,18 @@ export class EvaluacionesService {
     }
 
     // Propuesta de adjudicación borrador, limitada por el presupuesto, con
-    // prioridad de MÉRITO GLOBAL y un piso de CUPO por unidad académica.
+    // prioridad de MÉRITO GLOBAL y un piso de CUOTA FEDERATIVA por unidad académica.
     //
     // Algoritmo dirigido por financiamiento (presupuesto general, no por UA):
     //   Paso 1 — MERITO global: se financian los mejores proyectos por mérito
-    //            global (tope de MERITO por UA = n - cupo, y reserva de piso).
-    //   Paso 2 — CUPO (piso): por cada UA se financian como CUPO los `cupo`
-    //            proyectos NO financiados de MENOR puntaje (CUPO = menor puntaje).
+    //            global (tope de MERITO por UA = n - cuota, y reserva de piso).
+    //   Paso 2 — CUOTA FEDERATIVA (piso): por cada UA se financian como CUOTA
+    //            FEDERATIVA los `cuota` proyectos NO financiados de MENOR
+    //            puntaje (CUOTA FEDERATIVA = menor puntaje).
     //   Paso 3 — Excedente (swap): con el presupuesto general remanente, promover
-    //            el CUPO de mayor puntaje a MERITO y financiar como CUPO el
-    //            no-financiado de menor puntaje de esa UA (iterativo, round-robin).
+    //            la CUOTA FEDERATIVA de mayor puntaje a MERITO y financiar como
+    //            CUOTA FEDERATIVA el no-financiado de menor puntaje de esa UA
+    //            (iterativo, round-robin).
     const propuesta = new Map<string, boolean>();
     const mecanismo = new Map<string, MecanismoAdjudicacion>();
     const costo = (ed: Edicion): number => Number(ed.presupuesto?.montoTotal ?? 0);
@@ -609,7 +611,7 @@ export class EvaluacionesService {
       (nombreUaPorId.get(a) ?? a).localeCompare(nombreUaPorId.get(b) ?? b),
     );
 
-    const cupo = convocatoria.cupoMinimoPorUnidadAcademica ?? 0;
+    const cuota = convocatoria.cuotaFederativa ?? 0;
 
     // Presupuesto disponible: null significa "sin límite" (comportamiento previo).
     // El presupuesto es GENERAL (único para toda la convocatoria, no por UA).
@@ -622,21 +624,21 @@ export class EvaluacionesService {
     };
 
     // Tope de MERITO por UA: protege a las UAs con pocos proyectos y deja el piso
-    // de CUPO libre (MERITO = top (n - cupo) por UA).
+    // de CUOTA FEDERATIVA libre (MERITO = top (n - cuota) por UA).
     const meritoMaxUA = new Map<string, number>();
     for (const ua of uas) {
       const n = listasPorUA.get(ua)!.length;
-      meritoMaxUA.set(ua, Math.max(0, n - Math.min(cupo, n)));
+      meritoMaxUA.set(ua, Math.max(0, n - Math.min(cuota, n)));
     }
     const meritoHechoUA = new Map<string, number>();
     for (const ua of uas) meritoHechoUA.set(ua, 0);
 
-    // Reserva de piso: costo de los `cupo` proyectos AÚN NO financiados más caros
-    // de cada UA (peor caso), para garantizar que el piso de CUPO sea financiable.
-    const reservaCupos = (): number => {
+    // Reserva de piso: costo de los `cuota` proyectos AÚN NO financiados más caros
+    // de cada UA (peor caso), para garantizar que el piso de CUOTA FEDERATIVA sea financiable.
+    const reservaCuotas = (): number => {
       let total = 0;
       for (const ua of uas) {
-        const c = Math.min(cupo, listasPorUA.get(ua)!.length);
+        const c = Math.min(cuota, listasPorUA.get(ua)!.length);
         const costos = elegiblesConPuntaje
           .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
           .map((ed) => costo(ed))
@@ -648,7 +650,7 @@ export class EvaluacionesService {
     };
 
     // PASO 1 — MERITO global (con tope por UA y reserva de piso). Los mejores
-    // proyectos por mérito global entran como MERITO y NUNCA pasan a CUPO.
+    // proyectos por mérito global entran como MERITO y NUNCA pasan a CUOTA FEDERATIVA.
     const porMerito = [...elegiblesConPuntaje].sort(porPuntajeDesc);
     for (const ed of porMerito) {
       const ua = ed.unidadAcademicaId;
@@ -661,7 +663,7 @@ export class EvaluacionesService {
         continue;
       }
       propuesta.set(ed.id, true);
-      if (disponible - costoEd >= reservaCupos()) {
+      if (disponible - costoEd >= reservaCuotas()) {
         mecanismo.set(ed.id, MecanismoAdjudicacion.Merito);
         meritoHechoUA.set(ua, (meritoHechoUA.get(ua) ?? 0) + 1);
         descontar(costoEd);
@@ -670,21 +672,22 @@ export class EvaluacionesService {
       }
     }
 
-    // PASO 2 — CUPO en orden GLOBAL por puntaje, garantizando la cuota de cada UA.
-    // Para cada UA se reserva su cuota (min(cupo, n) mejores proyectos por puntaje).
-    // Luego se recorre la lista GLOBAL por puntaje y se financia como CUPO todo
-    // proyecto reservado cuya UA aún no llegó a su cuota y quepa en el presupuesto.
-    // Así el orden de financiación es global (ya no es UA por UA) pero la cuota de
-    // cada UA tiene prioridad sobre el excedente: ningún proyecto por encima de la
-    // cuota se financia como CUPO antes de cubrir las cuotas reservadas. Las UAs
-    // que presentaron menos de `cupo` proyectos reservan todos los suyos. El
+    // PASO 2 — CUOTA FEDERATIVA en orden GLOBAL por puntaje, garantizando la
+    // cuota de cada UA. Para cada UA se reserva su cuota (min(cuota, n) mejores
+    // proyectos por puntaje). Luego se recorre la lista GLOBAL por puntaje y se
+    // financia como CUOTA FEDERATIVA todo proyecto reservado cuya UA aún no
+    // llegó a su cuota y quepa en el presupuesto. Así el orden de financiación
+    // es global (ya no es UA por UA) pero la cuota de cada UA tiene prioridad
+    // sobre el excedente: ningún proyecto por encima de la cuota se financia
+    // como CUOTA FEDERATIVA antes de cubrir las cuotas reservadas. Las UAs que
+    // presentaron menos de `cuota` proyectos reservan todos los suyos. El
     // excedente (no reservado) se financia por MÉRITO global en la Fase 3 (swap),
     // que se ejecuta tal cual está.
-    const cupoPorUa = new Map<string, number>();
-    for (const ua of uas) cupoPorUa.set(ua, 0);
+    const cuotaPorUa = new Map<string, number>();
+    for (const ua of uas) cuotaPorUa.set(ua, 0);
     const reservaCuota = new Set<string>();
     for (const ua of uas) {
-      const c = Math.min(cupo, listasPorUA.get(ua)!.length);
+      const c = Math.min(cuota, listasPorUA.get(ua)!.length);
       listasPorUA
         .get(ua)!
         .filter((ed) => !propuesta.get(ed.id))
@@ -692,50 +695,51 @@ export class EvaluacionesService {
         .slice(0, c)
         .forEach((ed) => reservaCuota.add(ed.id));
     }
-    const globalCupo = [...elegiblesConPuntaje].sort(porPuntajeEstable);
-    for (const ed of globalCupo) {
+    const globalCuota = [...elegiblesConPuntaje].sort(porPuntajeEstable);
+    for (const ed of globalCuota) {
       if (!reservaCuota.has(ed.id)) continue;
       const ua = ed.unidadAcademicaId;
-      if (cupoPorUa.get(ua)! >= Math.min(cupo, listasPorUA.get(ua)!.length)) continue;
+      if (cuotaPorUa.get(ua)! >= Math.min(cuota, listasPorUA.get(ua)!.length)) continue;
       const costoEd = costo(ed);
       if (disponible != null && costoEd > disponible) continue;
       propuesta.set(ed.id, true);
-      mecanismo.set(ed.id, MecanismoAdjudicacion.Cupo);
+      mecanismo.set(ed.id, MecanismoAdjudicacion.CuotaFederativa);
       descontar(costoEd);
-      cupoPorUa.set(ua, cupoPorUa.get(ua)! + 1);
+      cuotaPorUa.set(ua, cuotaPorUa.get(ua)! + 1);
     }
 
     // PASO 3 — Excedente (swap), presupuesto GENERAL. Selección GREEDY por mérito:
-    // en cada iteración se toma el CUPO financiado de MAYOR puntaje de TODA la
-    // convocatoria cuya UA aún tenga un proyecto no financiado; se promueve a
-    // MERITO y se financia como CUPO el no-financiado de mayor puntaje de ESA MISMA
-    // UA. Si el reemplazo no cabe en el presupuesto, se corta (no se promueve un
-    // CUPO de menor mérito mientras exista uno mayor sin promover).
+    // en cada iteración se toma la CUOTA FEDERATIVA financiada de MAYOR puntaje
+    // de TODA la convocatoria cuya UA aún tenga un proyecto no financiado; se
+    // promueve a MERITO y se financia como CUOTA FEDERATIVA el no-financiado de
+    // mayor puntaje de ESA MISMA UA. Si el reemplazo no cabe en el presupuesto,
+    // se corta (no se promueve una CUOTA FEDERATIVA de menor mérito mientras
+    // exista una mayor sin promover).
     while (true) {
       const uasConNoFinanciado = new Set(
         elegiblesConPuntaje
           .filter((ed) => !propuesta.get(ed.id))
           .map((ed) => ed.unidadAcademicaId),
       );
-      const mejorCupo = elegiblesConPuntaje
+      const mejorCuota = elegiblesConPuntaje
         .filter(
           (ed) =>
             propuesta.get(ed.id) &&
-            mecanismo.get(ed.id) === MecanismoAdjudicacion.Cupo &&
+            mecanismo.get(ed.id) === MecanismoAdjudicacion.CuotaFederativa &&
             uasConNoFinanciado.has(ed.unidadAcademicaId),
         )
         .sort(porPuntajeEstable)[0];
-      if (!mejorCupo) break;
-      const ua = mejorCupo.unidadAcademicaId;
+      if (!mejorCuota) break;
+      const ua = mejorCuota.unidadAcademicaId;
       const u = elegiblesConPuntaje
         .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
-        .sort(porPuntajeDesc)[0]; // mayor puntaje -> nuevo CUPO (contiguo a MERITO)
+        .sort(porPuntajeDesc)[0]; // mayor puntaje -> nueva CUOTA FEDERATIVA (contigua a MERITO)
       if (!u) break;
       const costoU = costo(u);
       if (disponible != null && costoU > disponible) break;
-      mecanismo.set(mejorCupo.id, MecanismoAdjudicacion.Merito); // promover el CUPO de mayor mérito
+      mecanismo.set(mejorCuota.id, MecanismoAdjudicacion.Merito); // promover la CUOTA FEDERATIVA de mayor mérito
       propuesta.set(u.id, true);
-      mecanismo.set(u.id, MecanismoAdjudicacion.Cupo); // nuevo CUPO de la misma UA
+      mecanismo.set(u.id, MecanismoAdjudicacion.CuotaFederativa); // nueva CUOTA FEDERATIVA de la misma UA
       descontar(costoU);
     }
 

@@ -1,4 +1,4 @@
 export enum MecanismoAdjudicacion {
   Merito = 'MERITO',
-  Cupo = 'CUPO',
+  CuotaFederativa = 'CUOTA_FEDERATIVA',
 }

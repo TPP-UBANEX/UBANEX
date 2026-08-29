@@ -50,7 +50,7 @@ function construirEscenario(ordenCreacion: number[]): Fixture {
     id: 'conv1',
     ordenMeritoConfirmado: false,
     presupuestoTotal: 200,
-    cupoMinimoPorUnidadAcademica: 1,
+    cuotaFederativa: 1,
     templateEvaluacionInstitucional: { estructura: estructuraInst },
     templateEvaluacionCruzada: { estructura: estructuraCruz },
   } as unknown as Convocatoria;
@@ -127,7 +127,7 @@ function resumen(ediciones: Edicion[], ordenCreacion: number[]): Record<number, 
 
 function construirEscenarioFlex(
   uaProyectos: Array<{ clave: string; cantidad: number; puntaje?: number }>,
-  cupo: number,
+  cuota: number,
   presupuestoTotal: number,
 ): Fixture {
   const estructuraInst = {
@@ -163,7 +163,7 @@ function construirEscenarioFlex(
     id: 'conv1',
     ordenMeritoConfirmado: false,
     presupuestoTotal,
-    cupoMinimoPorUnidadAcademica: cupo,
+    cuotaFederativa: cuota,
     templateEvaluacionInstitucional: { estructura: estructuraInst },
     templateEvaluacionCruzada: { estructura: estructuraCruz },
   } as unknown as Convocatoria;
@@ -215,13 +215,13 @@ function construirEscenarioFlex(
 
 function conteoPorUa(
   ediciones: Edicion[],
-): Record<string, { cupo: number; merito: number; financiados: number }> {
-  const r: Record<string, { cupo: number; merito: number; financiados: number }> = {};
+): Record<string, { cuotaFederativa: number; merito: number; financiados: number }> {
+  const r: Record<string, { cuotaFederativa: number; merito: number; financiados: number }> = {};
   for (const e of ediciones) {
     const ua = e.unidadAcademicaId;
-    if (!r[ua]) r[ua] = { cupo: 0, merito: 0, financiados: 0 };
+    if (!r[ua]) r[ua] = { cuotaFederativa: 0, merito: 0, financiados: 0 };
     if (e.adjudicacionPropuesta) r[ua].financiados++;
-    if (e.mecanismoAdjudicacion === 'CUPO') r[ua].cupo++;
+    if (e.mecanismoAdjudicacion === 'CUOTA_FEDERATIVA') r[ua].cuotaFederativa++;
     if (e.mecanismoAdjudicacion === 'MERITO') r[ua].merito++;
   }
   return r;
@@ -315,9 +315,9 @@ describe('EvaluacionesService.generarOrdenMerito - Fase 2 global por puntaje', (
     return svc;
   }
 
-  it('con presupuesto holgado cada UA recibe su cuota (min(cupo, n)) y las chicas todas', async () => {
+  it('con presupuesto holgado cada UA recibe su cuota (min(cuota, n)) y las chicas todas', async () => {
     const usuario = { id: 'u1' } as any;
-    // A:3, B:2 (n < cupo), C:4 proyectos; cupo 2; presupuesto holgado.
+    // A:3, B:2 (n < cuota), C:4 proyectos; cuota federativa 2; presupuesto holgado.
     const fixture = construirEscenarioFlex(
       [
         { clave: 'A', cantidad: 3 },
@@ -329,10 +329,10 @@ describe('EvaluacionesService.generarOrdenMerito - Fase 2 global por puntaje', (
     );
     const c = conteoPorUa(await armarService(fixture).generarOrdenMerito('conv1', usuario));
 
-    expect(c['uaA'].cupo).toBe(2);
-    expect(c['uaB'].cupo).toBe(2);
-    expect(c['uaC'].cupo).toBe(2);
-    // UA B presentó menos que el cupo: todos sus proyectos son CUPO, 0 mérito.
+    expect(c['uaA'].cuotaFederativa).toBe(2);
+    expect(c['uaB'].cuotaFederativa).toBe(2);
+    expect(c['uaC'].cuotaFederativa).toBe(2);
+    // UA B presentó menos que la cuota: todos sus proyectos son cuota federativa, 0 mérito.
     expect(c['uaB'].merito).toBe(0);
     expect(c['uaB'].financiados).toBe(2);
     // Presupuesto holgado: todo financiado.
@@ -342,7 +342,7 @@ describe('EvaluacionesService.generarOrdenMerito - Fase 2 global por puntaje', (
 
   it('con presupuesto ajustado el orden GLOBAL por puntaje decide la cuota (no el alfabético)', async () => {
     const usuario = { id: 'u1' } as any;
-    // 3 UAs, 2 proyectos cada una, cupo 2. Costo 80 c/u -> 4 proyectos = 320
+    // 3 UAs, 2 proyectos cada una, cuota federativa 2. Costo 80 c/u -> 4 proyectos = 320
     // cubren solo 2 UAs. UA C tiene puntaje alto: con orden global debe llevarse
     // su cuota pese a ser alfabéticamente la última.
     const fixture = construirEscenarioFlex(
@@ -356,9 +356,9 @@ describe('EvaluacionesService.generarOrdenMerito - Fase 2 global por puntaje', (
     );
     const c = conteoPorUa(await armarService(fixture).generarOrdenMerito('conv1', usuario));
 
-    expect(c['uaC'].cupo).toBe(2); // gana por puntaje global
-    expect(c['uaA'].cupo).toBe(2); // le alcanza el presupuesto
-    expect(c['uaB'].cupo).toBe(0); // se queda sin cuota (orden global, no alfabético)
+    expect(c['uaC'].cuotaFederativa).toBe(2); // gana por puntaje global
+    expect(c['uaA'].cuotaFederativa).toBe(2); // le alcanza el presupuesto
+    expect(c['uaB'].cuotaFederativa).toBe(0); // se queda sin cuota (orden global, no alfabético)
     expect(c['uaB'].financiados).toBe(0);
   });
 });
@@ -397,7 +397,7 @@ describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', ()
       id: 'e1',
       convocatoriaId: 'conv1',
       adjudicacionPropuesta: true,
-      mecanismoAdjudicacion: 'CUPO',
+      mecanismoAdjudicacion: 'CUOTA_FEDERATIVA',
       presupuesto: { montoTotal: 80 },
       proyecto: {},
       unidadAcademica: {},

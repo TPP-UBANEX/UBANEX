@@ -258,7 +258,7 @@ export interface Convocatoria {
   fechaInicioEjecucion: string | null;
   fechaFinEjecucion: string | null;
   formularioId: string | null;
-  cupoMinimoPorUnidadAcademica?: number | null;
+  cuotaFederativa?: number | null;
   presupuestoTotal?: number | null;
   ordenMeritoConfirmado: boolean;
   formulario?: Formulario;
@@ -298,7 +298,7 @@ export interface Edicion {
   datosFormulario?: Record<string, unknown>;
   ordenMerito?: number | null;
   adjudicacionPropuesta?: boolean | null;
-  mecanismoAdjudicacion?: 'MERITO' | 'CUPO' | null;
+  mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
   puntajeMerito?: number | null;
   creadoEn: string;
   actualizadoEn: string;
