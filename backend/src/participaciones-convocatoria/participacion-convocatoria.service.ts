@@ -5,7 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindOptionsWhere } from 'typeorm';
 import { ParticipacionConvocatoria } from './participacion-convocatoria.entity';
 import { CrearParticipacionDto } from './dto/crear-participacion.dto';
-import { ActualizarEstadoParticipacionDto } from './dto/actualizar-estado-participacion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Edicion } from '../proyectos/edicion.entity';
@@ -119,17 +118,12 @@ export class ParticipacionConvocatoriaService {
         throw new BadRequestException('Evaluador no puede tener edicionId ni esDirectorPrincipal');
       }
 
-      const esSecretaria = asignadoPor.roles.some(
-        r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
-      );
-      if (!esSecretaria) {
-        throw new BadRequestException('Solo la Secretaría de la Unidad Académica puede proponer evaluadores');
+      const esRectorado = asignadoPor.roles.includes(RolUsuario.AutoridadDeRectorado);
+      if (!esRectorado) {
+        throw new BadRequestException('Solo una Autoridad de Rectorado puede dar de alta evaluadores');
       }
-      if (!asignadoPor.unidadAcademicaId) {
-        throw new BadRequestException('La Secretaría debe pertenecer a una Unidad Académica');
-      }
-      if (usuario.unidadAcademicaId !== asignadoPor.unidadAcademicaId) {
-        throw new BadRequestException('Solo se pueden proponer docentes de la propia Unidad Académica');
+      if (!usuario.unidadAcademicaId) {
+        throw new BadRequestException('El docente debe pertenecer a una Unidad Académica');
       }
 
       const proyectosEnConvocatoria = await this.edicionRepo.count({
@@ -144,19 +138,13 @@ export class ParticipacionConvocatoriaService {
         .innerJoin('p.usuario', 'u')
         .where('p.convocatoriaId = :convocatoriaId', { convocatoriaId: dto.convocatoriaId })
         .andWhere('p.rol = :rol', { rol: RolEjecucion.Evaluador })
-        .andWhere('p.estado IN (:...estados)', {
-          estados: [
-            EstadoPropuestaEvaluador.Propuesto,
-            EstadoPropuestaEvaluador.Aceptada,
-            EstadoPropuestaEvaluador.Aprobado,
-          ],
-        })
-        .andWhere('u.unidadAcademicaId = :uaId', { uaId: asignadoPor.unidadAcademicaId })
+        .andWhere('p.estado = :estado', { estado: EstadoPropuestaEvaluador.Aprobado })
+        .andWhere('u.unidadAcademicaId = :uaId', { uaId: usuario.unidadAcademicaId })
         .getCount();
 
       if (activos >= CANTIDAD_EVALUADORES_POR_UA) {
         throw new BadRequestException(
-          `La Unidad Académica ya alcanzó el límite de ${CANTIDAD_EVALUADORES_POR_UA} evaluadores activos en esta convocatoria`,
+          `La Unidad Académica ya alcanzó el límite de ${CANTIDAD_EVALUADORES_POR_UA} evaluadores en esta convocatoria`,
         );
       }
     }
@@ -169,18 +157,18 @@ export class ParticipacionConvocatoriaService {
       esDirectorPrincipal: dto.esDirectorPrincipal ?? null,
       asignadoPorId: asignadoPor.id,
       estado: dto.rol === RolEjecucion.Evaluador
-        ? EstadoPropuestaEvaluador.Propuesto
+        ? EstadoPropuestaEvaluador.Aprobado
         : null,
     });
 
     const saved = await this.repo.save(entity);
 
     if (dto.rol === RolEjecucion.Evaluador) {
-      await this.notificarDocentePropuesto(usuario, convocatoria, saved.id);
+      await this.notificarDocenteAlta(usuario, convocatoria, saved.id);
       await this.auditoria.registrar({
         usuarioId: usuario.id,
         accion: TipoAccionAuditoria.PROPUESTA_EVALUADOR,
-        descripcion: `Propuesto como evaluador en la convocatoria "${convocatoria.nombre}"`,
+        descripcion: `Dado de alta como evaluador en la convocatoria "${convocatoria.nombre}"`,
         responsableId: asignadoPor.id,
         responsableNombre: asignadoPor.nombreCompleto,
       });
@@ -189,20 +177,20 @@ export class ParticipacionConvocatoriaService {
     return saved;
   }
 
-  private async notificarDocentePropuesto(
+  private async notificarDocenteAlta(
     usuario: Usuario,
     convocatoria: Convocatoria,
     participacionId: string,
   ): Promise<void> {
     try {
-      await this.mail.enviarPropuestaEvaluador(
+      await this.mail.enviarAltaEvaluador(
         usuario.email,
         usuario.nombreCompleto,
         convocatoria.nombre,
       );
     } catch (err) {
       this.logger.error(
-        `No se pudo enviar el mail de propuesta a ${usuario.email}: ${err instanceof Error ? err.message : err}`,
+        `No se pudo enviar el mail de alta a ${usuario.email}: ${err instanceof Error ? err.message : err}`,
       );
     }
 
@@ -210,188 +198,14 @@ export class ParticipacionConvocatoriaService {
       await this.notificacionRepo.save(
         this.notificacionRepo.create({
           usuarioId: usuario.id,
-          tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-          participacionId,
-          mensaje: `Fuiste propuesto como evaluador en la convocatoria "${convocatoria.nombre}"`,
-        }),
-      );
-    } catch (err) {
-      this.logger.error(
-        `No se pudo crear la notificación de propuesta para ${usuario.email}: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
-
-  async actualizarEstado(
-    id: string,
-    dto: ActualizarEstadoParticipacionDto,
-    usuario: Usuario,
-  ): Promise<ParticipacionConvocatoria> {
-    const entity = await this.repo.findOne({
-      where: { id },
-      relations: { usuario: true, convocatoria: true },
-    });
-    if (!entity) throw new NotFoundException('Participacion no encontrada');
-    if (entity.rol !== RolEjecucion.Evaluador) {
-      throw new BadRequestException('Solo las participaciones de evaluador pueden aprobarse o rechazarse');
-    }
-    if (entity.estado !== EstadoPropuestaEvaluador.Aceptada) {
-      throw new BadRequestException('Solo las propuestas aceptadas por el docente pueden aprobarse o rechazarse');
-    }
-    entity.estado = dto.estado;
-    const saved = await this.repo.save(entity);
-    await this.notificarAutoridadesEstadoEvaluador(saved);
-    const aprobado = dto.estado === EstadoPropuestaEvaluador.Aprobado;
-    await this.auditoria.registrar({
-      usuarioId: entity.usuarioId,
-      accion: TipoAccionAuditoria.APROBACION_EVALUADOR,
-      descripcion: `Rectorado ${aprobado ? 'aprobó' : 'rechazó'} su participación como evaluador en la convocatoria "${saved.convocatoria?.nombre ?? ''}"`,
-      responsableId: usuario.id,
-      responsableNombre: usuario.nombreCompleto,
-    });
-    return saved;
-  }
-
-  async responder(
-    id: string,
-    docente: Usuario,
-    aceptada: boolean,
-  ): Promise<ParticipacionConvocatoria> {
-    const entity = await this.repo.findOne({
-      where: { id },
-      relations: { usuario: true, convocatoria: true },
-    });
-    if (!entity) throw new NotFoundException('Participacion no encontrada');
-    if (entity.rol !== RolEjecucion.Evaluador) {
-      throw new BadRequestException('Solo las propuestas de evaluador pueden aceptarse o declinarse');
-    }
-    if (entity.usuarioId !== docente.id) {
-      throw new BadRequestException('Solo el docente propuesto puede responder su propia propuesta');
-    }
-    if (entity.estado !== EstadoPropuestaEvaluador.Propuesto) {
-      throw new BadRequestException('Solo las propuestas pendientes pueden aceptarse o declinarse');
-    }
-
-    entity.estado = aceptada
-      ? EstadoPropuestaEvaluador.Aceptada
-      : EstadoPropuestaEvaluador.Declinada;
-    const saved = await this.repo.save(entity);
-    await this.notificarSecretariaRespuestaDocente(saved, aceptada);
-    await this.resolverNotificacionPropuesta(docente.id, saved.id);
-    await this.auditoria.registrar({
-      usuarioId: entity.usuarioId,
-      accion: TipoAccionAuditoria.RESPUESTA_EVALUADOR,
-      descripcion: `${aceptada ? 'Aceptó' : 'Declinó'} ser evaluador en la convocatoria "${saved.convocatoria?.nombre ?? ''}"`,
-      responsableId: docente.id,
-      responsableNombre: docente.nombreCompleto,
-    });
-    return saved;
-  }
-
-  private async resolverNotificacionPropuesta(usuarioId: string, participacionId: string) {
-    try {
-      await this.notificacionRepo.update(
-        {
-          usuarioId,
-          participacionId,
-          tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-        },
-        { leida: true },
-      );
-    } catch (err) {
-      this.logger.error(
-        `No se pudo marcar leída la notificación de propuesta: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
-
-  private async notificarSecretariaRespuestaDocente(
-    entity: ParticipacionConvocatoria,
-    aceptada: boolean,
-  ): Promise<void> {
-    const docente = entity.usuario;
-    const convocatoria = entity.convocatoria;
-    if (!docente?.email || !convocatoria) return;
-
-    try {
-      const autoridades = await this.usuarioRepo.find({
-        where: { unidadAcademicaId: docente.unidadAcademicaId },
-      });
-      const destinos = autoridades
-        .filter(a =>
-          a.habilitado !== false &&
-          a.roles.some(
-            r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
-          ),
-        )
-        .map(a => a.email);
-
-      if (destinos.length > 0) {
-        await this.mail.enviarRespuestaDocente(
-          destinos,
-          'equipo de la Unidad Académica',
-          docente.nombreCompleto,
-          convocatoria.nombre,
-          aceptada,
-        );
-      }
-    } catch (err) {
-      this.logger.error(
-        `No se pudo notificar a la Unidad Académica sobre la respuesta del docente ${docente?.email}: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
-
-  private async notificarAutoridadesEstadoEvaluador(
-    entity: ParticipacionConvocatoria,
-  ): Promise<void> {
-    const docente = entity.usuario;
-    const convocatoria = entity.convocatoria;
-    if (!docente?.email || !convocatoria) return;
-
-    try {
-      const aprobado = entity.estado === EstadoPropuestaEvaluador.Aprobado;
-
-      await this.mail.enviarResultadoPropuestaEvaluador(
-        docente.email,
-        docente.nombreCompleto,
-        convocatoria.nombre,
-        aprobado,
-      );
-
-      await this.notificacionRepo.save(
-        this.notificacionRepo.create({
-          usuarioId: docente.id,
           tipo: TipoNotificacion.RESULTADO_EVALUADOR,
-          participacionId: entity.id,
-          mensaje: `Tu propuesta como evaluador en la convocatoria "${convocatoria.nombre}" fue ${aprobado ? 'aprobada' : 'rechazada'}`,
+          participacionId,
+          mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${convocatoria.nombre}"`,
         }),
       );
-
-      const autoridades = await this.usuarioRepo.find({
-        where: { unidadAcademicaId: docente.unidadAcademicaId },
-      });
-      const destinos = autoridades
-        .filter(a =>
-          a.habilitado !== false &&
-          a.roles.some(
-            r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
-          ),
-        )
-        .map(a => a.email);
-
-      if (destinos.length > 0) {
-        await this.mail.enviarEstadoEvaluador(
-          destinos,
-          'equipo de la Unidad Académica',
-          docente.nombreCompleto,
-          convocatoria.nombre,
-          aprobado,
-        );
-      }
     } catch (err) {
       this.logger.error(
-        `No se pudo notificar a la Unidad Académica sobre el evaluador ${docente?.email}: ${err instanceof Error ? err.message : err}`,
+        `No se pudo crear la notificación de alta para ${usuario.email}: ${err instanceof Error ? err.message : err}`,
       );
     }
   }
@@ -584,6 +398,13 @@ export class ParticipacionConvocatoriaService {
   async desasignar(id: string, usuario: Usuario): Promise<void> {
     const entity = await this.repo.findOne({ where: { id } });
     if (!entity) throw new NotFoundException('Participacion no encontrada');
+
+    if (
+      entity.rol === RolEjecucion.Evaluador &&
+      !usuario.roles.includes(RolUsuario.AutoridadDeRectorado)
+    ) {
+      throw new ForbiddenException('Solo una Autoridad de Rectorado puede dar de baja evaluadores');
+    }
 
     if (!this.esAutoridad(usuario)) {
       const edicion = await this.edicionRepo.findOne({ where: { id: entity.edicionId ?? '' } });

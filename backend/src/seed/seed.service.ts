@@ -447,12 +447,13 @@ export class SeedService {
     return creados;
   }
 
-  private generarPerfilDocente(): {
+  private generarPerfilDocente(completo = true): {
     genero?: Genero;
     cargoDocente?: CargoDocente;
     tipoDesignacionDocente?: TipoDesignacionDocente;
     personaConDiscapacidad?: boolean;
     telefono?: string;
+    direccionLocalidad?: string;
   } {
     const cargoes = [
       CargoDocente.ProfesorTitular,
@@ -468,13 +469,23 @@ export class SeedService {
       TipoDesignacionDocente.Suplente,
     ];
     const generos = [Genero.Masculino, Genero.Femenino, Genero.Otro, Genero.PrefieroNoResponder];
-    return {
+    const localidades = [
+      'Caballito, CABA', 'La Plata, Buenos Aires', 'Morón, Buenos Aires',
+      'Quilmes, Buenos Aires', 'Rosario, Santa Fe', 'Córdoba Capital',
+      'Vicente López, Buenos Aires', 'San Isidro, Buenos Aires',
+    ];
+    const perfil = {
       genero: this.rng.pick(generos),
       cargoDocente: this.rng.pick(cargoes),
       tipoDesignacionDocente: this.rng.pick(designaciones),
       personaConDiscapacidad: this.rng.bool(0.05),
       telefono: `11 ${String(this.rng.entero(1000, 9999))} ${String(this.rng.entero(1000, 9999))}`,
+      direccionLocalidad: this.rng.pick(localidades),
     };
+    // Un perfil "incompleto" deja sin cargar la dirección/localidad: alcanza para que
+    // el docente figure como "perfil incompleto" (ej. en el alta de evaluadores).
+    if (!completo) delete (perfil as { direccionLocalidad?: string }).direccionLocalidad;
+    return perfil;
   }
 
   private async seedPoolsUa(
@@ -536,7 +547,11 @@ export class SeedService {
         unidadAcademicaId: ua.id,
         areaDocente: this.rng.pick(areas),
         estadoValidacionDocente: estado,
-        ...(estado === EstadoValidacionDocente.Validado ? this.generarPerfilDocente() : {}),
+        // ~20% de los validados quedan con el perfil incompleto (para ver ese grupo
+        // en el alta de evaluadores); el resto, completos y listos para seleccionar.
+        ...(estado === EstadoValidacionDocente.Validado
+          ? this.generarPerfilDocente(!this.rng.bool(0.2))
+          : {}),
       };
     });
 
@@ -1374,7 +1389,7 @@ export class SeedService {
     datosFormulario?: object,
     esInterfacultad = false,
     unidadAcademicaAdicionalId?: string,
-    esConsolidado = false,
+    esConsolidado: boolean | null = null,
   ): Promise<Edicion> {
     const existeProyecto = await this.proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
     if (existeProyecto) {
@@ -1696,6 +1711,94 @@ export class SeedService {
       undefined,
       true,
     );
+
+    await this.seedProyectoConsolidadoHistorico();
+  }
+
+  /**
+   * Proyecto consolidado por historial real: mismo equipo directivo adjudicado en 4 convocatorias
+   * consecutivas (2023–2026) y con una edición presentada en 2027 (convocatoria en Presentación).
+   * Como la racha llega a 4, al pasar la 2027 a Evaluación su edición debe saltear la etapa y
+   * quedar Adjudicada automáticamente. `esConsolidado` queda en null (automático) para que se vea
+   * la derivación, no el override.
+   */
+  private async seedProyectoConsolidadoHistorico(): Promise<void> {
+    const derecho = this.uaMap.get('Facultad de Derecho')!;
+    const director = await this.seedDocente(
+      {
+        nombreCompleto: 'Dra. Consolidado Histórico',
+        email: 'consolidado@uba.ar',
+        password: '123456',
+        roles: [RolUsuario.Docente],
+        unidadAcademicaId: derecho.id,
+        telefono: '11 4444 5555',
+        genero: Genero.Femenino,
+        personaConDiscapacidad: false,
+        cargoDocente: CargoDocente.ProfesorTitular,
+        tipoDesignacionDocente: TipoDesignacionDocente.Regular,
+        areaDocente: 'Extensión Universitaria',
+        direccionLocalidad: 'Caballito, CABA',
+      },
+      EstadoValidacionDocente.Validado,
+    );
+
+    const nombreProyecto = 'Escuela de Oficios Comunitaria (consolidado histórico)';
+    let proyecto = await this.proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
+    if (!proyecto) {
+      proyecto = await this.proyectoRepo.save(
+        this.proyectoRepo.create({
+          nombre: nombreProyecto,
+          creadoPorId: director.id,
+          esConsolidado: null,
+          esInterfacultad: false,
+        }),
+      );
+    }
+
+    const plan: Array<{ anio: number; estado: EstadoEdicion }> = [
+      { anio: 2023, estado: EstadoEdicion.Adjudicado },
+      { anio: 2024, estado: EstadoEdicion.Adjudicado },
+      { anio: 2025, estado: EstadoEdicion.Adjudicado },
+      { anio: 2026, estado: EstadoEdicion.Adjudicado },
+      { anio: 2027, estado: EstadoEdicion.Presentado },
+    ];
+
+    for (const { anio, estado } of plan) {
+      const conv = this.convs.get(anio);
+      if (!conv) continue;
+      const campos = await this.camposDeConvocatoria(conv);
+      let edicion = await this.edicionRepo.findOne({
+        where: { proyectoId: proyecto.id, convocatoriaId: conv.id },
+      });
+      if (!edicion) {
+        edicion = await this.edicionRepo.save(
+          this.edicionRepo.create({
+            proyectoId: proyecto.id,
+            convocatoriaId: conv.id,
+            estado,
+            creadoPorId: director.id,
+            unidadAcademicaId: derecho.id,
+            anioEdicion: anio,
+            presupuesto: generarPresupuesto(this.rng, anio),
+            datosFormulario: this.seedDatosFormulario(campos, {
+              resumen: 'Escuela de oficios comunitaria sostenida por el mismo equipo directivo año a año.',
+              area: 'Educación',
+              poblaciones: ['Comunidad general'],
+              antecedentes: true,
+              anio,
+            }),
+          }),
+        );
+      }
+      await this.seedParticipacion({
+        usuarioId: director.id,
+        convocatoriaId: conv.id,
+        rol: RolEjecucion.DirectorDeProyecto,
+        edicionId: edicion.id,
+        esDirectorPrincipal: true,
+        asignadoPorId: this.authDerecho.id,
+      });
+    }
   }
 
   private tituloUnico(base: string): string {
@@ -1915,6 +2018,8 @@ export class SeedService {
         if ((edicionesPorUa.get(ua.id) ?? 0) >= PROYECTOS_MASIVOS_MINIMO) continue;
 
         // 1) Consolidados de 2025 → en 2026 pasan directo a la adjudicación (saltean evaluación).
+        // Se fuerza el override manual `esConsolidado = true` como demo del salteo; el cálculo
+        // automático por historial de adjudicaciones se deriva aparte (ver consolidacion.ts).
         if (anio === 2026) {
           const candidatos = this.consolidados2025.get(ua.id) ?? [];
           for (const cand of candidatos) {
@@ -1979,7 +2084,7 @@ export class SeedService {
           const proyecto = this.proyectoRepo.create({
             nombre: titulo,
             creadoPorId: director.id,
-            esConsolidado: false,
+            esConsolidado: null,
             esInterfacultad,
             unidadAcademicaAdicionalId: uaAdicionalId,
           });
@@ -2096,7 +2201,7 @@ export class SeedService {
         usuarioId,
         tipo: TipoNotificacion.RESULTADO_EVALUADOR,
         participacionId: p.id,
-        mensaje: `Tu propuesta como evaluador en la convocatoria "${convocatoriaNombre}" fue aprobada`,
+        mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${convocatoriaNombre}"`,
         leida: false,
       }),
     );
@@ -2179,22 +2284,6 @@ export class SeedService {
 
         const cupoRestante = Math.max(0, 3 - aprobadosEnUa.length);
         const aAprobar = tomar(cupoRestante);
-        // Igual que el cupo de aprobados: se crea uno por estado sólo si la UA
-        // todavía no tiene ninguno, para no sumar una tanda en cada arranque.
-        const yaTieneEstado = (estado: EstadoPropuestaEvaluador): boolean =>
-          existentes.some(
-            (p) =>
-              p.rol === RolEjecucion.Evaluador &&
-              p.estado === estado &&
-              p.usuario?.unidadAcademicaId === ua.id,
-          );
-        const propuesto = yaTieneEstado(EstadoPropuestaEvaluador.Propuesto)
-          ? undefined
-          : tomar(1)[0];
-        const aceptada = yaTieneEstado(EstadoPropuestaEvaluador.Aceptada) ? undefined : tomar(1)[0];
-        const declinada = yaTieneEstado(EstadoPropuestaEvaluador.Declinada)
-          ? undefined
-          : tomar(1)[0];
 
         for (const evaluador of aAprobar) {
           evaluadorRows.push(
@@ -2209,62 +2298,10 @@ export class SeedService {
           notifMeta.push({
             usuarioId: evaluador.id,
             tipo: TipoNotificacion.RESULTADO_EVALUADOR,
-            mensaje: `Tu propuesta como evaluador en la convocatoria "${conv.nombre}" fue aprobada`,
+            mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${conv.nombre}"`,
             leida: false,
           });
           aprobadosUa.get(ua.id)?.add(evaluador.id);
-        }
-
-        if (propuesto) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: propuesto.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Propuesto,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: propuesto.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: false,
-          });
-        }
-        if (aceptada) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: aceptada.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Aceptada,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: aceptada.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: true,
-          });
-        }
-        if (declinada) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: declinada.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Declinada,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: declinada.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: true,
-          });
         }
       }
 

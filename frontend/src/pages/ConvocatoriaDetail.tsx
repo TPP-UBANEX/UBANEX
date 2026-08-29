@@ -152,9 +152,7 @@ export function ConvocatoriaDetail() {
   const errores = erroresFechas(editForm);
 
   const tieneInvPendiente = invitacionEvaluador?.estado === EstadoPropuestaEvaluador.Propuesto;
-  const esEvaluadorActivo =
-    invitacionEvaluador?.estado === EstadoPropuestaEvaluador.Aceptada ||
-    invitacionEvaluador?.estado === EstadoPropuestaEvaluador.Aprobado;
+  const esEvaluadorActivo = invitacionEvaluador !== null
 
   const cargarDatos = () => {
     if (!id) return;
