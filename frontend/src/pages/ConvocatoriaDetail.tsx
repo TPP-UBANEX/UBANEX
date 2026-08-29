@@ -561,7 +561,7 @@ export function ConvocatoriaDetail() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Cuota federativa mínima por unidad académica</p>
+                    <p className="text-sm font-medium">Cuota federativa</p>
                     <Input
                       type="number"
                       min={0}
@@ -578,7 +578,7 @@ export function ConvocatoriaDetail() {
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Presupuesto total de la convocatoria</p>
+                    <p className="text-sm font-medium">Presupuesto total máximo</p>
                     <Input
                       type="number"
                       min={0}
