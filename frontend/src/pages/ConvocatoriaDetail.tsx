@@ -397,8 +397,13 @@ export function ConvocatoriaDetail() {
   ) => {
     if (!esRectorado) return;
     if (adjudicado) {
-      const restanteReal = resumenPresupuesto.total - resumenPresupuesto.adjudicado;
       const costo = Number(e.presupuesto?.montoTotal ?? 0);
+      // Si el proyecto ya está adjudicado, su costo ya está contado en el total
+      // adjudicado: al cambiar solo el método no se suma presupuesto nuevo, así
+      // que se descuenta del total para chequear solo el presupuesto adicional.
+      const yaAdjudicado = e.adjudicacionPropuesta === true;
+      const baseAdjudicado = resumenPresupuesto.adjudicado - (yaAdjudicado ? costo : 0);
+      const restanteReal = resumenPresupuesto.total - baseAdjudicado;
       if (restanteReal < costo) {
         toast.error(
           `No hay presupuesto disponible para adjudicar este proyecto (restante ${formatearMoneda(restanteReal)}, costo ${formatearMoneda(costo)})`,

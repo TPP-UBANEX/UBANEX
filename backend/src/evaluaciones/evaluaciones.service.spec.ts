@@ -2,6 +2,7 @@
 import { EvaluacionesService } from './evaluaciones.service';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoEvaluacion } from '../common/enums/estado-evaluacion.enum';
+import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
 import { EvaluacionCruzada } from './evaluacion-cruzada.entity';
 import { Edicion } from '../proyectos/edicion.entity';
@@ -359,5 +360,71 @@ describe('EvaluacionesService.generarOrdenMerito - Fase 2 global por puntaje', (
     expect(c['uaA'].cupo).toBe(2); // le alcanza el presupuesto
     expect(c['uaB'].cupo).toBe(0); // se queda sin cuota (orden global, no alfabético)
     expect(c['uaB'].financiados).toBe(0);
+  });
+});
+
+describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', () => {
+  function armarService(edicion: any, presupuestoTotal: number) {
+    const convocatoria = {
+      id: 'conv1',
+      presupuestoTotal,
+      ordenMeritoConfirmado: false,
+    };
+    const edicionRepo = {
+      findOne: jest.fn().mockResolvedValue(edicion),
+      find: jest.fn().mockResolvedValue([edicion]),
+      save: jest.fn(async (e: any) => e),
+    };
+    const convocatoriaRepo = { findOne: jest.fn().mockResolvedValue(convocatoria) };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      dummy as any,
+      dummy as any,
+      convocatoriaRepo as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    return svc;
+  }
+
+  it('cambia el método de un proyecto ya adjudicado aunque no haya presupuesto para sumar uno nuevo', async () => {
+    const edicion = {
+      id: 'e1',
+      convocatoriaId: 'conv1',
+      adjudicacionPropuesta: true,
+      mecanismoAdjudicacion: 'CUPO',
+      presupuesto: { montoTotal: 80 },
+      proyecto: {},
+      unidadAcademica: {},
+      estado: EstadoEdicion.EnEvaluacion,
+    } as any;
+    const svc = armarService(edicion, 80);
+    const actualizada = await svc.actualizarPropuestaAdjudicacion('e1', true, MecanismoAdjudicacion.Merito, {
+      id: 'u1',
+    } as any);
+    expect(actualizada.mecanismoAdjudicacion).toBe('MERITO');
+    expect(actualizada.adjudicacionPropuesta).toBe(true);
+  });
+
+  it('bloquea adjudicar un proyecto nuevo si no alcanza el presupuesto', async () => {
+    const edicion = {
+      id: 'e1',
+      convocatoriaId: 'conv1',
+      adjudicacionPropuesta: false,
+      mecanismoAdjudicacion: null,
+      presupuesto: { montoTotal: 90 },
+      proyecto: {},
+      unidadAcademica: {},
+      estado: EstadoEdicion.EnEvaluacion,
+    } as any;
+    const svc = armarService(edicion, 80);
+    await expect(
+      svc.actualizarPropuestaAdjudicacion('e1', true, MecanismoAdjudicacion.Merito, { id: 'u1' } as any),
+    ).rejects.toThrow(/No hay presupuesto disponible/);
   });
 });
