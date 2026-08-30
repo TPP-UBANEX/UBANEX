@@ -52,4 +52,14 @@ export class ActualizarConvocatoriaDto {
   @Min(0)
   @IsOptional()
   presupuestoTotal?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  topePresupuestoNoConsolidado?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  topePresupuestoConsolidado?: number;
 }

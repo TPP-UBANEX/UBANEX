@@ -67,6 +67,14 @@ export class Convocatoria {
   @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
   presupuestoTotal: number | null;
 
+  // Tope por proyecto sobre el total del presupuesto solicitado (no el que se adjudica), según si
+  // el proyecto es consolidado o no (ver proyectos/consolidacion.ts). null o <= 0 = sin tope.
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  topePresupuestoNoConsolidado: number | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  topePresupuestoConsolidado: number | null;
+
   @Column({ type: 'boolean', default: false })
   ordenMeritoConfirmado: boolean;
 
