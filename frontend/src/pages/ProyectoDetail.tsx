@@ -177,7 +177,7 @@ export function ProyectoDetail() {
   const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
     camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
-  const presupuestoFaltante = presupuestoIncompletoParaEnvio(edicion?.presupuesto, edicion?.convocatoria)
+  const presupuestoFaltante = presupuestoIncompletoParaEnvio(edicion?.presupuestoSolicitado, edicion?.convocatoria)
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
     && camposObligatoriosFaltantes.length === 0 && presupuestoFaltante.length === 0
   const esDocente = user?.roles.includes(RolUsuario.Docente)
@@ -209,7 +209,7 @@ export function ProyectoDetail() {
       : camposObligatoriosFaltantes.length > 0
         ? <ListaCamposFaltantes titulo="Falta completar lo siguiente:" campos={camposObligatoriosFaltantes} />
         : presupuestoFaltante.length > 0
-          ? <ListaCamposFaltantes titulo="Falta completar el presupuesto:" campos={presupuestoFaltante} />
+          ? <ListaCamposFaltantes titulo="Falta completar el presupuesto solicitado:" campos={presupuestoFaltante} />
           : null
 
   const cargarDatos = async () => {
@@ -272,7 +272,9 @@ export function ProyectoDetail() {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
     setEditAnioEdicion(edicion.anioEdicion ?? null)
-    setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
+    setEditPresupuesto(
+      edicion.presupuestoSolicitado ? JSON.parse(JSON.stringify(edicion.presupuestoSolicitado)) : null,
+    )
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
     direccion.reset()
@@ -307,7 +309,7 @@ export function ProyectoDetail() {
         anioEdicion: editAnioEdicion ?? undefined,
         esInterfacultad: direccion.esInterfacultad,
         unidadAcademicaAdicionalId: direccion.unidadAcademicaAdicionalId,
-        presupuesto: editPresupuesto || undefined,
+        presupuestoSolicitado: editPresupuesto || undefined,
         datosFormulario: editDatosFormulario,
       })
       await direccion.sincronizar()
@@ -600,8 +602,8 @@ export function ProyectoDetail() {
           <CardContent><p className="text-sm">{edicion?.anioEdicion || '-'}</p></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
-          <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuesto?.montoTotal)}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto solicitado</CardTitle></CardHeader>
+          <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuestoSolicitado?.montoTotal)}</p></CardContent>
         </Card>
         {puedeGestionarDireccion && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowGestionarDireccion(true)}>
@@ -623,7 +625,7 @@ export function ProyectoDetail() {
             <TabsTrigger key={seccion.id} value={`seccion-${seccion.id}`}>{seccion.nombre}</TabsTrigger>
           ))}
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
-          <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
+          <TabsTrigger value="presupuesto">Presupuesto solicitado</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
           <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
@@ -785,13 +787,15 @@ export function ProyectoDetail() {
         <TabsContent value="presupuesto" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Presupuesto</CardTitle>
+              <CardTitle className="text-sm font-medium">Presupuesto solicitado</CardTitle>
               <span className="text-sm font-bold">
-                Total: {formatearMoneda(editando ? editPresupuesto?.montoTotal : edicion?.presupuesto?.montoTotal)}
+                Total: {formatearMoneda(
+                  editando ? editPresupuesto?.montoTotal : edicion?.presupuestoSolicitado?.montoTotal,
+                )}
               </span>
             </CardHeader>
             <CardContent className="space-y-4">
-              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, edicion?.convocatoria, {
+              {renderPresupuesto(editPresupuesto || edicion?.presupuestoSolicitado || null, editando, edicion?.convocatoria, {
                 addPartida, removePartida, updateViatico, updateBien,
               }, { activo: modoSugerencia, onSugerir: handleSugerirClick })}
             </CardContent>
@@ -853,7 +857,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="sugerencias" className="mt-4">
           {edicion ? (
-            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} presupuesto={edicion.presupuesto} onRespondida={cargarDatos} />
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} presupuesto={edicion.presupuestoSolicitado} onRespondida={cargarDatos} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}

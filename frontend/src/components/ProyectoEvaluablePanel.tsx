@@ -21,7 +21,7 @@ export function ProyectoEvaluablePanel({
 }) {
   if (!edicion) return null
 
-  const presupuesto = edicion.presupuesto
+  const presupuesto = edicion.presupuestoSolicitado
   const secciones = agruparCamposEnSecciones(campos)
 
   return (
@@ -70,7 +70,7 @@ export function ProyectoEvaluablePanel({
               {edicion.proyecto?.esInterfacultad ? 'Sí' : 'No'}
             </div>
             <div>
-              <span className="text-muted-foreground">Presupuesto:</span>{' '}
+              <span className="text-muted-foreground">Presupuesto solicitado:</span>{' '}
               {presupuesto ? formatearMoneda(presupuesto.montoTotal) : '-'}
             </div>
           </div>

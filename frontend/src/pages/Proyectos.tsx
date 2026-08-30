@@ -208,7 +208,7 @@ export function Proyectos() {
                       <TableHead>Creado por</TableHead>
                       <TableHead>Facultad</TableHead>
                       <TableHead>Etapa</TableHead>
-                      <TableHead>Presupuesto</TableHead>
+                      <TableHead>Presupuesto solicitado</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -243,7 +243,7 @@ export function Proyectos() {
                               : e.unidadAcademica?.nombre || '-'}
                           </TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                          <TableCell className="text-sm">{formatearMoneda(e.presupuesto?.montoTotal)}</TableCell>
+                          <TableCell className="text-sm">{formatearMoneda(e.presupuestoSolicitado?.montoTotal)}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
                           </TableCell>
@@ -332,7 +332,11 @@ export function Proyectos() {
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
                         <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
-                        {e.presupuesto && <Badge variant="outline" className="text-xs">{formatearMoneda(e.presupuesto.montoTotal)}</Badge>}
+                        {e.presupuestoSolicitado && (
+                          <Badge variant="outline" className="text-xs">
+                            {formatearMoneda(e.presupuestoSolicitado.montoTotal)}
+                          </Badge>
+                        )}
                       </CardContent>
                     </Card>
                   ))}

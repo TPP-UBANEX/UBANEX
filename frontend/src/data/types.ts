@@ -293,7 +293,7 @@ export interface Edicion {
   unidadAcademicaId: string;
   unidadAcademica?: UnidadAcademica;
   convocatoria?: Convocatoria;
-  presupuesto?: Presupuesto;
+  presupuestoSolicitado?: Presupuesto;
   anioEdicion?: number;
   datosFormulario?: Record<string, unknown>;
   ordenMerito?: number | null;
@@ -348,7 +348,7 @@ export interface ActualizarEdicionDto {
   esConsolidado?: boolean | null;
   esInterfacultad?: boolean;
   unidadAcademicaAdicionalId?: string | null;
-  presupuesto?: Presupuesto;
+  presupuestoSolicitado?: Presupuesto;
   datosFormulario?: Record<string, unknown>;
 }
 

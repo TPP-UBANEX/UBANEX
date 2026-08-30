@@ -176,3 +176,30 @@ export function formatearMoneda(valor: number | null | undefined): string {
   if (!Number.isFinite(num)) return '$0'
   return `$${num.toLocaleString('es-AR')}`
 }
+
+export interface PresupuestoAAdjudicar {
+  solicitado: number
+  extraInsumos: number
+  extraPse: number
+  total: number
+}
+
+/**
+ * Espejo de backend/src/proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar.
+ * Presupuesto a adjudicar = presupuesto solicitado + extra por insumos + extra por PSE. Los
+ * extras son porcentajes del solicitado que aplican solo si se cumplen condiciones particulares
+ * de cada uno; esas condiciones todavía no están definidas, así que por ahora ambos son 0.
+ */
+export function calcularPresupuestoAAdjudicar(
+  presupuestoSolicitado: Presupuesto | null | undefined,
+): PresupuestoAAdjudicar {
+  const solicitado = Number(presupuestoSolicitado?.montoTotal ?? 0)
+  const extraInsumos = 0
+  const extraPse = 0
+  return {
+    solicitado,
+    extraInsumos,
+    extraPse,
+    total: redondear2(solicitado + extraInsumos + extraPse),
+  }
+}
