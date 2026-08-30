@@ -264,6 +264,11 @@ export interface Convocatoria {
   // proyecto es consolidado o no. null/0 = sin tope.
   topePresupuestoNoConsolidado?: number | null;
   topePresupuestoConsolidado?: number | null;
+  // Porcentajes que componen el presupuesto a adjudicar por sobre el solicitado (ver
+  // lib/presupuesto.ts#calcularPresupuestoAAdjudicar). 0 = extra desactivado.
+  porcentajeExtraInsumos?: number;
+  umbralInsumos?: number;
+  porcentajeExtraPse?: number;
   ordenMeritoConfirmado: boolean;
   formulario?: Formulario;
 }
@@ -317,6 +322,9 @@ export interface Edicion {
   // el tope resultante para esta edición según ese cálculo. null = sin tope configurado.
   esConsolidadoParaTope?: boolean;
   topePresupuestoSolicitado?: number | null;
+  // Viene de la evaluación institucional (EvaluacionInstitucional.esPse), no del proyecto; ver
+  // calcularPresupuestoAAdjudicar en lib/presupuesto.ts. Presente solo en el listado "todas".
+  esPse?: boolean;
 }
 
 export interface Presupuesto {
@@ -343,6 +351,7 @@ export interface BienPresupuesto {
   cantidad: number;
   precioUnitario: number;
   monto: number;
+  esInsumo?: boolean;
 }
 
 export interface CrearProyectoDto {
@@ -468,6 +477,8 @@ export interface EvaluacionInstitucional {
   categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
   checklist: Record<string, boolean> | null;
   observaciones: string | null;
+  // Fijo y obligatorio para confirmar, independiente del template (ver ../../backend/src/evaluaciones/evaluacion-institucional.entity.ts).
+  esPse: boolean | null;
   realizadoPor?: Usuario;
   actualizadoPor?: Usuario;
   confirmadoPor?: Usuario;
@@ -519,6 +530,7 @@ export interface MonitoreoEvaluacion {
       id: string;
       estado: EstadoEvaluacion;
       observaciones: string | null;
+      esPse: boolean | null;
       realizadoPor: { id: string; nombreCompleto: string } | null;
       confirmadoPor: { id: string; nombreCompleto: string } | null;
     } | null;
@@ -545,6 +557,7 @@ export interface EvaluacionEdicionDetalle {
     confirmadoPor: { id: string; nombreCompleto: string } | null;
     categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
     checklist: Record<string, boolean> | null;
+    esPse: boolean | null;
   } | null;
   cruzadas: Array<{
     id: string;
@@ -571,6 +584,7 @@ export interface GuardarEvaluacionInstitucionalDto {
   categorias?: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
   checklist?: Record<string, boolean> | null;
   observaciones?: string;
+  esPse?: boolean;
 }
 
 export interface GuardarEvaluacionCruzadaDto {
