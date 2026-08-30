@@ -167,6 +167,8 @@ export const api = {
       fechaFinEjecucion?: string;
       cuotaFederativa?: number;
       presupuestoTotal?: number | null;
+      topePresupuestoNoConsolidado?: number | null;
+      topePresupuestoConsolidado?: number | null;
     }) => post<import('@/data/types').Convocatoria>('/convocatorias', data),
     actualizar: (
       id: string,
@@ -183,6 +185,8 @@ export const api = {
         fechaFinEjecucion?: string;
         cuotaFederativa?: number;
         presupuestoTotal?: number | null;
+        topePresupuestoNoConsolidado?: number | null;
+        topePresupuestoConsolidado?: number | null;
       },
     ) => patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
     eliminar: (id: string) => del(`/convocatorias/${id}`),

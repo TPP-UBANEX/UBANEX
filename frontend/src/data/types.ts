@@ -260,6 +260,10 @@ export interface Convocatoria {
   formularioId: string | null;
   cuotaFederativa?: number | null;
   presupuestoTotal?: number | null;
+  // Tope por proyecto sobre el total del presupuesto solicitado (no el adjudicado), según si el
+  // proyecto es consolidado o no. null/0 = sin tope.
+  topePresupuestoNoConsolidado?: number | null;
+  topePresupuestoConsolidado?: number | null;
   ordenMeritoConfirmado: boolean;
   formulario?: Formulario;
 }
@@ -279,6 +283,9 @@ export interface Proyecto {
   // Calculados en el backend (no persistidos), presentes en obtenerProyecto.
   esConsolidadoDerivado?: boolean;
   esConsolidadoEfectivo?: boolean;
+  // Irreversible: si alguna vez fue consolidado, le corresponde el tope de presupuesto de
+  // consolidado para siempre (ver esConsolidadoParaTope en el backend).
+  fueConsolidadoAlgunaVez?: boolean;
   rachaAdjudicaciones?: number;
 }
 
@@ -306,6 +313,10 @@ export interface Edicion {
   esConsolidadoDerivado?: boolean;
   salteaEvaluacion?: boolean;
   rachaAdjudicaciones?: number;
+  // Consolidación irreversible a efectos del tope de presupuesto (ver esConsolidadoParaTope), y
+  // el tope resultante para esta edición según ese cálculo. null = sin tope configurado.
+  esConsolidadoParaTope?: boolean;
+  topePresupuestoSolicitado?: number | null;
 }
 
 export interface Presupuesto {

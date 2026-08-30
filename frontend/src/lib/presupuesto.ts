@@ -121,7 +121,13 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
  */
 export function presupuestoIncompletoParaEnvio(
   presupuesto: Presupuesto | null | undefined,
-  convocatoria?: { fechaInicioEjecucion: string | null; fechaFinEjecucion: string | null } | null,
+  convocatoria?: {
+    fechaInicioEjecucion: string | null
+    fechaFinEjecucion: string | null
+    topePresupuestoConsolidado?: number | null
+    topePresupuestoNoConsolidado?: number | null
+  } | null,
+  esConsolidado = false,
 ): string[] {
   if (!presupuesto || !presupuesto.rubros?.some(r => r.partidas?.length > 0)) {
     return ['El presupuesto está vacío']
@@ -164,7 +170,46 @@ export function presupuestoIncompletoParaEnvio(
     })
   }
 
+  const tope = topePresupuestoSolicitado(convocatoria, esConsolidado)
+  const motivoTope = motivoTopeExcedido(presupuesto, tope, esConsolidado)
+  if (motivoTope) motivos.push(motivoTope)
+
   return motivos
+}
+
+/**
+ * Espejo de backend/src/proyectos/presupuesto.util.ts#topePresupuestoSolicitado. Tope por proyecto
+ * sobre el total del presupuesto solicitado, según si es consolidado o no. `null`/`0`/no
+ * configurado = sin tope.
+ */
+export function topePresupuestoSolicitado(
+  convocatoria?: { topePresupuestoConsolidado?: number | null; topePresupuestoNoConsolidado?: number | null } | null,
+  esConsolidado = false,
+): number | null {
+  const bruto = esConsolidado
+    ? convocatoria?.topePresupuestoConsolidado
+    : convocatoria?.topePresupuestoNoConsolidado
+  const tope = Number(bruto ?? 0)
+  return Number.isFinite(tope) && tope > 0 ? tope : null
+}
+
+/**
+ * Espejo de backend/src/proyectos/presupuesto.util.ts#motivoTopeExcedido. Mensaje si el total
+ * solicitado supera `tope`, o `null` si está dentro (o no hay tope).
+ */
+export function motivoTopeExcedido(
+  presupuesto: Presupuesto | null | undefined,
+  tope: number | null,
+  esConsolidado: boolean,
+): string | null {
+  if (tope === null) return null
+  const total = Number(presupuesto?.montoTotal ?? 0)
+  if (total <= tope) return null
+  const etiquetaTipo = esConsolidado ? 'consolidados' : 'no consolidados'
+  return (
+    `El total solicitado (${formatearMoneda(total)}) supera el tope de ${formatearMoneda(tope)} `
+    + `para proyectos ${etiquetaTipo} de esta convocatoria`
+  )
 }
 
 /** Convierte un input numérico crudo a un número finito y no negativo, o 0 si es inválido. */
