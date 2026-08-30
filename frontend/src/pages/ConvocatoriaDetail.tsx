@@ -131,6 +131,8 @@ export function ConvocatoriaDetail() {
     fechaFinEjecucion: '',
     cuotaFederativa: 0,
     presupuestoTotal: 0,
+    topePresupuestoNoConsolidado: 0,
+    topePresupuestoConsolidado: 0,
   });
   const [guardando, setGuardando] = useState(false);
   const [confirmEditOpen, setConfirmEditOpen] = useState(false);
@@ -448,6 +450,8 @@ export function ConvocatoriaDetail() {
       fechaFinEjecucion: conv.fechaFinEjecucion || '',
       cuotaFederativa: conv.cuotaFederativa ?? 0,
       presupuestoTotal: conv.presupuestoTotal ?? 0,
+      topePresupuestoNoConsolidado: conv.topePresupuestoNoConsolidado ?? 0,
+      topePresupuestoConsolidado: conv.topePresupuestoConsolidado ?? 0,
     });
     setEditOpen(true);
   };
@@ -471,6 +475,10 @@ export function ConvocatoriaDetail() {
       const actualizada = await api.convocatorias.actualizar(id!, {
         ...editForm,
         presupuestoTotal: editForm.presupuestoTotal > 0 ? editForm.presupuestoTotal : null,
+        topePresupuestoNoConsolidado:
+          editForm.topePresupuestoNoConsolidado > 0 ? editForm.topePresupuestoNoConsolidado : null,
+        topePresupuestoConsolidado:
+          editForm.topePresupuestoConsolidado > 0 ? editForm.topePresupuestoConsolidado : null,
       });
       setConv(actualizada);
       toast.success('Convocatoria actualizada correctamente');
@@ -606,6 +614,47 @@ export function ConvocatoriaDetail() {
                     <p className="text-xs text-muted-foreground">
                       Tope global de presupuesto. Limita la cantidad de proyectos que se pueden
                       adjudicar (en orden de mérito). Dejar en 0 para no acotar.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      Tope de presupuesto solicitado — proyectos no consolidados
+                    </p>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={editForm.topePresupuestoNoConsolidado}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          topePresupuestoNoConsolidado: Math.max(0, parseFloat(e.target.value) || 0),
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Monto máximo del presupuesto solicitado por proyecto no consolidado. Dejar en
+                      0 para no acotar.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      Tope de presupuesto solicitado — proyectos consolidados
+                    </p>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={editForm.topePresupuestoConsolidado}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          topePresupuestoConsolidado: Math.max(0, parseFloat(e.target.value) || 0),
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Monto máximo del presupuesto solicitado por proyecto consolidado (aplica
+                      también si el proyecto fue consolidado alguna vez, aunque esta edición le
+                      toque evaluación). Dejar en 0 para no acotar.
                     </p>
                   </div>
                   <div className="space-y-1">
