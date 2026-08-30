@@ -13,9 +13,12 @@ import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { Presupuesto } from '../proyectos/presupuesto.interface';
 import {
-  esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, normalizarPresupuesto,
-  parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, validarPresupuesto,
+  esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, motivoTopeExcedido, normalizarPresupuesto,
+  parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, topePresupuestoSolicitado, validarPresupuesto,
 } from '../proyectos/presupuesto.util';
+import {
+  ordenarConvocatorias, calcularConsolidacion, esConsolidadoParaTope, DatosConsolidacion, EdicionHistorial,
+} from '../proyectos/consolidacion';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
@@ -317,8 +320,9 @@ export class SugerenciasService {
         break;
       default:
         if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
-          this.aplicarCambioPresupuesto(
+          await this.aplicarCambioPresupuesto(
             edicion,
+            proyecto,
             campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''),
             valorSugerido,
           );
@@ -339,8 +343,17 @@ export class SugerenciasService {
    * numéricos no viajan como string), y revalida + recalcula todo el presupuesto antes de guardar.
    * A diferencia de aplicarCambioJson, nunca crea nodos intermedios: si la partida ya no existe
    * (se borró desde que se sugirió el cambio), se rechaza en vez de reconstruirla a ciegas.
+   *
+   * También aplica el mismo tope de presupuesto solicitado que el guardado directo (ver
+   * proyectos.service.ts#actualizarEdicion): aprobar una sugerencia no puede dejar un total por
+   * encima del tope de la convocatoria.
    */
-  private aplicarCambioPresupuesto(edicion: Edicion, path: string, valorSugerido: string): void {
+  private async aplicarCambioPresupuesto(
+    edicion: Edicion,
+    proyecto: Proyecto,
+    path: string,
+    valorSugerido: string,
+  ): Promise<void> {
     const ruta = parsearRutaPartida(path);
     if (!ruta || !edicion.presupuestoSolicitado) {
       throw new BadRequestException('No se puede aplicar ese cambio de presupuesto');
@@ -364,7 +377,34 @@ export class SugerenciasService {
     partida[ruta.campo] = valor;
 
     validarPresupuesto(nuevoPresupuesto);
-    edicion.presupuestoSolicitado = normalizarPresupuesto(nuevoPresupuesto);
+    const presupuestoNormalizado = normalizarPresupuesto(nuevoPresupuesto);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: edicion.convocatoriaId } });
+    const datos = await this.calcularDatosConsolidacion(edicion.proyectoId, edicion.convocatoriaId);
+    const esConsolidado = esConsolidadoParaTope(datos, proyecto.esConsolidado);
+    const tope = topePresupuestoSolicitado(convocatoria, esConsolidado);
+    const motivoExcedido = motivoTopeExcedido(presupuestoNormalizado, tope, esConsolidado);
+    if (motivoExcedido) {
+      throw new BadRequestException(`No se pudo aplicar la sugerencia: ${motivoExcedido}`);
+    }
+
+    edicion.presupuestoSolicitado = presupuestoNormalizado;
+  }
+
+  /** Espejo de ProyectosService#calcularDatosConsolidacion (ver ese archivo para el detalle). */
+  private async calcularDatosConsolidacion(
+    proyectoId: string,
+    convocatoriaId: string,
+  ): Promise<DatosConsolidacion> {
+    const convocatorias = await this.convocatoriaRepo.find({ select: { id: true, anio: true } });
+    const convocatoriasOrdenadas = ordenarConvocatorias(convocatorias);
+    const historial: EdicionHistorial[] = (
+      await this.edicionRepo.find({
+        where: { proyectoId },
+        select: { convocatoriaId: true, estado: true },
+      })
+    ).map(e => ({ convocatoriaId: e.convocatoriaId, estado: e.estado }));
+    return calcularConsolidacion(convocatoriasOrdenadas, historial, convocatoriaId);
   }
 
   private aplicarCambioJson(edicion: Edicion, path: string, valor: unknown) {

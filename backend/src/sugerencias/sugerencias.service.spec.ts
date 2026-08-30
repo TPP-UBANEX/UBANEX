@@ -52,10 +52,12 @@ describe('SugerenciasService', () => {
   const saveNotificacion = jest.fn<(n: unknown) => Promise<unknown>>();
   const createNotificacion = jest.fn((data: unknown) => data);
   const findOneEdicion = jest.fn<() => Promise<Edicion | null>>();
+  const findEdiciones = jest.fn<() => Promise<Edicion[]>>();
   const saveEdicion = jest.fn<(e: unknown) => Promise<unknown>>();
   const findOneByProyecto = jest.fn<() => Promise<Proyecto | null>>();
   const findParticipaciones = jest.fn<() => Promise<ParticipacionConvocatoria[]>>();
   const findOneConvocatoria = jest.fn<() => Promise<Convocatoria | null>>();
+  const findConvocatorias = jest.fn<() => Promise<Convocatoria[]>>();
 
   const sugerenciaRepo = {
     findOne: findOneSugerencia,
@@ -70,6 +72,7 @@ describe('SugerenciasService', () => {
 
   const edicionRepo = {
     findOne: findOneEdicion,
+    find: findEdiciones,
     save: saveEdicion,
   } as unknown as Repository<Edicion>;
 
@@ -84,6 +87,7 @@ describe('SugerenciasService', () => {
 
   const convocatoriaRepo = {
     findOne: findOneConvocatoria,
+    find: findConvocatorias,
   } as unknown as Repository<Convocatoria>;
 
   const service = new SugerenciasService(
@@ -109,6 +113,8 @@ describe('SugerenciasService', () => {
     jest.clearAllMocks();
     findParticipaciones.mockResolvedValue([]);
     findOneConvocatoria.mockResolvedValue(null);
+    findConvocatorias.mockResolvedValue([]);
+    findEdiciones.mockResolvedValue([]);
     findOneByProyecto.mockResolvedValue({ id: 'proyecto-1', nombre: 'Proyecto de prueba' } as unknown as Proyecto);
     findOneSugerencia.mockResolvedValue(null);
     saveSugerencia.mockImplementation(async (s) => s);
@@ -192,6 +198,30 @@ describe('SugerenciasService', () => {
       expect(saveSugerencia).toHaveBeenCalledWith(
         expect.objectContaining({ estado: EstadoSugerencia.Aceptada }),
       );
+    });
+
+    it('rechaza aplicar el cambio si el nuevo total supera el tope de la convocatoria', async () => {
+      const ed = edicion();
+      const sugerencia = {
+        id: 'sugerencia-1',
+        edicionId: ed.id,
+        edicion: ed,
+        sugeridoPorId: 'u-secretaria',
+        campo: 'presupuestoSolicitado.rubros[0].partidas[0].monto',
+        valorActual: '1000',
+        valorSugerido: '2000',
+        comentario: 'ajustar el monto',
+        estado: EstadoSugerencia.Pendiente,
+      } as unknown as SugerenciaCambio;
+      findOneSugerencia.mockResolvedValue(sugerencia);
+      findOneConvocatoria.mockResolvedValue(
+        { id: 'convocatoria-1', topePresupuestoNoConsolidado: 1000, topePresupuestoConsolidado: 100000 } as unknown as Convocatoria,
+      );
+
+      await expect(
+        service.responder('sugerencia-1', { estado: EstadoSugerencia.Aceptada }, rectorado),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveEdicion).not.toHaveBeenCalled();
     });
   });
 });
