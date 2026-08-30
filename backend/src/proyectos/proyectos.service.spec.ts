@@ -31,6 +31,7 @@ describe('ProyectosService', () => {
   const findParticipaciones = jest.fn<() => Promise<ParticipacionConvocatoria[]>>();
   const deleteParticipaciones = jest.fn<(criteria: unknown) => Promise<unknown>>();
   const findOneManager = jest.fn<() => Promise<unknown>>();
+  const findManager = jest.fn<() => Promise<unknown[]>>();
 
   const proyectoRepo = {
     update: updateProyecto,
@@ -42,7 +43,7 @@ describe('ProyectosService', () => {
     find: findEdiciones,
     save: saveEdicion,
     softDelete: softDeleteEdicion,
-    manager: { findOne: findOneManager },
+    manager: { findOne: findOneManager, find: findManager },
   } as unknown as Repository<Edicion>;
 
   const participacionRepo = {
@@ -144,6 +145,7 @@ describe('ProyectosService', () => {
 
     beforeEach(() => {
       findOneManager.mockResolvedValue(convocatoria);
+      findManager.mockResolvedValue([{ id: 'convocatoria-1', anio: 2026 }]);
       findOneProyecto.mockResolvedValue(proyecto);
       findEdiciones.mockResolvedValue([]);
       saveEdicion.mockResolvedValue(undefined);
@@ -189,6 +191,34 @@ describe('ProyectosService', () => {
       expect(presupuesto.montoTotal).toBe(1000);
       expect(presupuesto.rubros[1].subtotal).toBe(1000);
     });
+
+    it('rechaza guardar un presupuesto que supera el tope de la convocatoria y no lo persiste', async () => {
+      const convocatoriaConTope = {
+        id: 'convocatoria-1', formulario: null, topePresupuestoNoConsolidado: 500, topePresupuestoConsolidado: 5000,
+      } as unknown as Convocatoria;
+      findOneEdicion.mockResolvedValue(
+        edicion({ convocatoria: convocatoriaConTope } as unknown as Partial<Edicion>),
+      );
+      const dto = {
+        presupuestoSolicitado: {
+          montoTotal: 1,
+          rubros: [
+            { tipo: TipoRubro.ViaticosYSeguros, subtotal: 0, partidas: [] },
+            {
+              tipo: TipoRubro.BienesDeConsumo,
+              subtotal: 0,
+              partidas: [{ descripcion: 'Papel', cantidad: 10, precioUnitario: 100, monto: 1 }],
+            },
+            { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: [] },
+          ],
+        },
+      } as unknown as Parameters<typeof service.actualizarEdicion>[2];
+
+      await expect(
+        service.actualizarEdicion('proyecto-1', 'edicion-1', dto, creador),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveEdicion).not.toHaveBeenCalled();
+    });
   });
 
   describe('enviarEdicion — presupuesto', () => {
@@ -217,6 +247,7 @@ describe('ProyectosService', () => {
 
     beforeEach(() => {
       findOneManager.mockResolvedValue(convocatoriaConEjecucion);
+      findManager.mockResolvedValue([{ id: 'convocatoria-1', anio: 2026 }]);
       findParticipaciones.mockResolvedValue(dosDirectores);
       findOneProyecto.mockResolvedValue(proyecto);
       findEdiciones.mockResolvedValue([]);
@@ -275,6 +306,50 @@ describe('ProyectosService', () => {
       const guardada = (saveEdicion.mock.calls[0] as unknown as [Edicion])[0];
       expect(guardada.estado).toBe(EstadoEdicion.Presentado);
     });
+
+    it('rechaza el envío si el presupuesto (ya guardado) supera el tope de la convocatoria', async () => {
+      // Simula una edición que llegó excedida sin pasar por el PATCH (p. ej. copiada de la
+      // edición anterior al crear una edición nueva, o el tope bajó después de guardarse).
+      const presupuestoCompleto: Presupuesto = {
+        montoTotal: 6100,
+        rubros: [
+          {
+            tipo: TipoRubro.ViaticosYSeguros,
+            subtotal: 1000,
+            partidas: [{
+              tipoPersona: TipoPersona.Docente,
+              descripcion: 'Viáticos',
+              periodoInicio: '2027-08-01',
+              periodoFin: '2027-09-01',
+              monto: 1000,
+            }],
+          },
+          {
+            tipo: TipoRubro.BienesDeConsumo,
+            subtotal: 5000,
+            partidas: [{ descripcion: 'Papel', cantidad: 10, precioUnitario: 500, monto: 5000 }],
+          },
+          {
+            tipo: TipoRubro.BienesDeUso,
+            subtotal: 100,
+            partidas: [{ descripcion: 'Equipo', cantidad: 1, precioUnitario: 100, monto: 100 }],
+          },
+        ],
+      };
+      const convocatoriaConTope = {
+        ...convocatoriaConEjecucion, topePresupuestoNoConsolidado: 5000, topePresupuestoConsolidado: 50000,
+      } as unknown as Convocatoria;
+      findOneEdicion.mockResolvedValue(
+        edicion({
+          convocatoria: convocatoriaConTope, presupuestoSolicitado: presupuestoCompleto,
+        } as unknown as Partial<Edicion>),
+      );
+
+      await expect(
+        service.enviarEdicion('proyecto-1', 'edicion-1', docenteValidado),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveEdicion).not.toHaveBeenCalled();
+    });
   });
 
   describe('actualizarEdicion — permisos de autoridad', () => {
@@ -287,6 +362,7 @@ describe('ProyectosService', () => {
 
     beforeEach(() => {
       findOneManager.mockResolvedValue(convocatoria);
+      findManager.mockResolvedValue([{ id: 'convocatoria-1', anio: 2026 }]);
       findOneProyecto.mockResolvedValue(proyecto);
       findEdiciones.mockResolvedValue([]);
       saveEdicion.mockResolvedValue(undefined);

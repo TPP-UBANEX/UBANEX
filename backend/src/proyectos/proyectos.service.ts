@@ -23,12 +23,20 @@ import { PaginatedResponse } from '../common/interfaces/paginated-response.inter
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
-import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
+import {
+  motivoTopeExcedido,
+  normalizarPresupuesto,
+  presupuestoIncompletoParaEnvio,
+  topePresupuestoSolicitado,
+  validarPresupuesto,
+} from './presupuesto.util';
 import {
   ordenarConvocatorias,
   calcularConsolidacion,
   esConsolidadoEfectivo,
+  esConsolidadoParaTope,
   salteaEvaluacionEfectivo,
+  DatosConsolidacion,
   EdicionHistorial,
 } from './consolidacion';
 
@@ -389,6 +397,28 @@ export class ProyectosService {
     return [...poolIds];
   }
 
+  /**
+   * Datos de consolidación (racha, derivada, histórico) del proyecto para una convocatoria
+   * puntual. Usado fuera de obtenerProyecto (que ya arma convocatoriasOrdenadas/historial una
+   * sola vez para todas las ediciones): al guardar el presupuesto y al validar el envío.
+   */
+  private async calcularDatosConsolidacion(
+    proyectoId: string,
+    convocatoriaId: string,
+  ): Promise<DatosConsolidacion> {
+    const convocatorias = await this.edicionRepo.manager.find(Convocatoria, {
+      select: { id: true, anio: true },
+    });
+    const convocatoriasOrdenadas = ordenarConvocatorias(convocatorias);
+    const historial: EdicionHistorial[] = (
+      await this.edicionRepo.find({
+        where: { proyectoId },
+        select: { convocatoriaId: true, estado: true },
+      })
+    ).map(e => ({ convocatoriaId: e.convocatoriaId, estado: e.estado }));
+    return calcularConsolidacion(convocatoriasOrdenadas, historial, convocatoriaId);
+  }
+
   async obtenerProyecto(id: string) {
     const proyecto = await this.proyectoRepo.findOne({
       where: { id },
@@ -418,11 +448,14 @@ export class ProyectosService {
     const indice = (convId: string) => convocatoriasOrdenadas.findIndex(c => c.id === convId);
     const edicionesEnriquecidas = ediciones.map(e => {
       const datos = calcularConsolidacion(convocatoriasOrdenadas, historial, e.convocatoriaId);
+      const esConsolidadoParaTopeEdicion = esConsolidadoParaTope(datos, proyecto.esConsolidado);
       return {
         ...e,
         rachaAdjudicaciones: datos.rachaAdjudicaciones,
         esConsolidadoDerivado: datos.esConsolidadoDerivado,
         salteaEvaluacion: salteaEvaluacionEfectivo(datos, proyecto.esConsolidado),
+        esConsolidadoParaTope: esConsolidadoParaTopeEdicion,
+        topePresupuestoSolicitado: topePresupuestoSolicitado(e.convocatoria, esConsolidadoParaTopeEdicion),
       };
     });
 
@@ -433,12 +466,13 @@ export class ProyectosService {
           historial,
           ediciones.reduce((a, b) => (indice(b.convocatoriaId) > indice(a.convocatoriaId) ? b : a)).convocatoriaId,
         )
-      : { rachaAdjudicaciones: 0, esConsolidadoDerivado: false, salteaEvaluacion: false };
+      : { rachaAdjudicaciones: 0, esConsolidadoDerivado: false, salteaEvaluacion: false, fueConsolidadoAlgunaVez: false };
 
     return {
       ...proyecto,
       esConsolidadoDerivado: datosUltima.esConsolidadoDerivado,
       esConsolidadoEfectivo: esConsolidadoEfectivo(datosUltima, proyecto.esConsolidado),
+      fueConsolidadoAlgunaVez: datosUltima.fueConsolidadoAlgunaVez,
       rachaAdjudicaciones: datosUltima.rachaAdjudicaciones,
       ediciones: edicionesEnriquecidas,
     };
@@ -499,7 +533,17 @@ export class ProyectosService {
 
     if (dto.presupuestoSolicitado !== undefined) {
       validarPresupuesto(dto.presupuestoSolicitado);
-      edicion.presupuestoSolicitado = normalizarPresupuesto(dto.presupuestoSolicitado);
+      const presupuesto = normalizarPresupuesto(dto.presupuestoSolicitado);
+      const proyectoParaTope = await this.proyectoRepo.findOne({
+        where: { id: proyectoId },
+        select: { id: true, esConsolidado: true },
+      });
+      const datos = await this.calcularDatosConsolidacion(proyectoId, edicion.convocatoriaId);
+      const esConsolidado = esConsolidadoParaTope(datos, proyectoParaTope?.esConsolidado ?? null);
+      const tope = topePresupuestoSolicitado(edicion.convocatoria, esConsolidado);
+      const motivoExcedido = motivoTopeExcedido(presupuesto, tope, esConsolidado);
+      if (motivoExcedido) throw new BadRequestException(motivoExcedido);
+      edicion.presupuestoSolicitado = presupuesto;
     }
 
     if (dto.datosFormulario !== undefined) {
@@ -553,9 +597,16 @@ export class ProyectosService {
       );
     }
 
+    const proyectoParaTope = await this.proyectoRepo.findOne({
+      where: { id: edicion.proyectoId },
+      select: { id: true, esConsolidado: true },
+    });
+    const datosConsolidacion = await this.calcularDatosConsolidacion(edicion.proyectoId, edicion.convocatoriaId);
+    const esConsolidado = esConsolidadoParaTope(datosConsolidacion, proyectoParaTope?.esConsolidado ?? null);
     const presupuestoIncompleto = presupuestoIncompletoParaEnvio(
       edicion.presupuestoSolicitado,
       edicion.convocatoria,
+      esConsolidado,
     );
     if (presupuestoIncompleto.length > 0) {
       motivos.push(`Presupuesto: ${presupuestoIncompleto.join(', ')}`);
