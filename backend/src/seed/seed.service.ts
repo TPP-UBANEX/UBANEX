@@ -3199,7 +3199,7 @@ export class SeedService {
       const valorSugerido = Math.round(valorActual * 0.8 * 100) / 100;
 
       return {
-        campo: `presupuesto.rubros[${rubroIdx}].partidas[${partidaIdx}].${campoNumerico}`,
+        campo: `${PREFIJO_RUTA_PRESUPUESTO}rubros[${rubroIdx}].partidas[${partidaIdx}].${campoNumerico}`,
         valorActual,
         valorSugerido,
       };

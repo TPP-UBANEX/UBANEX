@@ -42,15 +42,15 @@ const FORMATO_RUTA_RUBRO = /^rubros\[(\d+)\]$/;
 
 /**
  * Prefijo de las rutas de sugerencias sobre el presupuesto (ver sugerencias.service.ts), tal como
- * quedaron persistidas en `sugerencia.campo` antes del rename de `Edicion.presupuesto` a
- * `Edicion.presupuestoSolicitado`. Se mantiene sin cambios a propósito: es un formato de datos ya
- * guardado, no el nombre de la columna.
+ * quedan persistidas en `sugerencia_cambio.campo`. Acompaña al nombre de la columna
+ * `Edicion.presupuestoSolicitado`; las filas que quedaron con el prefijo viejo (`presupuesto.`) se
+ * migraron en <epoch>-prefijo-ruta-presupuesto-solicitado.ts.
  */
-export const PREFIJO_RUTA_PRESUPUESTO = 'presupuesto.';
+export const PREFIJO_RUTA_PRESUPUESTO = 'presupuestoSolicitado.';
 
 /**
- * Interpreta una ruta relativa a `presupuesto.` (sin ese prefijo) como el campo de una partida.
- * Solo reconoce campos de la whitelist: `subtotal` y `montoTotal` quedan afuera porque son
+ * Interpreta una ruta relativa a `presupuestoSolicitado.` (sin ese prefijo) como el campo de una
+ * partida. Solo reconoce campos de la whitelist: `subtotal` y `montoTotal` quedan afuera porque son
  * derivados y se recalculan al aplicar el cambio.
  */
 export function parsearRutaPartida(
@@ -64,8 +64,9 @@ export function parsearRutaPartida(
 }
 
 /**
- * Una ruta relativa a `presupuesto.` (sin ese prefijo) que apunta a un rubro completo (no a un
- * campo de una partida) solo admite un comentario: sirve para pedir agregar o quitar partidas.
+ * Una ruta relativa a `presupuestoSolicitado.` (sin ese prefijo) que apunta a un rubro completo
+ * (no a un campo de una partida) solo admite un comentario: sirve para pedir agregar o quitar
+ * partidas.
  */
 export function esRutaComentarioPresupuesto(presupuesto: Presupuesto | null, path: string): boolean {
   const match = FORMATO_RUTA_RUBRO.exec(path);
@@ -75,10 +76,10 @@ export function esRutaComentarioPresupuesto(presupuesto: Presupuesto | null, pat
 }
 
 /**
- * Etiqueta legible de una ruta relativa a `presupuesto.` (sin ese prefijo), para mostrar en la
- * lista de sugerencias y en las notificaciones. Se degrada con gracia: si la partida referenciada
- * ya no tiene descripción cargada, omite las comillas; si la ruta no matchea ningún patrón
- * conocido, devuelve la ruta cruda como antes.
+ * Etiqueta legible de una ruta relativa a `presupuestoSolicitado.` (sin ese prefijo), para mostrar
+ * en la lista de sugerencias y en las notificaciones. Se degrada con gracia: si la partida
+ * referenciada ya no tiene descripción cargada, omite las comillas; si la ruta no matchea ningún
+ * patrón conocido, devuelve la ruta cruda como antes.
  */
 export function etiquetaCampoPresupuesto(presupuesto: Presupuesto | null, path: string): string {
   const rutaPartida = parsearRutaPartida(path);

@@ -120,7 +120,7 @@ describe('SugerenciasService', () => {
 
       await expect(
         service.crear('edicion-1', {
-          campo: 'presupuesto.rubros[0].subtotal',
+          campo: 'presupuestoSolicitado.rubros[0].subtotal',
           comentario: 'esto no debería aceptarse',
         }, rectorado),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -132,7 +132,7 @@ describe('SugerenciasService', () => {
 
       await expect(
         service.crear('edicion-1', {
-          campo: 'presupuesto.rubros[0].partidas[5].monto',
+          campo: 'presupuestoSolicitado.rubros[0].partidas[5].monto',
           valorSugerido: '500',
           comentario: 'la partida 5 no existe',
         }, rectorado),
@@ -145,7 +145,7 @@ describe('SugerenciasService', () => {
 
       await expect(
         service.crear('edicion-1', {
-          campo: 'presupuesto.rubros[1].partidas[0].monto',
+          campo: 'presupuestoSolicitado.rubros[1].partidas[0].monto',
           valorSugerido: '9999',
           comentario: 'intento de mentir el monto de un bien',
         }, rectorado),
@@ -158,7 +158,7 @@ describe('SugerenciasService', () => {
 
       await expect(
         service.crear('edicion-1', {
-          campo: 'presupuesto.rubros[0]',
+          campo: 'presupuestoSolicitado.rubros[0]',
           comentario: 'faltaría una partida de seguros acá',
         }, rectorado),
       ).resolves.not.toThrow();
@@ -174,7 +174,7 @@ describe('SugerenciasService', () => {
         edicionId: ed.id,
         edicion: ed,
         sugeridoPorId: 'u-secretaria',
-        campo: 'presupuesto.rubros[0].partidas[0].monto',
+        campo: 'presupuestoSolicitado.rubros[0].partidas[0].monto',
         valorActual: '1000',
         valorSugerido: '2000',
         comentario: 'ajustar el monto',
