@@ -9,6 +9,7 @@ import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
+import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Formulario } from '../formularios/formulario.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
@@ -60,6 +61,8 @@ export class ProyectosService {
     private readonly emparejamientoRepo: Repository<Emparejamiento>,
     @InjectRepository(Formulario)
     private readonly formularioRepo: Repository<Formulario>,
+    @InjectRepository(EvaluacionInstitucional)
+    private readonly institucionalRepo: Repository<EvaluacionInstitucional>,
   ) {}
 
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
@@ -294,9 +297,22 @@ export class ProyectosService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
-  async listarTodas(usuario: Usuario, convocatoriaId?: string): Promise<Edicion[]> {
+  /**
+   * `esPse` (calculado, no persistido en Edicion): viene de la evaluación institucional
+   * (EvaluacionInstitucional.esPse), no del proyecto. Alimenta el cálculo del presupuesto a
+   * adjudicar en la pantalla de orden de mérito (ver presupuesto.util.ts#calcularPresupuestoAAdjudicar).
+   */
+  async listarTodas(usuario: Usuario, convocatoriaId?: string): Promise<(Edicion & { esPse: boolean })[]> {
     const query = await this.buildListado(usuario, { convocatoriaId });
-    return query.getMany();
+    const ediciones = await query.getMany();
+    if (ediciones.length === 0) return [];
+
+    const institucionales = await this.institucionalRepo.find({
+      where: { edicionId: In(ediciones.map((e) => e.id)) },
+      select: { edicionId: true, esPse: true },
+    });
+    const esPsePorEdicion = new Map(institucionales.map((i) => [i.edicionId, i.esPse === true]));
+    return ediciones.map((e) => ({ ...e, esPse: esPsePorEdicion.get(e.id) ?? false }));
   }
 
   async proyectosDisponiblesParaResubir(usuario: Usuario, convocatoriaId: string, search?: string) {
