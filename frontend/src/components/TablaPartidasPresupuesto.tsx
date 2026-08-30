@@ -20,7 +20,7 @@ interface Props {
   handlers?: {
     removePartida: (rubroIdx: number, partidaIdx: number) => void
     updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
-    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
+    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number | boolean) => void
   }
   sugerencia?: {
     activo: boolean
@@ -52,7 +52,7 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
 
   const columnas = esViatico
     ? ['Tipo', 'Descripción', 'Inicio', 'Fin', 'Monto']
-    : ['Descripción', 'Cantidad', 'Precio unit.', 'Monto']
+    : ['Descripción', 'Cantidad', 'Precio unit.', 'Monto', 'Insumo']
   const colSpan = columnas.length + (editando ? 1 : 0)
 
   // Ancho por columna: evita que "Descripción" (la única sin ancho fijo) le quite todo el
@@ -65,6 +65,7 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
     Cantidad: 'w-24',
     'Precio unit.': 'w-32',
     Monto: 'w-32',
+    Insumo: 'w-20 text-center',
   }
 
   const celdaSugerible = (pIdx: number, campo: string, valorActual: string, contenido: React.ReactNode) => (
@@ -172,6 +173,14 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
                     <TableCell>
                       <Input type="number" value={p.monto || ''} disabled className="bg-muted" />
                     </TableCell>
+                    <TableCell className="text-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300"
+                        checked={p.esInsumo === true}
+                        onChange={e => handlers.updateBien(rubroIdx, pIdx, 'esInsumo', e.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
                         <Trash2 className="h-4 w-4" />
@@ -184,6 +193,9 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
                     <TableCell>{celdaSugerible(pIdx, 'cantidad', String(p.cantidad), p.cantidad)}</TableCell>
                     <TableCell>{celdaSugerible(pIdx, 'precioUnitario', String(p.precioUnitario), formatearMoneda(p.precioUnitario))}</TableCell>
                     <TableCell>{formatearMoneda(p.monto)}</TableCell>
+                    <TableCell className="text-center">
+                      {celdaSugerible(pIdx, 'esInsumo', String(p.esInsumo === true), p.esInsumo === true ? 'Sí' : 'No')}
+                    </TableCell>
                   </>
                 )}
               </TableRow>

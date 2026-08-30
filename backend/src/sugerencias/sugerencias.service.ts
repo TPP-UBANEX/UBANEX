@@ -366,7 +366,9 @@ export class SugerenciasService {
 
     const valor = ['monto', 'cantidad', 'precioUnitario'].includes(ruta.campo)
       ? Number(valorSugerido)
-      : valorSugerido;
+      : ruta.campo === 'esInsumo'
+        ? valorSugerido === 'true'
+        : valorSugerido;
     if (typeof valor === 'number' && !Number.isFinite(valor)) {
       throw new BadRequestException('El valor sugerido debe ser un número válido');
     }
@@ -501,12 +503,18 @@ export class SugerenciasService {
           'El monto de un bien se calcula solo: sugerí un cambio en la cantidad o el precio unitario',
         );
       }
+      if (ruta.campo === 'esInsumo' && rubro.tipo === TipoRubro.ViaticosYSeguros) {
+        throw new BadRequestException('Una partida de Viáticos y Seguros no puede marcarse como insumo');
+      }
       if (valorSugerido == null) return;
       if (
         ['monto', 'cantidad', 'precioUnitario'].includes(ruta.campo)
         && (valorSugerido.trim() === '' || !Number.isFinite(Number(valorSugerido)))
       ) {
         throw new BadRequestException('El valor sugerido debe ser un número válido');
+      }
+      if (ruta.campo === 'esInsumo' && valorSugerido !== 'true' && valorSugerido !== 'false') {
+        throw new BadRequestException('El valor sugerido debe ser "Sí" o "No"');
       }
       return;
     }

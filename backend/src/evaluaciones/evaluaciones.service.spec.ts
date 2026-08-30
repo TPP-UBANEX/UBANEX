@@ -376,7 +376,7 @@ describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', ()
       save: jest.fn(async (e: any) => e),
     };
     const convocatoriaRepo = { findOne: jest.fn().mockResolvedValue(convocatoria) };
-    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const dummy = { find: jest.fn().mockResolvedValue([]), save: jest.fn(), findOne: jest.fn() };
     const svc = new EvaluacionesService(
       dummy as any,
       dummy as any,

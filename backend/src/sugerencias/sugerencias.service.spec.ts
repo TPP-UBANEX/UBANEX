@@ -170,6 +170,45 @@ describe('SugerenciasService', () => {
       ).resolves.not.toThrow();
       expect(saveSugerencia).toHaveBeenCalledTimes(1);
     });
+
+    it('rechaza sugerir esInsumo sobre una partida de Viáticos y Seguros', async () => {
+      findOneEdicion.mockResolvedValue(edicion());
+
+      await expect(
+        service.crear('edicion-1', {
+          campo: 'presupuestoSolicitado.rubros[0].partidas[0].esInsumo',
+          valorSugerido: 'true',
+          comentario: 'un viático no puede ser insumo',
+        }, rectorado),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveSugerencia).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un valor sugerido de esInsumo que no sea "true"/"false"', async () => {
+      findOneEdicion.mockResolvedValue(edicion());
+
+      await expect(
+        service.crear('edicion-1', {
+          campo: 'presupuestoSolicitado.rubros[1].partidas[0].esInsumo',
+          valorSugerido: 'si',
+          comentario: 'valor inválido',
+        }, rectorado),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveSugerencia).not.toHaveBeenCalled();
+    });
+
+    it('acepta sugerir esInsumo sobre una partida de bienes', async () => {
+      findOneEdicion.mockResolvedValue(edicion());
+
+      await expect(
+        service.crear('edicion-1', {
+          campo: 'presupuestoSolicitado.rubros[1].partidas[0].esInsumo',
+          valorSugerido: 'true',
+          comentario: 'esto sí es un insumo',
+        }, rectorado),
+      ).resolves.not.toThrow();
+      expect(saveSugerencia).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('responder — aceptar una sugerencia de monto', () => {
@@ -222,6 +261,30 @@ describe('SugerenciasService', () => {
         service.responder('sugerencia-1', { estado: EstadoSugerencia.Aceptada }, rectorado),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(saveEdicion).not.toHaveBeenCalled();
+    });
+
+    it('al aceptar esInsumo, guarda un booleano y no el string "true"', async () => {
+      const ed = edicion();
+      const sugerencia = {
+        id: 'sugerencia-1',
+        edicionId: ed.id,
+        edicion: ed,
+        sugeridoPorId: 'u-secretaria',
+        campo: 'presupuestoSolicitado.rubros[1].partidas[0].esInsumo',
+        valorActual: 'false',
+        valorSugerido: 'true',
+        comentario: 'esto es un insumo',
+        estado: EstadoSugerencia.Pendiente,
+      } as unknown as SugerenciaCambio;
+      findOneSugerencia.mockResolvedValue(sugerencia);
+
+      await service.responder('sugerencia-1', { estado: EstadoSugerencia.Aceptada }, rectorado);
+
+      expect(saveEdicion).toHaveBeenCalledTimes(1);
+      const guardada = (saveEdicion.mock.calls[0] as unknown as [Edicion])[0];
+      const presupuesto = guardada.presupuestoSolicitado as Presupuesto;
+      const partida = presupuesto.rubros[1].partidas[0] as unknown as { esInsumo: unknown };
+      expect(partida.esInsumo).toBe(true);
     });
   });
 });

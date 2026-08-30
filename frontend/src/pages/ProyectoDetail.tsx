@@ -48,6 +48,11 @@ const OPCIONES_TIPO_PERSONA = [
   { value: TipoPersona.Estudiante, label: 'Estudiante' },
 ]
 
+const OPCIONES_ES_INSUMO = [
+  { value: 'true', label: 'Sí' },
+  { value: 'false', label: 'No' },
+]
+
 const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'autoevaluacion', 'informe-final', 'sugerencias']
 
 interface ModalConfigSugerencia {
@@ -133,6 +138,7 @@ export function ProyectoDetail() {
       const ruta = parsearRutaPartida(sugerenciaModal.campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''))
       if (!ruta) return { soloComentario: true }
       if (ruta.campo === 'tipoPersona') return { opciones: OPCIONES_TIPO_PERSONA }
+      if (ruta.campo === 'esInsumo') return { opciones: OPCIONES_ES_INSUMO }
       if (ruta.campo === 'monto' || ruta.campo === 'precioUnitario') return { tipoInput: 'number', min: 0, step: 'any' }
       if (ruta.campo === 'cantidad') return { tipoInput: 'number', min: 1, step: 1 }
       if (ruta.campo === 'periodoInicio' || ruta.campo === 'periodoFin') return { tipoInput: 'date' }
@@ -423,7 +429,7 @@ export function ProyectoDetail() {
     setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
 
-  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
+  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number | boolean) => {
     if (!editPresupuesto) return
     const rubros = [...editPresupuesto.rubros]
     const rubro = { ...rubros[rubroIdx] }
@@ -943,7 +949,7 @@ function renderPresupuesto(
     addPartida: (rubroIdx: number, tipo: TipoRubro) => void
     removePartida: (rubroIdx: number, partidaIdx: number) => void
     updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
-    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
+    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number | boolean) => void
   },
   sugerencia?: {
     activo: boolean
