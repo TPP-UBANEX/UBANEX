@@ -55,6 +55,12 @@ const OPCIONES_ES_INSUMO = [
 
 const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'autoevaluacion', 'informe-final', 'sugerencias']
 
+/** Antepone https:// si el link no trae protocolo, para que no se resuelva como ruta relativa. */
+const conProtocolo = (url: string) => {
+  const u = url.trim()
+  return /^https?:\/\//i.test(u) ? u : `https://${u}`
+}
+
 interface ModalConfigSugerencia {
   multilinea?: boolean
   maxLongitud?: number
@@ -87,6 +93,9 @@ export function ProyectoDetail() {
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
   const [iniciandoEvaluacion, setIniciandoEvaluacion] = useState(false)
+  const [avalInput, setAvalInput] = useState('')
+  const [avalModo, setAvalModo] = useState<'si' | 'no'>('no')
+  const [guardandoAval, setGuardandoAval] = useState(false)
 
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
@@ -166,6 +175,9 @@ export function ProyectoDetail() {
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
   )
   const esRectorado = user?.roles.some(r => r === RolUsuario.AutoridadDeRectorado)
+  const esRectoradoAmplio = user?.roles.some(
+    r => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+  )
   const puedeAsignarDirector = user?.roles.some(r =>
     [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria, RolUsuario.AutoridadDeRectorado].includes(r),
   )
@@ -280,6 +292,11 @@ export function ProyectoDetail() {
       .catch(() => toast.error('Error al cargar sugerencias'))
   }, [modoSugerencia, edicion?.id, user?.id])
 
+  useEffect(() => {
+    setAvalInput(edicion?.avalUrl ?? '')
+    setAvalModo(edicion?.avalUrl ? 'si' : 'no')
+  }, [edicion?.id, edicion?.avalUrl])
+
   const direccion = useDireccionEdicion({ proyecto, edicion, directores, uas })
 
   const iniciarEdicion = () => {
@@ -307,6 +324,21 @@ export function ProyectoDetail() {
       cargarDatos()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al actualizar el consolidado')
+    }
+  }
+
+  const guardarAval = async () => {
+    if (!id || !edicion) return
+    setGuardandoAval(true)
+    try {
+      const nuevoValor = avalModo === 'si' && avalInput.trim() ? conProtocolo(avalInput) : null
+      await api.proyectos.actualizarAval(id, edicion.id, { avalUrl: nuevoValor })
+      toast.success('Aval actualizado')
+      cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar el aval')
+    } finally {
+      setGuardandoAval(false)
     }
   }
 
@@ -554,7 +586,7 @@ export function ProyectoDetail() {
               </TooltipProvider>
             </>
           )}
-          {!editando && esSecretariaMismaUA && !modoSugerencia && edicion?.estado === EstadoEdicion.Presentado && (
+          {!editando && (esSecretariaMismaUA || esRectoradoAmplio) && !modoSugerencia && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios].includes(edicion?.estado as EstadoEdicion) && (
             <Button variant="outline" onClick={() => setModoSugerencia(true)}>
               <MessageSquare className="h-4 w-4 mr-2" />Sugerir
             </Button>
@@ -564,7 +596,7 @@ export function ProyectoDetail() {
               <X className="h-4 w-4 mr-2" />Cancelar sugerencia
             </Button>
           )}
-          {!editando && esSecretariaMismaUA && edicion?.estado === EstadoEdicion.Presentado && edicion.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
+          {!editando && esRectoradoAmplio && edicion?.estado === EstadoEdicion.Presentado && edicion.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
             <>
               <Button
                 onClick={async () => {
@@ -572,10 +604,10 @@ export function ProyectoDetail() {
                   try {
                     setIniciandoEvaluacion(true)
                     await api.proyectos.iniciarEvaluacion(id, edicion.id)
-                    toast.success('Evaluación iniciada')
+                    toast.success('Edición pasada a evaluación')
                     cargarDatos()
                   } catch {
-                    toast.error('No se pudo iniciar la evaluación')
+                    toast.error('No se pudo pasar la edición a evaluación')
                   } finally {
                     setIniciandoEvaluacion(false)
                   }
@@ -583,7 +615,7 @@ export function ProyectoDetail() {
                 disabled={iniciandoEvaluacion}
               >
                 {iniciandoEvaluacion ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Iniciar evaluación
+                Pasar a evaluación
               </Button>
             </>
           )}
@@ -703,6 +735,37 @@ export function ProyectoDetail() {
                       </CampoSugerible>
                     </div>
                     <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
+                    <div>
+                      <span className="text-muted-foreground">Tiene aval:</span>{' '}
+                      {edicion?.avalUrl
+                        ? <a href={conProtocolo(edicion.avalUrl)} target="_blank" rel="noreferrer" className="text-primary underline">Sí — ver aval</a>
+                        : 'No'}
+                      {esSecretariaMismaUA && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios, EstadoEdicion.EnEvaluacion].includes(edicion?.estado as EstadoEdicion) && (
+                        <div className="mt-1 space-y-1">
+                          <div className="flex gap-1">
+                            <Button type="button" size="sm" variant={avalModo === 'si' ? 'default' : 'outline'} onClick={() => setAvalModo('si')}>Sí</Button>
+                            <Button type="button" size="sm" variant={avalModo === 'no' ? 'default' : 'outline'} onClick={() => setAvalModo('no')}>No</Button>
+                          </div>
+                          {avalModo === 'si' && (
+                            <Input
+                              className="h-8 text-xs"
+                              placeholder="https://..."
+                              maxLength={2048}
+                              value={avalInput}
+                              onChange={e => setAvalInput(e.target.value)}
+                            />
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={guardarAval}
+                            disabled={guardandoAval || (avalModo === 'si' && !avalInput.trim())}
+                          >
+                            {guardandoAval ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <span className="text-muted-foreground">Consolidado:</span>{' '}
                       {proyecto.esConsolidadoEfectivo ? 'Sí' : 'No'}

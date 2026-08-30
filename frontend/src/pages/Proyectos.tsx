@@ -23,8 +23,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria, PaginatedResponse, Hito } from '@/data/types'
-import { estadoBadge, estadoEdicionLabel, EstadoEdicion, RolUsuario, categoriaHitoLabel } from '@/data/types'
+import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario, categoriaHitoLabel } from '@/data/types'
 import { formatearMoneda } from '@/lib/presupuesto'
+import { toast } from 'sonner'
 import { Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 
 const pipelineColumns = [
@@ -57,6 +58,8 @@ export function Proyectos() {
   const [expandidaId, setExpandidaId] = useState<string | null>(null)
   const [hitosExpansion, setHitosExpansion] = useState<Record<string, Hito[]>>({})
   const [loadingHitosId, setLoadingHitosId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [pasandoEvaluacionId, setPasandoEvaluacionId] = useState<string | null>(null)
 
   const esAdmin = user?.roles.some(r =>
     r === RolUsuario.AutoridadDeSecretaria ||
@@ -64,6 +67,22 @@ export function Proyectos() {
     r === RolUsuario.AutoridadDeRectorado ||
     r === RolUsuario.AsistenteDeRectorado,
   )
+  const esRectorado = user?.roles.some(r =>
+    r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+  )
+
+  const pasarAEvaluacion = async (e: Edicion) => {
+    setPasandoEvaluacionId(e.id)
+    try {
+      await api.proyectos.iniciarEvaluacion(e.proyectoId, e.id)
+      toast.success('Edición pasada a evaluación')
+      setRefreshKey(k => k + 1)
+    } catch {
+      toast.error('No se pudo pasar la edición a evaluación')
+    } finally {
+      setPasandoEvaluacionId(null)
+    }
+  }
 
   const toggleExpandir = async (edicionId: string) => {
     if (expandidaId === edicionId) {
@@ -118,7 +137,7 @@ export function Proyectos() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [page, debouncedSearch, filtroEtapa, filtroConv, filtroAnio, vista])
+  }, [page, debouncedSearch, filtroEtapa, filtroConv, filtroAnio, vista, refreshKey])
 
   useEffect(() => {
     if (vista !== 'kanban') return
@@ -245,7 +264,19 @@ export function Proyectos() {
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                           <TableCell className="text-sm">{formatearMoneda(e.presupuestoSolicitado?.montoTotal)}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
+                            <div className="flex gap-1 justify-end">
+                              {esRectorado && e.estado === EstadoEdicion.Presentado && e.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={pasandoEvaluacionId === e.id}
+                                  onClick={e2 => { e2.stopPropagation(); pasarAEvaluacion(e) }}
+                                >
+                                  Pasar a evaluación
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                         {expandidaId === e.id && (

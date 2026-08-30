@@ -308,6 +308,7 @@ export interface Edicion {
   presupuestoSolicitado?: Presupuesto;
   anioEdicion?: number;
   datosFormulario?: Record<string, unknown>;
+  avalUrl?: string | null;
   ordenMerito?: number | null;
   adjudicacionPropuesta?: boolean | null;
   mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
@@ -318,6 +319,7 @@ export interface Edicion {
   esConsolidadoDerivado?: boolean;
   salteaEvaluacion?: boolean;
   rachaAdjudicaciones?: number;
+  tieneAval?: boolean;
   // Consolidación irreversible a efectos del tope de presupuesto (ver esConsolidadoParaTope), y
   // el tope resultante para esta edición según ese cálculo. null = sin tope configurado.
   esConsolidadoParaTope?: boolean;

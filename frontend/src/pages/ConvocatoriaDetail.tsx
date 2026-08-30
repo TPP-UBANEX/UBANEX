@@ -43,6 +43,7 @@ import {
   estadoConvocatoriaLabel,
   estadoEdicionLabel,
   EstadoEdicion,
+  EstadoConvocatoria,
   RolUsuario,
   RolEjecucion,
 } from '@/data/types';
@@ -154,6 +155,21 @@ export function ConvocatoriaDetail() {
   );
   const esAutoridadRectorado = user?.roles.includes(RolUsuario.AutoridadDeRectorado);
   const errores = erroresFechas(editForm);
+
+  const [pasandoEvaluacionId, setPasandoEvaluacionId] = useState<string | null>(null);
+
+  const pasarAEvaluacion = async (e: Edicion) => {
+    setPasandoEvaluacionId(e.id);
+    try {
+      await api.proyectos.iniciarEvaluacion(e.proyectoId, e.id);
+      toast.success('Edición pasada a evaluación');
+      setRefreshKey((k) => k + 1);
+    } catch {
+      toast.error('No se pudo pasar la edición a evaluación');
+    } finally {
+      setPasandoEvaluacionId(null);
+    }
+  };
 
   const esEvaluadorActivo = invitacionEvaluador !== null;
 
@@ -1095,18 +1111,35 @@ export function ConvocatoriaDetail() {
                             {formatearMoneda(e.presupuestoSolicitado?.montoTotal)}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e2) => {
-                                e2.stopPropagation();
-                                navigate(
-                                  `/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`,
-                                );
-                              }}
-                            >
-                              Ver
-                            </Button>
+                            <div className="flex gap-1 justify-end">
+                              {esRectorado &&
+                                conv?.estado === EstadoConvocatoria.Evaluacion &&
+                                e.estado === EstadoEdicion.Presentado && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={pasandoEvaluacionId === e.id}
+                                    onClick={(e2) => {
+                                      e2.stopPropagation();
+                                      pasarAEvaluacion(e);
+                                    }}
+                                  >
+                                    Pasar a evaluación
+                                  </Button>
+                                )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e2) => {
+                                  e2.stopPropagation();
+                                  navigate(
+                                    `/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`,
+                                  );
+                                }}
+                              >
+                                Ver
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

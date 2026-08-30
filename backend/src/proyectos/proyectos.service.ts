@@ -8,6 +8,7 @@ import { Edicion } from './edicion.entity';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
+import { ActualizarAvalDto } from './dto/actualizar-aval.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
@@ -470,6 +471,7 @@ export class ProyectosService {
         rachaAdjudicaciones: datos.rachaAdjudicaciones,
         esConsolidadoDerivado: datos.esConsolidadoDerivado,
         salteaEvaluacion: salteaEvaluacionEfectivo(datos, proyecto.esConsolidado),
+        tieneAval: !!e.avalUrl,
         esConsolidadoParaTope: esConsolidadoParaTopeEdicion,
         topePresupuestoSolicitado: topePresupuestoSolicitado(e.convocatoria, esConsolidadoParaTopeEdicion),
       };
@@ -718,12 +720,9 @@ export class ProyectosService {
     const esRectorado = usuario.roles.some(r =>
       [RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado].includes(r),
     );
-    const esSecretariaMismaUA = usuario.roles.some(r =>
-      [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
-    ) && usuario.unidadAcademicaId === edicion.unidadAcademicaId;
-    if (!esRectorado && !esSecretariaMismaUA) {
+    if (!esRectorado) {
       throw new ForbiddenException(
-        'Solo la Secretaría de la Unidad Académica del proyecto o el Rectorado pueden iniciar la evaluación',
+        'Solo el Rectorado puede pasar una edición a evaluación',
       );
     }
 
@@ -749,13 +748,48 @@ export class ProyectosService {
       );
     }
 
-    if (edicion.estado !== EstadoEdicion.Presentado && edicion.estado !== EstadoEdicion.PendienteDeCambios) {
+    if (edicion.estado !== EstadoEdicion.Presentado) {
       throw new BadRequestException(
         `No se puede iniciar la evaluación de una edición en estado ${edicion.estado}`,
       );
     }
 
     edicion.estado = EstadoEdicion.EnEvaluacion;
+    await this.edicionRepo.save(edicion);
+
+    return this.obtenerProyecto(proyectoId);
+  }
+
+  async actualizarAval(
+    proyectoId: string,
+    edicionId: string,
+    dto: ActualizarAvalDto,
+    usuario: Usuario,
+  ) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+
+    const esSecretariaMismaUA =
+      usuario.roles.some(r =>
+        [RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria].includes(r),
+      ) && usuario.unidadAcademicaId === edicion.unidadAcademicaId;
+    if (!esSecretariaMismaUA) {
+      throw new ForbiddenException(
+        'Solo la Secretaría de la Unidad Académica del proyecto puede cargar el aval',
+      );
+    }
+
+    const estadosPermitidos = [
+      EstadoEdicion.Presentado,
+      EstadoEdicion.PendienteDeCambios,
+      EstadoEdicion.EnEvaluacion,
+    ];
+    if (!estadosPermitidos.includes(edicion.estado)) {
+      throw new BadRequestException(
+        `No se puede cargar el aval de una edición en estado ${edicion.estado}`,
+      );
+    }
+
+    edicion.avalUrl = dto.avalUrl?.trim() || null;
     await this.edicionRepo.save(edicion);
 
     return this.obtenerProyecto(proyectoId);

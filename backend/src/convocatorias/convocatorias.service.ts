@@ -168,10 +168,13 @@ export class ConvocatoriasService {
   }
 
   /**
-   * Al pasar a Evaluación, las ediciones presentadas van a `EnEvaluacion`, salvo las
-   * de proyectos consolidados que este año saltean la etapa: esas pasan directo a
-   * `Adjudicado` (fiel a "saltean evaluación y van directo a adjudicación"), lo que
-   * a su vez alimenta la racha de adjudicaciones de las convocatorias siguientes.
+   * Al pasar a Evaluación, las ediciones presentadas NO se mueven automáticamente:
+   * el pase a `EnEvaluacion` lo aprueba Rectorado una por una (ver
+   * `ProyectosService.iniciarEvaluacion`). La única transición automática es la de
+   * los proyectos consolidados que este año saltean la etapa: esas ediciones pasan
+   * directo a `Adjudicado` (fiel a "saltean evaluación y van directo a
+   * adjudicación"), lo que alimenta la racha de adjudicaciones de las convocatorias
+   * siguientes.
    */
   private async aplicarTransicionEvaluacion(convocatoriaId: string): Promise<void> {
     const edicionesAEvaluar = await this.edicionRepo.find({
@@ -208,7 +211,6 @@ export class ConvocatoriasService {
     }
 
     const idsSaltean: string[] = [];
-    const idsEvaluan: string[] = [];
     for (const ed of edicionesAEvaluar) {
       const datos = calcularConsolidacion(
         convocatoriasOrdenadas,
@@ -217,14 +219,9 @@ export class ConvocatoriasService {
       );
       if (salteaEvaluacionEfectivo(datos, overridePorProyecto.get(ed.proyectoId) ?? null)) {
         idsSaltean.push(ed.id);
-      } else {
-        idsEvaluan.push(ed.id);
       }
     }
 
-    if (idsEvaluan.length > 0) {
-      await this.edicionRepo.update({ id: In(idsEvaluan) }, { estado: EstadoEdicion.EnEvaluacion });
-    }
     if (idsSaltean.length > 0) {
       await this.edicionRepo.update({ id: In(idsSaltean) }, { estado: EstadoEdicion.Adjudicado });
     }

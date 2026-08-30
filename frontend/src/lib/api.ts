@@ -291,6 +291,8 @@ export const api = {
         `/proyectos/${id}/ediciones/${edicionId}/iniciar-evaluacion`,
         {},
       ),
+    actualizarAval: (id: string, edicionId: string, data: { avalUrl: string | null }) =>
+      patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/aval`, data),
     eliminarEdicion: (id: string, edicionId: string) =>
       del(`/proyectos/${id}/ediciones/${edicionId}`),
     resubir: (id: string, data: { convocatoriaId: string; anioEdicion?: number }) =>
