@@ -52,7 +52,7 @@ import { EmparejamientoTab } from '@/components/EmparejamientoTab';
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores';
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab';
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab';
-import { formatearMoneda } from '@/lib/presupuesto';
+import { calcularPresupuestoAAdjudicar, formatearMoneda } from '@/lib/presupuesto';
 import {
   ArrowLeft,
   Pencil,
@@ -264,7 +264,8 @@ export function ConvocatoriaDetail() {
       case 'presupuesto-desc':
         base.sort(
           (a, b) =>
-            Number(b.presupuesto?.montoTotal ?? 0) - Number(a.presupuesto?.montoTotal ?? 0) ||
+            calcularPresupuestoAAdjudicar(b.presupuestoSolicitado).total -
+              calcularPresupuestoAAdjudicar(a.presupuestoSolicitado).total ||
             (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
             (a.id < b.id ? -1 : 1),
         );
@@ -272,7 +273,8 @@ export function ConvocatoriaDetail() {
       case 'presupuesto-asc':
         base.sort(
           (a, b) =>
-            Number(a.presupuesto?.montoTotal ?? 0) - Number(b.presupuesto?.montoTotal ?? 0) ||
+            calcularPresupuestoAAdjudicar(a.presupuestoSolicitado).total -
+              calcularPresupuestoAAdjudicar(b.presupuestoSolicitado).total ||
             (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
             (a.id < b.id ? -1 : 1),
         );
@@ -286,7 +288,10 @@ export function ConvocatoriaDetail() {
   const resumenPresupuesto = useMemo(() => {
     const total = Number(conv?.presupuestoTotal ?? 0);
     const adjudicados = todasEdiciones.filter((e) => e.adjudicacionPropuesta);
-    const adjudicado = adjudicados.reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0);
+    const adjudicado = adjudicados.reduce(
+      (s, e) => s + calcularPresupuestoAAdjudicar(e.presupuestoSolicitado).total,
+      0,
+    );
     return {
       total,
       adjudicado,
@@ -348,31 +353,34 @@ export function ConvocatoriaDetail() {
     const filas = todasEdiciones
       .filter((e) => e.ordenMerito != null)
       .sort((a, b) => (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0))
-      .map((e) => [
-        String(e.ordenMerito ?? ''),
-        e.proyecto?.nombre || 'Sin nombre',
-        e.unidadAcademica?.nombre || '-',
-        e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1).replace('.', ',') : '-',
-        e.presupuesto?.montoTotal != null
-          ? Number(e.presupuesto.montoTotal).toFixed(2).replace('.', ',')
-          : '0,00',
-        e.adjudicacionPropuesta === true
-          ? 'Adjudicado'
-          : e.adjudicacionPropuesta === false
-            ? 'No adjudicado'
-            : 'Sin evaluación',
-        e.mecanismoAdjudicacion === 'MERITO'
-          ? 'Mérito'
-          : e.mecanismoAdjudicacion === 'CUOTA_FEDERATIVA'
-            ? 'Cuota federativa'
-            : '—',
-      ]);
+      .map((e) => {
+        const aAdjudicar = calcularPresupuestoAAdjudicar(e.presupuestoSolicitado);
+        return [
+          String(e.ordenMerito ?? ''),
+          e.proyecto?.nombre || 'Sin nombre',
+          e.unidadAcademica?.nombre || '-',
+          e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1).replace('.', ',') : '-',
+          aAdjudicar.solicitado.toFixed(2).replace('.', ','),
+          aAdjudicar.total.toFixed(2).replace('.', ','),
+          e.adjudicacionPropuesta === true
+            ? 'Adjudicado'
+            : e.adjudicacionPropuesta === false
+              ? 'No adjudicado'
+              : 'Sin evaluación',
+          e.mecanismoAdjudicacion === 'MERITO'
+            ? 'Mérito'
+            : e.mecanismoAdjudicacion === 'CUOTA_FEDERATIVA'
+              ? 'Cuota federativa'
+              : '—',
+        ];
+      });
     const cabecera = [
       'Orden',
       'Proyecto',
       'Unidad Académica',
       'Puntaje',
-      'Presupuesto',
+      'Presupuesto solicitado',
+      'Presupuesto a adjudicar',
       'Adjudicación',
       'Mecanismo',
     ];
@@ -397,7 +405,7 @@ export function ConvocatoriaDetail() {
   ) => {
     if (!esRectorado) return;
     if (adjudicado) {
-      const costo = Number(e.presupuesto?.montoTotal ?? 0);
+      const costo = calcularPresupuestoAAdjudicar(e.presupuestoSolicitado).total;
       // Si el proyecto ya está adjudicado, su costo ya está contado en el total
       // adjudicado: al cambiar solo el método no se suma presupuesto nuevo, así
       // que se descuenta del total para chequear solo el presupuesto adicional.
@@ -924,7 +932,7 @@ export function ConvocatoriaDetail() {
                         <TableHead>Facultad</TableHead>
                         <TableHead>Estado</TableHead>
                         {conv?.ordenMeritoConfirmado && <TableHead>Adjudicación</TableHead>}
-                        <TableHead>Presupuesto</TableHead>
+                        <TableHead>Presupuesto solicitado</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -966,7 +974,7 @@ export function ConvocatoriaDetail() {
                             </TableCell>
                           )}
                           <TableCell className="text-sm">
-                            {formatearMoneda(e.presupuesto?.montoTotal)}
+                            {formatearMoneda(e.presupuestoSolicitado?.montoTotal)}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -1055,8 +1063,8 @@ export function ConvocatoriaDetail() {
                     <SelectContent>
                       <SelectItem value="puntaje-desc">Puntaje (mayor a menor)</SelectItem>
                       <SelectItem value="puntaje-asc">Puntaje (menor a mayor)</SelectItem>
-                      <SelectItem value="presupuesto-desc">Presupuesto (mayor a menor)</SelectItem>
-                      <SelectItem value="presupuesto-asc">Presupuesto (menor a mayor)</SelectItem>
+                      <SelectItem value="presupuesto-desc">A adjudicar (mayor a menor)</SelectItem>
+                      <SelectItem value="presupuesto-asc">A adjudicar (menor a mayor)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1098,7 +1106,7 @@ export function ConvocatoriaDetail() {
                     <span className="font-medium text-foreground">
                       {formatearMoneda(resumenPresupuesto.total)}
                     </span>
-                    {' · '}Adjudicado:{' '}
+                    {' · '}Adjudicado (a adjudicar):{' '}
                     <span className="font-medium text-foreground">
                       {formatearMoneda(resumenPresupuesto.adjudicado)}
                     </span>
@@ -1133,13 +1141,16 @@ export function ConvocatoriaDetail() {
                       <TableHead>Proyecto</TableHead>
                       <TableHead>Unidad académica</TableHead>
                       <TableHead className="text-right">Puntaje</TableHead>
-                      <TableHead className="text-right">Presupuesto</TableHead>
+                      <TableHead className="text-right">Solicitado</TableHead>
+                      <TableHead className="text-right">A adjudicar</TableHead>
                         <TableHead>Adjudicación propuesta</TableHead>
                         <TableHead>Mecanismo</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {edicionesMeritoFiltradas.map((e) => (
+                    {edicionesMeritoFiltradas.map((e) => {
+                      const aAdjudicar = calcularPresupuestoAAdjudicar(e.presupuestoSolicitado);
+                      return (
                       <TableRow
                         key={e.id}
                         className="cursor-pointer"
@@ -1160,7 +1171,10 @@ export function ConvocatoriaDetail() {
                           {e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1) : '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatearMoneda(e.presupuesto?.montoTotal)}
+                          {formatearMoneda(aAdjudicar.solicitado)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatearMoneda(aAdjudicar.total)}
                         </TableCell>
                         <TableCell>
                           {e.adjudicacionPropuesta === null ? (
@@ -1173,7 +1187,7 @@ export function ConvocatoriaDetail() {
                               disabled={
                                 !e.adjudicacionPropuesta &&
                                 resumenPresupuesto.total - resumenPresupuesto.adjudicado <
-                                  Number(e.presupuesto?.montoTotal ?? 0)
+                                  aAdjudicar.total
                               }
                               onClick={(ev) => {
                                 ev.stopPropagation();
@@ -1215,7 +1229,8 @@ export function ConvocatoriaDetail() {
                           )}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
                   )}
