@@ -7,6 +7,7 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
+import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { Presupuesto } from './presupuesto.interface';
 
 @Entity()
@@ -49,7 +50,7 @@ export class Edicion {
   anioEdicion: number | null;
 
   @Column({ type: 'json', nullable: true })
-  presupuesto: Presupuesto | null;
+  presupuestoSolicitado: Presupuesto | null;
 
   @Column({ type: 'json', nullable: true })
   datosFormulario: object | null;
@@ -58,6 +59,27 @@ export class Edicion {
   // la edición. Requisito para la adjudicación; no bloquea el pase a evaluación.
   @Column({ type: 'text', nullable: true })
   avalUrl: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  ordenMerito: number | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  adjudicacionPropuesta: boolean | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  mecanismoAdjudicacion?: MecanismoAdjudicacion | null;
+
+  @Column({
+    type: 'numeric',
+    precision: 6,
+    scale: 2,
+    nullable: true,
+    transformer: {
+      to: (v: number | null) => v,
+      from: (v: string | null) => (v == null ? null : Number(v)),
+    },
+  })
+  puntajeMerito: number | null;
 
   @CreateDateColumn()
   creadoEn: Date;

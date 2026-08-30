@@ -152,7 +152,12 @@ export function Evaluacion() {
         vista === 'monitoreo' ? (
           <MonitoreoView key={convocatoriaId} convocatoriaId={convocatoriaId} />
         ) : vista === 'institucional' ? (
-          <InstitucionalView key={convocatoriaId} convocatoriaId={convocatoriaId} user={user} />
+          <InstitucionalView
+            key={convocatoriaId}
+            convocatoriaId={convocatoriaId}
+            convocatoria={convocatorias.find((c) => c.id === convocatoriaId) ?? null}
+            user={user}
+          />
         ) : (
           <CruzadaView key={convocatoriaId} convocatoriaId={convocatoriaId} />
         )
@@ -174,9 +179,11 @@ type RespuestaCategoriasInst = Record<
 
 function InstitucionalView({
   convocatoriaId,
+  convocatoria,
   user,
 }: {
   convocatoriaId: string
+  convocatoria: Convocatoria | null
   user: Usuario | null
 }) {
   const [items, setItems] = useState<EdicionEvaluableInstitucional[]>([])
@@ -194,6 +201,7 @@ function InstitucionalView({
   const [respuestas, setRespuestas] = useState<RespuestaCategoriasInst>({})
   const [checklist, setChecklist] = useState<Record<string, boolean>>({})
   const [observaciones, setObservaciones] = useState('')
+  const [esPse, setEsPse] = useState<boolean | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
@@ -251,6 +259,7 @@ function InstitucionalView({
     setEvaluacion(evaluacion)
     initRespuestas(template?.estructura ?? null, evaluacion)
     setObservaciones(evaluacion?.observaciones ?? '')
+    setEsPse(evaluacion?.esPse ?? null)
     api.evaluaciones.institucionales
       .historial(convocatoriaId, id)
       .then(setHistorial)
@@ -299,6 +308,7 @@ function InstitucionalView({
         categorias,
         checklist,
         observaciones,
+        ...(esPse !== null ? { esPse } : {}),
       })
       toast.success('Borrador de evaluación institucional guardado')
       await seleccionar(edicionId)
@@ -322,6 +332,7 @@ function InstitucionalView({
         categorias,
         checklist,
         observaciones,
+        ...(esPse !== null ? { esPse } : {}),
       })
       await api.evaluaciones.institucionales.confirmar(convocatoriaId, edicionId)
       toast.success('Evaluación institucional confirmada')
@@ -417,6 +428,8 @@ function InstitucionalView({
           <ProyectoEvaluablePanel
             edicion={edicionSeleccionada}
             campos={camposFormulario}
+            convocatoria={convocatoria}
+            esPse={esPse ?? evaluacion?.esPse ?? false}
           />
           <div className="space-y-4">
             <Card>
@@ -556,6 +569,37 @@ function InstitucionalView({
                         ))}
                       </div>
                     )}
+
+                    <div className="space-y-2 rounded-md border border-dashed p-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium">¿Es una Práctica Social Educativa?</p>
+                          <p className="text-xs text-muted-foreground">
+                            Determina un extra sobre el presupuesto a adjudicar, no suma puntaje.
+                          </p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={esPse === true ? 'default' : 'outline'}
+                            disabled={confirmada}
+                            onClick={() => setEsPse(true)}
+                          >
+                            Sí
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={esPse === false ? 'default' : 'outline'}
+                            disabled={confirmada}
+                            onClick={() => setEsPse(false)}
+                          >
+                            No
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">

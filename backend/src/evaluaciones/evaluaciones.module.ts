@@ -8,7 +8,9 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
+import { Notificacion } from '../sugerencias/notificacion.entity';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
+import { MailModule } from '../common/mail/mail.module';
 
 @Module({
   imports: [
@@ -19,8 +21,10 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
       Edicion,
       Emparejamiento,
       ParticipacionConvocatoria,
+      Notificacion,
     ]),
     AuditoriaModule,
+    MailModule,
   ],
   controllers: [EvaluacionesController],
   providers: [EvaluacionesService],

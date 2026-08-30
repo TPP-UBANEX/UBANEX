@@ -37,8 +37,8 @@ import {
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import {
-  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA,
-  normalizarPresupuesto, parsearRutaPartida, presupuestoIncompletoParaEnvio,
+  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, motivoTopeExcedido,
+  normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -46,6 +46,11 @@ import { toast } from 'sonner'
 const OPCIONES_TIPO_PERSONA = [
   { value: TipoPersona.Docente, label: 'Docente' },
   { value: TipoPersona.Estudiante, label: 'Estudiante' },
+]
+
+const OPCIONES_ES_INSUMO = [
+  { value: 'true', label: 'Sí' },
+  { value: 'false', label: 'No' },
 ]
 
 const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'autoevaluacion', 'informe-final', 'sugerencias']
@@ -138,10 +143,11 @@ export function ProyectoDetail() {
   const tipoCampoSugerido = campoSugerido?.tipo ?? null
 
   const modalConfig: ModalConfigSugerencia = ((): ModalConfigSugerencia => {
-    if (sugerenciaModal.campo.startsWith('presupuesto.')) {
-      const ruta = parsearRutaPartida(sugerenciaModal.campo.replace('presupuesto.', ''))
+    if (sugerenciaModal.campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      const ruta = parsearRutaPartida(sugerenciaModal.campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''))
       if (!ruta) return { soloComentario: true }
       if (ruta.campo === 'tipoPersona') return { opciones: OPCIONES_TIPO_PERSONA }
+      if (ruta.campo === 'esInsumo') return { opciones: OPCIONES_ES_INSUMO }
       if (ruta.campo === 'monto' || ruta.campo === 'precioUnitario') return { tipoInput: 'number', min: 0, step: 'any' }
       if (ruta.campo === 'cantidad') return { tipoInput: 'number', min: 1, step: 1 }
       if (ruta.campo === 'periodoInicio' || ruta.campo === 'periodoFin') return { tipoInput: 'date' }
@@ -189,9 +195,17 @@ export function ProyectoDetail() {
   const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
     camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
-  const presupuestoFaltante = presupuestoIncompletoParaEnvio(edicion?.presupuesto, edicion?.convocatoria)
+  const presupuestoFaltante = presupuestoIncompletoParaEnvio(
+    edicion?.presupuestoSolicitado, edicion?.convocatoria, edicion?.esConsolidadoParaTope,
+  )
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
     && camposObligatoriosFaltantes.length === 0 && presupuestoFaltante.length === 0
+  // Aviso en vivo mientras se edita: el mismo tope que el backend termina rechazando al guardar.
+  const motivoTopePresupuesto = motivoTopeExcedido(
+    editPresupuesto || edicion?.presupuestoSolicitado,
+    edicion?.topePresupuestoSolicitado ?? null,
+    edicion?.esConsolidadoParaTope ?? false,
+  )
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
@@ -221,7 +235,7 @@ export function ProyectoDetail() {
       : camposObligatoriosFaltantes.length > 0
         ? <ListaCamposFaltantes titulo="Falta completar lo siguiente:" campos={camposObligatoriosFaltantes} />
         : presupuestoFaltante.length > 0
-          ? <ListaCamposFaltantes titulo="Falta completar el presupuesto:" campos={presupuestoFaltante} />
+          ? <ListaCamposFaltantes titulo="Falta completar el presupuesto solicitado:" campos={presupuestoFaltante} />
           : null
 
   const cargarDatos = async () => {
@@ -289,7 +303,9 @@ export function ProyectoDetail() {
     if (!proyecto || !edicion) return
     setEditNombre(proyecto.nombre)
     setEditAnioEdicion(edicion.anioEdicion ?? null)
-    setEditPresupuesto(edicion.presupuesto ? JSON.parse(JSON.stringify(edicion.presupuesto)) : null)
+    setEditPresupuesto(
+      edicion.presupuestoSolicitado ? JSON.parse(JSON.stringify(edicion.presupuestoSolicitado)) : null,
+    )
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
     setEditando(true)
     direccion.reset()
@@ -339,7 +355,7 @@ export function ProyectoDetail() {
         anioEdicion: editAnioEdicion ?? undefined,
         esInterfacultad: direccion.esInterfacultad,
         unidadAcademicaAdicionalId: direccion.unidadAcademicaAdicionalId,
-        presupuesto: editPresupuesto || undefined,
+        presupuestoSolicitado: editPresupuesto || undefined,
         datosFormulario: editDatosFormulario,
       })
       await direccion.sincronizar()
@@ -445,7 +461,7 @@ export function ProyectoDetail() {
     setEditPresupuesto(normalizarPresupuesto({ ...editPresupuesto, rubros }))
   }
 
-  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => {
+  const updateBien = (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number | boolean) => {
     if (!editPresupuesto) return
     const rubros = [...editPresupuesto.rubros]
     const rubro = { ...rubros[rubroIdx] }
@@ -552,15 +568,18 @@ export function ProyectoDetail() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span tabIndex={0}>
-                      <Button onClick={handleGuardar} disabled={guardando || !!direccion.motivoDireccion}>
+                      <Button
+                        onClick={handleGuardar}
+                        disabled={guardando || !!direccion.motivoDireccion || !!motivoTopePresupuesto}
+                      >
                         {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                         Guardar
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {direccion.motivoDireccion && (
+                  {(direccion.motivoDireccion || motivoTopePresupuesto) && (
                     <TooltipContent>
-                      <p>{direccion.motivoDireccion}</p>
+                      <p>{direccion.motivoDireccion || motivoTopePresupuesto}</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -632,8 +651,8 @@ export function ProyectoDetail() {
           <CardContent><p className="text-sm">{edicion?.anioEdicion || '-'}</p></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto</CardTitle></CardHeader>
-          <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuesto?.montoTotal)}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto solicitado</CardTitle></CardHeader>
+          <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuestoSolicitado?.montoTotal)}</p></CardContent>
         </Card>
         {puedeGestionarDireccion && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowGestionarDireccion(true)}>
@@ -655,7 +674,7 @@ export function ProyectoDetail() {
             <TabsTrigger key={seccion.id} value={`seccion-${seccion.id}`}>{seccion.nombre}</TabsTrigger>
           ))}
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
-          <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
+          <TabsTrigger value="presupuesto">Presupuesto solicitado</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
           <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
@@ -848,13 +867,21 @@ export function ProyectoDetail() {
         <TabsContent value="presupuesto" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Presupuesto</CardTitle>
-              <span className="text-sm font-bold">
-                Total: {formatearMoneda(editando ? editPresupuesto?.montoTotal : edicion?.presupuesto?.montoTotal)}
+              <CardTitle className="text-sm font-medium">Presupuesto solicitado</CardTitle>
+              <span className={`text-sm font-bold ${motivoTopePresupuesto ? 'text-destructive' : ''}`}>
+                Total: {formatearMoneda(
+                  editando ? editPresupuesto?.montoTotal : edicion?.presupuestoSolicitado?.montoTotal,
+                )}
+                {edicion?.topePresupuestoSolicitado != null && (
+                  <> / tope {formatearMoneda(edicion.topePresupuestoSolicitado)}</>
+                )}
               </span>
             </CardHeader>
             <CardContent className="space-y-4">
-              {renderPresupuesto(editPresupuesto || edicion?.presupuesto || null, editando, edicion?.convocatoria, {
+              {motivoTopePresupuesto && (
+                <p className="text-sm text-destructive">{motivoTopePresupuesto}</p>
+              )}
+              {renderPresupuesto(editPresupuesto || edicion?.presupuestoSolicitado || null, editando, edicion?.convocatoria, {
                 addPartida, removePartida, updateViatico, updateBien,
               }, { activo: modoSugerencia, onSugerir: handleSugerirClick })}
             </CardContent>
@@ -916,7 +943,7 @@ export function ProyectoDetail() {
 
         <TabsContent value="sugerencias" className="mt-4">
           {edicion ? (
-            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} presupuesto={edicion.presupuesto} onRespondida={cargarDatos} />
+            <SugerenciasTab edicionId={edicion.id} creadoPorId={edicion.creadoPorId} directorIds={directores.map(d => d.usuarioId)} camposFormulario={camposFormulario} presupuesto={edicion.presupuestoSolicitado} onRespondida={cargarDatos} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
@@ -985,7 +1012,7 @@ function renderPresupuesto(
     addPartida: (rubroIdx: number, tipo: TipoRubro) => void
     removePartida: (rubroIdx: number, partidaIdx: number) => void
     updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
-    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number) => void
+    updateBien: (rubroIdx: number, pIdx: number, field: keyof BienPresupuesto, value: string | number | boolean) => void
   },
   sugerencia?: {
     activo: boolean
@@ -1019,7 +1046,7 @@ function renderPresupuesto(
                   variant="ghost"
                   size="sm"
                   onClick={() => sugerencia.onSugerir(
-                    `presupuesto.rubros[${rubroIdx}]`, '', LABELS_RUBRO[rubro.tipo as TipoRubro],
+                    `${PREFIJO_RUTA_PRESUPUESTO}rubros[${rubroIdx}]`, '', LABELS_RUBRO[rubro.tipo as TipoRubro],
                   )}
                 >
                   <MessageSquare className="h-3 w-3 mr-1" />Comentar
