@@ -32,7 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Convocatoria, ParticipacionConvocatoria, PaginatedResponse } from '@/data/types'
-import { RolUsuario, RolEjecucion, EstadoPropuestaEvaluador } from '@/data/types'
+import { RolUsuario, RolEjecucion } from '@/data/types'
 import { estadoBadge, estadoConvocatoriaLabel } from '@/data/types'
 import { toast } from 'sonner'
 import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -133,16 +133,11 @@ export function Convocatorias() {
 
   useEffect(() => {
     if (esGestion) return
-    const estadosActivos = [
-      EstadoPropuestaEvaluador.Propuesto,
-      EstadoPropuestaEvaluador.Aceptada,
-      EstadoPropuestaEvaluador.Aprobado,
-    ]
     api.participaciones.listarMias()
       .then((part: ParticipacionConvocatoria[]) => {
         setConvocatoriasEvaluador(new Set(
           part
-            .filter(p => p.rol === RolEjecucion.Evaluador && p.estado && estadosActivos.includes(p.estado))
+            .filter(p => p.rol === RolEjecucion.Evaluador)
             .map(p => p.convocatoriaId),
         ))
       })

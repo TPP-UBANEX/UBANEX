@@ -13,7 +13,7 @@ import { Bell, MessageSquare, CheckCheck, Loader2, UserCheck, CheckCircle2, Tras
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { Notificacion } from '@/data/types'
-import { TipoNotificacion, EstadoPropuestaEvaluador } from '@/data/types'
+import { TipoNotificacion } from '@/data/types'
 import { cn } from '@/lib/utils'
 import {
   Dialog,
@@ -29,7 +29,6 @@ export function NotificacionesDropdown() {
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const [respondiendoId, setRespondiendoId] = useState<string | null>(null)
   const [confirmarBorrar, setConfirmarBorrar] = useState<Notificacion | null>(null)
 
   const cargar = useCallback(async () => {
@@ -55,24 +54,22 @@ export function NotificacionesDropdown() {
     n.tipo === TipoNotificacion.PROPUESTA_EVALUADOR ||
     n.tipo === TipoNotificacion.RESULTADO_EVALUADOR
 
-  const visibles = notificaciones.filter(n => esEvaluador(n) || !n.leida)
+  const esPersistente = (n: Notificacion) =>
+    esEvaluador(n) || n.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+
+  const visibles = notificaciones.filter(n => esPersistente(n) || !n.leida)
 
   const handleClick = async (notif: Notificacion) => {
     if (!notif.leida) {
       await api.notificaciones.leer(notif.id).catch(() => {})
       setNotificaciones(prev =>
-        esEvaluador(notif)
+        esPersistente(notif)
           ? prev.map(n => (n.id === notif.id ? { ...n, leida: true } : n))
           : prev.filter(n => n.id !== notif.id),
       )
     }
-    const esPropuesta = notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR
-    const esResultado = notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
     const convocatoriaId = notif.participacion?.convocatoriaId
-    if (esPropuesta && notif.participacion?.estado === EstadoPropuestaEvaluador.Propuesto) {
-      return
-    }
-    if ((esPropuesta || esResultado) && convocatoriaId) {
+    if (esEvaluador(notif) && convocatoriaId) {
       navigate(`/convocatorias/${convocatoriaId}`)
       setOpen(false)
       return
@@ -81,25 +78,6 @@ export function NotificacionesDropdown() {
     if (edicion) {
       navigate(`/proyectos/${edicion.proyectoId}?convocatoria=${edicion.convocatoriaId}&tab=sugerencias`)
       setOpen(false)
-    }
-  }
-
-  const responder = async (e: React.MouseEvent, notif: Notificacion, aceptada: boolean) => {
-    e.stopPropagation()
-    if (respondiendoId === notif.id) return
-    if (notif.tipo !== TipoNotificacion.PROPUESTA_EVALUADOR ||
-        notif.participacion?.estado !== EstadoPropuestaEvaluador.Propuesto) return
-    setRespondiendoId(notif.id)
-    try {
-      await (aceptada
-        ? api.participaciones.aceptar(notif.participacion.id)
-        : api.participaciones.declinar(notif.participacion.id))
-      toast.success(aceptada ? 'Aceptaste la propuesta como evaluador' : 'Declinaste la propuesta')
-      setNotificaciones(prev => prev.filter(n => n.id !== notif.id))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al responder la propuesta')
-    } finally {
-      setRespondiendoId(null)
     }
   }
 
@@ -175,45 +153,26 @@ export function NotificacionesDropdown() {
                     ? UserCheck
                     : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
                       ? CheckCircle2
-                      : MessageSquare
+                      : notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+                        ? CheckCircle2
+                        : MessageSquare
                   const color = notif.tipo === TipoNotificacion.NUEVA_SUGERENCIA
                     ? 'text-blue-500'
                     : notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR
                       ? 'text-amber-500'
                       : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
                         ? 'text-green-500'
-                        : 'text-green-500'
+                        : notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+                          ? 'text-green-500'
+                          : 'text-green-500'
                   return <Icono className={cn('h-4 w-4 mt-0.5 shrink-0', color)} />
                 })()}
                 <div className="flex-1 min-w-0">
                   <p className={cn('text-sm leading-tight', !notif.leida && 'font-medium')}>{notif.mensaje}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{tiempoRelativo(notif.creadoEn)}</p>
-                  {notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR &&
-                    notif.participacion?.estado === EstadoPropuestaEvaluador.Propuesto && (
-                    <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={respondiendoId === notif.id}
-                        onClick={e => responder(e, notif, true)}
-                      >
-                        {respondiendoId === notif.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                        Aceptar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs"
-                        disabled={respondiendoId === notif.id}
-                        onClick={e => responder(e, notif, false)}
-                      >
-                        Declinar
-                      </Button>
-                    </div>
-                  )}
                 </div>
                 {!notif.leida && <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />}
-                {esEvaluador(notif) && (
+                {esPersistente(notif) && (
                   <Button
                     variant="ghost"
                     size="icon"

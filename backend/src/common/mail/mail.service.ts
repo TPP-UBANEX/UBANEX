@@ -59,7 +59,7 @@ export class MailService {
     });
   }
 
-  async enviarPropuestaEvaluador(
+  async enviarAltaEvaluador(
     destino: string,
     docenteNombre: string,
     convocatoriaNombre: string,
@@ -68,24 +68,21 @@ export class MailService {
     await sgMail.send({
       from,
       to: destino,
-      subject: `UBANEX — Fuiste propuesto como evaluador en "${convocatoriaNombre}"`,
+      subject: `UBANEX — Fuiste dado de alta como evaluador en "${convocatoriaNombre}"`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; border: 1px solid #e4e4e7; border-radius: 8px; overflow: hidden;">
           <div style="background: #1a1a2e; padding: 24px 20px; text-align: center;">
             <div style="font-size: 22px; font-weight: bold; color: #ffffff;">UBANEX</div>
             <div style="color: #b8b8cc; font-size: 13px; margin-top: 4px;">
-              Propuesta de evaluador · <strong>${convocatoriaNombre}</strong>
+              Alta de evaluador · <strong>${convocatoriaNombre}</strong>
             </div>
           </div>
           <div style="padding: 24px 20px; background: #ffffff;">
             <p style="margin: 0 0 12px;">Hola <strong>${docenteNombre}</strong>,</p>
             <p style="margin: 0;">
-              Tu Unidad Académica te propuso como <strong>evaluador</strong> en la convocatoria
-              <strong>${convocatoriaNombre}</strong>.
+              La Dirección de Rectorado te dio de alta como <strong>evaluador</strong> en la convocatoria
+              <strong>${convocatoriaNombre}</strong>. Ya podés cumplir funciones de evaluador.
             </p>
-            <div style="margin-top: 16px; padding: 12px 16px; background: #f4f4f5; border-left: 4px solid #1a1a2e; border-radius: 4px; color: #444;">
-              <p style="margin: 0;">Ingresá a UBANEX para <strong>Aceptar</strong> o <strong>Rechazar</strong> la propuesta.</p>
-            </div>
           </div>
           <div style="padding: 12px 20px; text-align: center; border-top: 1px solid #e4e4e7; font-size: 12px; color: #999;">
             Sistema de Gestión UBANEX

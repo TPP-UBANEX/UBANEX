@@ -9,7 +9,10 @@
     "lint": "eslint src/",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/ormconfig.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/ormconfig.ts",
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/ormconfig.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.0",
@@ -45,6 +48,7 @@
     "jest": "^30.4.2",
     "prettier": "^3.0.0",
     "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.0.0"
   }

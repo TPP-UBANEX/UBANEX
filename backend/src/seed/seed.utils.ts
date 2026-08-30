@@ -110,6 +110,7 @@ export function generarPresupuesto(rng: Rng, anioInicio: number): Presupuesto {
             cantidad: rng.entero(20, 120),
             precioUnitario: precioUnitarioConsumo,
             monto: 0,
+            esInsumo: true,
           },
         ],
       },
@@ -122,6 +123,7 @@ export function generarPresupuesto(rng: Rng, anioInicio: number): Presupuesto {
             cantidad: rng.entero(1, 5),
             precioUnitario: precioUnitarioUso,
             monto: 0,
+            esInsumo: false,
           },
         ],
       },
@@ -135,7 +137,12 @@ export function generarEvaluacionInstitucional(
   estructura: EstructuraTemplateInstitucional,
   rng: Rng,
   completo: boolean,
-): { categorias: Record<string, unknown>; checklist: Record<string, unknown>; observaciones: string } {
+): {
+  categorias: Record<string, unknown>;
+  checklist: Record<string, unknown>;
+  observaciones: string;
+  esPse: boolean | null;
+} {
   const categorias: Record<string, unknown> = {};
   for (const categoria of estructura.categorias ?? []) {
     for (const subcategoria of categoria.subcategorias ?? []) {
@@ -155,18 +162,35 @@ export function generarEvaluacionInstitucional(
   for (const item of estructura.checklist ?? []) {
     checklist[item.id] = completo ? true : rng.bool(0.6);
   }
-  return { categorias, checklist, observaciones: rng.pick(OBSERVACIONES_INST) };
+  // Fijo y obligatorio para confirmar (ver evaluaciones.service.ts), independiente del template:
+  // un borrador puede quedar sin responder para ejercitar el bloqueo de confirmación.
+  const esPse = completo ? rng.bool(0.25) : (rng.bool(0.5) ? rng.bool(0.25) : null);
+  return { categorias, checklist, observaciones: rng.pick(OBSERVACIONES_INST), esPse };
 }
 
 export function generarEvaluacionCruzada(
   estructura: EstructuraTemplateCruzada,
   rng: Rng,
+  modo?: 'alta' | 'baja' | 'alta90' | 'media',
 ): { items: Record<string, number>; observaciones: string } {
   const items: Record<string, number> = {};
   for (const categoria of estructura.categorias ?? []) {
     for (const item of categoria.items ?? []) {
-      const minimo = Math.max(0, item.puntajeMaximo - 4);
-      items[item.id] = rng.entero(minimo, item.puntajeMaximo);
+      const maximo = item.puntajeMaximo;
+      let minimo = Math.max(0, maximo - 4);
+      let tope = maximo;
+      if (modo === 'alta') {
+        minimo = Math.ceil(maximo * 0.6);
+      } else if (modo === 'alta90') {
+        minimo = Math.ceil(maximo * 0.82);
+      } else if (modo === 'media') {
+        minimo = Math.ceil(maximo * 0.6);
+        tope = Math.floor(maximo * 0.98);
+      } else if (modo === 'baja') {
+        minimo = 0;
+        tope = Math.floor(maximo * 0.4);
+      }
+      items[item.id] = rng.entero(Math.min(minimo, tope), tope);
     }
   }
   return { items, observaciones: rng.pick(OBSERVACIONES_CRUZADA) };

@@ -52,138 +52,138 @@ export enum TipoDesignacionDocente {
 }
 
 export interface UnidadAcademica {
-  id: string
-  nombre: string
+  id: string;
+  nombre: string;
 }
 
 export interface Carrera {
-  id: string
-  nombre: string
-  unidadAcademicaId: string
-  unidadAcademica?: UnidadAcademica
+  id: string;
+  nombre: string;
+  unidadAcademicaId: string;
+  unidadAcademica?: UnidadAcademica;
 }
 
 export interface Usuario {
-  id: string
-  nombreCompleto: string
-  email: string
-  roles: RolUsuario[]
-  unidadAcademica?: UnidadAcademica
-  unidadAcademicaId?: string
-  estadoValidacionDocente?: EstadoValidacionDocente
-  habilitado: boolean
-  ocupado?: boolean
-  ultimaActividad?: string
-  creadoPor?: Usuario
-  creadoPorId?: string
-  nombre?: string
-  apellido?: string
-  telefono?: string
-  genero?: Genero
-  personaConDiscapacidad?: boolean
-  cargoDocente?: CargoDocente
-  tipoDesignacionDocente?: TipoDesignacionDocente
-  areaDocente?: string
-  direccionLocalidad?: string
-  porcentajeCarrera?: number
-  carrera?: Carrera
-  carreraId?: string
+  id: string;
+  nombreCompleto: string;
+  email: string;
+  roles: RolUsuario[];
+  unidadAcademica?: UnidadAcademica;
+  unidadAcademicaId?: string;
+  estadoValidacionDocente?: EstadoValidacionDocente;
+  habilitado: boolean;
+  ocupado?: boolean;
+  ultimaActividad?: string;
+  creadoPor?: Usuario;
+  creadoPorId?: string;
+  nombre?: string;
+  apellido?: string;
+  telefono?: string;
+  genero?: Genero;
+  personaConDiscapacidad?: boolean;
+  cargoDocente?: CargoDocente;
+  tipoDesignacionDocente?: TipoDesignacionDocente;
+  areaDocente?: string;
+  direccionLocalidad?: string;
+  porcentajeCarrera?: number;
+  carrera?: Carrera;
+  carreraId?: string;
 }
 
 export interface AuthResponse {
-  accessToken: string
+  accessToken: string;
 }
 
 export interface LoginDto {
-  email: string
-  password: string
+  email: string;
+  password: string;
 }
 
 export interface RegisterDto {
-  nombre: string
-  apellido: string
-  email: string
-  password: string
-  tipo: 'estudiante' | 'docente'
-  unidadAcademicaId?: string
-  telefono?: string
-  carreraId?: string
+  nombre: string;
+  apellido: string;
+  email: string;
+  password: string;
+  tipo: 'estudiante' | 'docente';
+  unidadAcademicaId?: string;
+  telefono?: string;
+  carreraId?: string;
 }
 
 export interface CrearUsuarioDto {
-  nombreCompleto?: string
-  email: string
-  password: string
-  roles: RolUsuario[]
-  unidadAcademicaId?: string
-  nombre?: string
-  apellido?: string
-  telefono?: string
-  genero?: Genero
-  personaConDiscapacidad?: boolean
-  cargoDocente?: CargoDocente
-  tipoDesignacionDocente?: TipoDesignacionDocente
-  areaDocente?: string
-  direccionLocalidad?: string
-  porcentajeCarrera?: number
-  carreraId?: string
+  nombreCompleto?: string;
+  email: string;
+  password: string;
+  roles: RolUsuario[];
+  unidadAcademicaId?: string;
+  nombre?: string;
+  apellido?: string;
+  telefono?: string;
+  genero?: Genero;
+  personaConDiscapacidad?: boolean;
+  cargoDocente?: CargoDocente;
+  tipoDesignacionDocente?: TipoDesignacionDocente;
+  areaDocente?: string;
+  direccionLocalidad?: string;
+  porcentajeCarrera?: number;
+  carreraId?: string;
 }
 
 export interface PaginationMeta {
-  total: number
-  page: number
-  limit: number
-  totalPages: number
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface PaginatedResponse<T> {
-  data: T[]
-  meta: PaginationMeta
+  data: T[];
+  meta: PaginationMeta;
   stats?: {
-    rectorado?: number
-    secretarias: number
-    estudiantes: number
-    docentes: number
-  }
+    rectorado?: number;
+    secretarias: number;
+    estudiantes: number;
+    docentes: number;
+  };
 }
 
 export interface UsuariosQueryParams {
-  page?: number
-  limit?: number
-  search?: string
-  rol?: string
-  unidadAcademicaId?: string
+  page?: number;
+  limit?: number;
+  search?: string;
+  rol?: string;
+  unidadAcademicaId?: string;
 }
 
 export interface ParticipacionConvocatoria {
-  id: string
-  usuarioId: string
-  usuario?: Usuario
-  convocatoriaId: string
-  convocatoria?: Convocatoria
-  rol: RolEjecucion
-  edicionId?: string
-  esDirectorPrincipal?: boolean
-  estado?: EstadoPropuestaEvaluador | null
-  asignadoPorId: string
-  creadoEn: string
+  id: string;
+  usuarioId: string;
+  usuario?: Usuario;
+  convocatoriaId: string;
+  convocatoria?: Convocatoria;
+  rol: RolEjecucion;
+  edicionId?: string;
+  esDirectorPrincipal?: boolean;
+  estado?: EstadoPropuestaEvaluador | null;
+  asignadoPorId: string;
+  creadoEn: string;
 }
 
 export interface CrearParticipacionDto {
-  usuarioId: string
-  convocatoriaId: string
-  rol: RolEjecucion
-  edicionId?: string
-  esDirectorPrincipal?: boolean
-  nombre?: string
-  apellido?: string
-  telefono?: string
-  genero?: Genero
-  personaConDiscapacidad?: boolean
-  cargoDocente?: CargoDocente
-  tipoDesignacionDocente?: TipoDesignacionDocente
-  areaDocente?: string
-  direccionLocalidad?: string
+  usuarioId: string;
+  convocatoriaId: string;
+  rol: RolEjecucion;
+  edicionId?: string;
+  esDirectorPrincipal?: boolean;
+  nombre?: string;
+  apellido?: string;
+  telefono?: string;
+  genero?: Genero;
+  personaConDiscapacidad?: boolean;
+  cargoDocente?: CargoDocente;
+  tipoDesignacionDocente?: TipoDesignacionDocente;
+  areaDocente?: string;
+  direccionLocalidad?: string;
 }
 
 export enum TipoAccionAuditoria {
@@ -201,14 +201,14 @@ export enum TipoAccionAuditoria {
 }
 
 export interface Auditoria {
-  id: string
-  usuarioId: string
-  accion: TipoAccionAuditoria
-  descripcion: string
-  responsableId: string
-  responsableNombre: string
-  fecha: string
-  motivo: string | null
+  id: string;
+  usuarioId: string;
+  accion: TipoAccionAuditoria;
+  descripcion: string;
+  responsableId: string;
+  responsableNombre: string;
+  fecha: string;
+  motivo: string | null;
 }
 
 // --- Enums de dominio ---
@@ -246,106 +246,144 @@ export enum TipoPersona {
 // --- Entidades de dominio ---
 
 export interface Convocatoria {
-  id: string
-  nombre: string
-  descripcion: string
-  anio: number
-  estado: EstadoConvocatoria
-  fechaInicioPresentacion: string | null
-  fechaFinPresentacion: string | null
-  fechaInicioEvaluacion: string | null
-  fechaFinEvaluacion: string | null
-  fechaInicioEjecucion: string | null
-  fechaFinEjecucion: string | null
-  formularioId: string | null
-  formulario?: Formulario
-  umbralInconsistenciaCruzada: number | null
+  id: string;
+  nombre: string;
+  descripcion: string;
+  anio: number;
+  estado: EstadoConvocatoria;
+  fechaInicioPresentacion: string | null;
+  fechaFinPresentacion: string | null;
+  fechaInicioEvaluacion: string | null;
+  fechaFinEvaluacion: string | null;
+  fechaInicioEjecucion: string | null;
+  fechaFinEjecucion: string | null;
+  formularioId: string | null;
+  cuotaFederativa?: number | null;
+  presupuestoTotal?: number | null;
+  // Tope por proyecto sobre el total del presupuesto solicitado (no el adjudicado), según si el
+  // proyecto es consolidado o no. null/0 = sin tope.
+  topePresupuestoNoConsolidado?: number | null;
+  topePresupuestoConsolidado?: number | null;
+  // Porcentajes que componen el presupuesto a adjudicar por sobre el solicitado (ver
+  // lib/presupuesto.ts#calcularPresupuestoAAdjudicar). 0 = extra desactivado.
+  porcentajeExtraInsumos?: number;
+  umbralInsumos?: number;
+  porcentajeExtraPse?: number;
+  ordenMeritoConfirmado: boolean;
+  umbralInconsistenciaCruzada: number | null;
+  formulario?: Formulario;
 }
 
 export interface Proyecto {
-  id: string
-  nombre: string
-  esConsolidado: boolean
-  esInterfacultad: boolean
-  unidadAcademicaAdicional?: UnidadAcademica
-  unidadAcademicaAdicionalId?: string
-  creadoPor: Usuario
-  creadoPorId: string
-  creadoEn: string
-  ediciones?: Edicion[]
+  id: string;
+  nombre: string;
+  // Override manual: null = automático (derivado del historial), true/false = forzado.
+  esConsolidado: boolean | null;
+  esInterfacultad: boolean;
+  unidadAcademicaAdicional?: UnidadAcademica;
+  unidadAcademicaAdicionalId?: string;
+  creadoPor: Usuario;
+  creadoPorId: string;
+  creadoEn: string;
+  ediciones?: Edicion[];
+  // Calculados en el backend (no persistidos), presentes en obtenerProyecto.
+  esConsolidadoDerivado?: boolean;
+  esConsolidadoEfectivo?: boolean;
+  // Irreversible: si alguna vez fue consolidado, le corresponde el tope de presupuesto de
+  // consolidado para siempre (ver esConsolidadoParaTope en el backend).
+  fueConsolidadoAlgunaVez?: boolean;
+  rachaAdjudicaciones?: number;
 }
 
 export interface Edicion {
-  id: string
-  proyectoId: string
-  proyecto?: Proyecto
-  convocatoriaId: string
-  estado: EstadoEdicion
-  creadoPorId: string
-  creadoPor?: Usuario
-  unidadAcademicaId: string
-  unidadAcademica?: UnidadAcademica
-  convocatoria?: Convocatoria
-  presupuesto?: Presupuesto
-  anioEdicion?: number
-  datosFormulario?: Record<string, unknown>
-  creadoEn: string
-  actualizadoEn: string
+  id: string;
+  proyectoId: string;
+  proyecto?: Proyecto;
+  convocatoriaId: string;
+  estado: EstadoEdicion;
+  creadoPorId: string;
+  creadoPor?: Usuario;
+  unidadAcademicaId: string;
+  unidadAcademica?: UnidadAcademica;
+  convocatoria?: Convocatoria;
+  presupuestoSolicitado?: Presupuesto;
+  anioEdicion?: number;
+  datosFormulario?: Record<string, unknown>;
+  avalUrl?: string | null;
+  ordenMerito?: number | null;
+  adjudicacionPropuesta?: boolean | null;
+  mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
+  puntajeMerito?: number | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  // Calculados en el backend (no persistidos).
+  esConsolidadoDerivado?: boolean;
+  salteaEvaluacion?: boolean;
+  rachaAdjudicaciones?: number;
+  tieneAval?: boolean;
+  // Consolidación irreversible a efectos del tope de presupuesto (ver esConsolidadoParaTope), y
+  // el tope resultante para esta edición según ese cálculo. null = sin tope configurado.
+  esConsolidadoParaTope?: boolean;
+  topePresupuestoSolicitado?: number | null;
+  // Viene de la evaluación institucional (EvaluacionInstitucional.esPse), no del proyecto; ver
+  // calcularPresupuestoAAdjudicar en lib/presupuesto.ts. Presente solo en el listado "todas".
+  esPse?: boolean;
 }
 
 export interface Presupuesto {
-  montoTotal: number
-  rubros: RubroPresupuesto[]
+  montoTotal: number;
+  rubros: RubroPresupuesto[];
 }
 
 export interface RubroPresupuesto {
-  tipo: TipoRubro
-  subtotal: number
-  partidas: ViaticoPresupuesto[] | BienPresupuesto[]
+  tipo: TipoRubro;
+  subtotal: number;
+  partidas: ViaticoPresupuesto[] | BienPresupuesto[];
 }
 
 export interface ViaticoPresupuesto {
-  tipoPersona: TipoPersona
-  descripcion: string
-  periodoInicio: string
-  periodoFin: string
-  monto: number
+  tipoPersona: TipoPersona;
+  descripcion: string;
+  periodoInicio: string;
+  periodoFin: string;
+  monto: number;
 }
 
 export interface BienPresupuesto {
-  descripcion: string
-  cantidad: number
-  precioUnitario: number
-  monto: number
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  monto: number;
+  esInsumo?: boolean;
 }
 
 export interface CrearProyectoDto {
-  nombre: string
-  convocatoriaId: string
-  anioEdicion?: number
-  esConsolidado?: boolean
-  esInterfacultad?: boolean
+  nombre: string;
+  convocatoriaId: string;
+  anioEdicion?: number;
+  esConsolidado?: boolean | null;
+  esInterfacultad?: boolean;
 }
 
 export interface ActualizarEdicionDto {
-  nombre?: string
-  anioEdicion?: number
-  esConsolidado?: boolean
-  esInterfacultad?: boolean
-  unidadAcademicaAdicionalId?: string | null
-  presupuesto?: Presupuesto
-  datosFormulario?: Record<string, unknown>
+  nombre?: string;
+  anioEdicion?: number;
+  esConsolidado?: boolean | null;
+  esInterfacultad?: boolean;
+  unidadAcademicaAdicionalId?: string | null;
+  presupuestoSolicitado?: Presupuesto;
+  datosFormulario?: Record<string, unknown>;
 }
 
 export interface Evaluacion {
-  id: string
-  proyectoId: string
-  proyectoTitulo?: string
-  evaluador: string
-  tipo: string
-  puntaje: number
-  observaciones: string
-  estado: string
+  id: string;
+  proyectoId: string;
+  proyectoTitulo?: string;
+  evaluador: string;
+  tipo: string;
+  puntaje: number;
+  observaciones: string;
+  estado: string;
 }
 
 // --- Evaluación (módulo de evaluación) ---
@@ -361,153 +399,156 @@ export enum TipoEvaluacionCruzada {
   TerceraUa = 'TerceraUa',
 }
 
-export type TipoValorSubcategoria = 'numerico' | 'booleano'
+export type TipoValorSubcategoria = 'numerico' | 'booleano';
 
 export interface SubcategoriaInstitucional {
-  id: string
-  texto: string
-  tipoValor: TipoValorSubcategoria
-  minimo: number | null
-  maximo: number | null
-  fundamentacion: string | null
+  id: string;
+  texto: string;
+  tipoValor: TipoValorSubcategoria;
+  minimo: number | null;
+  maximo: number | null;
+  fundamentacion: string | null;
 }
 
 export interface CategoriaInstitucional {
-  id: string
-  nombre: string
-  subcategorias: SubcategoriaInstitucional[]
+  id: string;
+  nombre: string;
+  subcategorias: SubcategoriaInstitucional[];
 }
 
 export interface ItemChecklist {
-  id: string
-  texto: string
+  id: string;
+  texto: string;
 }
 
 export interface EstructuraTemplateInstitucional {
-  categorias: CategoriaInstitucional[]
-  checklist: ItemChecklist[]
+  categorias: CategoriaInstitucional[];
+  checklist: ItemChecklist[];
 }
 
 export interface ItemCruzada {
-  id: string
-  nombre: string
-  puntajeMaximo: number
+  id: string;
+  nombre: string;
+  puntajeMaximo: number;
 }
 
 export interface CategoriaCruzada {
-  id: string
-  nombre: string
-  puntajeMaximo: number
-  items: ItemCruzada[]
+  id: string;
+  nombre: string;
+  puntajeMaximo: number;
+  items: ItemCruzada[];
 }
 
 export interface EstructuraTemplateCruzada {
-  categorias: CategoriaCruzada[]
+  categorias: CategoriaCruzada[];
 }
 
 export interface TemplateEvaluacionInstitucional {
-  id: string
-  nombre: string
-  esDefault: boolean
-  esPlantilla: boolean
-  estructura: EstructuraTemplateInstitucional | null
+  id: string;
+  nombre: string;
+  esDefault: boolean;
+  esPlantilla: boolean;
+  estructura: EstructuraTemplateInstitucional | null;
 }
 
 export interface TemplateEvaluacionCruzada {
-  id: string
-  nombre: string
-  esDefault: boolean
-  esPlantilla: boolean
-  estructura: EstructuraTemplateCruzada | null
+  id: string;
+  nombre: string;
+  esDefault: boolean;
+  esPlantilla: boolean;
+  estructura: EstructuraTemplateCruzada | null;
 }
 
 export interface GuardarTemplateInstitucionalDto {
-  nombre: string
-  esDefault?: boolean
-  estructura?: EstructuraTemplateInstitucional | null
+  nombre: string;
+  esDefault?: boolean;
+  estructura?: EstructuraTemplateInstitucional | null;
 }
 
 export interface GuardarTemplateCruzadaDto {
-  nombre: string
-  esDefault?: boolean
-  estructura?: EstructuraTemplateCruzada | null
+  nombre: string;
+  esDefault?: boolean;
+  estructura?: EstructuraTemplateCruzada | null;
 }
 
 export interface EvaluacionInstitucional {
-  id: string
-  convocatoriaId: string
-  edicionId: string
-  templateId: string
-  estado: EstadoEvaluacion
-  categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
-  checklist: Record<string, boolean> | null
-  observaciones: string | null
-  realizadoPor?: Usuario
-  actualizadoPor?: Usuario
-  confirmadoPor?: Usuario
-  realizadoPorId?: string
-  actualizadoPorId?: string
-  confirmadoPorId?: string
+  id: string;
+  convocatoriaId: string;
+  edicionId: string;
+  templateId: string;
+  estado: EstadoEvaluacion;
+  categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
+  checklist: Record<string, boolean> | null;
+  observaciones: string | null;
+  // Fijo y obligatorio para confirmar, independiente del template (ver ../../backend/src/evaluaciones/evaluacion-institucional.entity.ts).
+  esPse: boolean | null;
+  realizadoPor?: Usuario;
+  actualizadoPor?: Usuario;
+  confirmadoPor?: Usuario;
+  realizadoPorId?: string;
+  actualizadoPorId?: string;
+  confirmadoPorId?: string;
 }
 
 export interface EvaluacionCruzada {
-  id: string
-  convocatoriaId: string
-  edicionId: string
-  evaluadorId: string
-  evaluador?: Usuario
-  tipo: TipoEvaluacionCruzada
-  templateId: string
-  estado: EstadoEvaluacion
-  items: Record<string, number> | null
-  observaciones: string | null
-  actualizadoPor?: Usuario
-  actualizadoPorId?: string
+  id: string;
+  convocatoriaId: string;
+  edicionId: string;
+  evaluadorId: string;
+  evaluador?: Usuario;
+  tipo: TipoEvaluacionCruzada;
+  templateId: string;
+  estado: EstadoEvaluacion;
+  items: Record<string, number> | null;
+  observaciones: string | null;
+  actualizadoPor?: Usuario;
+  actualizadoPorId?: string;
 }
 
 export interface EdicionEvaluableInstitucional {
-  edicion: Edicion
-  evaluacion: EvaluacionInstitucional | null
+  edicion: Edicion;
+  evaluacion: EvaluacionInstitucional | null;
 }
 
 export interface EdicionEvaluableCruzada {
-  edicion: Edicion
-  tipo: TipoEvaluacionCruzada
-  evaluacion: EvaluacionCruzada | null
+  edicion: Edicion;
+  tipo: TipoEvaluacionCruzada;
+  evaluacion: EvaluacionCruzada | null;
 }
 
 export interface HistorialEvaluacion {
-  fecha: string
-  accion: string
-  descripcion: string
-  usuarioId: string
-  usuarioNombre: string
+  fecha: string;
+  accion: string;
+  descripcion: string;
+  usuarioId: string;
+  usuarioNombre: string;
 }
 
 export interface MonitoreoEvaluacion {
-  convocatoria: Convocatoria
-  meta: PaginationMeta
+  convocatoria: Convocatoria;
+  meta: PaginationMeta;
   ediciones: Array<{
-    edicion: Edicion
+    edicion: Edicion;
     institucional: {
-      id: string
-      estado: EstadoEvaluacion
-      observaciones: string | null
-      realizadoPor: { id: string; nombreCompleto: string } | null
-      confirmadoPor: { id: string; nombreCompleto: string } | null
-    } | null
+      id: string;
+      estado: EstadoEvaluacion;
+      observaciones: string | null;
+      esPse: boolean | null;
+      realizadoPor: { id: string; nombreCompleto: string } | null;
+      confirmadoPor: { id: string; nombreCompleto: string } | null;
+    } | null;
     cruzadas: Array<{
-      id: string
-      tipo: TipoEvaluacionCruzada
-      estado: EstadoEvaluacion
-      evaluador: { id: string; nombreCompleto: string } | null
-    }>
+      id: string;
+      tipo: TipoEvaluacionCruzada;
+      estado: EstadoEvaluacion;
+      evaluador: { id: string; nombreCompleto: string } | null;
+    }>;
     inconsistencia: {
-      inconsistente: boolean
-      diferencia: number
-      umbral: number
-    } | null
-  }>
+      inconsistente: boolean;
+      diferencia: number;
+      umbral: number;
+    } | null;
+  }>;
 }
 
 export interface CandidatoTerceraUa {
@@ -519,61 +560,62 @@ export interface CandidatoTerceraUa {
 
 export interface EvaluacionEdicionDetalle {
   convocatoria: {
-    id: string
-    nombre: string | null
-    estado: string | null
-  }
+    id: string;
+    nombre: string | null;
+    estado: string | null;
+  };
   institucional: {
-    id: string
-    estado: EstadoEvaluacion
-    observaciones: string | null
-    realizadoPor: { id: string; nombreCompleto: string } | null
-    confirmadoPor: { id: string; nombreCompleto: string } | null
-    categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
-    checklist: Record<string, boolean> | null
-  } | null
+    id: string;
+    estado: EstadoEvaluacion;
+    observaciones: string | null;
+    realizadoPor: { id: string; nombreCompleto: string } | null;
+    confirmadoPor: { id: string; nombreCompleto: string } | null;
+    categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
+    checklist: Record<string, boolean> | null;
+    esPse: boolean | null;
+  } | null;
   cruzadas: Array<{
-    id: string
-    tipo: TipoEvaluacionCruzada
-    estado: EstadoEvaluacion
-    evaluador: { id: string; nombreCompleto: string } | null
-    observaciones: string | null
-    items: Record<string, number> | null
-    puntaje: number | null
-    puntajeMaximo: number | null
-  }>
-  estructuraInstitucional: EstructuraTemplateInstitucional | null
-  estructuraCruzada: EstructuraTemplateCruzada | null
+    id: string;
+    tipo: TipoEvaluacionCruzada;
+    estado: EstadoEvaluacion;
+    evaluador: { id: string; nombreCompleto: string } | null;
+    observaciones: string | null;
+    items: Record<string, number> | null;
+    puntaje: number | null;
+    puntajeMaximo: number | null;
+  }>;
+  estructuraInstitucional: EstructuraTemplateInstitucional | null;
+  estructuraCruzada: EstructuraTemplateCruzada | null;
   resumen: {
-    puntajeInstitucional: number
-    puntajeInstitucionalMaximo: number
-    puntajeCruzadaPromedio: number | null
-    puntajeCruzadaMaximo: number
-    notaFinal: number
-    adjudicado: boolean
-  } | null
+    puntajeInstitucional: number;
+    puntajeInstitucionalMaximo: number;
+    puntajeCruzadaPromedio: number | null;
+    puntajeCruzadaMaximo: number;
+    notaFinal: number;
+  } | null;
 }
 
 export interface GuardarEvaluacionInstitucionalDto {
-  categorias?: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null
-  checklist?: Record<string, boolean> | null
-  observaciones?: string
+  categorias?: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
+  checklist?: Record<string, boolean> | null;
+  observaciones?: string;
+  esPse?: boolean;
 }
 
 export interface GuardarEvaluacionCruzadaDto {
-  items?: Record<string, number> | null
-  observaciones?: string
+  items?: Record<string, number> | null;
+  observaciones?: string;
 }
 
 export interface Rendicion {
-  id: string
-  proyectoId: string
-  proyectoTitulo?: string
-  rubro: string
-  monto: number
-  estado: string
-  fecha: string
-  comprobanteUrl?: string
+  id: string;
+  proyectoId: string;
+  proyectoTitulo?: string;
+  rubro: string;
+  monto: number;
+  estado: string;
+  fecha: string;
+  comprobanteUrl?: string;
 }
 
 export enum TipoCampo {
@@ -592,85 +634,86 @@ export enum TipoCampo {
 }
 
 // Espejo de backend/src/common/dto/campo-formulario.dto.ts
-export const TIPOS_COLUMNA_TABLA = Object.values(TipoCampo)
-  .filter(t => t !== TipoCampo.Seccion && t !== TipoCampo.Tabla && t !== TipoCampo.Archivo)
+export const TIPOS_COLUMNA_TABLA = Object.values(TipoCampo).filter(
+  (t) => t !== TipoCampo.Seccion && t !== TipoCampo.Tabla && t !== TipoCampo.Archivo,
+);
 
 // Espejo de backend/src/common/enums/tipo-campo.enum.ts
-export const TIPOS_VALOR_OBJETO: TipoCampo[] = [TipoCampo.Geolocalizacion, TipoCampo.Usuario]
+export const TIPOS_VALOR_OBJETO: TipoCampo[] = [TipoCampo.Geolocalizacion, TipoCampo.Usuario];
 
 // Espejo de backend/src/common/enums/rol-usuario.enum.ts
-export const ROLES_USUARIO_BUSCABLES: RolUsuario[] = [RolUsuario.Docente, RolUsuario.Estudiante]
+export const ROLES_USUARIO_BUSCABLES: RolUsuario[] = [RolUsuario.Docente, RolUsuario.Estudiante];
 
 export interface Localidad {
-  id: string
-  nombre: string
-  provincia: string
-  lat?: number
-  lon?: number
+  id: string;
+  nombre: string;
+  provincia: string;
+  lat?: number;
+  lon?: number;
 }
 
 export interface ValorGeolocalizacion {
-  nombre: string
-  id?: string
-  provincia?: string
-  lat?: number
-  lon?: number
+  nombre: string;
+  id?: string;
+  provincia?: string;
+  lat?: number;
+  lon?: number;
 }
 
 /** Espejo de backend/src/usuarios/usuario-sugerido.interface.ts */
 export interface UsuarioSugerido {
-  id: string
-  nombre: string
-  email: string
+  id: string;
+  nombre: string;
+  email: string;
 }
 
 export interface ValorUsuario {
-  nombre: string
-  id?: string
-  email?: string
+  nombre: string;
+  id?: string;
+  email?: string;
 }
 
 // Espejo de backend/src/common/enums/tipo-campo.enum.ts
 export const MAX_LONGITUD_POR_TIPO: Partial<Record<TipoCampo, number>> = {
   [TipoCampo.Texto]: 255,
   [TipoCampo.TextoLargo]: 10000,
-}
+};
 
 export interface ColumnaTabla {
-  id: string
-  tipo: TipoCampo
-  nombre: string
-  esObligatorio: boolean
-  opciones?: string[]
-  minimo?: number
-  maximo?: number
-  admiteDecimales?: boolean
-  rolesUsuario?: RolUsuario[]
+  id: string;
+  tipo: TipoCampo;
+  nombre: string;
+  esObligatorio: boolean;
+  opciones?: string[];
+  minimo?: number;
+  maximo?: number;
+  admiteDecimales?: boolean;
+  rolesUsuario?: RolUsuario[];
 }
 
 export interface CampoFormulario {
-  id: string
-  tipo: TipoCampo
-  nombre: string
-  textoAyuda?: string
-  esObligatorio: boolean
-  orden: number
-  opciones?: string[]
-  minimo?: number
-  maximo?: number
-  admiteDecimales?: boolean
-  columnas?: ColumnaTabla[]
-  filasMinimas?: number
-  filasMaximas?: number
-  rolesUsuario?: RolUsuario[]
+  id: string;
+  tipo: TipoCampo;
+  nombre: string;
+  textoAyuda?: string;
+  esObligatorio: boolean;
+  orden: number;
+  opciones?: string[];
+  minimo?: number;
+  maximo?: number;
+  admiteDecimales?: boolean;
+  columnas?: ColumnaTabla[];
+  filasMinimas?: number;
+  filasMaximas?: number;
+  rolesUsuario?: RolUsuario[];
 }
 
 export interface Formulario {
-  id: string
-  nombre: string
-  esDefault: boolean
-  esPlantilla: boolean
-  campos?: CampoFormulario[]
+  id: string;
+  nombre: string;
+  esDefault: boolean;
+  esPlantilla: boolean;
+  campos?: CampoFormulario[];
 }
 
 export const tipoCampoLabels: Record<TipoCampo, string> = {
@@ -686,24 +729,24 @@ export const tipoCampoLabels: Record<TipoCampo, string> = {
   [TipoCampo.Seccion]: 'Sección',
   [TipoCampo.Tabla]: 'Tabla',
   [TipoCampo.Usuario]: 'Usuario (docente/estudiante)',
-}
+};
 
 export interface Emparejamiento {
-  id: string
-  convocatoriaId: string
-  unidadAId: string
-  unidadA: UnidadAcademica
-  unidadBId: string
-  unidadB: UnidadAcademica
+  id: string;
+  convocatoriaId: string;
+  unidadAId: string;
+  unidadA: UnidadAcademica;
+  unidadBId: string;
+  unidadB: UnidadAcademica;
 }
 
 export interface ParEmparejamientoDto {
-  unidadAId: string
-  unidadBId: string
+  unidadAId: string;
+  unidadBId: string;
 }
 
 export interface GuardarEmparejamientoDto {
-  pares: ParEmparejamientoDto[]
+  pares: ParEmparejamientoDto[];
 }
 
 // --- Sugerencias de cambio ---
@@ -720,44 +763,45 @@ export enum TipoNotificacion {
   RESPUESTA_SUGERENCIA = 'RESPUESTA_SUGERENCIA',
   PROPUESTA_EVALUADOR = 'PROPUESTA_EVALUADOR',
   RESULTADO_EVALUADOR = 'RESULTADO_EVALUADOR',
+  RESULTADO_ADJUDICACION = 'RESULTADO_ADJUDICACION',
 }
 
 export interface SugerenciaCambio {
-  id: string
-  edicionId: string
-  sugeridoPor: Usuario
-  campo: string
-  valorActual: string | null
-  valorSugerido: string | null
-  comentario: string
-  estado: EstadoSugerencia
-  respuestaDirector: string | null
-  creadoEn: string
-  respondidoEn: string | null
+  id: string;
+  edicionId: string;
+  sugeridoPor: Usuario;
+  campo: string;
+  valorActual: string | null;
+  valorSugerido: string | null;
+  comentario: string;
+  estado: EstadoSugerencia;
+  respuestaDirector: string | null;
+  creadoEn: string;
+  respondidoEn: string | null;
 }
 
 export interface CrearSugerenciaDto {
-  campo: string
-  valorSugerido?: string
-  comentario: string
+  campo: string;
+  valorSugerido?: string;
+  comentario: string;
 }
 
 export interface ResponderSugerenciaDto {
-  estado: EstadoSugerencia
-  respuestaDirector?: string
+  estado: EstadoSugerencia;
+  respuestaDirector?: string;
 }
 
 export interface Notificacion {
-  id: string
-  usuarioId: string
-  tipo: TipoNotificacion
-  sugerenciaId?: string | null
-  sugerencia?: (SugerenciaCambio & { edicion: Edicion }) | null
-  participacionId?: string | null
-  participacion?: ParticipacionConvocatoria & { convocatoria: Convocatoria }
-  mensaje: string
-  leida: boolean
-  creadoEn: string
+  id: string;
+  usuarioId: string;
+  tipo: TipoNotificacion;
+  sugerenciaId?: string | null;
+  sugerencia?: (SugerenciaCambio & { edicion: Edicion }) | null;
+  participacionId?: string | null;
+  participacion?: ParticipacionConvocatoria & { convocatoria: Convocatoria };
+  mensaje: string;
+  leida: boolean;
+  creadoEn: string;
 }
 
 export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -799,7 +843,7 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   MasInformacion: 'outline',
   Confirmada: 'default',
   Completada: 'default',
-}
+};
 
 export const estadoConvocatoriaLabel: Record<string, string> = {
   configuracion: 'Configuración',
@@ -807,7 +851,7 @@ export const estadoConvocatoriaLabel: Record<string, string> = {
   evaluacion: 'Evaluación',
   ejecucion: 'Ejecución',
   cierre: 'Cierre',
-}
+};
 
 export const estadoEdicionLabel: Record<string, string> = {
   Borrador: 'Borrador',
@@ -818,7 +862,7 @@ export const estadoEdicionLabel: Record<string, string> = {
   NoAdjudicado: 'No adjudicado',
   EnEjecucion: 'En ejecución',
   Cerrado: 'Cerrado',
-}
+};
 
 export enum CategoriaHito {
   Organizacion = 'Organizacion',

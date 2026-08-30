@@ -16,7 +16,9 @@ import { useAuth } from '@/lib/auth-context'
 import type { SugerenciaCambio, CampoFormulario, Presupuesto } from '@/data/types'
 import { estadoBadge, EstadoSugerencia, RolUsuario } from '@/data/types'
 import { formatearValorSerializado } from '@/components/CampoFormularioInput'
-import { etiquetaCampoPresupuesto, formatearMoneda, parsearRutaPartida } from '@/lib/presupuesto'
+import {
+  etiquetaCampoPresupuesto, formatearMoneda, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO,
+} from '@/lib/presupuesto'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -94,7 +96,9 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
       esInterfacultad: 'Es interfacultad',
     }
     if (mapa[campo]) return mapa[campo]
-    if (campo.startsWith('presupuesto.')) return etiquetaCampoPresupuesto(presupuesto, campo.slice(12))
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.slice(PREFIJO_RUTA_PRESUPUESTO.length))
+    }
     if (campo.startsWith('datosFormulario.')) {
       const campoId = campo.slice(16)
       const campoFormulario = camposFormulario.find(c => c.id === campoId)
@@ -116,7 +120,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
 
   // Los montos del presupuesto viajan como string; se formatean como moneda para el diff.
   const formatearValorPresupuesto = (campo: string, valor: string): string => {
-    const ruta = parsearRutaPartida(campo.slice(12))
+    const ruta = parsearRutaPartida(campo.slice(PREFIJO_RUTA_PRESUPUESTO.length))
     if (ruta && (ruta.campo === 'monto' || ruta.campo === 'precioUnitario')) {
       return formatearMoneda(Number(valor))
     }
@@ -128,7 +132,7 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     const mostrar = (valor: string | null) => {
       if (valor == null) return '(sin valor)'
       if (campoFormulario) return formatearValorSerializado(campoFormulario, valor)
-      if (campo.startsWith('presupuesto.')) return formatearValorPresupuesto(campo, valor)
+      if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) return formatearValorPresupuesto(campo, valor)
       return formatearValorProyecto(campo, valor)
     }
 
