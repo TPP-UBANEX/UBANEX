@@ -38,7 +38,7 @@ import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import {
   formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA,
-  normalizarPresupuesto, parsearRutaPartida, presupuestoIncompletoParaEnvio,
+  normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -129,8 +129,8 @@ export function ProyectoDetail() {
   const tipoCampoSugerido = campoSugerido?.tipo ?? null
 
   const modalConfig: ModalConfigSugerencia = ((): ModalConfigSugerencia => {
-    if (sugerenciaModal.campo.startsWith('presupuesto.')) {
-      const ruta = parsearRutaPartida(sugerenciaModal.campo.replace('presupuesto.', ''))
+    if (sugerenciaModal.campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      const ruta = parsearRutaPartida(sugerenciaModal.campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''))
       if (!ruta) return { soloComentario: true }
       if (ruta.campo === 'tipoPersona') return { opciones: OPCIONES_TIPO_PERSONA }
       if (ruta.campo === 'monto' || ruta.campo === 'precioUnitario') return { tipoInput: 'number', min: 0, step: 'any' }
@@ -960,7 +960,7 @@ function renderPresupuesto(
                   variant="ghost"
                   size="sm"
                   onClick={() => sugerencia.onSugerir(
-                    `presupuesto.rubros[${rubroIdx}]`, '', LABELS_RUBRO[rubro.tipo as TipoRubro],
+                    `${PREFIJO_RUTA_PRESUPUESTO}rubros[${rubroIdx}]`, '', LABELS_RUBRO[rubro.tipo as TipoRubro],
                   )}
                 >
                   <MessageSquare className="h-3 w-3 mr-1" />Comentar

@@ -6,7 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CampoSugerible } from '@/components/CampoSugerible'
 import type { BienPresupuesto, Convocatoria, RubroPresupuesto, ViaticoPresupuesto } from '@/data/types'
 import { TipoRubro } from '@/data/types'
-import { formatearMoneda, LABELS_CAMPO_PARTIDA, LABELS_RUBRO, numeroNoNegativo } from '@/lib/presupuesto'
+import {
+  formatearMoneda, LABELS_CAMPO_PARTIDA, LABELS_RUBRO, numeroNoNegativo, PREFIJO_RUTA_PRESUPUESTO,
+} from '@/lib/presupuesto'
 import { cn } from '@/lib/utils'
 import { Trash2 } from 'lucide-react'
 
@@ -45,7 +47,7 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
   const rubroLabel = LABELS_RUBRO[rubro.tipo]
 
   const campoPartida = (pIdx: number, campo: string) =>
-    `presupuesto.rubros[${rubroIdx}].partidas[${pIdx}].${campo}`
+    `${PREFIJO_RUTA_PRESUPUESTO}rubros[${rubroIdx}].partidas[${pIdx}].${campo}`
   const labelPartida = (campo: string) => `${rubroLabel} > ${LABELS_CAMPO_PARTIDA[campo]}`
 
   const columnas = esViatico

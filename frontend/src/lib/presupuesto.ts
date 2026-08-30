@@ -39,9 +39,12 @@ export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
 const FORMATO_RUTA_PARTIDA = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/
 const FORMATO_RUTA_RUBRO = /^rubros\[(\d+)\]$/
 
+/** Espejo de backend/src/proyectos/presupuesto.util.ts#PREFIJO_RUTA_PRESUPUESTO. */
+export const PREFIJO_RUTA_PRESUPUESTO = 'presupuestoSolicitado.'
+
 /**
  * Espejo de backend/src/proyectos/presupuesto.util.ts#parsearRutaPartida. Interpreta una ruta
- * relativa a `presupuesto.` (sin ese prefijo) como el campo de una partida.
+ * relativa a `presupuestoSolicitado.` (sin ese prefijo) como el campo de una partida.
  */
 export function parsearRutaPartida(
   path: string,
@@ -55,8 +58,8 @@ export function parsearRutaPartida(
 
 /**
  * Espejo de backend/src/proyectos/presupuesto.util.ts#etiquetaCampoPresupuesto. Etiqueta legible
- * de una ruta relativa a `presupuesto.` (sin ese prefijo), para mostrar en la lista de sugerencias
- * y en el modal de "Sugerir cambio".
+ * de una ruta relativa a `presupuestoSolicitado.` (sin ese prefijo), para mostrar en la lista de
+ * sugerencias y en el modal de "Sugerir cambio".
  */
 export function etiquetaCampoPresupuesto(presupuesto: Presupuesto | null | undefined, path: string): string {
   const rutaPartida = parsearRutaPartida(path)
