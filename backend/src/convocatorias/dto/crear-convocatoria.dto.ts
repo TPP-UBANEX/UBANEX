@@ -74,4 +74,9 @@ export class CrearConvocatoriaDto {
   @Max(100)
   @IsOptional()
   porcentajeExtraPse?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  umbralInconsistenciaCruzada?: number;
 }

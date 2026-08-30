@@ -1172,10 +1172,19 @@ export class SeedService {
   private async seedConvocatoria(data: Partial<Convocatoria>): Promise<Convocatoria> {
     const existe = await this.convocatoriaRepo.findOne({ where: { nombre: data.nombre } });
     if (existe) {
+      let huboCambios = false;
       if (data.estado && existe.estado !== data.estado) {
         existe.estado = data.estado;
-        await this.convocatoriaRepo.save(existe);
+        huboCambios = true;
         console.log(`  ${existe.nombre} — estado reconciliado a ${existe.estado}`);
+      }
+      if (existe.umbralInconsistenciaCruzada == null && data.umbralInconsistenciaCruzada != null) {
+        existe.umbralInconsistenciaCruzada = data.umbralInconsistenciaCruzada;
+        huboCambios = true;
+        console.log(`  ${existe.nombre} — umbral de inconsistencia reconciliado a ${existe.umbralInconsistenciaCruzada}`);
+      }
+      if (huboCambios) {
+        await this.convocatoriaRepo.save(existe);
       }
       return existe;
     }
@@ -1346,13 +1355,13 @@ export class SeedService {
   }
 
   private async seedConvocatorias(): Promise<void> {
-    const especificaciones: Array<{ anio: number; estado: EstadoConvocatoria }> = [
-      { anio: 2023, estado: EstadoConvocatoria.Cierre },
-      { anio: 2024, estado: EstadoConvocatoria.Cierre },
-      { anio: 2025, estado: EstadoConvocatoria.Ejecucion },
-      { anio: 2026, estado: EstadoConvocatoria.Evaluacion },
-      { anio: 2027, estado: EstadoConvocatoria.Presentacion },
-      { anio: 2028, estado: EstadoConvocatoria.Configuracion },
+    const especificaciones: Array<{ anio: number; estado: EstadoConvocatoria; umbralInconsistenciaCruzada?: number }> = [
+      { anio: 2023, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 20 },
+      { anio: 2024, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 20 },
+      { anio: 2025, estado: EstadoConvocatoria.Ejecucion, umbralInconsistenciaCruzada: 20 },
+      { anio: 2026, estado: EstadoConvocatoria.Evaluacion, umbralInconsistenciaCruzada: 20 },
+      { anio: 2027, estado: EstadoConvocatoria.Presentacion, umbralInconsistenciaCruzada: 20 },
+      { anio: 2028, estado: EstadoConvocatoria.Configuracion, umbralInconsistenciaCruzada: 20 },
     ];
 
     for (const spec of especificaciones) {
@@ -1370,6 +1379,7 @@ export class SeedService {
         fechaFinEvaluacion: this.crearFecha(anio, 7, 15),
         fechaInicioEjecucion: this.crearFecha(anio, 8, 1),
         fechaFinEjecucion: this.crearFecha(anio + 1, 2, 28),
+        umbralInconsistenciaCruzada: spec.umbralInconsistenciaCruzada,
         formularioId,
         cuotaFederativa: 1,
         // Holgados respecto de lo que genera generarPresupuesto (~$840.000 en el peor caso), para

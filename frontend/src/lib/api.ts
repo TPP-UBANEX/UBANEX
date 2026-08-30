@@ -172,6 +172,7 @@ export const api = {
       porcentajeExtraInsumos?: number;
       umbralInsumos?: number;
       porcentajeExtraPse?: number;
+      umbralInconsistenciaCruzada?: number;
     }) => post<import('@/data/types').Convocatoria>('/convocatorias', data),
     actualizar: (
       id: string,
@@ -193,6 +194,7 @@ export const api = {
         porcentajeExtraInsumos?: number;
         umbralInsumos?: number;
         porcentajeExtraPse?: number;
+        umbralInconsistenciaCruzada?: number | null;
       },
     ) => patch<import('@/data/types').Convocatoria>(`/convocatorias/${id}`, data),
     eliminar: (id: string) => del(`/convocatorias/${id}`),
@@ -441,6 +443,10 @@ export const api = {
         post<import('@/data/types').EvaluacionCruzada>(
           `/evaluaciones/cruzadas/${edicionId}/designar-tercera?convocatoriaId=${convocatoriaId}`,
           { evaluadorId },
+        ),
+      candidatosTercera: (convocatoriaId: string, edicionId: string) =>
+        get<import('@/data/types').CandidatoTerceraUa[]>(
+          `/evaluaciones/cruzadas/${edicionId}/tercera-candidatos?convocatoriaId=${convocatoriaId}`,
         ),
       historial: (convocatoriaId: string, edicionId: string) =>
         get<import('@/data/types').HistorialEvaluacion[]>(

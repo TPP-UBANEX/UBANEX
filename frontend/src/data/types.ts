@@ -270,6 +270,7 @@ export interface Convocatoria {
   umbralInsumos?: number;
   porcentajeExtraPse?: number;
   ordenMeritoConfirmado: boolean;
+  umbralInconsistenciaCruzada: number | null;
   formulario?: Formulario;
 }
 
@@ -542,7 +543,19 @@ export interface MonitoreoEvaluacion {
       estado: EstadoEvaluacion;
       evaluador: { id: string; nombreCompleto: string } | null;
     }>;
+    inconsistencia: {
+      inconsistente: boolean;
+      diferencia: number;
+      umbral: number;
+    } | null;
   }>;
+}
+
+export interface CandidatoTerceraUa {
+  id: string
+  nombreCompleto: string
+  email: string
+  unidadAcademica: { id: string; nombre: string } | null
 }
 
 export interface EvaluacionEdicionDetalle {

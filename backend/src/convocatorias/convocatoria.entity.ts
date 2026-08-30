@@ -97,4 +97,10 @@ export class Convocatoria {
 
   @Column({ nullable: true })
   templateAutoevaluacionImpactoId: string | null;
+
+  // Diferencia de puntaje (en puntos de la evaluación cruzada) a partir de la
+  // cual la edición se marca como inconsistente y puede requerir la tercera
+  // Unidad Académica de desempate. Null → usa el default del sistema.
+  @Column({ type: 'int', nullable: true })
+  umbralInconsistenciaCruzada: number | null;
 }

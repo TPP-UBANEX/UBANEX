@@ -137,6 +137,7 @@ export function ConvocatoriaDetail() {
     porcentajeExtraInsumos: 35,
     umbralInsumos: 40,
     porcentajeExtraPse: 15,
+    umbralInconsistenciaCruzada: '',
   });
   const [guardando, setGuardando] = useState(false);
   const [confirmEditOpen, setConfirmEditOpen] = useState(false);
@@ -480,6 +481,8 @@ export function ConvocatoriaDetail() {
       porcentajeExtraInsumos: conv.porcentajeExtraInsumos ?? 35,
       umbralInsumos: conv.umbralInsumos ?? 40,
       porcentajeExtraPse: conv.porcentajeExtraPse ?? 15,
+      umbralInconsistenciaCruzada:
+        conv.umbralInconsistenciaCruzada != null ? String(conv.umbralInconsistenciaCruzada) : '',
     });
     setEditOpen(true);
   };
@@ -500,8 +503,10 @@ export function ConvocatoriaDetail() {
     setConfirmEditOpen(false);
     setGuardando(true);
     try {
+      const umbral = editForm.umbralInconsistenciaCruzada.trim();
       const actualizada = await api.convocatorias.actualizar(id!, {
         ...editForm,
+        umbralInconsistenciaCruzada: umbral === '' ? null : parseInt(umbral, 10),
         presupuestoTotal: editForm.presupuestoTotal > 0 ? editForm.presupuestoTotal : null,
         topePresupuestoNoConsolidado:
           editForm.topePresupuestoNoConsolidado > 0 ? editForm.topePresupuestoNoConsolidado : null,
@@ -832,6 +837,19 @@ export function ConvocatoriaDetail() {
                           </p>
                         )}
                       </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Umbral de inconsistencia (3ra UA) · vacío = default 20 pts
+                      </p>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="mt-1"
+                        placeholder="20"
+                        value={editForm.umbralInconsistenciaCruzada}
+                        onChange={e => setEditForm(f => ({ ...f, umbralInconsistenciaCruzada: e.target.value }))}
+                      />
                     </div>
                   </div>
                   <div className="border rounded-lg p-3 space-y-3">

@@ -170,7 +170,10 @@ Gestionar el ciclo completo de las convocatorias y la presentación de proyectos
 
 - Cada convocatoria define su propio **template de formulario** (estructura de campos) para la presentación de proyectos.
 - Los templates pueden reutilizarse entre convocatorias (opción **default**).
-- Tipos de campo disponibles: `texto`, `booleano`, `checkbox`, `select`, `archivo`.
+- Tipos de campo disponibles (`TipoCampo`): `texto`, `texto_largo`, `numero`, `fecha`,
+  `geolocalizacion`, `booleano`, `checkbox`, `select`, `usuario`, `tabla`, `seccion` y
+  `archivo`. `archivo` está deshabilitado hasta que exista almacenamiento de adjuntos;
+  `seccion` es solo un separador visual.
 - Cada campo se configura como obligatorio u opcional.
 
 ### Proyecto y Edición
@@ -261,10 +264,13 @@ Proyecto con `esConsolidado = true`: mismo equipo directivo durante dos años co
 
 ### Orden de mérito
 
-Se construye utilizando:
-* Puntajes de ambas evaluaciones.
-* Prioridades institucionales.
-* Cuota federativa.
+Se construye con la **nota final** de cada edición: cada "Sí" de la evaluación
+institucional suma 10 pts y se le suma el promedio de las evaluaciones cruzadas
+confirmadas (`notaFinal = round((promedioCruzadas + puntajeInstitucional) * 10) / 10`).
+Los proyectos consolidados encabezan el orden. No hay umbral de nota para adjudicar: el
+corte lo determina el presupuesto disponible de la convocatoria y la **cuota federativa**
+como piso por unidad académica. Ver [`dominio/modelo.md`](dominio/modelo.md) §Adjudicación
+y Orden de Mérito para el algoritmo completo.
 
 ### Adjudicación
 
@@ -296,6 +302,9 @@ Comienza cuando se firma la resolución de adjudicación.
 - Misma estructura que Bienes de Consumo.
 
 ### Rendición
+
+> **Estado: no implementado aún.** Hoy `Rendicion` es una tabla mínima de solo lectura;
+> no existen los comprobantes ni el flujo de revisión descrito abajo (ver "Estado actual").
 
 - Una única **Rendición** por Edición, activa durante la etapa `Ejecución`.
 - El director y/o codirector suben **Comprobantes** (archivos PDF o imagen), cada uno asociado a uno de los 3 rubros del presupuesto.
@@ -815,6 +824,9 @@ Duración:
 
 # 15. Preguntas Pendientes
 
+> Nota: varias de estas preguntas ya se resolvieron durante la implementación. Se marcan
+> abajo con **[Resuelto]**; el detalle está en [`dominio/modelo.md`](dominio/modelo.md).
+
 ## Infraestructura
 
 * ¿Dónde se almacenarán los documentos adjuntos (archivos de formularios, comprobantes de rendición)?
@@ -828,9 +840,14 @@ Duración:
 
 ## Evaluación
 
-* Fórmula exacta del puntaje final (cómo se combinan evaluación institucional y cruzada para el orden de mérito).
-* Reglas precisas de cuota federativa.
-* Manejo de suplentes y de la tercera UA de resolución de inconsistencias.
+* **[Resuelto]** Fórmula del puntaje final: cada "Sí" institucional suma 10 pts y
+  `notaFinal = round((promedio de cruzadas confirmadas + puntaje institucional) * 10) / 10`.
+  No hay umbral de nota; el corte lo da el presupuesto + la cuota federativa.
+* **[Resuelto]** Reglas de cuota federativa: piso por UA con algoritmo de 3 pasos
+  (mérito global con tope por UA → piso de cuota → swap por excedente).
+* **[Resuelto]** Tercera UA de resolución de inconsistencias: se compara la evaluación
+  Propia vs. Ajena contra `umbralInconsistenciaCruzada` (default 40) y se designa un
+  evaluador de una tercera UA. Suplencias: no hay (el estado `NoAdjudicado` es terminal).
 
 ## Rendición
 
@@ -840,7 +857,8 @@ Duración:
 
 ## Ejecución y Seguimiento
 
-* ¿Cuáles son las categorías fijas de hitos?
+* **[Resuelto]** Categorías fijas de hitos (`CategoriaHito`): Organización, Capacitación,
+  Actividad con la Comunidad, Articulación, Difusión, Informe Parcial.
 * ¿Quién revisa los comprobantes de rendición exactamente (Rectorado, Secretaría, ambos)?
 * ¿Hay un límite de reemplazos de comprobantes rechazados?
 
@@ -853,28 +871,45 @@ Duración:
 
 # Estado actual
 
-Proyecto definido.
-Relevamiento avanzado.
-Documento de propuesta prácticamente terminado.
-Modelo de dominio implementado en código.
+Proyecto definido. Relevamiento avanzado. Documento de propuesta terminado. Modelo de
+dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
 
 ## Implementado
 
-* Sistema de autenticación (registro como Estudiante/Docente, login JWT).
-* Roles del sistema: 6 roles (Autoridad/Asistente de Rectorado, Autoridad/Asistente de Secretaría, Estudiante, Docente).
-* Roles de ejecución por convocatoria: DirectorDeProyecto y Evaluador mediante `ParticipacionConvocatoria`.
-* CRUD de usuarios con paginación, filtros y validación de docentes.
-* CRUD de convocatorias con fechas por etapa y formularios dinámicos.
-* CRUD de proyectos y ediciones con presupuesto (3 rubros).
-* Evaluaciones con puntajes y observaciones.
-* Rendiciones con comprobantes.
+* Autenticación JWT: registro propio como Estudiante/Docente, login, guards y roles.
+* 6 roles globales (Autoridad/Asistente de Rectorado, Autoridad/Asistente de Secretaría,
+  Estudiante, Docente) en grupos excluyentes; validación de docentes por Secretaría.
+* Roles de ejecución por convocatoria (`DirectorDeProyecto`, `Evaluador`) vía
+  `ParticipacionConvocatoria`; alta directa de evaluadores por Rectorado.
+* CRUD de usuarios con paginación, filtros y perfil académico/docente; auditoría de
+  acciones; catálogos de unidades académicas, carreras y geo.
+* CRUD de convocatorias con estados y fechas por etapa.
+* Formularios dinámicos con 12 tipos de campo, tablas, y plantillas reutilizables;
+  se congelan al pasar a `Presentacion`.
+* Proyectos y ediciones con presupuesto de 3 rubros (recálculo en backend), tope de
+  presupuesto solicitado por convocatoria, aval de edición y reenvío ("resubir").
+* Sugerencias de cambio sobre ediciones presentadas + notificaciones in-app / mail.
 * Emparejamiento de unidades académicas por convocatoria.
-* Auditoría de acciones de usuario.
-
-## Próximos artefactos
-
+* Evaluación institucional y cruzada con estado `Borrador | Confirmada` y plantillas
+  configurables por convocatoria.
+* Consolidación derivada del historial + override tri-estado; salteo de evaluación de
+  consolidados.
+* Orden de mérito y adjudicación propuesta (mérito / cuota federativa) con presupuesto a
+  adjudicar (topes, extra por insumos, extra por PSE); confirmación que fija el resultado
+  y notifica a los directores.
+* Desempate por tercera evaluación: umbral de inconsistencia cruzada y designación de un
+  evaluador de una tercera unidad académica.
 * Hitos de ejecución.
-* Autoevaluación de impacto.
-* Informe final.
-* Orden de mérito y adjudicación.
+* Autoevaluación de impacto (plantillas configurables) e informe final (autogenerado
+  desde hitos), cada uno con su confirmación.
+
+## Falta / incompleto
+
+* **Rendición de comprobantes** (Módulo 3): hoy es una tabla mínima de solo lectura, sin
+  entidad `Comprobante` ni flujo de revisión.
+* **Cierre de la Edición a `Cerrado`**: existen las confirmaciones individuales de
+  informe y autoevaluación, pero no la transición que valida los 3 requisitos (informe
+  confirmado + autoevaluación completada + rendición aceptada).
+* **Almacenamiento de adjuntos**: `TipoCampo.Archivo` deshabilitado, aval como URL, sin
+  subida real de archivos.
 * Wireframes y presentación de defensa.

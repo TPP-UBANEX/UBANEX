@@ -49,6 +49,8 @@ import {
 // define el presupuesto + cuota federativa, no un umbral de nota.
 const PUNTAJE_BOOLEANO = 10;
 
+const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
+
 @Injectable()
 export class EvaluacionesService {
   private readonly logger = new Logger(EvaluacionesService.name);
@@ -118,7 +120,13 @@ export class EvaluacionesService {
     return {
       convocatoria,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-      ediciones: ediciones.map((ed) => this.mapearFilaOrden(ed, instPorEdicion, cruzadasPorEdicion)),
+      ediciones: ediciones.map((ed) => ({
+        ...this.mapearFilaOrden(ed, instPorEdicion, cruzadasPorEdicion),
+        inconsistencia: this.calcularInconsistencia(
+          cruzadasPorEdicion.get(ed.id) ?? [],
+          convocatoria.umbralInconsistenciaCruzada,
+        ),
+      })),
     };
   }
 
@@ -416,6 +424,36 @@ export class EvaluacionesService {
       puntajeCruzadaMaximo: maxCruzada,
       notaFinal,
       checklistCompleto,
+    };
+  }
+
+  private puntajeCruzada(cruzada: EvaluacionCruzada): number {
+    return Object.values(cruzada.items ?? {}).reduce<number>((suma, v) => suma + Number(v), 0);
+  }
+
+  // Detecta una inconsistencia extraordinaria entre la evaluación Propia y la
+  // Ajena: ambas confirmadas y con diferencia de puntaje que supera el umbral
+  // de la convocatoria. Devuelve null si aún no hay par confirmado.
+  private calcularInconsistencia(
+    cruzadas: EvaluacionCruzada[],
+    umbral: number | null,
+  ): { inconsistente: boolean; diferencia: number; umbral: number } | null {
+    const propia = cruzadas.find(c => c.tipo === TipoEvaluacionCruzada.Propia);
+    const ajena = cruzadas.find(c => c.tipo === TipoEvaluacionCruzada.Ajena);
+    if (
+      !propia ||
+      !ajena ||
+      propia.estado !== EstadoEvaluacion.Confirmada ||
+      ajena.estado !== EstadoEvaluacion.Confirmada
+    ) {
+      return null;
+    }
+    const diferencia = Math.abs(this.puntajeCruzada(propia) - this.puntajeCruzada(ajena));
+    const umbralEfectivo = umbral ?? UMBRAL_INCONSISTENCIA_DEFAULT;
+    return {
+      inconsistente: diferencia > umbralEfectivo,
+      diferencia,
+      umbral: umbralEfectivo,
     };
   }
 
@@ -1615,6 +1653,48 @@ export class EvaluacionesService {
 
   // ───────────── Tercera Unidad Académica de resolución ─────────────
 
+  // Candidatos para la tercera UA: evaluadores aprobados de la convocatoria
+  // cuya Unidad Académica no sea la del proyecto ni la emparejada, y que no
+  // tengan ya una evaluación sobre la edición.
+  async listarCandidatosTercera(convocatoriaId: string, edicionId: string) {
+    const edicion = await this.edicionRepo.findOne({ where: { id: edicionId, convocatoriaId } });
+    if (!edicion) throw new NotFoundException('Edición no encontrada');
+
+    const uaEmparejada = await this.obtenerUaEmparejada(convocatoriaId, edicion.unidadAcademicaId);
+
+    const participaciones = await this.participacionRepo.find({
+      where: {
+        convocatoriaId,
+        rol: RolEjecucion.Evaluador,
+        estado: EstadoPropuestaEvaluador.Aprobado,
+      },
+      relations: { usuario: { unidadAcademica: true } },
+    });
+
+    const evaluacionesEnEdicion = await this.cruzadaRepo.find({
+      where: { edicionId },
+      select: { evaluadorId: true },
+    });
+    const evaluadoresEnEdicion = new Set(evaluacionesEnEdicion.map(e => e.evaluadorId));
+
+    return participaciones
+      .filter(p => {
+        const ua = p.usuario.unidadAcademicaId;
+        if (ua === edicion.unidadAcademicaId) return false;
+        if (uaEmparejada && ua === uaEmparejada) return false;
+        if (evaluadoresEnEdicion.has(p.usuarioId)) return false;
+        return true;
+      })
+      .map(p => ({
+        id: p.usuario.id,
+        nombreCompleto: p.usuario.nombreCompleto,
+        email: p.usuario.email,
+        unidadAcademica: p.usuario.unidadAcademica
+          ? { id: p.usuario.unidadAcademica.id, nombre: p.usuario.unidadAcademica.nombre }
+          : null,
+      }));
+  }
+
   async designarTercera(
     convocatoriaId: string,
     edicionId: string,
@@ -1654,7 +1734,26 @@ export class EvaluacionesService {
       );
     }
 
-    await this.validarEvaluadorAprobado(convocatoriaId, evaluadorId);
+    const participacion = await this.participacionRepo.findOne({
+      where: {
+        usuarioId: evaluadorId,
+        convocatoriaId,
+        rol: RolEjecucion.Evaluador,
+        estado: EstadoPropuestaEvaluador.Aprobado,
+      },
+      relations: { usuario: { unidadAcademica: true } },
+    });
+    if (!participacion) {
+      throw new ForbiddenException('Solo evaluadores aprobados de la convocatoria pueden evaluar');
+    }
+
+    const uaEmparejada = await this.obtenerUaEmparejada(convocatoriaId, edicion.unidadAcademicaId);
+    const uaEvaluador = participacion.usuario.unidadAcademicaId;
+    if (uaEvaluador === edicion.unidadAcademicaId || (uaEmparejada && uaEvaluador === uaEmparejada)) {
+      throw new BadRequestException(
+        'El evaluador debe pertenecer a una Unidad Académica distinta de la del proyecto y de la emparejada',
+      );
+    }
 
     const existente = await this.cruzadaRepo.findOne({
       where: { edicionId, tipo: TipoEvaluacionCruzada.TerceraUa },

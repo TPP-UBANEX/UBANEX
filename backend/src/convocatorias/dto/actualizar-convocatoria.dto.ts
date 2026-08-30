@@ -80,4 +80,9 @@ export class ActualizarConvocatoriaDto {
   @Max(100)
   @IsOptional()
   porcentajeExtraPse?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  umbralInconsistenciaCruzada?: number;
 }
