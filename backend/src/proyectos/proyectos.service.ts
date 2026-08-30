@@ -151,7 +151,7 @@ export class ProyectosService {
         creadoPorId: usuario.id,
         unidadAcademicaId: usuario.unidadAcademicaId,
         anioEdicion: dto.anioEdicion || new Date().getFullYear(),
-        presupuesto: ultimaEdicion?.presupuesto ?? null,
+        presupuestoSolicitado: ultimaEdicion?.presupuestoSolicitado ?? null,
         datosFormulario: datosFormularioMapeados,
       }),
     );
@@ -497,9 +497,9 @@ export class ProyectosService {
       edicion.anioEdicion = dto.anioEdicion;
     }
 
-    if (dto.presupuesto !== undefined) {
-      validarPresupuesto(dto.presupuesto);
-      edicion.presupuesto = normalizarPresupuesto(dto.presupuesto);
+    if (dto.presupuestoSolicitado !== undefined) {
+      validarPresupuesto(dto.presupuestoSolicitado);
+      edicion.presupuestoSolicitado = normalizarPresupuesto(dto.presupuestoSolicitado);
     }
 
     if (dto.datosFormulario !== undefined) {
@@ -553,7 +553,10 @@ export class ProyectosService {
       );
     }
 
-    const presupuestoIncompleto = presupuestoIncompletoParaEnvio(edicion.presupuesto, edicion.convocatoria);
+    const presupuestoIncompleto = presupuestoIncompletoParaEnvio(
+      edicion.presupuestoSolicitado,
+      edicion.convocatoria,
+    );
     if (presupuestoIncompleto.length > 0) {
       motivos.push(`Presupuesto: ${presupuestoIncompleto.join(', ')}`);
     }

@@ -28,7 +28,7 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { BienPresupuesto, Presupuesto, ViaticoPresupuesto } from '../proyectos/presupuesto.interface';
-import { etiquetaCampoPresupuesto } from '../proyectos/presupuesto.util';
+import { etiquetaCampoPresupuesto, PREFIJO_RUTA_PRESUPUESTO } from '../proyectos/presupuesto.util';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { TipoPersona } from '../common/enums/tipo-persona.enum';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
@@ -1442,7 +1442,7 @@ export class SeedService {
         creadoPorId: creadoPor.id,
         unidadAcademicaId: unidadAcademica.id,
         anioEdicion: convocatoria.anio,
-        presupuesto: presupuesto || null,
+        presupuestoSolicitado: presupuesto || null,
         datosFormulario: datosFormulario ?? null,
       }),
     );
@@ -1779,7 +1779,7 @@ export class SeedService {
             creadoPorId: director.id,
             unidadAcademicaId: derecho.id,
             anioEdicion: anio,
-            presupuesto: generarPresupuesto(this.rng, anio),
+            presupuestoSolicitado: generarPresupuesto(this.rng, anio),
             datosFormulario: this.seedDatosFormulario(campos, {
               resumen: 'Escuela de oficios comunitaria sostenida por el mismo equipo directivo año a año.',
               area: 'Educación',
@@ -1911,7 +1911,7 @@ export class SeedService {
         creadoPorId: plan.directorId,
         unidadAcademicaId: plan.uaId,
         anioEdicion: anio,
-        presupuesto: plan.presupuesto,
+        presupuestoSolicitado: plan.presupuesto,
         datosFormulario: plan.datos,
       });
       edicion.id = crypto.randomUUID();
@@ -3146,7 +3146,7 @@ export class SeedService {
     }
 
     if (elegido.nombre === 'presupuesto') {
-      const sugerida = this.primeraPartidaSugerible(ed.presupuesto);
+      const sugerida = this.primeraPartidaSugerible(ed.presupuestoSolicitado);
       if (!sugerida) return undefined;
       return {
         campo: sugerida.campo,
@@ -3219,7 +3219,11 @@ export class SeedService {
     });
     directores.forEach((d) => destinatarios.add(d.usuarioId));
 
-    const nombreCampo = this.nombreLegibleSugerencia(sugerencia.campo, campos, ed.presupuesto);
+    const nombreCampo = this.nombreLegibleSugerencia(
+      sugerencia.campo,
+      campos,
+      ed.presupuestoSolicitado,
+    );
     for (const usuarioId of destinatarios) {
       if (usuarioId === sugeridoPor.id) continue;
       await this.notificacionRepo.save(
@@ -3235,8 +3239,8 @@ export class SeedService {
 
   private nombreLegibleSugerencia(campo: string, campos: CampoFormulario[], presupuesto: Presupuesto | null): string {
     if (campo === 'nombre') return 'Nombre del proyecto';
-    if (campo.startsWith('presupuesto.')) {
-      return etiquetaCampoPresupuesto(presupuesto, campo.replace('presupuesto.', ''));
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''));
     }
     if (campo.startsWith('datosFormulario.')) {
       const id = campo.replace('datosFormulario.', '');

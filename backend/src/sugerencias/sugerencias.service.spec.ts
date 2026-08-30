@@ -100,7 +100,7 @@ describe('SugerenciasService', () => {
       unidadAcademicaId: 'ua-derecho',
       creadoPorId: 'u-creador',
       estado: EstadoEdicion.Presentado,
-      presupuesto: presupuestoDePrueba(),
+      presupuestoSolicitado: presupuestoDePrueba(),
       ...overrides,
     } as unknown as Edicion;
   }
@@ -186,7 +186,7 @@ describe('SugerenciasService', () => {
 
       expect(saveEdicion).toHaveBeenCalledTimes(1);
       const guardada = (saveEdicion.mock.calls[0] as unknown as [Edicion])[0];
-      const presupuesto = guardada.presupuesto as Presupuesto;
+      const presupuesto = guardada.presupuestoSolicitado as Presupuesto;
       expect(presupuesto.rubros[0].subtotal).toBe(2000);
       expect(presupuesto.montoTotal).toBe(7000);
       expect(saveSugerencia).toHaveBeenCalledWith(

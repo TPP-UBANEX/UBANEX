@@ -14,7 +14,7 @@ import { validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { Presupuesto } from '../proyectos/presupuesto.interface';
 import {
   esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, normalizarPresupuesto,
-  parsearRutaPartida, validarPresupuesto,
+  parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, validarPresupuesto,
 } from '../proyectos/presupuesto.util';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { Usuario } from '../usuarios/usuario.entity';
@@ -247,10 +247,10 @@ export class SugerenciasService {
       case 'esInterfacultad': return String(proyecto.esInterfacultad);
       case 'anioEdicion': return edicion.anioEdicion != null ? String(edicion.anioEdicion) : null;
       default:
-        if (campo.startsWith('presupuesto.')) {
-          const path = campo.replace('presupuesto.', '');
+        if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+          const path = campo.replace(PREFIJO_RUTA_PRESUPUESTO, '');
           if (!parsearRutaPartida(path)) return null;
-          return this.obtenerValorJson(edicion.presupuesto, path);
+          return this.obtenerValorJson(edicion.presupuestoSolicitado, path);
         }
         if (campo.startsWith('datosFormulario.')) {
           return this.obtenerValorJson(edicion.datosFormulario, campo.replace('datosFormulario.', ''));
@@ -316,8 +316,12 @@ export class SugerenciasService {
         await this.edicionRepo.save(edicion);
         break;
       default:
-        if (campo.startsWith('presupuesto.')) {
-          this.aplicarCambioPresupuesto(edicion, campo.replace('presupuesto.', ''), valorSugerido);
+        if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+          this.aplicarCambioPresupuesto(
+            edicion,
+            campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''),
+            valorSugerido,
+          );
           await this.edicionRepo.save(edicion);
         } else if (campo.startsWith('datosFormulario.')) {
           const campoId = campo.replace('datosFormulario.', '');
@@ -338,10 +342,10 @@ export class SugerenciasService {
    */
   private aplicarCambioPresupuesto(edicion: Edicion, path: string, valorSugerido: string): void {
     const ruta = parsearRutaPartida(path);
-    if (!ruta || !edicion.presupuesto) {
+    if (!ruta || !edicion.presupuestoSolicitado) {
       throw new BadRequestException('No se puede aplicar ese cambio de presupuesto');
     }
-    const rubro = edicion.presupuesto.rubros[ruta.rubroIndice];
+    const rubro = edicion.presupuestoSolicitado.rubros[ruta.rubroIndice];
     const partidaExistente = rubro?.partidas?.[ruta.partidaIndice];
     if (!rubro || !partidaExistente) {
       throw new BadRequestException('No se puede aplicar ese cambio: la partida ya no existe');
@@ -354,13 +358,13 @@ export class SugerenciasService {
       throw new BadRequestException('El valor sugerido debe ser un número válido');
     }
 
-    const nuevoPresupuesto: Presupuesto = JSON.parse(JSON.stringify(edicion.presupuesto));
+    const nuevoPresupuesto: Presupuesto = JSON.parse(JSON.stringify(edicion.presupuestoSolicitado));
     const partida = nuevoPresupuesto.rubros[ruta.rubroIndice].partidas[ruta.partidaIndice] as unknown as
       Record<string, unknown>;
     partida[ruta.campo] = valor;
 
     validarPresupuesto(nuevoPresupuesto);
-    edicion.presupuesto = normalizarPresupuesto(nuevoPresupuesto);
+    edicion.presupuestoSolicitado = normalizarPresupuesto(nuevoPresupuesto);
   }
 
   private aplicarCambioJson(edicion: Edicion, path: string, valor: unknown) {
@@ -388,7 +392,7 @@ export class SugerenciasService {
     directores.forEach(d => destinatarios.add(d.usuarioId));
 
     const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
-    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, edicion.presupuesto);
+    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, edicion.presupuestoSolicitado);
     const mensaje = `${sugeridoPor.nombreCompleto} sugirió un cambio en "${nombreCampo}" del proyecto "${proyecto.nombre}"`;
 
     for (const usuarioId of destinatarios) {
@@ -412,7 +416,11 @@ export class SugerenciasService {
     };
     const accion = accionTexto[sugerencia.estado] || 'respondió a';
     const campos = await this.obtenerCamposFormulario(sugerencia.edicion.convocatoriaId);
-    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, sugerencia.edicion.presupuesto);
+    const nombreCampo = this.nombreLegible(
+      sugerencia.campo,
+      campos,
+      sugerencia.edicion.presupuestoSolicitado,
+    );
     const mensaje = `${respondidoPor.nombreCompleto} ${accion} la sugerencia en "${nombreCampo}"`;
 
     await this.notificacionRepo.save(
@@ -443,7 +451,7 @@ export class SugerenciasService {
   private validarCampoPresupuesto(edicion: Edicion, path: string, valorSugerido: string | null): void {
     const ruta = parsearRutaPartida(path);
     if (ruta) {
-      const rubro = edicion.presupuesto?.rubros?.[ruta.rubroIndice];
+      const rubro = edicion.presupuestoSolicitado?.rubros?.[ruta.rubroIndice];
       const partida = rubro?.partidas?.[ruta.partidaIndice];
       if (!rubro || !partida) {
         throw new BadRequestException('No se puede sugerir un cambio sobre una partida que no existe');
@@ -463,7 +471,7 @@ export class SugerenciasService {
       return;
     }
 
-    if (esRutaComentarioPresupuesto(edicion.presupuesto, path)) {
+    if (esRutaComentarioPresupuesto(edicion.presupuestoSolicitado, path)) {
       if (valorSugerido != null) {
         throw new BadRequestException('Sobre un rubro solo se puede dejar un comentario, no un valor sugerido');
       }
@@ -479,8 +487,12 @@ export class SugerenciasService {
     campo: string,
     valorSugerido: string | null,
   ): Promise<void> {
-    if (campo.startsWith('presupuesto.')) {
-      this.validarCampoPresupuesto(edicion, campo.replace('presupuesto.', ''), valorSugerido);
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      this.validarCampoPresupuesto(
+        edicion,
+        campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''),
+        valorSugerido,
+      );
       return;
     }
 
@@ -512,8 +524,8 @@ export class SugerenciasService {
       esInterfacultad: 'Es interfacultad',
     };
     if (mapa[campo]) return mapa[campo];
-    if (campo.startsWith('presupuesto.')) {
-      return etiquetaCampoPresupuesto(presupuesto, campo.replace('presupuesto.', ''));
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''));
     }
     if (campo.startsWith('datosFormulario.')) {
       const campoId = campo.replace('datosFormulario.', '');

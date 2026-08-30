@@ -152,7 +152,7 @@ describe('ProyectosService', () => {
     it('rechaza un presupuesto mal formado y no lo persiste', async () => {
       findOneEdicion.mockResolvedValue(edicion({ convocatoria } as unknown as Partial<Edicion>));
       const dto = {
-        presupuesto: {
+        presupuestoSolicitado: {
           montoTotal: 1,
           rubros: [{ tipo: 'Sueldos', subtotal: -5, partidas: [] }],
         },
@@ -167,7 +167,7 @@ describe('ProyectosService', () => {
     it('persiste el presupuesto normalizado en vez del que llegó mentido', async () => {
       findOneEdicion.mockResolvedValue(edicion({ convocatoria } as unknown as Partial<Edicion>));
       const dto = {
-        presupuesto: {
+        presupuestoSolicitado: {
           montoTotal: 1,
           rubros: [
             { tipo: TipoRubro.ViaticosYSeguros, subtotal: 999, partidas: [] },
@@ -185,7 +185,7 @@ describe('ProyectosService', () => {
 
       expect(saveEdicion).toHaveBeenCalledTimes(1);
       const guardada = (saveEdicion.mock.calls[0] as unknown as [Edicion])[0];
-      const presupuesto = guardada.presupuesto as Presupuesto;
+      const presupuesto = guardada.presupuestoSolicitado as Presupuesto;
       expect(presupuesto.montoTotal).toBe(1000);
       expect(presupuesto.rubros[1].subtotal).toBe(1000);
     });
@@ -225,7 +225,9 @@ describe('ProyectosService', () => {
 
     it('rechaza el envío si el presupuesto está vacío', async () => {
       findOneEdicion.mockResolvedValue(
-        edicion({ convocatoria: convocatoriaConEjecucion, presupuesto: null } as unknown as Partial<Edicion>),
+        edicion({
+          convocatoria: convocatoriaConEjecucion, presupuestoSolicitado: null,
+        } as unknown as Partial<Edicion>),
       );
 
       await expect(
@@ -263,7 +265,7 @@ describe('ProyectosService', () => {
       };
       findOneEdicion.mockResolvedValue(
         edicion({
-          convocatoria: convocatoriaConEjecucion, presupuesto: presupuestoCompleto,
+          convocatoria: convocatoriaConEjecucion, presupuestoSolicitado: presupuestoCompleto,
         } as unknown as Partial<Edicion>),
       );
 
