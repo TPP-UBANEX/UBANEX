@@ -14,6 +14,12 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
  *
  * "Aprobado" = `Edicion.estado === Adjudicado`. Un hueco (no participó o no adjudicado)
  * reinicia la racha.
+ *
+ * `fueConsolidadoAlgunaVez` es irreversible: una vez que en alguna convocatoria (hasta la actual
+ * inclusive) el proyecto llegó con racha >= 3, queda marcado para siempre, aunque después haya
+ * huecos que reinicien la racha. Se usa para el tope de presupuesto solicitado (ver
+ * presupuesto.util.ts#topePresupuestoSolicitado y esConsolidadoParaTope más abajo), no para
+ * esConsolidadoDerivado ni salteaEvaluacion, que siguen siendo por racha vigente.
  */
 
 export interface ConvocatoriaOrden {
@@ -30,6 +36,7 @@ export interface DatosConsolidacion {
   rachaAdjudicaciones: number;
   esConsolidadoDerivado: boolean;
   salteaEvaluacion: boolean;
+  fueConsolidadoAlgunaVez: boolean;
 }
 
 /** Ordena las convocatorias por año, con el id como desempate estable. */
@@ -58,6 +65,8 @@ export function calcularConsolidacion(
   }
 
   const idxActual = convocatoriasOrdenadas.findIndex(c => c.id === convocatoriaActualId);
+
+  // Recorrido hacia atrás para la racha de la convocatoria actual (comportamiento sin cambios).
   let racha = 0;
   for (let i = idxActual - 1; i >= 0; i--) {
     const conv = convocatoriasOrdenadas[i];
@@ -68,10 +77,23 @@ export function calcularConsolidacion(
     }
   }
 
+  // Recorrido hacia adelante (0..idxActual) para detectar si el proyecto llegó a consolidarse
+  // alguna vez hasta la convocatoria actual inclusive: existe una convocatoria en la que el
+  // proyecto tiene edición y llegaba con una racha >= 3 de adjudicaciones consecutivas.
+  let rachaAcumulada = 0;
+  let fueConsolidadoAlgunaVez = false;
+  for (let i = 0; i <= idxActual; i++) {
+    const conv = convocatoriasOrdenadas[i];
+    const estado = estadoPorConvocatoria.get(conv.id);
+    if (estado !== undefined && rachaAcumulada >= 3) fueConsolidadoAlgunaVez = true;
+    rachaAcumulada = estado === EstadoEdicion.Adjudicado ? rachaAcumulada + 1 : 0;
+  }
+
   return {
     rachaAdjudicaciones: racha,
     esConsolidadoDerivado: racha >= 3,
     salteaEvaluacion: racha >= 4 && racha % 2 === 0,
+    fueConsolidadoAlgunaVez,
   };
 }
 
@@ -92,4 +114,18 @@ export function salteaEvaluacionEfectivo(
   overrideManual: boolean | null,
 ): boolean {
   return datos.salteaEvaluacion && overrideManual !== false;
+}
+
+/**
+ * Consolidación a efectos del tope de presupuesto solicitado (ver presupuesto.util.ts): es
+ * irreversible. Una vez que el proyecto se consolidó alguna vez, le corresponde el tope de
+ * consolidado para siempre, aunque en la convocatoria actual le toque volver a evaluación. El
+ * override manual solo puede subir a un proyecto al tope de consolidado (`true`); un `false`
+ * nunca lo baja, a diferencia de `esConsolidadoEfectivo`.
+ */
+export function esConsolidadoParaTope(
+  datos: DatosConsolidacion,
+  overrideManual: boolean | null,
+): boolean {
+  return overrideManual === true || datos.fueConsolidadoAlgunaVez;
 }
