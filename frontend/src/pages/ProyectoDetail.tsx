@@ -37,7 +37,7 @@ import {
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import {
-  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA,
+  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, motivoTopeExcedido,
   normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
 import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
@@ -177,9 +177,17 @@ export function ProyectoDetail() {
   const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
     camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
-  const presupuestoFaltante = presupuestoIncompletoParaEnvio(edicion?.presupuestoSolicitado, edicion?.convocatoria)
+  const presupuestoFaltante = presupuestoIncompletoParaEnvio(
+    edicion?.presupuestoSolicitado, edicion?.convocatoria, edicion?.esConsolidadoParaTope,
+  )
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
     && camposObligatoriosFaltantes.length === 0 && presupuestoFaltante.length === 0
+  // Aviso en vivo mientras se edita: el mismo tope que el backend termina rechazando al guardar.
+  const motivoTopePresupuesto = motivoTopeExcedido(
+    editPresupuesto || edicion?.presupuestoSolicitado,
+    edicion?.topePresupuestoSolicitado ?? null,
+    edicion?.esConsolidadoParaTope ?? false,
+  )
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
@@ -522,15 +530,18 @@ export function ProyectoDetail() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span tabIndex={0}>
-                      <Button onClick={handleGuardar} disabled={guardando || !!direccion.motivoDireccion}>
+                      <Button
+                        onClick={handleGuardar}
+                        disabled={guardando || !!direccion.motivoDireccion || !!motivoTopePresupuesto}
+                      >
                         {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                         Guardar
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {direccion.motivoDireccion && (
+                  {(direccion.motivoDireccion || motivoTopePresupuesto) && (
                     <TooltipContent>
-                      <p>{direccion.motivoDireccion}</p>
+                      <p>{direccion.motivoDireccion || motivoTopePresupuesto}</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -788,13 +799,19 @@ export function ProyectoDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Presupuesto solicitado</CardTitle>
-              <span className="text-sm font-bold">
+              <span className={`text-sm font-bold ${motivoTopePresupuesto ? 'text-destructive' : ''}`}>
                 Total: {formatearMoneda(
                   editando ? editPresupuesto?.montoTotal : edicion?.presupuestoSolicitado?.montoTotal,
+                )}
+                {edicion?.topePresupuestoSolicitado != null && (
+                  <> / tope {formatearMoneda(edicion.topePresupuestoSolicitado)}</>
                 )}
               </span>
             </CardHeader>
             <CardContent className="space-y-4">
+              {motivoTopePresupuesto && (
+                <p className="text-sm text-destructive">{motivoTopePresupuesto}</p>
+              )}
               {renderPresupuesto(editPresupuesto || edicion?.presupuestoSolicitado || null, editando, edicion?.convocatoria, {
                 addPartida, removePartida, updateViatico, updateBien,
               }, { activo: modoSugerencia, onSugerir: handleSugerirClick })}
