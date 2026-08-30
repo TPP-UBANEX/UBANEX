@@ -2,7 +2,8 @@ import { describe, it, expect } from '@jest/globals';
 import { BadRequestException } from '@nestjs/common';
 import {
   calcularPresupuestoAAdjudicar, esRutaComentarioPresupuesto, etiquetaCampoPresupuesto,
-  normalizarPresupuesto, parsearRutaPartida, presupuestoIncompletoParaEnvio, validarPresupuesto,
+  motivoTopeExcedido, normalizarPresupuesto, parsearRutaPartida, presupuestoIncompletoParaEnvio,
+  topePresupuestoSolicitado, validarPresupuesto,
 } from './presupuesto.util';
 import { Presupuesto } from './presupuesto.interface';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
@@ -241,6 +242,66 @@ describe('presupuestoIncompletoParaEnvio', () => {
     const motivos = presupuestoIncompletoParaEnvio(p, { fechaInicioEjecucion: null, fechaFinEjecucion: null });
     expect(motivos).toContain(
       '"Viáticos y Seguros": el período de la partida 1 no puede comenzar antes de hoy',
+    );
+  });
+
+  it('reporta el total excedido cuando supera el tope de no consolidado', () => {
+    const p = normalizarPresupuesto(presupuestoValido());
+    const motivos = presupuestoIncompletoParaEnvio(
+      p,
+      { ...convocatoriaConEjecucion, topePresupuestoNoConsolidado: 1000, topePresupuestoConsolidado: 100000 },
+      false,
+    );
+    expect(motivos).toContain(
+      `El total solicitado ($${p.montoTotal.toLocaleString('es-AR')}) supera el tope de $1.000 para `
+      + 'proyectos no consolidados de esta convocatoria',
+    );
+  });
+
+  it('no reporta el tope cuando el total esta dentro del tope de consolidado', () => {
+    const p = normalizarPresupuesto(presupuestoValido());
+    p.rubros[2].partidas = [{ descripcion: 'Equipamiento', cantidad: 1, precioUnitario: 100, monto: 100 }];
+    const motivos = presupuestoIncompletoParaEnvio(
+      p,
+      { ...convocatoriaConEjecucion, topePresupuestoNoConsolidado: 1000, topePresupuestoConsolidado: 100000 },
+      true,
+    );
+    expect(motivos).toEqual([]);
+  });
+});
+
+describe('topePresupuestoSolicitado', () => {
+  it('devuelve el tope de consolidado o no consolidado según corresponda', () => {
+    const convocatoria = { topePresupuestoConsolidado: 5000, topePresupuestoNoConsolidado: 1000 };
+    expect(topePresupuestoSolicitado(convocatoria, true)).toBe(5000);
+    expect(topePresupuestoSolicitado(convocatoria, false)).toBe(1000);
+  });
+
+  it('devuelve null cuando el tope no está configurado, es 0 o negativo', () => {
+    expect(topePresupuestoSolicitado(null, false)).toBeNull();
+    expect(topePresupuestoSolicitado({ topePresupuestoConsolidado: 0, topePresupuestoNoConsolidado: null }, true)).toBeNull();
+    expect(topePresupuestoSolicitado({ topePresupuestoConsolidado: null, topePresupuestoNoConsolidado: 0 }, false)).toBeNull();
+  });
+
+  it('interpreta el valor numeric que llega como string desde pg', () => {
+    const convocatoria = { topePresupuestoConsolidado: '5000.50' as unknown as number, topePresupuestoNoConsolidado: null };
+    expect(topePresupuestoSolicitado(convocatoria, true)).toBe(5000.5);
+  });
+});
+
+describe('motivoTopeExcedido', () => {
+  it('devuelve null si no hay tope configurado', () => {
+    expect(motivoTopeExcedido({ montoTotal: 999999, rubros: [] }, null, false)).toBeNull();
+  });
+
+  it('devuelve null si el total es igual al tope (no bloquea el límite exacto)', () => {
+    expect(motivoTopeExcedido({ montoTotal: 1000, rubros: [] }, 1000, false)).toBeNull();
+  });
+
+  it('devuelve el mensaje cuando el total supera el tope', () => {
+    const motivo = motivoTopeExcedido({ montoTotal: 1500, rubros: [] }, 1000, true);
+    expect(motivo).toBe(
+      'El total solicitado ($1.500) supera el tope de $1.000 para proyectos consolidados de esta convocatoria',
     );
   });
 });

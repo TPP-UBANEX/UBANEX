@@ -253,12 +253,20 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
 /**
  * Describe, en texto legible, qué falta completar del presupuesto para poder enviar la edición:
  * los 3 rubros deben tener al menos una partida, cada partida debe tener descripción y monto > 0,
- * y los viáticos deben tener período completo y dentro de la ejecución de la convocatoria (o, si
- * la convocatoria todavía no tiene esas fechas cargadas, no comenzar antes de hoy).
+ * los viáticos deben tener período completo y dentro de la ejecución de la convocatoria (o, si
+ * la convocatoria todavía no tiene esas fechas cargadas, no comenzar antes de hoy), y el total no
+ * debe superar el tope de la convocatoria para proyectos consolidados/no consolidados (`esConsolidado`,
+ * ver consolidacion.ts#esConsolidadoParaTope). Guardar el presupuesto (actualizarEdicion) ya
+ * bloquea esto mismo antes; se repite acá porque una edición puede llegar excedida sin pasar por
+ * ahí (se copia al crear una edición nueva, o baja el tope de una convocatoria ya en curso).
  */
 export function presupuestoIncompletoParaEnvio(
   presupuesto: Presupuesto | null,
-  convocatoria?: Pick<Convocatoria, 'fechaInicioEjecucion' | 'fechaFinEjecucion'> | null,
+  convocatoria?: Pick<
+    Convocatoria,
+    'fechaInicioEjecucion' | 'fechaFinEjecucion' | 'topePresupuestoConsolidado' | 'topePresupuestoNoConsolidado'
+  > | null,
+  esConsolidado = false,
 ): string[] {
   if (!presupuesto || !presupuesto.rubros?.some((r) => r.partidas?.length > 0)) {
     return ['El presupuesto está vacío'];
@@ -301,7 +309,47 @@ export function presupuestoIncompletoParaEnvio(
     });
   }
 
+  const tope = topePresupuestoSolicitado(convocatoria, esConsolidado);
+  const motivoTope = motivoTopeExcedido(presupuesto, tope, esConsolidado);
+  if (motivoTope) motivos.push(motivoTope);
+
   return motivos;
+}
+
+/**
+ * Tope por proyecto sobre el total del presupuesto solicitado (no el que se adjudica), según si
+ * el proyecto es consolidado o no (ver consolidacion.ts#esConsolidadoParaTope). `null`/`0`/no
+ * configurado = sin tope. Los campos `numeric` de Postgres llegan como string vía TypeORM.
+ */
+export function topePresupuestoSolicitado(
+  convocatoria: Pick<Convocatoria, 'topePresupuestoConsolidado' | 'topePresupuestoNoConsolidado'> | null | undefined,
+  esConsolidado: boolean,
+): number | null {
+  const bruto = esConsolidado
+    ? convocatoria?.topePresupuestoConsolidado
+    : convocatoria?.topePresupuestoNoConsolidado;
+  const tope = Number(bruto ?? 0);
+  return Number.isFinite(tope) && tope > 0 ? tope : null;
+}
+
+/** Mensaje si el total solicitado supera `tope`, o `null` si está dentro (o no hay tope). */
+export function motivoTopeExcedido(
+  presupuesto: Presupuesto | null,
+  tope: number | null,
+  esConsolidado: boolean,
+): string | null {
+  if (tope === null) return null;
+  const total = Number(presupuesto?.montoTotal ?? 0);
+  if (total <= tope) return null;
+  const etiquetaTipo = esConsolidado ? 'consolidados' : 'no consolidados';
+  return (
+    `El total solicitado (${formatearMoneda(total)}) supera el tope de ${formatearMoneda(tope)} `
+    + `para proyectos ${etiquetaTipo} de esta convocatoria`
+  );
+}
+
+function formatearMoneda(valor: number): string {
+  return `$${valor.toLocaleString('es-AR')}`;
 }
 
 /**
