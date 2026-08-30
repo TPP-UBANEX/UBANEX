@@ -120,6 +120,21 @@ describe('validarPresupuesto', () => {
     (p.rubros[0].partidas[0] as { tipoPersona: string }).tipoPersona = 'Invitado';
     expect(() => validarPresupuesto(p)).toThrow(BadRequestException);
   });
+
+  it('acepta esInsumo ausente, true o false en un bien', () => {
+    const p = presupuestoValido();
+    expect(() => validarPresupuesto(p)).not.toThrow();
+    (p.rubros[1].partidas[0] as { esInsumo?: boolean }).esInsumo = true;
+    expect(() => validarPresupuesto(p)).not.toThrow();
+    (p.rubros[1].partidas[0] as { esInsumo?: boolean }).esInsumo = false;
+    expect(() => validarPresupuesto(p)).not.toThrow();
+  });
+
+  it('rechaza un esInsumo que no es booleano', () => {
+    const p = presupuestoValido();
+    (p.rubros[1].partidas[0] as { esInsumo?: unknown }).esInsumo = 'true';
+    expect(() => validarPresupuesto(p)).toThrow(BadRequestException);
+  });
 });
 
 describe('normalizarPresupuesto', () => {
@@ -158,6 +173,19 @@ describe('normalizarPresupuesto', () => {
     (p.rubros[1].partidas[0] as { descripcion: string }).descripcion = '  Resmas de papel  ';
     const normalizado = normalizarPresupuesto(p);
     expect(normalizado.rubros[1].partidas[0].descripcion).toBe('Resmas de papel');
+  });
+
+  it('normaliza esInsumo ausente en un bien a false', () => {
+    const p = presupuestoValido();
+    const normalizado = normalizarPresupuesto(p);
+    expect((normalizado.rubros[1].partidas[0] as { esInsumo: boolean }).esInsumo).toBe(false);
+  });
+
+  it('preserva esInsumo true en un bien', () => {
+    const p = presupuestoValido();
+    (p.rubros[1].partidas[0] as { esInsumo?: boolean }).esInsumo = true;
+    const normalizado = normalizarPresupuesto(p);
+    expect((normalizado.rubros[1].partidas[0] as { esInsumo: boolean }).esInsumo).toBe(true);
   });
 });
 
@@ -374,22 +402,129 @@ describe('etiquetaCampoPresupuesto', () => {
 });
 
 describe('calcularPresupuestoAAdjudicar', () => {
+  const PARAMETROS = { porcentajeExtraInsumos: 35, umbralInsumos: 40, porcentajeExtraPse: 15 };
+
+  // Total 10000: viáticos 1000 + consumo (insumo, `montoInsumo`) + uso 9000 - montoInsumo.
+  function presupuestoConInsumo(montoInsumo: number): Presupuesto {
+    return normalizarPresupuesto({
+      montoTotal: 0,
+      rubros: [
+        {
+          tipo: TipoRubro.ViaticosYSeguros,
+          subtotal: 0,
+          partidas: [{
+            tipoPersona: TipoPersona.Docente,
+            descripcion: 'Viáticos',
+            periodoInicio: '2027-08-01',
+            periodoFin: '2027-09-01',
+            monto: 1000,
+          }],
+        },
+        {
+          tipo: TipoRubro.BienesDeConsumo,
+          subtotal: 0,
+          partidas: [
+            { descripcion: 'Insumos', cantidad: 1, precioUnitario: montoInsumo, monto: 0, esInsumo: true },
+          ],
+        },
+        {
+          tipo: TipoRubro.BienesDeUso,
+          subtotal: 0,
+          partidas: [
+            { descripcion: 'Equipamiento', cantidad: 1, precioUnitario: 9000 - montoInsumo, monto: 0 },
+          ],
+        },
+      ],
+    });
+  }
+
   it('sin presupuesto solicitado, todo queda en 0', () => {
-    expect(calcularPresupuestoAAdjudicar(null)).toEqual({
+    expect(calcularPresupuestoAAdjudicar(null, PARAMETROS)).toEqual({
       solicitado: 0,
+      montoInsumos: 0,
+      porcentajeInsumos: 0,
+      aplicaExtraInsumos: false,
       extraInsumos: 0,
+      esPse: false,
       extraPse: 0,
       total: 0,
     });
   });
 
-  it('hoy el total coincide con el solicitado: los extras aún están fijos en 0', () => {
+  it('sin partidas marcadas como insumo, no aplica el extra', () => {
     const p = normalizarPresupuesto(presupuestoValido());
-    expect(calcularPresupuestoAAdjudicar(p)).toEqual({
-      solicitado: p.montoTotal,
-      extraInsumos: 0,
-      extraPse: 0,
-      total: p.montoTotal,
-    });
+    const r = calcularPresupuestoAAdjudicar(p, PARAMETROS);
+    expect(r.solicitado).toBe(p.montoTotal);
+    expect(r.montoInsumos).toBe(0);
+    expect(r.aplicaExtraInsumos).toBe(false);
+    expect(r.extraInsumos).toBe(0);
+    expect(r.total).toBe(p.montoTotal);
+  });
+
+  it('justo por debajo del umbral, no aplica el extra por insumos', () => {
+    const p = presupuestoConInsumo(3999); // 39.99% de 10000
+    const r = calcularPresupuestoAAdjudicar(p, PARAMETROS);
+    expect(r.porcentajeInsumos).toBeCloseTo(39.99, 5);
+    expect(r.aplicaExtraInsumos).toBe(false);
+    expect(r.extraInsumos).toBe(0);
+    expect(r.total).toBe(r.solicitado);
+  });
+
+  it('exactamente en el umbral (borde), aplica el extra por insumos', () => {
+    const p = presupuestoConInsumo(4000); // exactamente 40% de 10000
+    const r = calcularPresupuestoAAdjudicar(p, PARAMETROS);
+    expect(r.porcentajeInsumos).toBeCloseTo(40, 5);
+    expect(r.aplicaExtraInsumos).toBe(true);
+    expect(r.extraInsumos).toBe(3500); // 35% de 10000
+    expect(r.total).toBe(13500);
+  });
+
+  it('por encima del umbral, aplica el extra por insumos', () => {
+    const p = presupuestoConInsumo(6000); // 60% de 10000
+    const r = calcularPresupuestoAAdjudicar(p, PARAMETROS);
+    expect(r.aplicaExtraInsumos).toBe(true);
+    expect(r.extraInsumos).toBe(3500);
+  });
+
+  it('PSE solo, sin insumos', () => {
+    const p = normalizarPresupuesto(presupuestoValido());
+    const r = calcularPresupuestoAAdjudicar(p, PARAMETROS, true);
+    expect(r.esPse).toBe(true);
+    expect(r.extraPse).toBe(redondear2(p.montoTotal * 0.15));
+    expect(r.extraInsumos).toBe(0);
+    expect(r.total).toBe(redondear2(p.montoTotal + p.montoTotal * 0.15));
+  });
+
+  it('ambos extras a la vez se suman', () => {
+    const p = presupuestoConInsumo(6000);
+    const r = calcularPresupuestoAAdjudicar(p, PARAMETROS, true);
+    expect(r.extraInsumos).toBe(3500);
+    expect(r.extraPse).toBe(1500);
+    expect(r.total).toBe(15000);
+  });
+
+  it('porcentajeExtraInsumos en 0 desactiva el extra aunque se supere el umbral', () => {
+    const p = presupuestoConInsumo(6000);
+    const r = calcularPresupuestoAAdjudicar(p, { ...PARAMETROS, porcentajeExtraInsumos: 0 });
+    expect(r.aplicaExtraInsumos).toBe(true);
+    expect(r.extraInsumos).toBe(0);
+  });
+
+  it('sin parametros, usa los defaults 35/40/15', () => {
+    const p = presupuestoConInsumo(6000);
+    const r = calcularPresupuestoAAdjudicar(p);
+    expect(r.extraInsumos).toBe(3500);
+  });
+
+  it('una partida de insumo en Viáticos y Seguros se ignora (nunca cuenta)', () => {
+    const p = normalizarPresupuesto(presupuestoValido());
+    (p.rubros[0].partidas[0] as { esInsumo?: boolean }).esInsumo = true;
+    const r = calcularPresupuestoAAdjudicar(p, PARAMETROS);
+    expect(r.montoInsumos).toBe(0);
+    expect(r.aplicaExtraInsumos).toBe(false);
   });
 });
+
+function redondear2(n: number): number {
+  return Math.round(n * 100) / 100;
+}

@@ -24,6 +24,7 @@ export const MAX_LONGITUD_DESCRIPCION_PARTIDA = 500
 /** Campos de una partida sobre los que se puede sugerir un cambio (espejo del backend). */
 export const CAMPOS_PARTIDA_PERMITIDOS = [
   'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+  'esInsumo',
 ] as const
 
 export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
@@ -34,6 +35,7 @@ export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
   periodoInicio: 'Inicio del período',
   periodoFin: 'Fin del período',
   tipoPersona: 'Tipo de persona',
+  esInsumo: 'Es insumo',
 }
 
 const FORMATO_RUTA_PARTIDA = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/
@@ -107,7 +109,9 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
     const partidas = (rubro.partidas as BienPresupuesto[]).map((p) => {
       const cantidad = Number(p.cantidad) || 0
       const precioUnitario = Number(p.precioUnitario) || 0
-      return { ...p, cantidad, precioUnitario, monto: redondear2(cantidad * precioUnitario) }
+      return {
+        ...p, cantidad, precioUnitario, monto: redondear2(cantidad * precioUnitario), esInsumo: p.esInsumo === true,
+      }
     })
     return { tipo, partidas, subtotal: redondear2(partidas.reduce((sum, p) => sum + p.monto, 0)) }
   })
@@ -227,26 +231,56 @@ export function formatearMoneda(valor: number | null | undefined): string {
 
 export interface PresupuestoAAdjudicar {
   solicitado: number
+  montoInsumos: number
+  porcentajeInsumos: number
+  aplicaExtraInsumos: boolean
   extraInsumos: number
+  esPse: boolean
   extraPse: number
   total: number
 }
 
+const PORCENTAJE_EXTRA_INSUMOS_DEFAULT = 35
+const UMBRAL_INSUMOS_DEFAULT = 40
+const PORCENTAJE_EXTRA_PSE_DEFAULT = 15
+
 /**
  * Espejo de backend/src/proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar.
- * Presupuesto a adjudicar = presupuesto solicitado + extra por insumos + extra por PSE. Los
- * extras son porcentajes del solicitado que aplican solo si se cumplen condiciones particulares
- * de cada uno; esas condiciones todavía no están definidas, así que por ahora ambos son 0.
+ * Presupuesto a adjudicar = presupuesto solicitado + extra por insumos + extra por PSE.
  */
 export function calcularPresupuestoAAdjudicar(
   presupuestoSolicitado: Presupuesto | null | undefined,
+  parametros?: {
+    porcentajeExtraInsumos?: number | string | null
+    umbralInsumos?: number | string | null
+    porcentajeExtraPse?: number | string | null
+  } | null,
+  esPse = false,
 ): PresupuestoAAdjudicar {
   const solicitado = Number(presupuestoSolicitado?.montoTotal ?? 0)
-  const extraInsumos = 0
-  const extraPse = 0
+  const porcentajeExtraInsumos = Number(parametros?.porcentajeExtraInsumos ?? PORCENTAJE_EXTRA_INSUMOS_DEFAULT)
+  const umbralInsumos = Number(parametros?.umbralInsumos ?? UMBRAL_INSUMOS_DEFAULT)
+  const porcentajeExtraPse = Number(parametros?.porcentajeExtraPse ?? PORCENTAJE_EXTRA_PSE_DEFAULT)
+
+  const montoInsumos = redondear2(
+    (presupuestoSolicitado?.rubros ?? [])
+      .filter(r => r.tipo !== TipoRubro.ViaticosYSeguros)
+      .flatMap(r => r.partidas as BienPresupuesto[])
+      .filter(p => p.esInsumo === true)
+      .reduce((sum, p) => sum + (Number(p.monto) || 0), 0),
+  )
+  const porcentajeInsumos = solicitado > 0 ? (montoInsumos / solicitado) * 100 : 0
+  const aplicaExtraInsumos = solicitado > 0 && porcentajeInsumos >= umbralInsumos - 1e-9
+  const extraInsumos = aplicaExtraInsumos ? redondear2((solicitado * porcentajeExtraInsumos) / 100) : 0
+  const extraPse = esPse ? redondear2((solicitado * porcentajeExtraPse) / 100) : 0
+
   return {
     solicitado,
+    montoInsumos,
+    porcentajeInsumos,
+    aplicaExtraInsumos,
     extraInsumos,
+    esPse,
     extraPse,
     total: redondear2(solicitado + extraInsumos + extraPse),
   }

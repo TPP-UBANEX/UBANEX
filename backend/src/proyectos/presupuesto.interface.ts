@@ -14,6 +14,8 @@ export interface BienPresupuesto {
   cantidad: number;
   precioUnitario: number;
   monto: number;
+  /** Si el docente/creador considera que esta partida es un insumo (ver presupuesto.util.ts#calcularPresupuestoAAdjudicar). */
+  esInsumo?: boolean;
 }
 
 export interface RubroPresupuesto {

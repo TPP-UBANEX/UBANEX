@@ -25,6 +25,7 @@ export const LABELS_RUBRO: Record<TipoRubro, string> = {
 /** Campos de una partida sobre los que se puede sugerir un cambio (ver sugerencias.service.ts). */
 export const CAMPOS_PARTIDA_PERMITIDOS = [
   'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+  'esInsumo',
 ] as const;
 
 export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
@@ -35,6 +36,7 @@ export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
   periodoInicio: 'Inicio del período',
   periodoFin: 'Fin del período',
   tipoPersona: 'Tipo de persona',
+  esInsumo: 'Es insumo',
 };
 
 const FORMATO_RUTA_PARTIDA = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/;
@@ -170,6 +172,9 @@ function validarBien(label: string, partida: unknown, indice: number): void {
   if (!esMontoValido(b.precioUnitario)) {
     throw new BadRequestException(`"${label}": la partida ${indice + 1} tiene un precio unitario inválido`);
   }
+  if (b.esInsumo !== undefined && typeof b.esInsumo !== 'boolean') {
+    throw new BadRequestException(`"${label}": la partida ${indice + 1} tiene un valor inválido en "es insumo"`);
+  }
 }
 
 /**
@@ -243,6 +248,7 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
       ...p,
       descripcion: p.descripcion.trim(),
       monto: redondear2(p.cantidad * p.precioUnitario),
+      esInsumo: p.esInsumo === true,
     }));
     return { tipo, partidas, subtotal: redondear2(partidas.reduce((sum, p) => sum + p.monto, 0)) };
   });
@@ -359,28 +365,64 @@ function formatearMoneda(valor: number): string {
  *
  *   presupuesto a adjudicar = presupuesto solicitado + extra por insumos + extra por PSE
  *
- * Los dos extras son porcentajes del solicitado que se aplican solo si se cumplen condiciones
- * particulares de cada uno. Esas condiciones todavía no están definidas, así que por ahora ambos
- * extras son constantes en 0 (el total coincide con el solicitado).
+ * El extra por insumos es `porcentajeExtraInsumos`% del solicitado, y solo se aplica si al menos
+ * `umbralInsumos`% del monto total solicitado corresponde a partidas de bienes marcadas como
+ * insumo (`BienPresupuesto.esInsumo`; Viáticos y Seguros nunca cuenta). El extra por PSE es
+ * `porcentajeExtraPse`% del solicitado, y solo se aplica si la evaluación institucional de la
+ * edición marcó el proyecto como Práctica Social Educativa (`EvaluacionInstitucional.esPse`) —
+ * deliberadamente por fuera de `categorias`, para que no sume puntaje además del extra de plata
+ * (ver evaluaciones.service.ts#calcularPuntaje).
  */
 export interface PresupuestoAAdjudicar {
   solicitado: number;
+  montoInsumos: number;
+  porcentajeInsumos: number;
+  aplicaExtraInsumos: boolean;
   extraInsumos: number;
+  esPse: boolean;
   extraPse: number;
   total: number;
 }
 
+/** Porcentajes/umbral por default si la convocatoria no trae `parametros` (o llega `null`/`undefined`). */
+const PORCENTAJE_EXTRA_INSUMOS_DEFAULT = 35;
+const UMBRAL_INSUMOS_DEFAULT = 40;
+const PORCENTAJE_EXTRA_PSE_DEFAULT = 15;
+
 export function calcularPresupuestoAAdjudicar(
   presupuestoSolicitado: Presupuesto | null | undefined,
+  parametros?: Pick<
+    Convocatoria,
+    'porcentajeExtraInsumos' | 'umbralInsumos' | 'porcentajeExtraPse'
+  > | null,
+  esPse = false,
 ): PresupuestoAAdjudicar {
   const solicitado = Number(presupuestoSolicitado?.montoTotal ?? 0);
-  // TODO: reemplazar por los porcentajes condicionales de insumos y PSE cuando se definan sus
-  // criterios de aplicación.
-  const extraInsumos = 0;
-  const extraPse = 0;
+  // Los `numeric` de Postgres llegan como string vía TypeORM.
+  const porcentajeExtraInsumos = Number(parametros?.porcentajeExtraInsumos ?? PORCENTAJE_EXTRA_INSUMOS_DEFAULT);
+  const umbralInsumos = Number(parametros?.umbralInsumos ?? UMBRAL_INSUMOS_DEFAULT);
+  const porcentajeExtraPse = Number(parametros?.porcentajeExtraPse ?? PORCENTAJE_EXTRA_PSE_DEFAULT);
+
+  const montoInsumos = redondear2(
+    (presupuestoSolicitado?.rubros ?? [])
+      .filter((r) => r.tipo !== TipoRubro.ViaticosYSeguros)
+      .flatMap((r) => r.partidas as BienPresupuesto[])
+      .filter((p) => p.esInsumo === true)
+      .reduce((sum, p) => sum + Number(p.monto ?? 0), 0),
+  );
+  const porcentajeInsumos = solicitado > 0 ? (montoInsumos / solicitado) * 100 : 0;
+  // Tolerancia chica contra errores de punto flotante en el borde exacto del umbral.
+  const aplicaExtraInsumos = solicitado > 0 && porcentajeInsumos >= umbralInsumos - 1e-9;
+  const extraInsumos = aplicaExtraInsumos ? redondear2((solicitado * porcentajeExtraInsumos) / 100) : 0;
+  const extraPse = esPse ? redondear2((solicitado * porcentajeExtraPse) / 100) : 0;
+
   return {
     solicitado,
+    montoInsumos,
+    porcentajeInsumos,
+    aplicaExtraInsumos,
     extraInsumos,
+    esPse,
     extraPse,
     total: redondear2(solicitado + extraInsumos + extraPse),
   };
