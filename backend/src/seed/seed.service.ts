@@ -1371,6 +1371,10 @@ export class SeedService {
         fechaFinEjecucion: this.crearFecha(anio + 1, 2, 28),
         formularioId,
         cuotaFederativa: 1,
+        // Holgados respecto de lo que genera generarPresupuesto (~$840.000 en el peor caso), para
+        // que el seed no falle guardando ediciones por superar el tope.
+        topePresupuestoNoConsolidado: 1_200_000,
+        topePresupuestoConsolidado: 2_500_000,
       });
       await this.asegurarTemplatesConvocatoria(conv);
       this.convs.set(anio, conv);
@@ -2732,6 +2736,8 @@ export class SeedService {
       fechaFinEjecucion: this.crearFecha(2027, 2, 28),
       formularioId: formularioId ?? undefined,
       cuotaFederativa: 2,
+      topePresupuestoNoConsolidado: 1_200_000,
+      topePresupuestoConsolidado: 2_500_000,
     });
     await this.asegurarTemplatesConvocatoria(conv);
 
@@ -2988,6 +2994,9 @@ export class SeedService {
       templateEvaluacionInstitucionalId: templateInst.id,
       templateEvaluacionCruzadaId: templateCruz.id,
       presupuestoTotal: 148605613.5,
+      // El mayor total individual del Excel es ~$1.694.925; se deja holgura sobre eso.
+      topePresupuestoNoConsolidado: 1_800_000,
+      topePresupuestoConsolidado: 3_000_000,
     });
 
     const autor = this.admin;
