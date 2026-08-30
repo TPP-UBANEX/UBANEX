@@ -1,8 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
 import { BadRequestException } from '@nestjs/common';
 import {
-  esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, normalizarPresupuesto, parsearRutaPartida,
-  presupuestoIncompletoParaEnvio, validarPresupuesto,
+  calcularPresupuestoAAdjudicar, esRutaComentarioPresupuesto, etiquetaCampoPresupuesto,
+  normalizarPresupuesto, parsearRutaPartida, presupuestoIncompletoParaEnvio, validarPresupuesto,
 } from './presupuesto.util';
 import { Presupuesto } from './presupuesto.interface';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
@@ -309,5 +309,26 @@ describe('etiquetaCampoPresupuesto', () => {
 
   it('devuelve la ruta cruda si no matchea ningun patron conocido', () => {
     expect(etiquetaCampoPresupuesto(p, 'algoInesperado')).toBe('Presupuesto > algoInesperado');
+  });
+});
+
+describe('calcularPresupuestoAAdjudicar', () => {
+  it('sin presupuesto solicitado, todo queda en 0', () => {
+    expect(calcularPresupuestoAAdjudicar(null)).toEqual({
+      solicitado: 0,
+      extraInsumos: 0,
+      extraPse: 0,
+      total: 0,
+    });
+  });
+
+  it('hoy el total coincide con el solicitado: los extras aún están fijos en 0', () => {
+    const p = normalizarPresupuesto(presupuestoValido());
+    expect(calcularPresupuestoAAdjudicar(p)).toEqual({
+      solicitado: p.montoTotal,
+      extraInsumos: 0,
+      extraPse: 0,
+      total: p.montoTotal,
+    });
   });
 });

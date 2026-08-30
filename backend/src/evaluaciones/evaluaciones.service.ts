@@ -28,6 +28,7 @@ import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evalu
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
+import { calcularPresupuestoAAdjudicar } from '../proyectos/presupuesto.util';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import {
@@ -550,8 +551,9 @@ export class EvaluacionesService {
       }
     }
 
-    // Propuesta de adjudicación borrador, limitada por el presupuesto, con
-    // prioridad de MÉRITO GLOBAL y un piso de CUOTA FEDERATIVA por unidad académica.
+    // Propuesta de adjudicación borrador, limitada por el presupuesto a adjudicar (presupuesto
+    // solicitado + extra por insumos + extra por PSE, ver presupuesto.util.ts), con prioridad de
+    // MÉRITO GLOBAL y un piso de CUOTA FEDERATIVA por unidad académica.
     //
     // Algoritmo dirigido por financiamiento (presupuesto general, no por UA):
     //   Paso 1 — MERITO global: se financian los mejores proyectos por mérito
@@ -565,7 +567,8 @@ export class EvaluacionesService {
     //            (iterativo, round-robin).
     const propuesta = new Map<string, boolean>();
     const mecanismo = new Map<string, MecanismoAdjudicacion>();
-    const costo = (ed: Edicion): number => Number(ed.presupuesto?.montoTotal ?? 0);
+    const costo = (ed: Edicion): number =>
+      calcularPresupuestoAAdjudicar(ed.presupuestoSolicitado).total;
 
     // Todas las ediciones con evaluación confirmada participan del cálculo.
     const elegiblesConPuntaje = elegibles.filter(({ p }) => p !== null).map(({ ed }) => ed);
@@ -780,7 +783,8 @@ export class EvaluacionesService {
       );
     }
 
-    // Guarda de presupuesto: no se puede adjudicar si no alcanza para este proyecto.
+    // Guarda de presupuesto: no se puede adjudicar si no alcanza para este proyecto (se compara
+    // contra el presupuesto a adjudicar, no contra el solicitado).
     if (adjudicado && edicion.adjudicacionPropuesta !== true) {
       const convocatoria = await this.convocatoriaRepo.findOne({
         where: { id: edicion.convocatoriaId },
@@ -793,8 +797,8 @@ export class EvaluacionesService {
         });
         const adjudicadoSum = todas
           .filter((e) => e.adjudicacionPropuesta === true)
-          .reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0);
-        const costo = Number(edicion.presupuesto?.montoTotal ?? 0);
+          .reduce((s, e) => s + calcularPresupuestoAAdjudicar(e.presupuestoSolicitado).total, 0);
+        const costo = calcularPresupuestoAAdjudicar(edicion.presupuestoSolicitado).total;
         if (adjudicadoSum + costo > tope + 0.001) {
           throw new BadRequestException(
             'No hay presupuesto disponible para adjudicar este proyecto',

@@ -41,6 +41,14 @@ const FORMATO_RUTA_PARTIDA = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/
 const FORMATO_RUTA_RUBRO = /^rubros\[(\d+)\]$/;
 
 /**
+ * Prefijo de las rutas de sugerencias sobre el presupuesto (ver sugerencias.service.ts), tal como
+ * quedaron persistidas en `sugerencia.campo` antes del rename de `Edicion.presupuesto` a
+ * `Edicion.presupuestoSolicitado`. Se mantiene sin cambios a propósito: es un formato de datos ya
+ * guardado, no el nombre de la columna.
+ */
+export const PREFIJO_RUTA_PRESUPUESTO = 'presupuesto.';
+
+/**
  * Interpreta una ruta relativa a `presupuesto.` (sin ese prefijo) como el campo de una partida.
  * Solo reconoce campos de la whitelist: `subtotal` y `montoTotal` quedan afuera porque son
  * derivados y se recalculan al aplicar el cambio.
@@ -293,4 +301,38 @@ export function presupuestoIncompletoParaEnvio(
   }
 
   return motivos;
+}
+
+/**
+ * Presupuesto a adjudicar: el monto sobre el que se calcula la adjudicación propuesta (orden de
+ * mérito, tope de la convocatoria, guarda manual del Rectorado), a diferencia del presupuesto
+ * solicitado, que es lo que pide el docente.
+ *
+ *   presupuesto a adjudicar = presupuesto solicitado + extra por insumos + extra por PSE
+ *
+ * Los dos extras son porcentajes del solicitado que se aplican solo si se cumplen condiciones
+ * particulares de cada uno. Esas condiciones todavía no están definidas, así que por ahora ambos
+ * extras son constantes en 0 (el total coincide con el solicitado).
+ */
+export interface PresupuestoAAdjudicar {
+  solicitado: number;
+  extraInsumos: number;
+  extraPse: number;
+  total: number;
+}
+
+export function calcularPresupuestoAAdjudicar(
+  presupuestoSolicitado: Presupuesto | null | undefined,
+): PresupuestoAAdjudicar {
+  const solicitado = Number(presupuestoSolicitado?.montoTotal ?? 0);
+  // TODO: reemplazar por los porcentajes condicionales de insumos y PSE cuando se definan sus
+  // criterios de aplicación.
+  const extraInsumos = 0;
+  const extraPse = 0;
+  return {
+    solicitado,
+    extraInsumos,
+    extraPse,
+    total: redondear2(solicitado + extraInsumos + extraPse),
+  };
 }
