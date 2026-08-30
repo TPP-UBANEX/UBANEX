@@ -2400,7 +2400,13 @@ export class SeedService {
     });
     if (!conv) return;
 
-    const institucional = async (edicionId: string, autoridad: Usuario, categorias: Record<string, unknown>, observaciones: string): Promise<void> => {
+    const institucional = async (
+      edicionId: string,
+      autoridad: Usuario,
+      categorias: Record<string, unknown>,
+      observaciones: string,
+      esPse = false,
+    ): Promise<void> => {
       const existente = await this.institucionalEvalRepo.findOne({ where: { edicionId } });
       if (existente) return;
       if (!conv.templateEvaluacionInstitucionalId) return;
@@ -2415,6 +2421,7 @@ export class SeedService {
           categorias,
           checklist: { 'check-superposicion': true, 'check-presupuesto': true, 'check-documentacion': true },
           observaciones,
+          esPse,
         }),
       );
       await this.auditoriaRepo.save(this.construirHistorialEvaluacion({
@@ -2473,6 +2480,7 @@ export class SeedService {
         'sub-devolucion': { valor: true },
       },
       'El proyecto está muy bien articulado con el territorio y su equipo tiene una trayectoria sólida.',
+      true,
     );
     await cruzada(this.p5.id, this.evaluadorDerecho, TipoEvaluacionCruzada.Propia, {
       'item-problema': 9, 'item-objetivos': 7, 'item-metodologia': 6, 'item-participacion-diseno': 7,
@@ -2583,6 +2591,7 @@ export class SeedService {
                 categorias: generada.categorias,
                 checklist: generada.checklist,
                 observaciones: generada.observaciones,
+                esPse: generada.esPse,
               }),
             );
             instMeta.push({

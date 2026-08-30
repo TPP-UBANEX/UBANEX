@@ -6,11 +6,12 @@ import { Proyecto } from './proyecto.entity';
 import { Edicion } from './edicion.entity';
 import { Formulario } from '../formularios/formulario.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
+import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { ParticipacionesConvocatoriaModule } from '../participaciones-convocatoria/participaciones-convocatoria.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Proyecto, Edicion, Formulario, Emparejamiento]),
+    TypeOrmModule.forFeature([Proyecto, Edicion, Formulario, Emparejamiento, EvaluacionInstitucional]),
     ParticipacionesConvocatoriaModule,
   ],
   controllers: [ProyectosController],

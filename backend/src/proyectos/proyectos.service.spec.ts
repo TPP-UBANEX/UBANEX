@@ -11,6 +11,8 @@ import { Edicion } from './edicion.entity';
 import { Presupuesto } from './presupuesto.interface';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
+import { Formulario } from '../formularios/formulario.entity';
+import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
@@ -53,8 +55,15 @@ describe('ProyectosService', () => {
   } as unknown as Repository<ParticipacionConvocatoria>;
 
   const emparejamientoRepo = {} as unknown as Repository<Emparejamiento>;
+  const formularioRepo = {} as unknown as Repository<Formulario>;
+  const findInstitucionales = jest.fn<() => Promise<EvaluacionInstitucional[]>>().mockResolvedValue([]);
+  const institucionalRepo = {
+    find: findInstitucionales,
+  } as unknown as Repository<EvaluacionInstitucional>;
 
-  const service = new ProyectosService(proyectoRepo, edicionRepo, participacionRepo, emparejamientoRepo);
+  const service = new ProyectosService(
+    proyectoRepo, edicionRepo, participacionRepo, emparejamientoRepo, formularioRepo, institucionalRepo,
+  );
 
   function edicion(overrides: Partial<Edicion> = {}): Edicion {
     return {
