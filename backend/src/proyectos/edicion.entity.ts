@@ -50,7 +50,7 @@ export class Edicion {
   anioEdicion: number | null;
 
   @Column({ type: 'json', nullable: true })
-  presupuesto: Presupuesto | null;
+  presupuestoSolicitado: Presupuesto | null;
 
   @Column({ type: 'json', nullable: true })
   datosFormulario: object | null;

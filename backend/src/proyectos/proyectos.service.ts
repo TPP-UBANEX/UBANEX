@@ -9,6 +9,7 @@ import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { Usuario } from '../usuarios/usuario.entity';
+import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Formulario } from '../formularios/formulario.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
@@ -23,12 +24,20 @@ import { PaginatedResponse } from '../common/interfaces/paginated-response.inter
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
-import { normalizarPresupuesto, presupuestoIncompletoParaEnvio, validarPresupuesto } from './presupuesto.util';
+import {
+  motivoTopeExcedido,
+  normalizarPresupuesto,
+  presupuestoIncompletoParaEnvio,
+  topePresupuestoSolicitado,
+  validarPresupuesto,
+} from './presupuesto.util';
 import {
   ordenarConvocatorias,
   calcularConsolidacion,
   esConsolidadoEfectivo,
+  esConsolidadoParaTope,
   salteaEvaluacionEfectivo,
+  DatosConsolidacion,
   EdicionHistorial,
 } from './consolidacion';
 
@@ -52,6 +61,8 @@ export class ProyectosService {
     private readonly emparejamientoRepo: Repository<Emparejamiento>,
     @InjectRepository(Formulario)
     private readonly formularioRepo: Repository<Formulario>,
+    @InjectRepository(EvaluacionInstitucional)
+    private readonly institucionalRepo: Repository<EvaluacionInstitucional>,
   ) {}
 
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
@@ -151,7 +162,7 @@ export class ProyectosService {
         creadoPorId: usuario.id,
         unidadAcademicaId: usuario.unidadAcademicaId,
         anioEdicion: dto.anioEdicion || new Date().getFullYear(),
-        presupuesto: ultimaEdicion?.presupuesto ?? null,
+        presupuestoSolicitado: ultimaEdicion?.presupuestoSolicitado ?? null,
         datosFormulario: datosFormularioMapeados,
       }),
     );
@@ -286,9 +297,22 @@ export class ProyectosService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
-  async listarTodas(usuario: Usuario, convocatoriaId?: string): Promise<Edicion[]> {
+  /**
+   * `esPse` (calculado, no persistido en Edicion): viene de la evaluación institucional
+   * (EvaluacionInstitucional.esPse), no del proyecto. Alimenta el cálculo del presupuesto a
+   * adjudicar en la pantalla de orden de mérito (ver presupuesto.util.ts#calcularPresupuestoAAdjudicar).
+   */
+  async listarTodas(usuario: Usuario, convocatoriaId?: string): Promise<(Edicion & { esPse: boolean })[]> {
     const query = await this.buildListado(usuario, { convocatoriaId });
-    return query.getMany();
+    const ediciones = await query.getMany();
+    if (ediciones.length === 0) return [];
+
+    const institucionales = await this.institucionalRepo.find({
+      where: { edicionId: In(ediciones.map((e) => e.id)) },
+      select: { edicionId: true, esPse: true },
+    });
+    const esPsePorEdicion = new Map(institucionales.map((i) => [i.edicionId, i.esPse === true]));
+    return ediciones.map((e) => ({ ...e, esPse: esPsePorEdicion.get(e.id) ?? false }));
   }
 
   async proyectosDisponiblesParaResubir(usuario: Usuario, convocatoriaId: string, search?: string) {
@@ -389,6 +413,28 @@ export class ProyectosService {
     return [...poolIds];
   }
 
+  /**
+   * Datos de consolidación (racha, derivada, histórico) del proyecto para una convocatoria
+   * puntual. Usado fuera de obtenerProyecto (que ya arma convocatoriasOrdenadas/historial una
+   * sola vez para todas las ediciones): al guardar el presupuesto y al validar el envío.
+   */
+  private async calcularDatosConsolidacion(
+    proyectoId: string,
+    convocatoriaId: string,
+  ): Promise<DatosConsolidacion> {
+    const convocatorias = await this.edicionRepo.manager.find(Convocatoria, {
+      select: { id: true, anio: true },
+    });
+    const convocatoriasOrdenadas = ordenarConvocatorias(convocatorias);
+    const historial: EdicionHistorial[] = (
+      await this.edicionRepo.find({
+        where: { proyectoId },
+        select: { convocatoriaId: true, estado: true },
+      })
+    ).map(e => ({ convocatoriaId: e.convocatoriaId, estado: e.estado }));
+    return calcularConsolidacion(convocatoriasOrdenadas, historial, convocatoriaId);
+  }
+
   async obtenerProyecto(id: string) {
     const proyecto = await this.proyectoRepo.findOne({
       where: { id },
@@ -418,11 +464,14 @@ export class ProyectosService {
     const indice = (convId: string) => convocatoriasOrdenadas.findIndex(c => c.id === convId);
     const edicionesEnriquecidas = ediciones.map(e => {
       const datos = calcularConsolidacion(convocatoriasOrdenadas, historial, e.convocatoriaId);
+      const esConsolidadoParaTopeEdicion = esConsolidadoParaTope(datos, proyecto.esConsolidado);
       return {
         ...e,
         rachaAdjudicaciones: datos.rachaAdjudicaciones,
         esConsolidadoDerivado: datos.esConsolidadoDerivado,
         salteaEvaluacion: salteaEvaluacionEfectivo(datos, proyecto.esConsolidado),
+        esConsolidadoParaTope: esConsolidadoParaTopeEdicion,
+        topePresupuestoSolicitado: topePresupuestoSolicitado(e.convocatoria, esConsolidadoParaTopeEdicion),
       };
     });
 
@@ -433,12 +482,13 @@ export class ProyectosService {
           historial,
           ediciones.reduce((a, b) => (indice(b.convocatoriaId) > indice(a.convocatoriaId) ? b : a)).convocatoriaId,
         )
-      : { rachaAdjudicaciones: 0, esConsolidadoDerivado: false, salteaEvaluacion: false };
+      : { rachaAdjudicaciones: 0, esConsolidadoDerivado: false, salteaEvaluacion: false, fueConsolidadoAlgunaVez: false };
 
     return {
       ...proyecto,
       esConsolidadoDerivado: datosUltima.esConsolidadoDerivado,
       esConsolidadoEfectivo: esConsolidadoEfectivo(datosUltima, proyecto.esConsolidado),
+      fueConsolidadoAlgunaVez: datosUltima.fueConsolidadoAlgunaVez,
       rachaAdjudicaciones: datosUltima.rachaAdjudicaciones,
       ediciones: edicionesEnriquecidas,
     };
@@ -497,9 +547,19 @@ export class ProyectosService {
       edicion.anioEdicion = dto.anioEdicion;
     }
 
-    if (dto.presupuesto !== undefined) {
-      validarPresupuesto(dto.presupuesto);
-      edicion.presupuesto = normalizarPresupuesto(dto.presupuesto);
+    if (dto.presupuestoSolicitado !== undefined) {
+      validarPresupuesto(dto.presupuestoSolicitado);
+      const presupuesto = normalizarPresupuesto(dto.presupuestoSolicitado);
+      const proyectoParaTope = await this.proyectoRepo.findOne({
+        where: { id: proyectoId },
+        select: { id: true, esConsolidado: true },
+      });
+      const datos = await this.calcularDatosConsolidacion(proyectoId, edicion.convocatoriaId);
+      const esConsolidado = esConsolidadoParaTope(datos, proyectoParaTope?.esConsolidado ?? null);
+      const tope = topePresupuestoSolicitado(edicion.convocatoria, esConsolidado);
+      const motivoExcedido = motivoTopeExcedido(presupuesto, tope, esConsolidado);
+      if (motivoExcedido) throw new BadRequestException(motivoExcedido);
+      edicion.presupuestoSolicitado = presupuesto;
     }
 
     if (dto.datosFormulario !== undefined) {
@@ -553,7 +613,17 @@ export class ProyectosService {
       );
     }
 
-    const presupuestoIncompleto = presupuestoIncompletoParaEnvio(edicion.presupuesto, edicion.convocatoria);
+    const proyectoParaTope = await this.proyectoRepo.findOne({
+      where: { id: edicion.proyectoId },
+      select: { id: true, esConsolidado: true },
+    });
+    const datosConsolidacion = await this.calcularDatosConsolidacion(edicion.proyectoId, edicion.convocatoriaId);
+    const esConsolidado = esConsolidadoParaTope(datosConsolidacion, proyectoParaTope?.esConsolidado ?? null);
+    const presupuestoIncompleto = presupuestoIncompletoParaEnvio(
+      edicion.presupuestoSolicitado,
+      edicion.convocatoria,
+      esConsolidado,
+    );
     if (presupuestoIncompleto.length > 0) {
       motivos.push(`Presupuesto: ${presupuestoIncompleto.join(', ')}`);
     }

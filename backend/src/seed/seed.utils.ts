@@ -110,6 +110,7 @@ export function generarPresupuesto(rng: Rng, anioInicio: number): Presupuesto {
             cantidad: rng.entero(20, 120),
             precioUnitario: precioUnitarioConsumo,
             monto: 0,
+            esInsumo: true,
           },
         ],
       },
@@ -122,6 +123,7 @@ export function generarPresupuesto(rng: Rng, anioInicio: number): Presupuesto {
             cantidad: rng.entero(1, 5),
             precioUnitario: precioUnitarioUso,
             monto: 0,
+            esInsumo: false,
           },
         ],
       },
@@ -135,7 +137,12 @@ export function generarEvaluacionInstitucional(
   estructura: EstructuraTemplateInstitucional,
   rng: Rng,
   completo: boolean,
-): { categorias: Record<string, unknown>; checklist: Record<string, unknown>; observaciones: string } {
+): {
+  categorias: Record<string, unknown>;
+  checklist: Record<string, unknown>;
+  observaciones: string;
+  esPse: boolean | null;
+} {
   const categorias: Record<string, unknown> = {};
   for (const categoria of estructura.categorias ?? []) {
     for (const subcategoria of categoria.subcategorias ?? []) {
@@ -155,7 +162,10 @@ export function generarEvaluacionInstitucional(
   for (const item of estructura.checklist ?? []) {
     checklist[item.id] = completo ? true : rng.bool(0.6);
   }
-  return { categorias, checklist, observaciones: rng.pick(OBSERVACIONES_INST) };
+  // Fijo y obligatorio para confirmar (ver evaluaciones.service.ts), independiente del template:
+  // un borrador puede quedar sin responder para ejercitar el bloqueo de confirmación.
+  const esPse = completo ? rng.bool(0.25) : (rng.bool(0.5) ? rng.bool(0.25) : null);
+  return { categorias, checklist, observaciones: rng.pick(OBSERVACIONES_INST), esPse };
 }
 
 export function generarEvaluacionCruzada(

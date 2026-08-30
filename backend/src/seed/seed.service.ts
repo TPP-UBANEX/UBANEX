@@ -28,7 +28,7 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { BienPresupuesto, Presupuesto, ViaticoPresupuesto } from '../proyectos/presupuesto.interface';
-import { etiquetaCampoPresupuesto } from '../proyectos/presupuesto.util';
+import { etiquetaCampoPresupuesto, PREFIJO_RUTA_PRESUPUESTO } from '../proyectos/presupuesto.util';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { TipoPersona } from '../common/enums/tipo-persona.enum';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
@@ -1371,6 +1371,10 @@ export class SeedService {
         fechaFinEjecucion: this.crearFecha(anio + 1, 2, 28),
         formularioId,
         cuotaFederativa: 1,
+        // Holgados respecto de lo que genera generarPresupuesto (~$840.000 en el peor caso), para
+        // que el seed no falle guardando ediciones por superar el tope.
+        topePresupuestoNoConsolidado: 1_200_000,
+        topePresupuestoConsolidado: 2_500_000,
       });
       await this.asegurarTemplatesConvocatoria(conv);
       this.convs.set(anio, conv);
@@ -1442,7 +1446,7 @@ export class SeedService {
         creadoPorId: creadoPor.id,
         unidadAcademicaId: unidadAcademica.id,
         anioEdicion: convocatoria.anio,
-        presupuesto: presupuesto || null,
+        presupuestoSolicitado: presupuesto || null,
         datosFormulario: datosFormulario ?? null,
       }),
     );
@@ -1779,7 +1783,7 @@ export class SeedService {
             creadoPorId: director.id,
             unidadAcademicaId: derecho.id,
             anioEdicion: anio,
-            presupuesto: generarPresupuesto(this.rng, anio),
+            presupuestoSolicitado: generarPresupuesto(this.rng, anio),
             datosFormulario: this.seedDatosFormulario(campos, {
               resumen: 'Escuela de oficios comunitaria sostenida por el mismo equipo directivo año a año.',
               area: 'Educación',
@@ -1911,7 +1915,7 @@ export class SeedService {
         creadoPorId: plan.directorId,
         unidadAcademicaId: plan.uaId,
         anioEdicion: anio,
-        presupuesto: plan.presupuesto,
+        presupuestoSolicitado: plan.presupuesto,
         datosFormulario: plan.datos,
       });
       edicion.id = crypto.randomUUID();
@@ -2396,7 +2400,13 @@ export class SeedService {
     });
     if (!conv) return;
 
-    const institucional = async (edicionId: string, autoridad: Usuario, categorias: Record<string, unknown>, observaciones: string): Promise<void> => {
+    const institucional = async (
+      edicionId: string,
+      autoridad: Usuario,
+      categorias: Record<string, unknown>,
+      observaciones: string,
+      esPse = false,
+    ): Promise<void> => {
       const existente = await this.institucionalEvalRepo.findOne({ where: { edicionId } });
       if (existente) return;
       if (!conv.templateEvaluacionInstitucionalId) return;
@@ -2411,6 +2421,7 @@ export class SeedService {
           categorias,
           checklist: { 'check-superposicion': true, 'check-presupuesto': true, 'check-documentacion': true },
           observaciones,
+          esPse,
         }),
       );
       await this.auditoriaRepo.save(this.construirHistorialEvaluacion({
@@ -2469,6 +2480,7 @@ export class SeedService {
         'sub-devolucion': { valor: true },
       },
       'El proyecto está muy bien articulado con el territorio y su equipo tiene una trayectoria sólida.',
+      true,
     );
     await cruzada(this.p5.id, this.evaluadorDerecho, TipoEvaluacionCruzada.Propia, {
       'item-problema': 9, 'item-objetivos': 7, 'item-metodologia': 6, 'item-participacion-diseno': 7,
@@ -2579,6 +2591,7 @@ export class SeedService {
                 categorias: generada.categorias,
                 checklist: generada.checklist,
                 observaciones: generada.observaciones,
+                esPse: generada.esPse,
               }),
             );
             instMeta.push({
@@ -2732,6 +2745,8 @@ export class SeedService {
       fechaFinEjecucion: this.crearFecha(2027, 2, 28),
       formularioId: formularioId ?? undefined,
       cuotaFederativa: 2,
+      topePresupuestoNoConsolidado: 1_200_000,
+      topePresupuestoConsolidado: 2_500_000,
     });
     await this.asegurarTemplatesConvocatoria(conv);
 
@@ -2988,6 +3003,9 @@ export class SeedService {
       templateEvaluacionInstitucionalId: templateInst.id,
       templateEvaluacionCruzadaId: templateCruz.id,
       presupuestoTotal: 148605613.5,
+      // El mayor total individual del Excel es ~$1.694.925; se deja holgura sobre eso.
+      topePresupuestoNoConsolidado: 1_800_000,
+      topePresupuestoConsolidado: 3_000_000,
     });
 
     const autor = this.admin;
@@ -3146,7 +3164,7 @@ export class SeedService {
     }
 
     if (elegido.nombre === 'presupuesto') {
-      const sugerida = this.primeraPartidaSugerible(ed.presupuesto);
+      const sugerida = this.primeraPartidaSugerible(ed.presupuestoSolicitado);
       if (!sugerida) return undefined;
       return {
         campo: sugerida.campo,
@@ -3199,7 +3217,7 @@ export class SeedService {
       const valorSugerido = Math.round(valorActual * 0.8 * 100) / 100;
 
       return {
-        campo: `presupuesto.rubros[${rubroIdx}].partidas[${partidaIdx}].${campoNumerico}`,
+        campo: `${PREFIJO_RUTA_PRESUPUESTO}rubros[${rubroIdx}].partidas[${partidaIdx}].${campoNumerico}`,
         valorActual,
         valorSugerido,
       };
@@ -3219,7 +3237,11 @@ export class SeedService {
     });
     directores.forEach((d) => destinatarios.add(d.usuarioId));
 
-    const nombreCampo = this.nombreLegibleSugerencia(sugerencia.campo, campos, ed.presupuesto);
+    const nombreCampo = this.nombreLegibleSugerencia(
+      sugerencia.campo,
+      campos,
+      ed.presupuestoSolicitado,
+    );
     for (const usuarioId of destinatarios) {
       if (usuarioId === sugeridoPor.id) continue;
       await this.notificacionRepo.save(
@@ -3235,8 +3257,8 @@ export class SeedService {
 
   private nombreLegibleSugerencia(campo: string, campos: CampoFormulario[], presupuesto: Presupuesto | null): string {
     if (campo === 'nombre') return 'Nombre del proyecto';
-    if (campo.startsWith('presupuesto.')) {
-      return etiquetaCampoPresupuesto(presupuesto, campo.replace('presupuesto.', ''));
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''));
     }
     if (campo.startsWith('datosFormulario.')) {
       const id = campo.replace('datosFormulario.', '');

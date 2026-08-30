@@ -52,7 +52,7 @@ import { EmparejamientoTab } from '@/components/EmparejamientoTab';
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores';
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab';
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab';
-import { formatearMoneda } from '@/lib/presupuesto';
+import { calcularPresupuestoAAdjudicar, formatearMoneda } from '@/lib/presupuesto';
 import {
   ArrowLeft,
   Pencil,
@@ -131,6 +131,11 @@ export function ConvocatoriaDetail() {
     fechaFinEjecucion: '',
     cuotaFederativa: 0,
     presupuestoTotal: 0,
+    topePresupuestoNoConsolidado: 0,
+    topePresupuestoConsolidado: 0,
+    porcentajeExtraInsumos: 35,
+    umbralInsumos: 40,
+    porcentajeExtraPse: 15,
   });
   const [guardando, setGuardando] = useState(false);
   const [confirmEditOpen, setConfirmEditOpen] = useState(false);
@@ -264,7 +269,8 @@ export function ConvocatoriaDetail() {
       case 'presupuesto-desc':
         base.sort(
           (a, b) =>
-            Number(b.presupuesto?.montoTotal ?? 0) - Number(a.presupuesto?.montoTotal ?? 0) ||
+            calcularPresupuestoAAdjudicar(b.presupuestoSolicitado, conv, b.esPse).total -
+              calcularPresupuestoAAdjudicar(a.presupuestoSolicitado, conv, a.esPse).total ||
             (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
             (a.id < b.id ? -1 : 1),
         );
@@ -272,7 +278,8 @@ export function ConvocatoriaDetail() {
       case 'presupuesto-asc':
         base.sort(
           (a, b) =>
-            Number(a.presupuesto?.montoTotal ?? 0) - Number(b.presupuesto?.montoTotal ?? 0) ||
+            calcularPresupuestoAAdjudicar(a.presupuestoSolicitado, conv, a.esPse).total -
+              calcularPresupuestoAAdjudicar(b.presupuestoSolicitado, conv, b.esPse).total ||
             (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0) ||
             (a.id < b.id ? -1 : 1),
         );
@@ -281,19 +288,22 @@ export function ConvocatoriaDetail() {
         base.sort((a, b) => (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0));
     }
     return base;
-  }, [edicionesMeritoFuente, filtroUA, ordenMeritoSort]);
+  }, [edicionesMeritoFuente, filtroUA, ordenMeritoSort, conv]);
 
   const resumenPresupuesto = useMemo(() => {
     const total = Number(conv?.presupuestoTotal ?? 0);
     const adjudicados = todasEdiciones.filter((e) => e.adjudicacionPropuesta);
-    const adjudicado = adjudicados.reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0);
+    const adjudicado = adjudicados.reduce(
+      (s, e) => s + calcularPresupuestoAAdjudicar(e.presupuestoSolicitado, conv, e.esPse).total,
+      0,
+    );
     return {
       total,
       adjudicado,
       restante: Math.max(0, total - adjudicado),
       cantidad: adjudicados.length,
     };
-  }, [conv?.presupuestoTotal, todasEdiciones]);
+  }, [conv, todasEdiciones]);
 
 
   const aplicarOrdenMerito = (actualizadas: Edicion[]) => {
@@ -348,31 +358,40 @@ export function ConvocatoriaDetail() {
     const filas = todasEdiciones
       .filter((e) => e.ordenMerito != null)
       .sort((a, b) => (a.ordenMerito ?? 0) - (b.ordenMerito ?? 0))
-      .map((e) => [
-        String(e.ordenMerito ?? ''),
-        e.proyecto?.nombre || 'Sin nombre',
-        e.unidadAcademica?.nombre || '-',
-        e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1).replace('.', ',') : '-',
-        e.presupuesto?.montoTotal != null
-          ? Number(e.presupuesto.montoTotal).toFixed(2).replace('.', ',')
-          : '0,00',
-        e.adjudicacionPropuesta === true
-          ? 'Adjudicado'
-          : e.adjudicacionPropuesta === false
-            ? 'No adjudicado'
-            : 'Sin evaluación',
-        e.mecanismoAdjudicacion === 'MERITO'
-          ? 'Mérito'
-          : e.mecanismoAdjudicacion === 'CUOTA_FEDERATIVA'
-            ? 'Cuota federativa'
-            : '—',
-      ]);
+      .map((e) => {
+        const aAdjudicar = calcularPresupuestoAAdjudicar(e.presupuestoSolicitado, conv, e.esPse);
+        return [
+          String(e.ordenMerito ?? ''),
+          e.proyecto?.nombre || 'Sin nombre',
+          e.unidadAcademica?.nombre || '-',
+          e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1).replace('.', ',') : '-',
+          aAdjudicar.solicitado.toFixed(2).replace('.', ','),
+          aAdjudicar.porcentajeInsumos.toFixed(1).replace('.', ','),
+          aAdjudicar.extraInsumos.toFixed(2).replace('.', ','),
+          aAdjudicar.extraPse.toFixed(2).replace('.', ','),
+          aAdjudicar.total.toFixed(2).replace('.', ','),
+          e.adjudicacionPropuesta === true
+            ? 'Adjudicado'
+            : e.adjudicacionPropuesta === false
+              ? 'No adjudicado'
+              : 'Sin evaluación',
+          e.mecanismoAdjudicacion === 'MERITO'
+            ? 'Mérito'
+            : e.mecanismoAdjudicacion === 'CUOTA_FEDERATIVA'
+              ? 'Cuota federativa'
+              : '—',
+        ];
+      });
     const cabecera = [
       'Orden',
       'Proyecto',
       'Unidad Académica',
       'Puntaje',
-      'Presupuesto',
+      'Presupuesto solicitado',
+      '% insumos',
+      'Extra insumos',
+      'Extra PSE',
+      'Presupuesto a adjudicar',
       'Adjudicación',
       'Mecanismo',
     ];
@@ -397,7 +416,7 @@ export function ConvocatoriaDetail() {
   ) => {
     if (!esRectorado) return;
     if (adjudicado) {
-      const costo = Number(e.presupuesto?.montoTotal ?? 0);
+      const costo = calcularPresupuestoAAdjudicar(e.presupuestoSolicitado, conv, e.esPse).total;
       // Si el proyecto ya está adjudicado, su costo ya está contado en el total
       // adjudicado: al cambiar solo el método no se suma presupuesto nuevo, así
       // que se descuenta del total para chequear solo el presupuesto adicional.
@@ -440,6 +459,11 @@ export function ConvocatoriaDetail() {
       fechaFinEjecucion: conv.fechaFinEjecucion || '',
       cuotaFederativa: conv.cuotaFederativa ?? 0,
       presupuestoTotal: conv.presupuestoTotal ?? 0,
+      topePresupuestoNoConsolidado: conv.topePresupuestoNoConsolidado ?? 0,
+      topePresupuestoConsolidado: conv.topePresupuestoConsolidado ?? 0,
+      porcentajeExtraInsumos: conv.porcentajeExtraInsumos ?? 35,
+      umbralInsumos: conv.umbralInsumos ?? 40,
+      porcentajeExtraPse: conv.porcentajeExtraPse ?? 15,
     });
     setEditOpen(true);
   };
@@ -463,6 +487,10 @@ export function ConvocatoriaDetail() {
       const actualizada = await api.convocatorias.actualizar(id!, {
         ...editForm,
         presupuestoTotal: editForm.presupuestoTotal > 0 ? editForm.presupuestoTotal : null,
+        topePresupuestoNoConsolidado:
+          editForm.topePresupuestoNoConsolidado > 0 ? editForm.topePresupuestoNoConsolidado : null,
+        topePresupuestoConsolidado:
+          editForm.topePresupuestoConsolidado > 0 ? editForm.topePresupuestoConsolidado : null,
       });
       setConv(actualizada);
       toast.success('Convocatoria actualizada correctamente');
@@ -598,6 +626,104 @@ export function ConvocatoriaDetail() {
                     <p className="text-xs text-muted-foreground">
                       Tope global de presupuesto. Limita la cantidad de proyectos que se pueden
                       adjudicar (en orden de mérito). Dejar en 0 para no acotar.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      Tope de presupuesto solicitado — proyectos no consolidados
+                    </p>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={editForm.topePresupuestoNoConsolidado}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          topePresupuestoNoConsolidado: Math.max(0, parseFloat(e.target.value) || 0),
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Monto máximo del presupuesto solicitado por proyecto no consolidado. Dejar en
+                      0 para no acotar.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      Tope de presupuesto solicitado — proyectos consolidados
+                    </p>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={editForm.topePresupuestoConsolidado}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          topePresupuestoConsolidado: Math.max(0, parseFloat(e.target.value) || 0),
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Monto máximo del presupuesto solicitado por proyecto consolidado (aplica
+                      también si el proyecto fue consolidado alguna vez, aunque esta edición le
+                      toque evaluación). Dejar en 0 para no acotar.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Extra por insumos (%)</p>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={editForm.porcentajeExtraInsumos}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          porcentajeExtraInsumos: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Porcentaje del presupuesto solicitado que se suma al presupuesto a adjudicar
+                      cuando se supera el umbral de insumos. 0 desactiva el extra.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Umbral de insumos (%)</p>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={editForm.umbralInsumos}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          umbralInsumos: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Porcentaje mínimo del presupuesto solicitado que debe corresponder a partidas
+                      de bienes marcadas como insumo para que aplique el extra por insumos.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Extra por PSE (%)</p>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={editForm.porcentajeExtraPse}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          porcentajeExtraPse: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Porcentaje del presupuesto solicitado que se suma al presupuesto a adjudicar
+                      si el proyecto es una Práctica Social Educativa. 0 desactiva el extra.
                     </p>
                   </div>
                   <div className="space-y-1">
@@ -924,7 +1050,7 @@ export function ConvocatoriaDetail() {
                         <TableHead>Facultad</TableHead>
                         <TableHead>Estado</TableHead>
                         {conv?.ordenMeritoConfirmado && <TableHead>Adjudicación</TableHead>}
-                        <TableHead>Presupuesto</TableHead>
+                        <TableHead>Presupuesto solicitado</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -966,7 +1092,7 @@ export function ConvocatoriaDetail() {
                             </TableCell>
                           )}
                           <TableCell className="text-sm">
-                            {formatearMoneda(e.presupuesto?.montoTotal)}
+                            {formatearMoneda(e.presupuestoSolicitado?.montoTotal)}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -1055,8 +1181,8 @@ export function ConvocatoriaDetail() {
                     <SelectContent>
                       <SelectItem value="puntaje-desc">Puntaje (mayor a menor)</SelectItem>
                       <SelectItem value="puntaje-asc">Puntaje (menor a mayor)</SelectItem>
-                      <SelectItem value="presupuesto-desc">Presupuesto (mayor a menor)</SelectItem>
-                      <SelectItem value="presupuesto-asc">Presupuesto (menor a mayor)</SelectItem>
+                      <SelectItem value="presupuesto-desc">A adjudicar (mayor a menor)</SelectItem>
+                      <SelectItem value="presupuesto-asc">A adjudicar (menor a mayor)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1098,7 +1224,7 @@ export function ConvocatoriaDetail() {
                     <span className="font-medium text-foreground">
                       {formatearMoneda(resumenPresupuesto.total)}
                     </span>
-                    {' · '}Adjudicado:{' '}
+                    {' · '}Adjudicado (a adjudicar):{' '}
                     <span className="font-medium text-foreground">
                       {formatearMoneda(resumenPresupuesto.adjudicado)}
                     </span>
@@ -1133,13 +1259,16 @@ export function ConvocatoriaDetail() {
                       <TableHead>Proyecto</TableHead>
                       <TableHead>Unidad académica</TableHead>
                       <TableHead className="text-right">Puntaje</TableHead>
-                      <TableHead className="text-right">Presupuesto</TableHead>
+                      <TableHead className="text-right">Solicitado</TableHead>
+                      <TableHead className="text-right">A adjudicar</TableHead>
                         <TableHead>Adjudicación propuesta</TableHead>
                         <TableHead>Mecanismo</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {edicionesMeritoFiltradas.map((e) => (
+                    {edicionesMeritoFiltradas.map((e) => {
+                      const aAdjudicar = calcularPresupuestoAAdjudicar(e.presupuestoSolicitado, conv, e.esPse);
+                      return (
                       <TableRow
                         key={e.id}
                         className="cursor-pointer"
@@ -1160,7 +1289,19 @@ export function ConvocatoriaDetail() {
                           {e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1) : '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatearMoneda(e.presupuesto?.montoTotal)}
+                          {formatearMoneda(aAdjudicar.solicitado)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatearMoneda(aAdjudicar.total)}
+                          {(aAdjudicar.extraInsumos > 0 || aAdjudicar.extraPse > 0) && (
+                            <div className="text-xs text-muted-foreground font-normal">
+                              {aAdjudicar.extraInsumos > 0 && (
+                                <>+{formatearMoneda(aAdjudicar.extraInsumos)} insumos</>
+                              )}
+                              {aAdjudicar.extraInsumos > 0 && aAdjudicar.extraPse > 0 && ' · '}
+                              {aAdjudicar.extraPse > 0 && <>+{formatearMoneda(aAdjudicar.extraPse)} PSE</>}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           {e.adjudicacionPropuesta === null ? (
@@ -1173,7 +1314,7 @@ export function ConvocatoriaDetail() {
                               disabled={
                                 !e.adjudicacionPropuesta &&
                                 resumenPresupuesto.total - resumenPresupuesto.adjudicado <
-                                  Number(e.presupuesto?.montoTotal ?? 0)
+                                  aAdjudicar.total
                               }
                               onClick={(ev) => {
                                 ev.stopPropagation();
@@ -1215,7 +1356,8 @@ export function ConvocatoriaDetail() {
                           )}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
                   )}

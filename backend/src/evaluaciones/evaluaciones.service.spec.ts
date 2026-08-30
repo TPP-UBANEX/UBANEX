@@ -85,7 +85,7 @@ function construirEscenario(ordenCreacion: number[]): Fixture {
       unidadAcademicaId: ua.id,
       unidadAcademica: { id: ua.id, nombre: ua.nombre } as any,
       convocatoria,
-      presupuesto: { montoTotal: 80 } as any,
+      presupuestoSolicitado: { montoTotal: 80 } as any,
       estado: EstadoEdicion.EnEvaluacion,
       proyecto: {} as any,
       ordenMerito: null,
@@ -186,7 +186,7 @@ function construirEscenarioFlex(
         unidadAcademicaId: ua.id,
         unidadAcademica: { id: ua.id, nombre: ua.nombre } as any,
         convocatoria,
-        presupuesto: { montoTotal: 80 } as any,
+        presupuestoSolicitado: { montoTotal: 80 } as any,
         estado: EstadoEdicion.EnEvaluacion,
         proyecto: {} as any,
         ordenMerito: null,
@@ -376,7 +376,7 @@ describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', ()
       save: jest.fn(async (e: any) => e),
     };
     const convocatoriaRepo = { findOne: jest.fn().mockResolvedValue(convocatoria) };
-    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const dummy = { find: jest.fn().mockResolvedValue([]), save: jest.fn(), findOne: jest.fn() };
     const svc = new EvaluacionesService(
       dummy as any,
       dummy as any,
@@ -398,7 +398,7 @@ describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', ()
       convocatoriaId: 'conv1',
       adjudicacionPropuesta: true,
       mecanismoAdjudicacion: 'CUOTA_FEDERATIVA',
-      presupuesto: { montoTotal: 80 },
+      presupuestoSolicitado: { montoTotal: 80 },
       proyecto: {},
       unidadAcademica: {},
       estado: EstadoEdicion.EnEvaluacion,
@@ -417,7 +417,7 @@ describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', ()
       convocatoriaId: 'conv1',
       adjudicacionPropuesta: false,
       mecanismoAdjudicacion: null,
-      presupuesto: { montoTotal: 90 },
+      presupuestoSolicitado: { montoTotal: 90 },
       proyecto: {},
       unidadAcademica: {},
       estado: EstadoEdicion.EnEvaluacion,

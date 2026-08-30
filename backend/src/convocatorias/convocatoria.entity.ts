@@ -67,6 +67,27 @@ export class Convocatoria {
   @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
   presupuestoTotal: number | null;
 
+  // Tope por proyecto sobre el total del presupuesto solicitado (no el que se adjudica), según si
+  // el proyecto es consolidado o no (ver proyectos/consolidacion.ts). null o <= 0 = sin tope.
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  topePresupuestoNoConsolidado: number | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  topePresupuestoConsolidado: number | null;
+
+  // Porcentajes (no fracciones) que componen el presupuesto a adjudicar por sobre el solicitado
+  // (ver proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar). 0 = extra desactivado.
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 35 })
+  porcentajeExtraInsumos: number;
+
+  // % mínimo del total solicitado que debe corresponder a partidas de bienes marcadas como
+  // insumo para que aplique el extra por insumos.
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 40 })
+  umbralInsumos: number;
+
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 15 })
+  porcentajeExtraPse: number;
+
   @Column({ type: 'boolean', default: false })
   ordenMeritoConfirmado: boolean;
 

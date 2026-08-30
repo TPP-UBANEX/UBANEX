@@ -13,9 +13,12 @@ import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import { validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { Presupuesto } from '../proyectos/presupuesto.interface';
 import {
-  esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, normalizarPresupuesto,
-  parsearRutaPartida, validarPresupuesto,
+  esRutaComentarioPresupuesto, etiquetaCampoPresupuesto, motivoTopeExcedido, normalizarPresupuesto,
+  parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, topePresupuestoSolicitado, validarPresupuesto,
 } from '../proyectos/presupuesto.util';
+import {
+  ordenarConvocatorias, calcularConsolidacion, esConsolidadoParaTope, DatosConsolidacion, EdicionHistorial,
+} from '../proyectos/consolidacion';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { Usuario } from '../usuarios/usuario.entity';
 import { CrearSugerenciaDto } from './dto/crear-sugerencia.dto';
@@ -247,10 +250,10 @@ export class SugerenciasService {
       case 'esInterfacultad': return String(proyecto.esInterfacultad);
       case 'anioEdicion': return edicion.anioEdicion != null ? String(edicion.anioEdicion) : null;
       default:
-        if (campo.startsWith('presupuesto.')) {
-          const path = campo.replace('presupuesto.', '');
+        if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+          const path = campo.replace(PREFIJO_RUTA_PRESUPUESTO, '');
           if (!parsearRutaPartida(path)) return null;
-          return this.obtenerValorJson(edicion.presupuesto, path);
+          return this.obtenerValorJson(edicion.presupuestoSolicitado, path);
         }
         if (campo.startsWith('datosFormulario.')) {
           return this.obtenerValorJson(edicion.datosFormulario, campo.replace('datosFormulario.', ''));
@@ -316,8 +319,13 @@ export class SugerenciasService {
         await this.edicionRepo.save(edicion);
         break;
       default:
-        if (campo.startsWith('presupuesto.')) {
-          this.aplicarCambioPresupuesto(edicion, campo.replace('presupuesto.', ''), valorSugerido);
+        if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+          await this.aplicarCambioPresupuesto(
+            edicion,
+            proyecto,
+            campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''),
+            valorSugerido,
+          );
           await this.edicionRepo.save(edicion);
         } else if (campo.startsWith('datosFormulario.')) {
           const campoId = campo.replace('datosFormulario.', '');
@@ -335,13 +343,22 @@ export class SugerenciasService {
    * numéricos no viajan como string), y revalida + recalcula todo el presupuesto antes de guardar.
    * A diferencia de aplicarCambioJson, nunca crea nodos intermedios: si la partida ya no existe
    * (se borró desde que se sugirió el cambio), se rechaza en vez de reconstruirla a ciegas.
+   *
+   * También aplica el mismo tope de presupuesto solicitado que el guardado directo (ver
+   * proyectos.service.ts#actualizarEdicion): aprobar una sugerencia no puede dejar un total por
+   * encima del tope de la convocatoria.
    */
-  private aplicarCambioPresupuesto(edicion: Edicion, path: string, valorSugerido: string): void {
+  private async aplicarCambioPresupuesto(
+    edicion: Edicion,
+    proyecto: Proyecto,
+    path: string,
+    valorSugerido: string,
+  ): Promise<void> {
     const ruta = parsearRutaPartida(path);
-    if (!ruta || !edicion.presupuesto) {
+    if (!ruta || !edicion.presupuestoSolicitado) {
       throw new BadRequestException('No se puede aplicar ese cambio de presupuesto');
     }
-    const rubro = edicion.presupuesto.rubros[ruta.rubroIndice];
+    const rubro = edicion.presupuestoSolicitado.rubros[ruta.rubroIndice];
     const partidaExistente = rubro?.partidas?.[ruta.partidaIndice];
     if (!rubro || !partidaExistente) {
       throw new BadRequestException('No se puede aplicar ese cambio: la partida ya no existe');
@@ -349,18 +366,47 @@ export class SugerenciasService {
 
     const valor = ['monto', 'cantidad', 'precioUnitario'].includes(ruta.campo)
       ? Number(valorSugerido)
-      : valorSugerido;
+      : ruta.campo === 'esInsumo'
+        ? valorSugerido === 'true'
+        : valorSugerido;
     if (typeof valor === 'number' && !Number.isFinite(valor)) {
       throw new BadRequestException('El valor sugerido debe ser un número válido');
     }
 
-    const nuevoPresupuesto: Presupuesto = JSON.parse(JSON.stringify(edicion.presupuesto));
+    const nuevoPresupuesto: Presupuesto = JSON.parse(JSON.stringify(edicion.presupuestoSolicitado));
     const partida = nuevoPresupuesto.rubros[ruta.rubroIndice].partidas[ruta.partidaIndice] as unknown as
       Record<string, unknown>;
     partida[ruta.campo] = valor;
 
     validarPresupuesto(nuevoPresupuesto);
-    edicion.presupuesto = normalizarPresupuesto(nuevoPresupuesto);
+    const presupuestoNormalizado = normalizarPresupuesto(nuevoPresupuesto);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: edicion.convocatoriaId } });
+    const datos = await this.calcularDatosConsolidacion(edicion.proyectoId, edicion.convocatoriaId);
+    const esConsolidado = esConsolidadoParaTope(datos, proyecto.esConsolidado);
+    const tope = topePresupuestoSolicitado(convocatoria, esConsolidado);
+    const motivoExcedido = motivoTopeExcedido(presupuestoNormalizado, tope, esConsolidado);
+    if (motivoExcedido) {
+      throw new BadRequestException(`No se pudo aplicar la sugerencia: ${motivoExcedido}`);
+    }
+
+    edicion.presupuestoSolicitado = presupuestoNormalizado;
+  }
+
+  /** Espejo de ProyectosService#calcularDatosConsolidacion (ver ese archivo para el detalle). */
+  private async calcularDatosConsolidacion(
+    proyectoId: string,
+    convocatoriaId: string,
+  ): Promise<DatosConsolidacion> {
+    const convocatorias = await this.convocatoriaRepo.find({ select: { id: true, anio: true } });
+    const convocatoriasOrdenadas = ordenarConvocatorias(convocatorias);
+    const historial: EdicionHistorial[] = (
+      await this.edicionRepo.find({
+        where: { proyectoId },
+        select: { convocatoriaId: true, estado: true },
+      })
+    ).map(e => ({ convocatoriaId: e.convocatoriaId, estado: e.estado }));
+    return calcularConsolidacion(convocatoriasOrdenadas, historial, convocatoriaId);
   }
 
   private aplicarCambioJson(edicion: Edicion, path: string, valor: unknown) {
@@ -388,7 +434,7 @@ export class SugerenciasService {
     directores.forEach(d => destinatarios.add(d.usuarioId));
 
     const campos = await this.obtenerCamposFormulario(edicion.convocatoriaId);
-    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, edicion.presupuesto);
+    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, edicion.presupuestoSolicitado);
     const mensaje = `${sugeridoPor.nombreCompleto} sugirió un cambio en "${nombreCampo}" del proyecto "${proyecto.nombre}"`;
 
     for (const usuarioId of destinatarios) {
@@ -412,7 +458,11 @@ export class SugerenciasService {
     };
     const accion = accionTexto[sugerencia.estado] || 'respondió a';
     const campos = await this.obtenerCamposFormulario(sugerencia.edicion.convocatoriaId);
-    const nombreCampo = this.nombreLegible(sugerencia.campo, campos, sugerencia.edicion.presupuesto);
+    const nombreCampo = this.nombreLegible(
+      sugerencia.campo,
+      campos,
+      sugerencia.edicion.presupuestoSolicitado,
+    );
     const mensaje = `${respondidoPor.nombreCompleto} ${accion} la sugerencia en "${nombreCampo}"`;
 
     await this.notificacionRepo.save(
@@ -443,7 +493,7 @@ export class SugerenciasService {
   private validarCampoPresupuesto(edicion: Edicion, path: string, valorSugerido: string | null): void {
     const ruta = parsearRutaPartida(path);
     if (ruta) {
-      const rubro = edicion.presupuesto?.rubros?.[ruta.rubroIndice];
+      const rubro = edicion.presupuestoSolicitado?.rubros?.[ruta.rubroIndice];
       const partida = rubro?.partidas?.[ruta.partidaIndice];
       if (!rubro || !partida) {
         throw new BadRequestException('No se puede sugerir un cambio sobre una partida que no existe');
@@ -453,6 +503,9 @@ export class SugerenciasService {
           'El monto de un bien se calcula solo: sugerí un cambio en la cantidad o el precio unitario',
         );
       }
+      if (ruta.campo === 'esInsumo' && rubro.tipo === TipoRubro.ViaticosYSeguros) {
+        throw new BadRequestException('Una partida de Viáticos y Seguros no puede marcarse como insumo');
+      }
       if (valorSugerido == null) return;
       if (
         ['monto', 'cantidad', 'precioUnitario'].includes(ruta.campo)
@@ -460,10 +513,13 @@ export class SugerenciasService {
       ) {
         throw new BadRequestException('El valor sugerido debe ser un número válido');
       }
+      if (ruta.campo === 'esInsumo' && valorSugerido !== 'true' && valorSugerido !== 'false') {
+        throw new BadRequestException('El valor sugerido debe ser "Sí" o "No"');
+      }
       return;
     }
 
-    if (esRutaComentarioPresupuesto(edicion.presupuesto, path)) {
+    if (esRutaComentarioPresupuesto(edicion.presupuestoSolicitado, path)) {
       if (valorSugerido != null) {
         throw new BadRequestException('Sobre un rubro solo se puede dejar un comentario, no un valor sugerido');
       }
@@ -479,8 +535,12 @@ export class SugerenciasService {
     campo: string,
     valorSugerido: string | null,
   ): Promise<void> {
-    if (campo.startsWith('presupuesto.')) {
-      this.validarCampoPresupuesto(edicion, campo.replace('presupuesto.', ''), valorSugerido);
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      this.validarCampoPresupuesto(
+        edicion,
+        campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''),
+        valorSugerido,
+      );
       return;
     }
 
@@ -512,8 +572,8 @@ export class SugerenciasService {
       esInterfacultad: 'Es interfacultad',
     };
     if (mapa[campo]) return mapa[campo];
-    if (campo.startsWith('presupuesto.')) {
-      return etiquetaCampoPresupuesto(presupuesto, campo.replace('presupuesto.', ''));
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''));
     }
     if (campo.startsWith('datosFormulario.')) {
       const campoId = campo.replace('datosFormulario.', '');

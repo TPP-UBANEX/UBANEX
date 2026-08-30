@@ -28,6 +28,7 @@ import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evalu
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
+import { calcularPresupuestoAAdjudicar } from '../proyectos/presupuesto.util';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import {
@@ -134,6 +135,7 @@ export class EvaluacionesService {
             id: inst.id,
             estado: inst.estado,
             observaciones: inst.observaciones,
+            esPse: inst.esPse,
             realizadoPor: inst.realizadoPor
               ? { id: inst.realizadoPor.id, nombreCompleto: inst.realizadoPor.nombreCompleto }
               : null,
@@ -317,6 +319,7 @@ export class EvaluacionesService {
               : null,
             categorias: verDetalleInst ? institucional.categorias : null,
             checklist: verDetalleInst ? institucional.checklist : null,
+            esPse: verDetalleInst ? institucional.esPse : null,
           }
         : null,
       cruzadas: cruzadas.map((c) => {
@@ -375,6 +378,8 @@ export class EvaluacionesService {
     const estructuraCruzada = edicion.convocatoria?.templateEvaluacionCruzada?.estructura ?? null;
     if (!estructuraInst || !estructuraCruzada) return null;
 
+    // Deliberadamente no incluye `institucional.esPse`: ese campo mueve el presupuesto a
+    // adjudicar (ver presupuesto.util.ts#calcularPresupuestoAAdjudicar), no el puntaje.
     const subcategorias = (estructuraInst.categorias ?? []).flatMap((c) => c.subcategorias ?? []);
     const respuestas = (institucional.categorias ?? {}) as Record<string, { valor?: unknown }>;
     const maxInst = subcategorias.reduce<number>((suma, sub) => {
@@ -550,8 +555,9 @@ export class EvaluacionesService {
       }
     }
 
-    // Propuesta de adjudicación borrador, limitada por el presupuesto, con
-    // prioridad de MÉRITO GLOBAL y un piso de CUOTA FEDERATIVA por unidad académica.
+    // Propuesta de adjudicación borrador, limitada por el presupuesto a adjudicar (presupuesto
+    // solicitado + extra por insumos + extra por PSE, ver presupuesto.util.ts), con prioridad de
+    // MÉRITO GLOBAL y un piso de CUOTA FEDERATIVA por unidad académica.
     //
     // Algoritmo dirigido por financiamiento (presupuesto general, no por UA):
     //   Paso 1 — MERITO global: se financian los mejores proyectos por mérito
@@ -565,7 +571,12 @@ export class EvaluacionesService {
     //            (iterativo, round-robin).
     const propuesta = new Map<string, boolean>();
     const mecanismo = new Map<string, MecanismoAdjudicacion>();
-    const costo = (ed: Edicion): number => Number(ed.presupuesto?.montoTotal ?? 0);
+    const costo = (ed: Edicion): number =>
+      calcularPresupuestoAAdjudicar(
+        ed.presupuestoSolicitado,
+        convocatoria,
+        instPorEdicion.get(ed.id)?.esPse === true,
+      ).total;
 
     // Todas las ediciones con evaluación confirmada participan del cálculo.
     const elegiblesConPuntaje = elegibles.filter(({ p }) => p !== null).map(({ ed }) => ed);
@@ -780,7 +791,8 @@ export class EvaluacionesService {
       );
     }
 
-    // Guarda de presupuesto: no se puede adjudicar si no alcanza para este proyecto.
+    // Guarda de presupuesto: no se puede adjudicar si no alcanza para este proyecto (se compara
+    // contra el presupuesto a adjudicar, no contra el solicitado).
     if (adjudicado && edicion.adjudicacionPropuesta !== true) {
       const convocatoria = await this.convocatoriaRepo.findOne({
         where: { id: edicion.convocatoriaId },
@@ -791,10 +803,25 @@ export class EvaluacionesService {
         const todas = await this.edicionRepo.find({
           where: { convocatoriaId: edicion.convocatoriaId },
         });
+        const institucionales = await this.institucionalRepo.find({
+          where: { convocatoriaId: edicion.convocatoriaId },
+          select: { edicionId: true, esPse: true },
+        });
+        const esPsePorEdicion = new Map(institucionales.map((i) => [i.edicionId, i.esPse === true]));
         const adjudicadoSum = todas
           .filter((e) => e.adjudicacionPropuesta === true)
-          .reduce((s, e) => s + Number(e.presupuesto?.montoTotal ?? 0), 0);
-        const costo = Number(edicion.presupuesto?.montoTotal ?? 0);
+          .reduce(
+            (s, e) =>
+              s
+              + calcularPresupuestoAAdjudicar(e.presupuestoSolicitado, convocatoria, esPsePorEdicion.get(e.id))
+                .total,
+            0,
+          );
+        const costo = calcularPresupuestoAAdjudicar(
+          edicion.presupuestoSolicitado,
+          convocatoria,
+          esPsePorEdicion.get(edicion.id),
+        ).total;
         if (adjudicadoSum + costo > tope + 0.001) {
           throw new BadRequestException(
             'No hay presupuesto disponible para adjudicar este proyecto',
@@ -1029,6 +1056,7 @@ export class EvaluacionesService {
     if (dto.categorias !== undefined) evaluacion.categorias = dto.categorias;
     if (dto.checklist !== undefined) evaluacion.checklist = dto.checklist;
     if (dto.observaciones !== undefined) evaluacion.observaciones = dto.observaciones;
+    if (dto.esPse !== undefined) evaluacion.esPse = dto.esPse;
     evaluacion.actualizadoPorId = usuario.id;
     const guardado = await this.institucionalRepo.save(evaluacion);
 
@@ -1171,6 +1199,10 @@ export class EvaluacionesService {
       if (checklist[item.id] === undefined || checklist[item.id] === null) {
         faltantes.push(item.texto);
       }
+    }
+    // Fijo y obligatorio, independiente del template (ver evaluacion-institucional.entity.ts#esPse).
+    if (evaluacion.esPse === undefined || evaluacion.esPse === null) {
+      faltantes.push('¿Es una Práctica Social Educativa?');
     }
     if (faltantes.length > 0) {
       throw new BadRequestException(

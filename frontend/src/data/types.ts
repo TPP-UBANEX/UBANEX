@@ -260,6 +260,15 @@ export interface Convocatoria {
   formularioId: string | null;
   cuotaFederativa?: number | null;
   presupuestoTotal?: number | null;
+  // Tope por proyecto sobre el total del presupuesto solicitado (no el adjudicado), según si el
+  // proyecto es consolidado o no. null/0 = sin tope.
+  topePresupuestoNoConsolidado?: number | null;
+  topePresupuestoConsolidado?: number | null;
+  // Porcentajes que componen el presupuesto a adjudicar por sobre el solicitado (ver
+  // lib/presupuesto.ts#calcularPresupuestoAAdjudicar). 0 = extra desactivado.
+  porcentajeExtraInsumos?: number;
+  umbralInsumos?: number;
+  porcentajeExtraPse?: number;
   ordenMeritoConfirmado: boolean;
   formulario?: Formulario;
 }
@@ -279,6 +288,9 @@ export interface Proyecto {
   // Calculados en el backend (no persistidos), presentes en obtenerProyecto.
   esConsolidadoDerivado?: boolean;
   esConsolidadoEfectivo?: boolean;
+  // Irreversible: si alguna vez fue consolidado, le corresponde el tope de presupuesto de
+  // consolidado para siempre (ver esConsolidadoParaTope en el backend).
+  fueConsolidadoAlgunaVez?: boolean;
   rachaAdjudicaciones?: number;
 }
 
@@ -293,7 +305,7 @@ export interface Edicion {
   unidadAcademicaId: string;
   unidadAcademica?: UnidadAcademica;
   convocatoria?: Convocatoria;
-  presupuesto?: Presupuesto;
+  presupuestoSolicitado?: Presupuesto;
   anioEdicion?: number;
   datosFormulario?: Record<string, unknown>;
   ordenMerito?: number | null;
@@ -306,6 +318,13 @@ export interface Edicion {
   esConsolidadoDerivado?: boolean;
   salteaEvaluacion?: boolean;
   rachaAdjudicaciones?: number;
+  // Consolidación irreversible a efectos del tope de presupuesto (ver esConsolidadoParaTope), y
+  // el tope resultante para esta edición según ese cálculo. null = sin tope configurado.
+  esConsolidadoParaTope?: boolean;
+  topePresupuestoSolicitado?: number | null;
+  // Viene de la evaluación institucional (EvaluacionInstitucional.esPse), no del proyecto; ver
+  // calcularPresupuestoAAdjudicar en lib/presupuesto.ts. Presente solo en el listado "todas".
+  esPse?: boolean;
 }
 
 export interface Presupuesto {
@@ -332,6 +351,7 @@ export interface BienPresupuesto {
   cantidad: number;
   precioUnitario: number;
   monto: number;
+  esInsumo?: boolean;
 }
 
 export interface CrearProyectoDto {
@@ -348,7 +368,7 @@ export interface ActualizarEdicionDto {
   esConsolidado?: boolean | null;
   esInterfacultad?: boolean;
   unidadAcademicaAdicionalId?: string | null;
-  presupuesto?: Presupuesto;
+  presupuestoSolicitado?: Presupuesto;
   datosFormulario?: Record<string, unknown>;
 }
 
@@ -457,6 +477,8 @@ export interface EvaluacionInstitucional {
   categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
   checklist: Record<string, boolean> | null;
   observaciones: string | null;
+  // Fijo y obligatorio para confirmar, independiente del template (ver ../../backend/src/evaluaciones/evaluacion-institucional.entity.ts).
+  esPse: boolean | null;
   realizadoPor?: Usuario;
   actualizadoPor?: Usuario;
   confirmadoPor?: Usuario;
@@ -508,6 +530,7 @@ export interface MonitoreoEvaluacion {
       id: string;
       estado: EstadoEvaluacion;
       observaciones: string | null;
+      esPse: boolean | null;
       realizadoPor: { id: string; nombreCompleto: string } | null;
       confirmadoPor: { id: string; nombreCompleto: string } | null;
     } | null;
@@ -534,6 +557,7 @@ export interface EvaluacionEdicionDetalle {
     confirmadoPor: { id: string; nombreCompleto: string } | null;
     categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
     checklist: Record<string, boolean> | null;
+    esPse: boolean | null;
   } | null;
   cruzadas: Array<{
     id: string;
@@ -560,6 +584,7 @@ export interface GuardarEvaluacionInstitucionalDto {
   categorias?: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
   checklist?: Record<string, boolean> | null;
   observaciones?: string;
+  esPse?: boolean;
 }
 
 export interface GuardarEvaluacionCruzadaDto {

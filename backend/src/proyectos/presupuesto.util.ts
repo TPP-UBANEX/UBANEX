@@ -25,6 +25,7 @@ export const LABELS_RUBRO: Record<TipoRubro, string> = {
 /** Campos de una partida sobre los que se puede sugerir un cambio (ver sugerencias.service.ts). */
 export const CAMPOS_PARTIDA_PERMITIDOS = [
   'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+  'esInsumo',
 ] as const;
 
 export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
@@ -35,14 +36,23 @@ export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
   periodoInicio: 'Inicio del período',
   periodoFin: 'Fin del período',
   tipoPersona: 'Tipo de persona',
+  esInsumo: 'Es insumo',
 };
 
 const FORMATO_RUTA_PARTIDA = /^rubros\[(\d+)\]\.partidas\[(\d+)\]\.([a-zA-Z]+)$/;
 const FORMATO_RUTA_RUBRO = /^rubros\[(\d+)\]$/;
 
 /**
- * Interpreta una ruta relativa a `presupuesto.` (sin ese prefijo) como el campo de una partida.
- * Solo reconoce campos de la whitelist: `subtotal` y `montoTotal` quedan afuera porque son
+ * Prefijo de las rutas de sugerencias sobre el presupuesto (ver sugerencias.service.ts), tal como
+ * quedan persistidas en `sugerencia_cambio.campo`. Acompaña al nombre de la columna
+ * `Edicion.presupuestoSolicitado`; las filas que quedaron con el prefijo viejo (`presupuesto.`) se
+ * migraron en <epoch>-prefijo-ruta-presupuesto-solicitado.ts.
+ */
+export const PREFIJO_RUTA_PRESUPUESTO = 'presupuestoSolicitado.';
+
+/**
+ * Interpreta una ruta relativa a `presupuestoSolicitado.` (sin ese prefijo) como el campo de una
+ * partida. Solo reconoce campos de la whitelist: `subtotal` y `montoTotal` quedan afuera porque son
  * derivados y se recalculan al aplicar el cambio.
  */
 export function parsearRutaPartida(
@@ -56,8 +66,9 @@ export function parsearRutaPartida(
 }
 
 /**
- * Una ruta relativa a `presupuesto.` (sin ese prefijo) que apunta a un rubro completo (no a un
- * campo de una partida) solo admite un comentario: sirve para pedir agregar o quitar partidas.
+ * Una ruta relativa a `presupuestoSolicitado.` (sin ese prefijo) que apunta a un rubro completo
+ * (no a un campo de una partida) solo admite un comentario: sirve para pedir agregar o quitar
+ * partidas.
  */
 export function esRutaComentarioPresupuesto(presupuesto: Presupuesto | null, path: string): boolean {
   const match = FORMATO_RUTA_RUBRO.exec(path);
@@ -67,10 +78,10 @@ export function esRutaComentarioPresupuesto(presupuesto: Presupuesto | null, pat
 }
 
 /**
- * Etiqueta legible de una ruta relativa a `presupuesto.` (sin ese prefijo), para mostrar en la
- * lista de sugerencias y en las notificaciones. Se degrada con gracia: si la partida referenciada
- * ya no tiene descripción cargada, omite las comillas; si la ruta no matchea ningún patrón
- * conocido, devuelve la ruta cruda como antes.
+ * Etiqueta legible de una ruta relativa a `presupuestoSolicitado.` (sin ese prefijo), para mostrar
+ * en la lista de sugerencias y en las notificaciones. Se degrada con gracia: si la partida
+ * referenciada ya no tiene descripción cargada, omite las comillas; si la ruta no matchea ningún
+ * patrón conocido, devuelve la ruta cruda como antes.
  */
 export function etiquetaCampoPresupuesto(presupuesto: Presupuesto | null, path: string): string {
   const rutaPartida = parsearRutaPartida(path);
@@ -161,6 +172,9 @@ function validarBien(label: string, partida: unknown, indice: number): void {
   if (!esMontoValido(b.precioUnitario)) {
     throw new BadRequestException(`"${label}": la partida ${indice + 1} tiene un precio unitario inválido`);
   }
+  if (b.esInsumo !== undefined && typeof b.esInsumo !== 'boolean') {
+    throw new BadRequestException(`"${label}": la partida ${indice + 1} tiene un valor inválido en "es insumo"`);
+  }
 }
 
 /**
@@ -234,6 +248,7 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
       ...p,
       descripcion: p.descripcion.trim(),
       monto: redondear2(p.cantidad * p.precioUnitario),
+      esInsumo: p.esInsumo === true,
     }));
     return { tipo, partidas, subtotal: redondear2(partidas.reduce((sum, p) => sum + p.monto, 0)) };
   });
@@ -244,12 +259,20 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
 /**
  * Describe, en texto legible, qué falta completar del presupuesto para poder enviar la edición:
  * los 3 rubros deben tener al menos una partida, cada partida debe tener descripción y monto > 0,
- * y los viáticos deben tener período completo y dentro de la ejecución de la convocatoria (o, si
- * la convocatoria todavía no tiene esas fechas cargadas, no comenzar antes de hoy).
+ * los viáticos deben tener período completo y dentro de la ejecución de la convocatoria (o, si
+ * la convocatoria todavía no tiene esas fechas cargadas, no comenzar antes de hoy), y el total no
+ * debe superar el tope de la convocatoria para proyectos consolidados/no consolidados (`esConsolidado`,
+ * ver consolidacion.ts#esConsolidadoParaTope). Guardar el presupuesto (actualizarEdicion) ya
+ * bloquea esto mismo antes; se repite acá porque una edición puede llegar excedida sin pasar por
+ * ahí (se copia al crear una edición nueva, o baja el tope de una convocatoria ya en curso).
  */
 export function presupuestoIncompletoParaEnvio(
   presupuesto: Presupuesto | null,
-  convocatoria?: Pick<Convocatoria, 'fechaInicioEjecucion' | 'fechaFinEjecucion'> | null,
+  convocatoria?: Pick<
+    Convocatoria,
+    'fechaInicioEjecucion' | 'fechaFinEjecucion' | 'topePresupuestoConsolidado' | 'topePresupuestoNoConsolidado'
+  > | null,
+  esConsolidado = false,
 ): string[] {
   if (!presupuesto || !presupuesto.rubros?.some((r) => r.partidas?.length > 0)) {
     return ['El presupuesto está vacío'];
@@ -292,5 +315,115 @@ export function presupuestoIncompletoParaEnvio(
     });
   }
 
+  const tope = topePresupuestoSolicitado(convocatoria, esConsolidado);
+  const motivoTope = motivoTopeExcedido(presupuesto, tope, esConsolidado);
+  if (motivoTope) motivos.push(motivoTope);
+
   return motivos;
+}
+
+/**
+ * Tope por proyecto sobre el total del presupuesto solicitado (no el que se adjudica), según si
+ * el proyecto es consolidado o no (ver consolidacion.ts#esConsolidadoParaTope). `null`/`0`/no
+ * configurado = sin tope. Los campos `numeric` de Postgres llegan como string vía TypeORM.
+ */
+export function topePresupuestoSolicitado(
+  convocatoria: Pick<Convocatoria, 'topePresupuestoConsolidado' | 'topePresupuestoNoConsolidado'> | null | undefined,
+  esConsolidado: boolean,
+): number | null {
+  const bruto = esConsolidado
+    ? convocatoria?.topePresupuestoConsolidado
+    : convocatoria?.topePresupuestoNoConsolidado;
+  const tope = Number(bruto ?? 0);
+  return Number.isFinite(tope) && tope > 0 ? tope : null;
+}
+
+/** Mensaje si el total solicitado supera `tope`, o `null` si está dentro (o no hay tope). */
+export function motivoTopeExcedido(
+  presupuesto: Presupuesto | null,
+  tope: number | null,
+  esConsolidado: boolean,
+): string | null {
+  if (tope === null) return null;
+  const total = Number(presupuesto?.montoTotal ?? 0);
+  if (total <= tope) return null;
+  const etiquetaTipo = esConsolidado ? 'consolidados' : 'no consolidados';
+  return (
+    `El total solicitado (${formatearMoneda(total)}) supera el tope de ${formatearMoneda(tope)} `
+    + `para proyectos ${etiquetaTipo} de esta convocatoria`
+  );
+}
+
+function formatearMoneda(valor: number): string {
+  return `$${valor.toLocaleString('es-AR')}`;
+}
+
+/**
+ * Presupuesto a adjudicar: el monto sobre el que se calcula la adjudicación propuesta (orden de
+ * mérito, tope de la convocatoria, guarda manual del Rectorado), a diferencia del presupuesto
+ * solicitado, que es lo que pide el docente.
+ *
+ *   presupuesto a adjudicar = presupuesto solicitado + extra por insumos + extra por PSE
+ *
+ * El extra por insumos es `porcentajeExtraInsumos`% del solicitado, y solo se aplica si al menos
+ * `umbralInsumos`% del monto total solicitado corresponde a partidas de bienes marcadas como
+ * insumo (`BienPresupuesto.esInsumo`; Viáticos y Seguros nunca cuenta). El extra por PSE es
+ * `porcentajeExtraPse`% del solicitado, y solo se aplica si la evaluación institucional de la
+ * edición marcó el proyecto como Práctica Social Educativa (`EvaluacionInstitucional.esPse`) —
+ * deliberadamente por fuera de `categorias`, para que no sume puntaje además del extra de plata
+ * (ver evaluaciones.service.ts#calcularPuntaje).
+ */
+export interface PresupuestoAAdjudicar {
+  solicitado: number;
+  montoInsumos: number;
+  porcentajeInsumos: number;
+  aplicaExtraInsumos: boolean;
+  extraInsumos: number;
+  esPse: boolean;
+  extraPse: number;
+  total: number;
+}
+
+/** Porcentajes/umbral por default si la convocatoria no trae `parametros` (o llega `null`/`undefined`). */
+const PORCENTAJE_EXTRA_INSUMOS_DEFAULT = 35;
+const UMBRAL_INSUMOS_DEFAULT = 40;
+const PORCENTAJE_EXTRA_PSE_DEFAULT = 15;
+
+export function calcularPresupuestoAAdjudicar(
+  presupuestoSolicitado: Presupuesto | null | undefined,
+  parametros?: Pick<
+    Convocatoria,
+    'porcentajeExtraInsumos' | 'umbralInsumos' | 'porcentajeExtraPse'
+  > | null,
+  esPse = false,
+): PresupuestoAAdjudicar {
+  const solicitado = Number(presupuestoSolicitado?.montoTotal ?? 0);
+  // Los `numeric` de Postgres llegan como string vía TypeORM.
+  const porcentajeExtraInsumos = Number(parametros?.porcentajeExtraInsumos ?? PORCENTAJE_EXTRA_INSUMOS_DEFAULT);
+  const umbralInsumos = Number(parametros?.umbralInsumos ?? UMBRAL_INSUMOS_DEFAULT);
+  const porcentajeExtraPse = Number(parametros?.porcentajeExtraPse ?? PORCENTAJE_EXTRA_PSE_DEFAULT);
+
+  const montoInsumos = redondear2(
+    (presupuestoSolicitado?.rubros ?? [])
+      .filter((r) => r.tipo !== TipoRubro.ViaticosYSeguros)
+      .flatMap((r) => r.partidas as BienPresupuesto[])
+      .filter((p) => p.esInsumo === true)
+      .reduce((sum, p) => sum + Number(p.monto ?? 0), 0),
+  );
+  const porcentajeInsumos = solicitado > 0 ? (montoInsumos / solicitado) * 100 : 0;
+  // Tolerancia chica contra errores de punto flotante en el borde exacto del umbral.
+  const aplicaExtraInsumos = solicitado > 0 && porcentajeInsumos >= umbralInsumos - 1e-9;
+  const extraInsumos = aplicaExtraInsumos ? redondear2((solicitado * porcentajeExtraInsumos) / 100) : 0;
+  const extraPse = esPse ? redondear2((solicitado * porcentajeExtraPse) / 100) : 0;
+
+  return {
+    solicitado,
+    montoInsumos,
+    porcentajeInsumos,
+    aplicaExtraInsumos,
+    extraInsumos,
+    esPse,
+    extraPse,
+    total: redondear2(solicitado + extraInsumos + extraPse),
+  };
 }

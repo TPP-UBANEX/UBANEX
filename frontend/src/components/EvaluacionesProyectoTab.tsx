@@ -230,6 +230,14 @@ export function EvaluacionesProyectoTab({
                           ))}
                         </div>
                       )}
+                      {inst.esPse !== null && (
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-sm flex-1">¿Es una Práctica Social Educativa?</p>
+                          <span className="text-sm font-medium shrink-0">
+                            {inst.esPse ? 'Sí' : 'No'}
+                          </span>
+                        </div>
+                      )}
                       {inst.observaciones ? (
                         <div className="space-y-1">
                           <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>

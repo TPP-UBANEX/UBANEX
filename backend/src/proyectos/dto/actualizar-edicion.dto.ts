@@ -27,7 +27,7 @@ export class ActualizarEdicionDto {
 
   @IsOptional()
   @IsObject()
-  presupuesto?: object;
+  presupuestoSolicitado?: object;
 
   @IsOptional()
   @IsObject()
