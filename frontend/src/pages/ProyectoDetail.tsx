@@ -83,6 +83,7 @@ export function ProyectoDetail() {
   const [guardando, setGuardando] = useState(false)
   const [iniciandoEvaluacion, setIniciandoEvaluacion] = useState(false)
   const [avalInput, setAvalInput] = useState('')
+  const [avalModo, setAvalModo] = useState<'si' | 'no'>('no')
   const [guardandoAval, setGuardandoAval] = useState(false)
 
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
@@ -273,6 +274,7 @@ export function ProyectoDetail() {
 
   useEffect(() => {
     setAvalInput(edicion?.avalUrl ?? '')
+    setAvalModo(edicion?.avalUrl ? 'si' : 'no')
   }, [edicion?.id, edicion?.avalUrl])
 
   const direccion = useDireccionEdicion({ proyecto, edicion, directores, uas })
@@ -307,7 +309,8 @@ export function ProyectoDetail() {
     if (!id || !edicion) return
     setGuardandoAval(true)
     try {
-      await api.proyectos.actualizarAval(id, edicion.id, { avalUrl: avalInput.trim() || null })
+      const nuevoValor = avalModo === 'si' ? (avalInput.trim() || null) : null
+      await api.proyectos.actualizarAval(id, edicion.id, { avalUrl: nuevoValor })
       toast.success('Aval actualizado')
       cargarDatos()
     } catch (err) {
@@ -709,20 +712,30 @@ export function ProyectoDetail() {
                     <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Tiene aval:</span>{' '}
-                      {edicion?.tieneAval
-                        ? (edicion.avalUrl
-                            ? <a href={edicion.avalUrl} target="_blank" rel="noreferrer" className="text-primary underline">Sí — ver aval</a>
-                            : 'Sí')
+                      {edicion?.avalUrl
+                        ? <a href={edicion.avalUrl} target="_blank" rel="noreferrer" className="text-primary underline">Sí — ver aval</a>
                         : 'No'}
                       {esSecretariaMismaUA && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios, EstadoEdicion.EnEvaluacion].includes(edicion?.estado as EstadoEdicion) && (
-                        <div className="flex gap-1 mt-1">
-                          <Input
-                            className="h-8 text-xs"
-                            placeholder="https://..."
-                            value={avalInput}
-                            onChange={e => setAvalInput(e.target.value)}
-                          />
-                          <Button type="button" size="sm" onClick={guardarAval} disabled={guardandoAval}>
+                        <div className="mt-1 space-y-1">
+                          <div className="flex gap-1">
+                            <Button type="button" size="sm" variant={avalModo === 'si' ? 'default' : 'outline'} onClick={() => setAvalModo('si')}>Sí</Button>
+                            <Button type="button" size="sm" variant={avalModo === 'no' ? 'default' : 'outline'} onClick={() => setAvalModo('no')}>No</Button>
+                          </div>
+                          {avalModo === 'si' && (
+                            <Input
+                              className="h-8 text-xs"
+                              placeholder="https://..."
+                              maxLength={2048}
+                              value={avalInput}
+                              onChange={e => setAvalInput(e.target.value)}
+                            />
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={guardarAval}
+                            disabled={guardandoAval || (avalModo === 'si' && !avalInput.trim())}
+                          >
                             {guardandoAval ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
                           </Button>
                         </div>
