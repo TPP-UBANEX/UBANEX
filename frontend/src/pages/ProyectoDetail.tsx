@@ -50,6 +50,12 @@ const OPCIONES_TIPO_PERSONA = [
 
 const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'autoevaluacion', 'informe-final', 'sugerencias']
 
+/** Antepone https:// si el link no trae protocolo, para que no se resuelva como ruta relativa. */
+const conProtocolo = (url: string) => {
+  const u = url.trim()
+  return /^https?:\/\//i.test(u) ? u : `https://${u}`
+}
+
 interface ModalConfigSugerencia {
   multilinea?: boolean
   maxLongitud?: number
@@ -309,7 +315,7 @@ export function ProyectoDetail() {
     if (!id || !edicion) return
     setGuardandoAval(true)
     try {
-      const nuevoValor = avalModo === 'si' ? (avalInput.trim() || null) : null
+      const nuevoValor = avalModo === 'si' && avalInput.trim() ? conProtocolo(avalInput) : null
       await api.proyectos.actualizarAval(id, edicion.id, { avalUrl: nuevoValor })
       toast.success('Aval actualizado')
       cargarDatos()
@@ -713,7 +719,7 @@ export function ProyectoDetail() {
                     <div>
                       <span className="text-muted-foreground">Tiene aval:</span>{' '}
                       {edicion?.avalUrl
-                        ? <a href={edicion.avalUrl} target="_blank" rel="noreferrer" className="text-primary underline">Sí — ver aval</a>
+                        ? <a href={conProtocolo(edicion.avalUrl)} target="_blank" rel="noreferrer" className="text-primary underline">Sí — ver aval</a>
                         : 'No'}
                       {esSecretariaMismaUA && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios, EstadoEdicion.EnEvaluacion].includes(edicion?.estado as EstadoEdicion) && (
                         <div className="mt-1 space-y-1">
