@@ -2744,6 +2744,20 @@ export class SeedService {
     console.log(`  ${cargados} avales cargados`);
   }
 
+  // Carga el aval en TODAS las ediciones en evaluación de una convocatoria, para
+  // que las convocatorias de prueba puedan completar el flujo de adjudicación
+  // (el aval es requisito para emitir la resolución).
+  private async cargarAvalesDeConvocatoria(convocatoriaId: string): Promise<void> {
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion },
+    });
+    for (const ed of ediciones) {
+      if (ed.avalUrl) continue;
+      ed.avalUrl = `https://drive.google.com/file/d/aval-${ed.id.slice(0, 8)}/view`;
+      await this.edicionRepo.save(ed);
+    }
+  }
+
   // ─────────── Convocatoria de prueba: orden de mérito ───────────
   // Convocatoria pequeña y realista con TODAS las UAs, evaluaciones confirmadas
   // y cuota federativa mínima por UA = 2, para probar el "Generar orden de mérito automático".
@@ -2911,6 +2925,7 @@ export class SeedService {
         (presupuestoTotalConvocatoria / montoTotalAcumulado) * 100,
       )}% del costo total de los proyectos)`,
     );
+    await this.cargarAvalesDeConvocatoria(conv.id);
     console.log(`  ${NOMBRE}: lista para probar el orden de mérito`);
   }
 
@@ -3089,6 +3104,7 @@ export class SeedService {
       );
       generados++;
     }
+    await this.cargarAvalesDeConvocatoria(conv.id);
     console.log(`  ${NOMBRE}: ${generados} proyectos generados (presupuesto 148605613.50)`);
   }
 
