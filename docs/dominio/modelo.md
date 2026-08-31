@@ -353,6 +353,7 @@ classDiagram
   - nombre / texto del criterio
   - tipo de valor (numérico con mínimo y máximo, o booleano) — excluyentes
   - fundamentación opcional (texto)
+  - Solo las subcategorías **numéricas** suman a la ponderación; las **booleanas** son banderas informativas y no aportan puntaje (igual que el checklist).
 - **Checklist** — sección aparte de ítems booleanos que no suma a la ponderación final. Es independiente de las categorías.
 
 #### Estructura de TemplateEvaluacionCruzada
@@ -667,11 +668,11 @@ classDiagram
 - El orden de mérito se genera **on demand** (`evaluaciones.service.ts#generarOrdenMerito`,
   lo dispara Rectorado), no automáticamente al cerrar la evaluación. Recalcula
   `ordenMerito` y `puntajeMerito` de todas las ediciones con evaluación confirmada.
-- **Nota final** (`calcularPuntaje`): cada "Sí" de la evaluación institucional vale 10 pts
-  (`PUNTAJE_BOOLEANO`); a eso se le suma el **promedio de las evaluaciones cruzadas
-  confirmadas**. `notaFinal = round((promedioCruzadas + puntajeInstitucional) * 10) / 10`.
-  Los ítems numéricos institucionales suman su valor directo. `esPse` **no** entra en la
-  nota. Desempate: nota final desc → checklist completo → id.
+- **Nota final** (`calcularPuntaje`): el puntaje institucional es la suma de las subcategorías
+  **numéricas** (su valor directo); las subcategorías booleanas no suman. A eso se le agrega el
+  **promedio de las evaluaciones cruzadas confirmadas**.
+  `notaFinal = round((promedioCruzadas + puntajeInstitucional) * 10) / 10`. `esPse` **no** entra
+  en la nota. Desempate: nota final desc → checklist completo → id.
 - **Adjudicación propuesta**: a partir de las notas se arma una propuesta borrador
   (`adjudicacionPropuesta` + `mecanismoAdjudicacion`), limitada por `presupuestoTotal`.
   Lo que se descuenta del presupuesto es el **presupuesto a adjudicar** de cada edición

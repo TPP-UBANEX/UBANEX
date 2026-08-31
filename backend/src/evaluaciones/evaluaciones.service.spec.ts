@@ -597,3 +597,85 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
     expect(convocatoria.resolucionUrl).toBe('https://intranet.uba.ar/RESCS-2026-1');
   });
 });
+
+describe('EvaluacionesService.generarOrdenMerito - subcategorías booleanas', () => {
+  it('las subcategorías booleanas no suman al puntaje de mérito', async () => {
+    const estructuraInst = {
+      categorias: [
+        {
+          id: 'c1',
+          nombre: 'Institucional',
+          subcategorias: [
+            { id: 'n1', texto: 'Numérica', tipoValor: 'numerico', minimo: 0, maximo: 10 },
+            { id: 'b1', texto: 'Booleana', tipoValor: 'booleano', minimo: null, maximo: null },
+          ],
+        },
+      ],
+      checklist: [],
+    };
+    const estructuraCruz = {
+      categorias: [
+        { id: 'cc1', nombre: 'Cruzada', puntajeMaximo: 20, items: [{ id: 'it1', nombre: 'Item', puntajeMaximo: 20 }] },
+      ],
+    };
+    const convocatoria = {
+      id: 'conv1',
+      ordenMeritoConfirmado: false,
+      presupuestoTotal: null,
+      cuotaFederativa: 0,
+      templateEvaluacionInstitucional: { estructura: estructuraInst },
+      templateEvaluacionCruzada: { estructura: estructuraCruz },
+    } as unknown as Convocatoria;
+
+    const edicion = {
+      id: 'e1',
+      convocatoriaId: 'conv1',
+      unidadAcademicaId: 'uaA',
+      unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      convocatoria,
+      presupuestoSolicitado: { montoTotal: 100 },
+      estado: EstadoEdicion.EnEvaluacion,
+      proyecto: { nombre: 'P1' },
+      ordenMerito: null,
+      puntajeMerito: null,
+      adjudicacionPropuesta: null,
+      mecanismoAdjudicacion: null,
+    } as unknown as Edicion;
+
+    const institucional = {
+      id: 'i1',
+      edicionId: 'e1',
+      estado: EstadoEvaluacion.Confirmada,
+      categorias: { n1: { valor: 7, fundamentacion: '' }, b1: { valor: true, fundamentacion: '' } },
+      checklist: {},
+    } as unknown as EvaluacionInstitucional;
+    const cruzada = {
+      id: 'cz1',
+      edicionId: 'e1',
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 15 },
+    } as unknown as EvaluacionCruzada;
+
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue([edicion]),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      { find: jest.fn().mockResolvedValue([institucional]) } as any,
+      { find: jest.fn().mockResolvedValue([cruzada]) } as any,
+      { findOne: jest.fn().mockResolvedValue(convocatoria) } as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+
+    const [actualizada] = await svc.generarOrdenMerito('conv1', { id: 'u1' } as any);
+    // 7 (numérica) + 15 (promedio cruzada) = 22. Si la booleana sumara serían 32.
+    expect(actualizada.puntajeMerito).toBe(22);
+  });
+});

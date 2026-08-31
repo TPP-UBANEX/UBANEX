@@ -46,10 +46,10 @@ import {
 
 // ── Fórmula del resumen final de evaluación ─────────────────────────────
 // El puntaje final (mérito) es la suma cruda del promedio de las evaluaciones
-// cruzadas confirmadas más la evaluación institucional confirmada. Cada "Sí"
-// del formulario suma PUNTAJE_BOOLEANO puntos. La asignación de fondos la
-// define el presupuesto + cuota federativa, no un umbral de nota.
-const PUNTAJE_BOOLEANO = 10;
+// cruzadas confirmadas más la evaluación institucional confirmada. Solo las
+// subcategorías numéricas de la institucional suman: las booleanas son banderas
+// informativas y no aportan puntaje (igual que el checklist). La asignación de
+// fondos la define el presupuesto + cuota federativa, no un umbral de nota.
 
 const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
 
@@ -392,15 +392,16 @@ export class EvaluacionesService {
     // adjudicar (ver presupuesto.util.ts#calcularPresupuestoAAdjudicar), no el puntaje.
     const subcategorias = (estructuraInst.categorias ?? []).flatMap((c) => c.subcategorias ?? []);
     const respuestas = (institucional.categorias ?? {}) as Record<string, { valor?: unknown }>;
-    const maxInst = subcategorias.reduce<number>((suma, sub) => {
-      if (sub.tipoValor === 'numerico') return suma + (sub.maximo ?? PUNTAJE_BOOLEANO);
-      return suma + PUNTAJE_BOOLEANO;
-    }, 0);
-    const puntajeInst = subcategorias.reduce<number>((suma, sub) => {
-      const respuesta = respuestas[sub.id]?.valor;
-      if (sub.tipoValor === 'numerico') return suma + Number(respuesta ?? 0);
-      return suma + (respuesta === true ? PUNTAJE_BOOLEANO : 0);
-    }, 0);
+    // Solo las subcategorías numéricas puntúan; las booleanas son informativas.
+    const maxInst = subcategorias.reduce<number>(
+      (suma, sub) => (sub.tipoValor === 'numerico' ? suma + (sub.maximo ?? 0) : suma),
+      0,
+    );
+    const puntajeInst = subcategorias.reduce<number>(
+      (suma, sub) =>
+        sub.tipoValor === 'numerico' ? suma + Number(respuestas[sub.id]?.valor ?? 0) : suma,
+      0,
+    );
 
     const maxCruzada = (estructuraCruzada.categorias ?? [])
       .flatMap((c) => c.items ?? [])
