@@ -1,29 +1,12 @@
-import { Type } from 'class-transformer';
-import {
-  ArrayNotEmpty,
-  IsArray,
-  IsDateString,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  IsUUID,
-  MaxLength,
-  Min,
-  ValidateNested,
-} from 'class-validator';
+import { IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 // Mismo límite que el aval por edición (ActualizarAvalDto).
 export const RESOLUCION_URL_MAX_LENGTH = 2048;
 
-export class MontoAdjudicadoInput {
-  @IsUUID()
-  edicionId: string;
-
-  @IsNumber()
-  @Min(0)
-  monto: number;
-}
+// El monto adjudicado NO se edita: sale de la fórmula
+// presupuesto a adjudicar = solicitado + extra insumos + extra PSE
+// (ver proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar) y es fijo
+// para toda la convocatoria. Estos DTOs solo llevan la resolución en sí.
 
 export class GuardarAdjudicacionDto {
   @IsOptional()
@@ -34,12 +17,6 @@ export class GuardarAdjudicacionDto {
   @IsOptional()
   @IsDateString()
   fechaResolucion?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => MontoAdjudicadoInput)
-  montos?: MontoAdjudicadoInput[];
 }
 
 export class EmitirAdjudicacionDto {
@@ -50,10 +27,4 @@ export class EmitirAdjudicacionDto {
 
   @IsDateString()
   fechaResolucion: string;
-
-  @IsArray()
-  @ArrayNotEmpty()
-  @ValidateNested({ each: true })
-  @Type(() => MontoAdjudicadoInput)
-  montos: MontoAdjudicadoInput[];
 }

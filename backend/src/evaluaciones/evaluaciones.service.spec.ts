@@ -511,10 +511,6 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
   }
 
   const usuario = { id: 'u1', nombreCompleto: 'Auth Rectorado' } as any;
-  const montosOk = [
-    { edicionId: 'e1', monto: 100 },
-    { edicionId: 'e2', monto: 180 },
-  ];
 
   it('rechaza emitir si el orden de mérito no está confirmado', async () => {
     const { svc } = construir({ ordenMeritoConfirmado: false });
@@ -522,7 +518,6 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
       svc.emitirAdjudicacion('conv1', {
         resolucionUrl: 'https://res',
         fechaResolucion: '2026-07-20',
-        montos: montosOk,
       } as any, usuario),
     ).rejects.toThrow(/orden de mérito/i);
   });
@@ -534,7 +529,6 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
       svc.emitirAdjudicacion('conv1', {
         resolucionUrl: 'https://res',
         fechaResolucion: '2026-07-20',
-        montos: montosOk,
       } as any, usuario),
     ).rejects.toThrow(/aval/i);
     expect(ediciones.map((e) => e.estado)).toEqual([
@@ -545,17 +539,17 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
     expect(convocatoria.adjudicacionEmitida).toBe(false);
   });
 
-  it('emite: adjudicadas → Adjudicado con monto, resto evaluadas → NoAdjudicado, convocatoria sigue en Evaluación', async () => {
+  it('emite: adjudicadas → Adjudicado con el monto de la fórmula, resto → NoAdjudicado, convocatoria sigue en Evaluación', async () => {
     const { svc, ediciones, convocatoria, auditoria } = construir();
     const res = await svc.emitirAdjudicacion('conv1', {
       resolucionUrl: '  https://res/RESCS-1  ',
       fechaResolucion: '2026-07-20',
-      montos: montosOk,
     } as any, usuario);
 
+    // Monto fijo = presupuesto a adjudicar (sin extras en el fixture → = solicitado).
     expect(ediciones.find((e) => e.id === 'e1').estado).toBe(EstadoEdicion.Adjudicado);
     expect(ediciones.find((e) => e.id === 'e1').montoAdjudicado).toBe(100);
-    expect(ediciones.find((e) => e.id === 'e2').montoAdjudicado).toBe(180);
+    expect(ediciones.find((e) => e.id === 'e2').montoAdjudicado).toBe(200);
     expect(ediciones.find((e) => e.id === 'e3').estado).toBe(EstadoEdicion.NoAdjudicado);
     expect(convocatoria.adjudicacionEmitida).toBe(true);
     expect(convocatoria.resolucionUrl).toBe('https://res/RESCS-1');
@@ -572,31 +566,21 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
       svc.emitirAdjudicacion('conv1', {
         resolucionUrl: 'https://res',
         fechaResolucion: '2026-07-20',
-        montos: montosOk,
       } as any, usuario),
     ).rejects.toThrow(/ya fue emitida/i);
   });
 
-  it('guardar borrador no cambia estados de edición', async () => {
+  it('guardar borrador solo persiste la resolución, sin tocar estados', async () => {
     const { svc, ediciones, convocatoria } = construir();
     await svc.guardarBorradorAdjudicacion('conv1', {
       resolucionUrl: 'https://res/borrador',
       fechaResolucion: '2026-07-19',
-      montos: [{ edicionId: 'e1', monto: 90 }],
     } as any, usuario);
     expect(ediciones.every((e) => e.estado === EstadoEdicion.EnEvaluacion)).toBe(true);
-    expect(ediciones.find((e) => e.id === 'e1').montoAdjudicado).toBe(90);
+    expect(ediciones.every((e) => e.montoAdjudicado == null)).toBe(true);
     expect(convocatoria.resolucionUrl).toBe('https://res/borrador');
+    expect(convocatoria.fechaResolucion).toBe('2026-07-19');
     expect(convocatoria.adjudicacionEmitida).toBe(false);
-  });
-
-  it('guardar borrador rechaza monto sobre una edición no propuesta', async () => {
-    const { svc } = construir();
-    await expect(
-      svc.guardarBorradorAdjudicacion('conv1', {
-        montos: [{ edicionId: 'e3', monto: 90 }],
-      } as any, usuario),
-    ).rejects.toThrow(/no está propuesta/i);
   });
 
   it('le antepone https:// al link de la resolución si no trae esquema', async () => {
@@ -609,7 +593,6 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
     await svc.emitirAdjudicacion('conv1', {
       resolucionUrl: 'intranet.uba.ar/RESCS-2026-1',
       fechaResolucion: '2026-07-20',
-      montos: montosOk,
     } as any, usuario);
     expect(convocatoria.resolucionUrl).toBe('https://intranet.uba.ar/RESCS-2026-1');
   });

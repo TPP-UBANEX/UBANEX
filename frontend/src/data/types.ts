@@ -364,13 +364,11 @@ export interface AdjudicacionResumen {
 export interface GuardarAdjudicacionDto {
   resolucionUrl?: string | null;
   fechaResolucion?: string;
-  montos?: Array<{ edicionId: string; monto: number }>;
 }
 
 export interface EmitirAdjudicacionDto {
   resolucionUrl: string;
   fechaResolucion: string;
-  montos: Array<{ edicionId: string; monto: number }>;
 }
 
 export interface Presupuesto {

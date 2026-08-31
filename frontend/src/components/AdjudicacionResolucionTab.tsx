@@ -42,7 +42,6 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
 
   const [resolucionUrl, setResolucionUrl] = useState('');
   const [fechaResolucion, setFechaResolucion] = useState('');
-  const [montos, setMontos] = useState<Record<string, string>>({});
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -52,13 +51,6 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
         setData(res);
         setResolucionUrl(res.convocatoria.resolucionUrl ?? '');
         setFechaResolucion(res.convocatoria.fechaResolucion ?? '');
-        const iniciales: Record<string, string> = {};
-        for (const item of res.items) {
-          if (item.adjudicacionPropuesta !== true) continue;
-          const valor = item.montoAdjudicado ?? item.presupuestoAAdjudicar;
-          iniciales[item.edicionId] = valor != null ? String(valor) : '';
-        }
-        setMontos(iniciales);
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : 'Error al cargar la adjudicación');
@@ -75,16 +67,12 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
     [data],
   );
   const emitida = data?.convocatoria.adjudicacionEmitida === true;
-  const totalAdjudicado = adjudicadas.reduce(
-    (s, i) => s + (Number(montos[i.edicionId]) || i.montoAdjudicado || 0),
-    0,
-  );
+  // El monto adjudicado es fijo: presupuesto solicitado + extra insumos + extra PSE (misma
+  // fórmula que usa el orden de mérito). No se edita.
+  const montoDe = (i: AdjudicacionResumen['items'][number]) =>
+    emitida ? (i.montoAdjudicado ?? i.presupuestoAAdjudicar) : i.presupuestoAAdjudicar;
+  const totalAdjudicado = adjudicadas.reduce((s, i) => s + montoDe(i), 0);
   const faltanAval = adjudicadas.filter((i) => !i.tieneAval);
-
-  const payloadMontos = () =>
-    adjudicadas
-      .map((i) => ({ edicionId: i.edicionId, monto: Number(montos[i.edicionId]) }))
-      .filter((m) => !Number.isNaN(m.monto));
 
   const guardarBorrador = async () => {
     try {
@@ -92,7 +80,6 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
       await api.evaluaciones.adjudicacion.guardarBorrador(convocatoriaId, {
         resolucionUrl: resolucionUrl.trim() || null,
         fechaResolucion: fechaResolucion || undefined,
-        montos: payloadMontos(),
       });
       toast.success('Borrador de la resolución guardado');
       cargar();
@@ -109,7 +96,6 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
       await api.evaluaciones.adjudicacion.emitir(convocatoriaId, {
         resolucionUrl: resolucionUrl.trim(),
         fechaResolucion,
-        montos: payloadMontos(),
       });
       toast.success('Resolución de adjudicación emitida');
       setConfirmarOpen(false);
@@ -156,8 +142,7 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
     resolucionUrl.trim().length > 0 &&
     fechaResolucion.length > 0 &&
     adjudicadas.length > 0 &&
-    faltanAval.length === 0 &&
-    adjudicadas.every((i) => Number(montos[i.edicionId]) > 0);
+    faltanAval.length === 0;
 
   return (
     <Card>
@@ -219,8 +204,7 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
                 <TableHead>Proyecto</TableHead>
                 <TableHead>Unidad académica</TableHead>
                 <TableHead>Aval</TableHead>
-                <TableHead className="text-right">A adjudicar</TableHead>
-                <TableHead className="text-right">Monto adjudicado</TableHead>
+                <TableHead className="text-right">Monto a adjudicar</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -238,29 +222,12 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
                       <span className="text-xs text-destructive">Falta</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {formatearMoneda(i.presupuestoAAdjudicar)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {emitida ? (
-                      formatearMoneda(i.montoAdjudicado)
-                    ) : (
-                      <Input
-                        type="number"
-                        min={0}
-                        className="h-8 w-40 ml-auto text-right"
-                        value={montos[i.edicionId] ?? ''}
-                        onChange={(e) =>
-                          setMontos((prev) => ({ ...prev, [i.edicionId]: e.target.value }))
-                        }
-                      />
-                    )}
-                  </TableCell>
+                  <TableCell className="text-right">{formatearMoneda(montoDe(i))}</TableCell>
                 </TableRow>
               ))}
               {adjudicadas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                     No hay proyectos propuestos para adjudicación.
                   </TableCell>
                 </TableRow>
@@ -269,14 +236,12 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
           </Table>
         </div>
 
-        {!emitida && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-muted-foreground">
-              {adjudicadas.length} proyecto(s) · Total{' '}
-              <span className="font-medium text-foreground">
-                {formatearMoneda(totalAdjudicado)}
-              </span>
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            {adjudicadas.length} proyecto(s) · Total{' '}
+            <span className="font-medium text-foreground">{formatearMoneda(totalAdjudicado)}</span>
+          </div>
+          {!emitida && (
             <div className="flex gap-2">
               <Button variant="outline" onClick={guardarBorrador} disabled={guardando || emitiendo}>
                 {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -291,8 +256,8 @@ export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmiti
                 </Button>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
 
       <Dialog open={confirmarOpen} onOpenChange={setConfirmarOpen}>

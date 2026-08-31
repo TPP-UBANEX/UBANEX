@@ -1017,29 +1017,6 @@ export class EvaluacionesService {
     }
     const guardada = await this.convocatoriaRepo.save(convocatoria);
 
-    if (dto.montos && dto.montos.length > 0) {
-      const ediciones = await this.edicionRepo.find({
-        where: { convocatoriaId },
-        relations: { proyecto: true },
-      });
-      const porId = new Map(ediciones.map((e) => [e.id, e]));
-      const modificadas: Edicion[] = [];
-      for (const { edicionId, monto } of dto.montos) {
-        const edicion = porId.get(edicionId);
-        if (!edicion) {
-          throw new BadRequestException(`La edición ${edicionId} no pertenece a la convocatoria`);
-        }
-        if (edicion.adjudicacionPropuesta !== true) {
-          throw new BadRequestException(
-            `La edición "${edicion.proyecto?.nombre ?? edicionId}" no está propuesta para adjudicación`,
-          );
-        }
-        edicion.montoAdjudicado = monto;
-        modificadas.push(edicion);
-      }
-      await this.edicionRepo.save(modificadas);
-    }
-
     await this.auditoria.registrar({
       usuarioId: usuario.id,
       accion: TipoAccionAuditoria.EDICION,
@@ -1068,6 +1045,11 @@ export class EvaluacionesService {
       where: { convocatoriaId },
       relations: { proyecto: true, unidadAcademica: true },
     });
+    const institucionales = await this.institucionalRepo.find({
+      where: { convocatoriaId },
+      select: { edicionId: true, esPse: true },
+    });
+    const esPsePorEdicion = new Map(institucionales.map((i) => [i.edicionId, i.esPse === true]));
 
     const adjudicadas = ediciones.filter((e) => e.adjudicacionPropuesta === true);
     if (adjudicadas.length === 0) {
@@ -1085,18 +1067,17 @@ export class EvaluacionesService {
       );
     }
 
-    // Cada edición adjudicada necesita un monto mayor a 0.
-    const montoPorEdicion = new Map(dto.montos.map((m) => [m.edicionId, m.monto]));
-    const sinMonto = adjudicadas.filter((e) => !((montoPorEdicion.get(e.id) ?? 0) > 0));
-    if (sinMonto.length > 0) {
-      const nombres = sinMonto.map((e) => e.proyecto?.nombre ?? e.id).join(', ');
-      throw new BadRequestException(`Falta el monto adjudicado (mayor a 0) de: ${nombres}`);
-    }
-
     for (const edicion of ediciones) {
       if (edicion.adjudicacionPropuesta === true) {
         edicion.estado = EstadoEdicion.Adjudicado;
-        edicion.montoAdjudicado = montoPorEdicion.get(edicion.id) ?? edicion.montoAdjudicado;
+        // El monto adjudicado es fijo: sale de la fórmula presupuesto a adjudicar
+        // (solicitado + extra insumos + extra PSE), la misma que usa el orden de
+        // mérito. No se edita a mano.
+        edicion.montoAdjudicado = calcularPresupuestoAAdjudicar(
+          edicion.presupuestoSolicitado,
+          convocatoria,
+          esPsePorEdicion.get(edicion.id),
+        ).total;
       } else if (edicion.estado === EstadoEdicion.EnEvaluacion) {
         edicion.estado = EstadoEdicion.NoAdjudicado;
       }
