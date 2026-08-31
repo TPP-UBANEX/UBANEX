@@ -29,6 +29,8 @@ import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { calcularPresupuestoAAdjudicar } from '../proyectos/presupuesto.util';
+import { puedeAdjudicarse } from '../proyectos/adjudicacion';
+import { GuardarAdjudicacionDto, EmitirAdjudicacionDto } from './dto/adjudicacion.dto';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import {
@@ -907,6 +909,212 @@ export class EvaluacionesService {
       this.logger.error(`Error enviando notificaciones de adjudicación: ${String(err)}`),
     );
     return guardada;
+  }
+
+  // ───────────── Resolución de adjudicación ─────────────
+  // Tercer paso, posterior a confirmar el orden de mérito: Rectorado carga el
+  // link a la resolución (no se suben archivos), la fecha y el monto por
+  // proyecto, y al emitir las ediciones pasan a Adjudicado / NoAdjudicado.
+  // Requisito: cada edición adjudicada debe tener el aval del decano cargado.
+
+  private validarConvocatoriaParaAdjudicacion(convocatoria: Convocatoria): void {
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    if (!convocatoria.ordenMeritoConfirmado) {
+      throw new BadRequestException(
+        'El orden de mérito todavía no fue confirmado; no se puede trabajar la resolución de adjudicación',
+      );
+    }
+    if (convocatoria.adjudicacionEmitida) {
+      throw new BadRequestException(
+        'La resolución de adjudicación ya fue emitida y no puede modificarse',
+      );
+    }
+  }
+
+  async obtenerAdjudicacion(convocatoriaId: string, usuario: Usuario) {
+    this.validarEsRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId },
+      relations: { proyecto: true, unidadAcademica: true },
+    });
+    const institucionales = await this.institucionalRepo.find({
+      where: { convocatoriaId },
+      select: { edicionId: true, esPse: true },
+    });
+    const esPsePorEdicion = new Map(institucionales.map((i) => [i.edicionId, i.esPse === true]));
+
+    const items = ediciones
+      .map((e) => ({
+        edicionId: e.id,
+        proyectoId: e.proyectoId,
+        proyectoNombre: e.proyecto?.nombre ?? null,
+        unidadAcademica: e.unidadAcademica
+          ? { id: e.unidadAcademica.id, nombre: e.unidadAcademica.nombre }
+          : null,
+        estadoEdicion: e.estado,
+        ordenMerito: e.ordenMerito,
+        puntajeMerito: e.puntajeMerito,
+        adjudicacionPropuesta: e.adjudicacionPropuesta,
+        mecanismoAdjudicacion: e.mecanismoAdjudicacion ?? null,
+        montoAdjudicado: e.montoAdjudicado,
+        presupuestoAAdjudicar: calcularPresupuestoAAdjudicar(
+          e.presupuestoSolicitado,
+          convocatoria,
+          esPsePorEdicion.get(e.id),
+        ).total,
+        tieneAval: puedeAdjudicarse(e),
+      }))
+      .sort((a, b) => {
+        if (a.ordenMerito == null && b.ordenMerito == null) return 0;
+        if (a.ordenMerito == null) return 1;
+        if (b.ordenMerito == null) return -1;
+        return a.ordenMerito - b.ordenMerito;
+      });
+
+    return {
+      convocatoria: {
+        id: convocatoria.id,
+        ordenMeritoConfirmado: convocatoria.ordenMeritoConfirmado,
+        adjudicacionEmitida: convocatoria.adjudicacionEmitida,
+        resolucionUrl: convocatoria.resolucionUrl,
+        fechaResolucion: convocatoria.fechaResolucion,
+      },
+      items,
+    };
+  }
+
+  async guardarBorradorAdjudicacion(
+    convocatoriaId: string,
+    dto: GuardarAdjudicacionDto,
+    usuario: Usuario,
+  ): Promise<Convocatoria> {
+    this.validarEsRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    this.validarConvocatoriaParaAdjudicacion(convocatoria);
+
+    if (dto.resolucionUrl !== undefined) {
+      convocatoria.resolucionUrl = dto.resolucionUrl?.trim() || null;
+    }
+    if (dto.fechaResolucion !== undefined) {
+      convocatoria.fechaResolucion = dto.fechaResolucion || null;
+    }
+    const guardada = await this.convocatoriaRepo.save(convocatoria);
+
+    if (dto.montos && dto.montos.length > 0) {
+      const ediciones = await this.edicionRepo.find({
+        where: { convocatoriaId },
+        relations: { proyecto: true },
+      });
+      const porId = new Map(ediciones.map((e) => [e.id, e]));
+      const modificadas: Edicion[] = [];
+      for (const { edicionId, monto } of dto.montos) {
+        const edicion = porId.get(edicionId);
+        if (!edicion) {
+          throw new BadRequestException(`La edición ${edicionId} no pertenece a la convocatoria`);
+        }
+        if (edicion.adjudicacionPropuesta !== true) {
+          throw new BadRequestException(
+            `La edición "${edicion.proyecto?.nombre ?? edicionId}" no está propuesta para adjudicación`,
+          );
+        }
+        edicion.montoAdjudicado = monto;
+        modificadas.push(edicion);
+      }
+      await this.edicionRepo.save(modificadas);
+    }
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EDICION,
+      descripcion: 'Guardó el borrador de la resolución de adjudicación',
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.ADJUDICACION,
+      entidadId: convocatoriaId,
+    });
+
+    return guardada;
+  }
+
+  async emitirAdjudicacion(
+    convocatoriaId: string,
+    dto: EmitirAdjudicacionDto,
+    usuario: Usuario,
+  ): Promise<{ convocatoria: Convocatoria; ediciones: Edicion[] }> {
+    this.validarEsAutoridadRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    this.validarConvocatoriaParaAdjudicacion(convocatoria);
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId },
+      relations: { proyecto: true, unidadAcademica: true },
+    });
+
+    const adjudicadas = ediciones.filter((e) => e.adjudicacionPropuesta === true);
+    if (adjudicadas.length === 0) {
+      throw new BadRequestException(
+        'No hay ediciones propuestas para adjudicación en el orden de mérito',
+      );
+    }
+
+    // Gate del aval: toda edición adjudicada necesita el aval firmado del decano.
+    const faltanAval = adjudicadas.filter((e) => !puedeAdjudicarse(e));
+    if (faltanAval.length > 0) {
+      const nombres = faltanAval.map((e) => e.proyecto?.nombre ?? e.id).join(', ');
+      throw new BadRequestException(
+        `No se puede emitir la resolución: faltan los avales de: ${nombres}`,
+      );
+    }
+
+    // Cada edición adjudicada necesita un monto mayor a 0.
+    const montoPorEdicion = new Map(dto.montos.map((m) => [m.edicionId, m.monto]));
+    const sinMonto = adjudicadas.filter((e) => !((montoPorEdicion.get(e.id) ?? 0) > 0));
+    if (sinMonto.length > 0) {
+      const nombres = sinMonto.map((e) => e.proyecto?.nombre ?? e.id).join(', ');
+      throw new BadRequestException(`Falta el monto adjudicado (mayor a 0) de: ${nombres}`);
+    }
+
+    for (const edicion of ediciones) {
+      if (edicion.adjudicacionPropuesta === true) {
+        edicion.estado = EstadoEdicion.Adjudicado;
+        edicion.montoAdjudicado = montoPorEdicion.get(edicion.id) ?? edicion.montoAdjudicado;
+      } else if (edicion.estado === EstadoEdicion.EnEvaluacion) {
+        edicion.estado = EstadoEdicion.NoAdjudicado;
+      }
+    }
+
+    await this.edicionRepo.manager.transaction(async (manager) => {
+      await manager.save(ediciones);
+      convocatoria.adjudicacionEmitida = true;
+      convocatoria.resolucionUrl = dto.resolucionUrl.trim();
+      convocatoria.fechaResolucion = dto.fechaResolucion;
+      convocatoria.adjudicacionEmitidaPorId = usuario.id;
+      await manager.save(convocatoria);
+    });
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EDICION,
+      descripcion: 'Emitió la resolución de adjudicación',
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.ADJUDICACION,
+      entidadId: convocatoriaId,
+    });
+
+    return { convocatoria, ediciones };
   }
 
   // Al confirmar el orden de mérito (cierre definitivo de la convocatoria) se

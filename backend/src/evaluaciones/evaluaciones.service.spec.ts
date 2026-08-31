@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EvaluacionesService } from './evaluaciones.service';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
+import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoEvaluacion } from '../common/enums/estado-evaluacion.enum';
 import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
@@ -426,5 +427,175 @@ describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', ()
     await expect(
       svc.actualizarPropuestaAdjudicacion('e1', true, MecanismoAdjudicacion.Merito, { id: 'u1' } as any),
     ).rejects.toThrow(/No hay presupuesto disponible/);
+  });
+});
+
+describe('EvaluacionesService - resolución de adjudicación', () => {
+  function construir(overrides: Partial<any> = {}) {
+    const convocatoria = {
+      id: 'conv1',
+      estado: EstadoConvocatoria.Evaluacion,
+      ordenMeritoConfirmado: true,
+      adjudicacionEmitida: false,
+      resolucionUrl: null,
+      fechaResolucion: null,
+      adjudicacionEmitidaPorId: null,
+      porcentajeExtraInsumos: 0,
+      porcentajeExtraPse: 0,
+      umbralInsumos: 40,
+      ...overrides,
+    } as any;
+
+    const ediciones: any[] = [
+      {
+        id: 'e1',
+        convocatoriaId: 'conv1',
+        estado: EstadoEdicion.EnEvaluacion,
+        adjudicacionPropuesta: true,
+        avalUrl: 'https://drive/e1',
+        montoAdjudicado: null,
+        presupuestoSolicitado: { montoTotal: 100 },
+        proyecto: { nombre: 'Proyecto 1' },
+        unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      },
+      {
+        id: 'e2',
+        convocatoriaId: 'conv1',
+        estado: EstadoEdicion.EnEvaluacion,
+        adjudicacionPropuesta: true,
+        avalUrl: 'https://drive/e2',
+        montoAdjudicado: null,
+        presupuestoSolicitado: { montoTotal: 200 },
+        proyecto: { nombre: 'Proyecto 2' },
+        unidadAcademica: { id: 'uaB', nombre: 'Facultad B' },
+      },
+      {
+        id: 'e3',
+        convocatoriaId: 'conv1',
+        estado: EstadoEdicion.EnEvaluacion,
+        adjudicacionPropuesta: false,
+        avalUrl: null,
+        montoAdjudicado: null,
+        presupuestoSolicitado: { montoTotal: 150 },
+        proyecto: { nombre: 'Proyecto 3' },
+        unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      },
+    ];
+
+    const convocatoriaRepo = {
+      findOne: jest.fn().mockResolvedValue(convocatoria),
+      save: jest.fn().mockImplementation((c) => Promise.resolve(c)),
+    };
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue(ediciones),
+      save: jest.fn().mockImplementation((e) => Promise.resolve(e)),
+      manager: { transaction: jest.fn().mockImplementation((cb) => cb({ save: jest.fn() })) },
+    };
+    const institucionalRepo = { find: jest.fn().mockResolvedValue([]) };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const auditoria = { registrar: jest.fn() };
+    const svc = new EvaluacionesService(
+      institucionalRepo as any,
+      dummy as any,
+      convocatoriaRepo as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      auditoria as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    jest.spyOn(svc as any, 'validarEsAutoridadRectorado').mockImplementation(() => undefined);
+    return { svc, convocatoria, ediciones, convocatoriaRepo, auditoria };
+  }
+
+  const usuario = { id: 'u1', nombreCompleto: 'Auth Rectorado' } as any;
+  const montosOk = [
+    { edicionId: 'e1', monto: 100 },
+    { edicionId: 'e2', monto: 180 },
+  ];
+
+  it('rechaza emitir si el orden de mérito no está confirmado', async () => {
+    const { svc } = construir({ ordenMeritoConfirmado: false });
+    await expect(
+      svc.emitirAdjudicacion('conv1', {
+        resolucionUrl: 'https://res',
+        fechaResolucion: '2026-07-20',
+        montos: montosOk,
+      } as any, usuario),
+    ).rejects.toThrow(/orden de mérito/i);
+  });
+
+  it('rechaza emitir si una edición adjudicada no tiene aval, sin tocar estados', async () => {
+    const { svc, ediciones, convocatoria } = construir();
+    ediciones[1].avalUrl = null;
+    await expect(
+      svc.emitirAdjudicacion('conv1', {
+        resolucionUrl: 'https://res',
+        fechaResolucion: '2026-07-20',
+        montos: montosOk,
+      } as any, usuario),
+    ).rejects.toThrow(/aval/i);
+    expect(ediciones.map((e) => e.estado)).toEqual([
+      EstadoEdicion.EnEvaluacion,
+      EstadoEdicion.EnEvaluacion,
+      EstadoEdicion.EnEvaluacion,
+    ]);
+    expect(convocatoria.adjudicacionEmitida).toBe(false);
+  });
+
+  it('emite: adjudicadas → Adjudicado con monto, resto evaluadas → NoAdjudicado, convocatoria sigue en Evaluación', async () => {
+    const { svc, ediciones, convocatoria, auditoria } = construir();
+    const res = await svc.emitirAdjudicacion('conv1', {
+      resolucionUrl: '  https://res/RESCS-1  ',
+      fechaResolucion: '2026-07-20',
+      montos: montosOk,
+    } as any, usuario);
+
+    expect(ediciones.find((e) => e.id === 'e1').estado).toBe(EstadoEdicion.Adjudicado);
+    expect(ediciones.find((e) => e.id === 'e1').montoAdjudicado).toBe(100);
+    expect(ediciones.find((e) => e.id === 'e2').montoAdjudicado).toBe(180);
+    expect(ediciones.find((e) => e.id === 'e3').estado).toBe(EstadoEdicion.NoAdjudicado);
+    expect(convocatoria.adjudicacionEmitida).toBe(true);
+    expect(convocatoria.resolucionUrl).toBe('https://res/RESCS-1');
+    expect(convocatoria.fechaResolucion).toBe('2026-07-20');
+    expect(convocatoria.adjudicacionEmitidaPorId).toBe('u1');
+    expect(convocatoria.estado).toBe(EstadoConvocatoria.Evaluacion);
+    expect(auditoria.registrar).toHaveBeenCalled();
+    expect(res.convocatoria.adjudicacionEmitida).toBe(true);
+  });
+
+  it('rechaza una segunda emisión (inmutable)', async () => {
+    const { svc } = construir({ adjudicacionEmitida: true });
+    await expect(
+      svc.emitirAdjudicacion('conv1', {
+        resolucionUrl: 'https://res',
+        fechaResolucion: '2026-07-20',
+        montos: montosOk,
+      } as any, usuario),
+    ).rejects.toThrow(/ya fue emitida/i);
+  });
+
+  it('guardar borrador no cambia estados de edición', async () => {
+    const { svc, ediciones, convocatoria } = construir();
+    await svc.guardarBorradorAdjudicacion('conv1', {
+      resolucionUrl: 'https://res/borrador',
+      fechaResolucion: '2026-07-19',
+      montos: [{ edicionId: 'e1', monto: 90 }],
+    } as any, usuario);
+    expect(ediciones.every((e) => e.estado === EstadoEdicion.EnEvaluacion)).toBe(true);
+    expect(ediciones.find((e) => e.id === 'e1').montoAdjudicado).toBe(90);
+    expect(convocatoria.resolucionUrl).toBe('https://res/borrador');
+    expect(convocatoria.adjudicacionEmitida).toBe(false);
+  });
+
+  it('guardar borrador rechaza monto sobre una edición no propuesta', async () => {
+    const { svc } = construir();
+    await expect(
+      svc.guardarBorradorAdjudicacion('conv1', {
+        montos: [{ edicionId: 'e3', monto: 90 }],
+      } as any, usuario),
+    ).rejects.toThrow(/no está propuesta/i);
   });
 });
