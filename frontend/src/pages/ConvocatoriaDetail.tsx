@@ -981,6 +981,9 @@ export function ConvocatoriaDetail() {
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
           {esRectorado && <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>}
+          {esRectorado && conv?.ordenMeritoConfirmado && (
+            <TabsTrigger value="adjudicacion">Adjudicación</TabsTrigger>
+          )}
           {!esUsuarioEjecucion && <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>}
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
           <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
@@ -1415,18 +1418,21 @@ export function ConvocatoriaDetail() {
                   )}
             </CardContent>
           </Card>
-          {id && conv?.ordenMeritoConfirmado && esAutoridadRectorado && (
-            <div className="mt-4">
+        </TabsContent>
+        )}
+        {esRectorado && conv?.ordenMeritoConfirmado && (
+          <TabsContent value="adjudicacion" className="mt-4">
+            {id && (
               <AdjudicacionResolucionTab
                 convocatoriaId={id}
+                puedeEmitir={!!esAutoridadRectorado}
                 onEmitida={() => {
                   cargarDatos();
                   setRefreshKey((k) => k + 1);
                 }}
               />
-            </div>
-          )}
-        </TabsContent>
+            )}
+          </TabsContent>
         )}
         <TabsContent value="emparejamiento" className="mt-4">
           {id && conv && <EmparejamientoTab convocatoriaId={id} estadoConvocatoria={conv.estado} />}

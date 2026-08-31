@@ -917,6 +917,13 @@ export class EvaluacionesService {
   // proyecto, y al emitir las ediciones pasan a Adjudicado / NoAdjudicado.
   // Requisito: cada edición adjudicada debe tener el aval del decano cargado.
 
+  // Normaliza el link de la resolución: si no trae esquema, se le antepone https://
+  private normalizarResolucionUrl(url: string | null | undefined): string | null {
+    const v = (url ?? '').trim();
+    if (!v) return null;
+    return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  }
+
   private validarConvocatoriaParaAdjudicacion(convocatoria: Convocatoria): void {
     if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
       throw new BadRequestException('La convocatoria no está en etapa de evaluación');
@@ -1003,7 +1010,7 @@ export class EvaluacionesService {
     this.validarConvocatoriaParaAdjudicacion(convocatoria);
 
     if (dto.resolucionUrl !== undefined) {
-      convocatoria.resolucionUrl = dto.resolucionUrl?.trim() || null;
+      convocatoria.resolucionUrl = this.normalizarResolucionUrl(dto.resolucionUrl);
     }
     if (dto.fechaResolucion !== undefined) {
       convocatoria.fechaResolucion = dto.fechaResolucion || null;
@@ -1098,7 +1105,7 @@ export class EvaluacionesService {
     await this.edicionRepo.manager.transaction(async (manager) => {
       await manager.save(ediciones);
       convocatoria.adjudicacionEmitida = true;
-      convocatoria.resolucionUrl = dto.resolucionUrl.trim();
+      convocatoria.resolucionUrl = this.normalizarResolucionUrl(dto.resolucionUrl);
       convocatoria.fechaResolucion = dto.fechaResolucion;
       convocatoria.adjudicacionEmitidaPorId = usuario.id;
       await manager.save(convocatoria);

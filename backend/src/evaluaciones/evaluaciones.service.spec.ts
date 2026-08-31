@@ -598,4 +598,19 @@ describe('EvaluacionesService - resolución de adjudicación', () => {
       } as any, usuario),
     ).rejects.toThrow(/no está propuesta/i);
   });
+
+  it('le antepone https:// al link de la resolución si no trae esquema', async () => {
+    const { svc, convocatoria } = construir();
+    await svc.guardarBorradorAdjudicacion('conv1', {
+      resolucionUrl: 'drive.google.com/file/d/x',
+    } as any, usuario);
+    expect(convocatoria.resolucionUrl).toBe('https://drive.google.com/file/d/x');
+
+    await svc.emitirAdjudicacion('conv1', {
+      resolucionUrl: 'intranet.uba.ar/RESCS-2026-1',
+      fechaResolucion: '2026-07-20',
+      montos: montosOk,
+    } as any, usuario);
+    expect(convocatoria.resolucionUrl).toBe('https://intranet.uba.ar/RESCS-2026-1');
+  });
 });

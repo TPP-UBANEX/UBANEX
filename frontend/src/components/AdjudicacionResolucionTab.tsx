@@ -27,11 +27,13 @@ import { toast } from 'sonner';
 
 interface Props {
   convocatoriaId: string;
+  // Solo la Autoridad de Rectorado puede emitir; el Asistente puede editar el borrador.
+  puedeEmitir: boolean;
   // Se dispara al emitir la resolución, para que el resto de la página refresque.
   onEmitida: () => void;
 }
 
-export function AdjudicacionResolucionTab({ convocatoriaId, onEmitida }: Props) {
+export function AdjudicacionResolucionTab({ convocatoriaId, puedeEmitir, onEmitida }: Props) {
   const [data, setData] = useState<AdjudicacionResumen | null>(null);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -148,7 +150,8 @@ export function AdjudicacionResolucionTab({ convocatoriaId, onEmitida }: Props) 
     );
   }
 
-  const puedeEmitir =
+  const emisionHabilitada =
+    puedeEmitir &&
     !emitida &&
     resolucionUrl.trim().length > 0 &&
     fechaResolucion.length > 0 &&
@@ -279,9 +282,14 @@ export function AdjudicacionResolucionTab({ convocatoriaId, onEmitida }: Props) 
                 {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Guardar borrador
               </Button>
-              <Button onClick={() => setConfirmarOpen(true)} disabled={!puedeEmitir || emitiendo}>
-                Emitir adjudicación
-              </Button>
+              {puedeEmitir && (
+                <Button
+                  onClick={() => setConfirmarOpen(true)}
+                  disabled={!emisionHabilitada || emitiendo}
+                >
+                  Emitir adjudicación
+                </Button>
+              )}
             </div>
           </div>
         )}
