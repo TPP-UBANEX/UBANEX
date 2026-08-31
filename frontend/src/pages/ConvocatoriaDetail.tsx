@@ -53,6 +53,7 @@ import { EmparejamientoTab } from '@/components/EmparejamientoTab';
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores';
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab';
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab';
+import { AdjudicacionResolucionTab } from '@/components/AdjudicacionResolucionTab';
 import { calcularPresupuestoAAdjudicar, formatearMoneda } from '@/lib/presupuesto';
 import {
   ArrowLeft,
@@ -1414,6 +1415,17 @@ export function ConvocatoriaDetail() {
                   )}
             </CardContent>
           </Card>
+          {id && conv?.ordenMeritoConfirmado && esAutoridadRectorado && (
+            <div className="mt-4">
+              <AdjudicacionResolucionTab
+                convocatoriaId={id}
+                onEmitida={() => {
+                  cargarDatos();
+                  setRefreshKey((k) => k + 1);
+                }}
+              />
+            </div>
+          )}
         </TabsContent>
         )}
         <TabsContent value="emparejamiento" className="mt-4">

@@ -368,6 +368,29 @@ export const api = {
         `/evaluaciones/edicion/${edicionId}/adjudicacion-propuesta`,
         { adjudicado, mecanismo },
       ),
+    adjudicacion: {
+      obtener: (convocatoriaId: string) =>
+        get<import('@/data/types').AdjudicacionResumen>(
+          `/evaluaciones/convocatoria/${convocatoriaId}/adjudicacion`,
+        ),
+      guardarBorrador: (
+        convocatoriaId: string,
+        data: import('@/data/types').GuardarAdjudicacionDto,
+      ) =>
+        request<import('@/data/types').Convocatoria>(
+          'PUT',
+          `/evaluaciones/convocatoria/${convocatoriaId}/adjudicacion`,
+          data,
+        ),
+      emitir: (
+        convocatoriaId: string,
+        data: import('@/data/types').EmitirAdjudicacionDto,
+      ) =>
+        post<{
+          convocatoria: import('@/data/types').Convocatoria;
+          ediciones: import('@/data/types').Edicion[];
+        }>(`/evaluaciones/convocatoria/${convocatoriaId}/adjudicacion/emitir`, data),
+    },
     edicion: (edicionId: string) =>
       get<import('@/data/types').EvaluacionEdicionDetalle>(`/evaluaciones/edicion/${edicionId}`),
     institucionales: {

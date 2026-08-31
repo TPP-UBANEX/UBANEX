@@ -270,6 +270,10 @@ export interface Convocatoria {
   umbralInsumos?: number;
   porcentajeExtraPse?: number;
   ordenMeritoConfirmado: boolean;
+  // Resolución de adjudicación (paso posterior a confirmar el orden de mérito).
+  adjudicacionEmitida?: boolean;
+  resolucionUrl?: string | null;
+  fechaResolucion?: string | null;
   umbralInconsistenciaCruzada: number | null;
   formulario?: Formulario;
 }
@@ -314,6 +318,7 @@ export interface Edicion {
   adjudicacionPropuesta?: boolean | null;
   mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
   puntajeMerito?: number | null;
+  montoAdjudicado?: number | null;
   creadoEn: string;
   actualizadoEn: string;
   // Calculados en el backend (no persistidos).
@@ -328,6 +333,44 @@ export interface Edicion {
   // Viene de la evaluación institucional (EvaluacionInstitucional.esPse), no del proyecto; ver
   // calcularPresupuestoAAdjudicar en lib/presupuesto.ts. Presente solo en el listado "todas".
   esPse?: boolean;
+}
+
+export interface AdjudicacionResumenItem {
+  edicionId: string;
+  proyectoId: string;
+  proyectoNombre: string | null;
+  unidadAcademica: { id: string; nombre: string } | null;
+  estadoEdicion: EstadoEdicion;
+  ordenMerito: number | null;
+  puntajeMerito: number | null;
+  adjudicacionPropuesta: boolean | null;
+  mecanismoAdjudicacion: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
+  montoAdjudicado: number | null;
+  presupuestoAAdjudicar: number;
+  tieneAval: boolean;
+}
+
+export interface AdjudicacionResumen {
+  convocatoria: {
+    id: string;
+    ordenMeritoConfirmado: boolean;
+    adjudicacionEmitida: boolean;
+    resolucionUrl: string | null;
+    fechaResolucion: string | null;
+  };
+  items: AdjudicacionResumenItem[];
+}
+
+export interface GuardarAdjudicacionDto {
+  resolucionUrl?: string | null;
+  fechaResolucion?: string;
+  montos?: Array<{ edicionId: string; monto: number }>;
+}
+
+export interface EmitirAdjudicacionDto {
+  resolucionUrl: string;
+  fechaResolucion: string;
+  montos: Array<{ edicionId: string; monto: number }>;
 }
 
 export interface Presupuesto {
