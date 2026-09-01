@@ -104,55 +104,62 @@ export function EvaluacionesProyectoTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {data.convocatoria.nombre ?? 'Convocatoria'}
-          {data.convocatoria.estado
-            ? ` · ${estadoConvocatoriaLabel[data.convocatoria.estado] ?? data.convocatoria.estado}`
-            : ''}
-        </span>
-      </div>
-
-      {data.resumen && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Resultado final</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Nota final</p>
-              <p className="text-2xl font-bold">
-                {data.resumen.notaFinal}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Resultado final</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {data.convocatoria.nombre ?? 'Convocatoria'}
+            {data.convocatoria.estado
+              ? ` · ${estadoConvocatoriaLabel[data.convocatoria.estado] ?? data.convocatoria.estado}`
+              : ''}
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Nota final</p>
+            <p className="text-3xl font-bold">
+              {data.resumen ? data.resumen.notaFinal : '—'}
+              {data.resumen && (
                 <span className="text-sm font-medium text-muted-foreground">
+                  {' '}
                   / {data.resumen.puntajeInstitucionalMaximo + data.resumen.puntajeCruzadaMaximo}
                 </span>
+              )}
+            </p>
+            {!data.resumen && (
+              <p className="text-xs text-muted-foreground">
+                Se calcula al confirmarse la evaluación institucional y las evaluaciones cruzadas.
               </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Evaluación institucional</p>
-              <p className="text-lg font-semibold">
-                {data.resumen.puntajeInstitucional}
+            )}
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Evaluación institucional</p>
+            <p className="text-lg font-semibold">
+              {data.resumen ? data.resumen.puntajeInstitucional : '—'}
+              {data.resumen && (
                 <span className="text-sm font-medium text-muted-foreground">
                   {' '}
                   / {data.resumen.puntajeInstitucionalMaximo}
                 </span>
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Evaluación cruzada (promedio)</p>
-              <p className="text-lg font-semibold">
-                {data.resumen.puntajeCruzadaPromedio != null
-                  ? data.resumen.puntajeCruzadaPromedio
-                  : '—'}
+              )}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Evaluación cruzada (promedio)</p>
+            <p className="text-lg font-semibold">
+              {data.resumen?.puntajeCruzadaPromedio != null
+                ? data.resumen.puntajeCruzadaPromedio
+                : '—'}
+              {data.resumen && (
                 <span className="text-sm font-medium text-muted-foreground">
                   {' '}
                   / {data.resumen.puntajeCruzadaMaximo}
                 </span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              )}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {sinEvaluaciones ? (
         <Card>
@@ -244,6 +251,13 @@ export function EvaluacionesProyectoTab({
                           <p className="text-sm whitespace-pre-wrap">{inst.observaciones}</p>
                         </div>
                       ) : null}
+                      <div className="border-t pt-2 flex items-center justify-between">
+                        <span className="text-sm font-medium">Puntaje total</span>
+                        <span className="text-sm font-bold shrink-0">
+                          {inst.puntaje ?? '—'}
+                          {inst.puntajeMaximo != null ? ` / ${inst.puntajeMaximo}` : ''}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">

@@ -305,7 +305,18 @@ export class EvaluacionesService {
     const algunaCruzadaConfirmada = cruzadas.some((c) => c.estado === EstadoEvaluacion.Confirmada);
 
     const cruzadasConfirmadas = cruzadas.filter((c) => c.estado === EstadoEvaluacion.Confirmada);
-    const resumen = this.calcularResumen(institucional, cruzadasConfirmadas, edicion);
+    const resumen = this.calcularResumen(
+      institucional,
+      cruzadasConfirmadas,
+      edicion,
+      esSecretariaUA || esRectorado,
+    );
+    const puntajeInst = verDetalleInst
+      ? this.puntajeInstitucional(
+          edicion.convocatoria?.templateEvaluacionInstitucional?.estructura ?? null,
+          institucional?.categorias ?? null,
+        )
+      : null;
 
     return {
       convocatoria: {
@@ -333,6 +344,8 @@ export class EvaluacionesService {
             categorias: verDetalleInst ? institucional.categorias : null,
             checklist: verDetalleInst ? institucional.checklist : null,
             esPse: verDetalleInst ? institucional.esPse : null,
+            puntaje: puntajeInst?.puntaje ?? null,
+            puntajeMaximo: puntajeInst?.maximo ?? null,
           }
         : null,
       cruzadas: cruzadas.map((c) => {
@@ -393,18 +406,10 @@ export class EvaluacionesService {
 
     // Deliberadamente no incluye `institucional.esPse`: ese campo mueve el presupuesto a
     // adjudicar (ver presupuesto.util.ts#calcularPresupuestoAAdjudicar), no el puntaje.
-    const subcategorias = (estructuraInst.categorias ?? []).flatMap((c) => c.subcategorias ?? []);
-    const respuestas = (institucional.categorias ?? {}) as Record<string, { valor?: unknown }>;
-    // Solo las subcategorías numéricas puntúan; las booleanas son informativas.
-    const maxInst = subcategorias.reduce<number>(
-      (suma, sub) => (sub.tipoValor === 'numerico' ? suma + (sub.maximo ?? 0) : suma),
-      0,
-    );
-    const puntajeInst = subcategorias.reduce<number>(
-      (suma, sub) =>
-        sub.tipoValor === 'numerico' ? suma + Number(respuestas[sub.id]?.valor ?? 0) : suma,
-      0,
-    );
+    const { puntaje: puntajeInst, maximo: maxInst } = this.puntajeInstitucional(
+      estructuraInst,
+      institucional.categorias,
+    )!;
 
     const maxCruzada = (estructuraCruzada.categorias ?? [])
       .flatMap((c) => c.items ?? [])
@@ -432,6 +437,30 @@ export class EvaluacionesService {
       notaFinal,
       checklistCompleto,
     };
+  }
+
+  // Puntaje de la evaluación institucional: solo las subcategorías numéricas
+  // puntúan, las booleanas y el checklist son informativos. Deliberadamente
+  // no incluye `esPse` (ver comentario en calcularPuntaje). Compartido por
+  // calcularPuntaje y por evaluacionDeEdicion (para mostrar el "Puntaje
+  // total" institucional aunque aún no haya orden de mérito).
+  private puntajeInstitucional(
+    estructuraInst: EstructuraTemplateInstitucional | null,
+    respuestas: Record<string, unknown> | null,
+  ): { puntaje: number; maximo: number } | null {
+    if (!estructuraInst) return null;
+    const subcategorias = (estructuraInst.categorias ?? []).flatMap((c) => c.subcategorias ?? []);
+    const valores = (respuestas ?? {}) as Record<string, { valor?: unknown }>;
+    const maximo = subcategorias.reduce<number>(
+      (suma, sub) => (sub.tipoValor === 'numerico' ? suma + (sub.maximo ?? 0) : suma),
+      0,
+    );
+    const puntaje = subcategorias.reduce<number>(
+      (suma, sub) =>
+        sub.tipoValor === 'numerico' ? suma + Number(valores[sub.id]?.valor ?? 0) : suma,
+      0,
+    );
+    return { puntaje, maximo };
   }
 
   private puntajeCruzada(cruzada: EvaluacionCruzada): number {
@@ -485,12 +514,19 @@ export class EvaluacionesService {
   // ejecución (o cerrada) y tanto la evaluación institucional como al menos
   // una cruzada fueron confirmadas. Es determinista: las evaluaciones
   // confirmadas son inmutables, así que no hace falta persistirlo.
+  // Mientras la edición sigue EnEvaluacion, se adelanta igualmente para
+  // secretaría de la UA y rectorado (`puedeVerAnticipado`): son quienes
+  // publican el orden de mérito y necesitan ver la nota final antes que el
+  // director del proyecto.
   private calcularResumen(
     institucional: EvaluacionInstitucional | null,
     cruzadasConfirmadas: EvaluacionCruzada[],
     edicion: Edicion,
+    puedeVerAnticipado: boolean,
   ) {
-    if (edicion.estado !== EstadoEdicion.EnEjecucion && edicion.estado !== EstadoEdicion.Cerrado) {
+    const edicionPublicada =
+      edicion.estado === EstadoEdicion.EnEjecucion || edicion.estado === EstadoEdicion.Cerrado;
+    if (!edicionPublicada && !puedeVerAnticipado) {
       return null;
     }
     return this.calcularPuntaje(institucional, cruzadasConfirmadas, edicion);

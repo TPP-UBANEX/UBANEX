@@ -616,6 +616,8 @@ export interface EvaluacionEdicionDetalle {
     categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
     checklist: Record<string, boolean> | null;
     esPse: boolean | null;
+    puntaje: number | null;
+    puntajeMaximo: number | null;
   } | null;
   cruzadas: Array<{
     id: string;
@@ -847,7 +849,10 @@ export interface Notificacion {
   creadoEn: string;
 }
 
-export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+export const estadoBadge: Record<
+  string,
+  'default' | 'secondary' | 'destructive' | 'outline' | 'success'
+> = {
   configuracion: 'outline',
   presentacion: 'default',
   evaluacion: 'secondary',
@@ -884,7 +889,7 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Aceptada: 'default',
   Rechazada: 'destructive',
   MasInformacion: 'outline',
-  Confirmada: 'default',
+  Confirmada: 'success',
   Completada: 'default',
 };
 
