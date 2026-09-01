@@ -196,6 +196,23 @@ export function generarEvaluacionCruzada(
   return { items, observaciones: rng.pick(OBSERVACIONES_CRUZADA) };
 }
 
+// Items deterministas como fracción del puntaje máximo de cada ítem. Se usa
+// para los casos demo de inconsistencia, donde la diferencia entre Propia y
+// Ajena tiene que ser reproducible (el modo aleatorio de generarEvaluacionCruzada
+// nunca llega al umbral de inconsistencia).
+export function itemsCruzadaFactor(
+  estructura: EstructuraTemplateCruzada,
+  factor: number,
+): Record<string, number> {
+  const items: Record<string, number> = {};
+  for (const categoria of estructura.categorias ?? []) {
+    for (const item of categoria.items ?? []) {
+      items[item.id] = Math.round(item.puntajeMaximo * factor);
+    }
+  }
+  return items;
+}
+
 export function slugUa(nombre: string): string {
   return nombre
     .toLowerCase()
