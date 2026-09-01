@@ -30,13 +30,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type {
   Convocatoria,
   Edicion,
   ParticipacionConvocatoria,
   PaginatedResponse,
+  DetalleMeritoIncompleto,
 } from '@/data/types';
 import {
   estadoBadge,
@@ -146,6 +147,7 @@ export function ConvocatoriaDetail() {
   const [generando, setGenerando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [confirmarMeritoOpen, setConfirmarMeritoOpen] = useState(false);
+  const [meritoIncompleto, setMeritoIncompleto] = useState<DetalleMeritoIncompleto | null>(null);
   const [ordenMeritoSort, setOrdenMeritoSort] = useState('puntaje-desc');
   const [tab, setTab] = useState('proyectos');
 
@@ -343,6 +345,16 @@ export function ConvocatoriaDetail() {
     setTodasEdiciones(fusionar);
   };
 
+  // Si el 400 trae `detalle` (listas de ediciones sin evaluar), lo mostramos en
+  // el diálogo con scroll en vez de un toast; si no, cae al toast de siempre.
+  const manejarErrorMerito = (err: unknown, mensajeGenerico: string): void => {
+    if (err instanceof ApiError && err.body && typeof err.body === 'object' && 'detalle' in err.body) {
+      setMeritoIncompleto((err.body as { detalle: DetalleMeritoIncompleto }).detalle);
+      return;
+    }
+    toast.error(err instanceof Error ? err.message : mensajeGenerico, { duration: 8000 });
+  };
+
   const generarOrdenMerito = async () => {
     if (!conv?.id) return;
     try {
@@ -351,9 +363,7 @@ export function ConvocatoriaDetail() {
       aplicarOrdenMerito(actualizadas);
       toast.success('Orden de mérito generado');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar el orden de mérito', {
-        duration: 8000,
-      });
+      manejarErrorMerito(err, 'Error al generar el orden de mérito');
     } finally {
       setGenerando(false);
     }
@@ -368,9 +378,7 @@ export function ConvocatoriaDetail() {
       setConfirmarMeritoOpen(false);
       toast.success('Orden de mérito confirmado y fijado');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al confirmar el orden de mérito', {
-        duration: 8000,
-      });
+      manejarErrorMerito(err, 'Error al confirmar el orden de mérito');
     } finally {
       setConfirmando(false);
     }
@@ -959,6 +967,95 @@ export function ConvocatoriaDetail() {
                     {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Confirmar y fijar
                   </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog
+              open={!!meritoIncompleto}
+              onOpenChange={(open) => !open && setMeritoIncompleto(null)}
+            >
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Faltan evaluaciones para el orden de mérito</DialogTitle>
+                  <DialogDescription>
+                    No se puede {meritoIncompleto?.accion === 'confirmar' ? 'confirmar' : 'generar'}{' '}
+                    el orden de mérito: hay ediciones sin evaluaciones completas.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                  {meritoIncompleto?.sinInstitucional && meritoIncompleto.sinInstitucional.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        Falta la evaluación institucional ({meritoIncompleto.sinInstitucional.length})
+                      </p>
+                      <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-0.5">
+                        {meritoIncompleto.sinInstitucional.map((nombre, i) => (
+                          <li key={`${nombre}-${i}`} className="break-words">
+                            {nombre}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {meritoIncompleto?.sinCruzadasCompletas &&
+                    meritoIncompleto.sinCruzadasCompletas.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
+                          Faltan las evaluaciones cruzadas propia y ajena (
+                          {meritoIncompleto.sinCruzadasCompletas.length})
+                        </p>
+                        <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-0.5">
+                          {meritoIncompleto.sinCruzadasCompletas.map((nombre, i) => (
+                            <li key={`${nombre}-${i}`} className="break-words">
+                              {nombre}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  {meritoIncompleto?.conInconsistenciaSinResolver &&
+                    meritoIncompleto.conInconsistenciaSinResolver.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
+                          Diferencia de {meritoIncompleto.umbral} o más puntos entre la propia y la
+                          ajena, sin tercera evaluación confirmada (
+                          {meritoIncompleto.conInconsistenciaSinResolver.length})
+                        </p>
+                        <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-0.5">
+                          {meritoIncompleto.conInconsistenciaSinResolver.map((nombre, i) => (
+                            <li key={`${nombre}-${i}`} className="break-words">
+                              {nombre}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                </div>
+                <DialogFooter className="sm:justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!meritoIncompleto) return;
+                      const texto = [
+                        ...meritoIncompleto.sinInstitucional,
+                        ...meritoIncompleto.sinCruzadasCompletas,
+                        ...meritoIncompleto.conInconsistenciaSinResolver,
+                      ].join('\n');
+                      navigator.clipboard
+                        .writeText(texto)
+                        .then(() => toast.success('Lista copiada'))
+                        .catch(() => toast.error('No se pudo copiar la lista'));
+                    }}
+                  >
+                    Copiar lista
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => navigate('/evaluacion')}>
+                      Ir a Evaluación
+                    </Button>
+                    <Button onClick={() => setMeritoIncompleto(null)}>Cerrar</Button>
+                  </div>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { BadRequestException } from '@nestjs/common';
 import { EvaluacionesService } from './evaluaciones.service';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
@@ -909,5 +910,30 @@ describe('EvaluacionesService - completitud de cruzadas para el orden de mérito
 
     const svc = armar(convocatoria, [edicion], [], []);
     await expect(svc.generarOrdenMerito('conv1', { id: 'u1' } as any)).resolves.toBeTruthy();
+  });
+
+  it('con muchas ediciones sin institucional, el mensaje se acota a 5 nombres y el detalle trae la lista completa', async () => {
+    const convocatoria = construirConvocatoria();
+    const nombres = Array.from({ length: 8 }, (_, i) => `P${i + 1}`);
+    const ediciones = nombres.map((nombre, i) =>
+      construirEdicion({ id: `e${i + 1}`, proyecto: { nombre } }),
+    );
+
+    const svc = armar(convocatoria, ediciones, [], []);
+    let error: BadRequestException | undefined;
+    try {
+      await svc.generarOrdenMerito('conv1', { id: 'u1' } as any);
+    } catch (e) {
+      error = e as BadRequestException;
+    }
+
+    expect(error).toBeInstanceOf(BadRequestException);
+    const response = error!.getResponse() as {
+      message: string;
+      detalle: { sinInstitucional: string[] };
+    };
+    expect(response.message).toContain('P1, P2, P3, P4, P5 y 3 más');
+    expect(response.message).not.toContain('P8');
+    expect(response.detalle.sinInstitucional).toEqual(nombres);
   });
 });

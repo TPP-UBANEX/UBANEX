@@ -633,22 +633,43 @@ export class EvaluacionesService {
       return;
     }
 
+    // Un mensaje con el nombre de cada edición faltante se vuelve ilegible
+    // cuando son decenas o cientos (convocatorias grandes): el mensaje se
+    // acota a los primeros `tope` nombres + "y N más", y el listado completo
+    // viaja aparte en `detalle` para que la UI lo muestre en un panel con
+    // scroll en vez de un toast desbordado.
+    const listar = (nombres: string[], tope = 5): string => {
+      if (nombres.length <= tope) return nombres.join(', ');
+      return `${nombres.slice(0, tope).join(', ')} y ${nombres.length - tope} más`;
+    };
+
     const verbo = accion === 'generar' ? 'generar' : 'confirmar';
     const partes: string[] = [`No se puede ${verbo} el orden de mérito.`];
     if (sinInstitucional.length > 0) {
-      partes.push(`Falta la evaluación institucional en: ${sinInstitucional.join(', ')}.`);
+      partes.push(`Falta la evaluación institucional en: ${listar(sinInstitucional)}.`);
     }
     if (sinCruzadasCompletas.length > 0) {
       partes.push(
-        `Faltan las evaluaciones cruzadas propia y ajena completas en: ${sinCruzadasCompletas.join(', ')}.`,
+        `Faltan las evaluaciones cruzadas propia y ajena completas en: ${listar(sinCruzadasCompletas)}.`,
       );
     }
     if (conInconsistenciaSinResolver.length > 0) {
       partes.push(
-        `Diferencia de ${diferenciaMaxima} o más puntos entre la propia y la ajena sin tercera evaluación confirmada en: ${conInconsistenciaSinResolver.join(', ')}. Designá una tercera Unidad Académica.`,
+        `Diferencia de ${diferenciaMaxima} o más puntos entre la propia y la ajena sin tercera evaluación confirmada en: ${listar(conInconsistenciaSinResolver)}. Designá una tercera Unidad Académica.`,
       );
     }
-    throw new BadRequestException(partes.join(' '));
+    throw new BadRequestException({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: partes.join(' '),
+      detalle: {
+        accion,
+        umbral: diferenciaMaxima || null,
+        sinInstitucional,
+        sinCruzadasCompletas,
+        conInconsistenciaSinResolver,
+      },
+    });
   }
 
   // Genera el orden de mérito automático de una convocatoria: rankea las

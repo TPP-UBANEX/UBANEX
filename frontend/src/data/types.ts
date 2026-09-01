@@ -601,6 +601,18 @@ export interface CandidatoTerceraUa {
   unidadAcademica: { id: string; nombre: string } | null
 }
 
+// Body del 400 que devuelve /evaluaciones/convocatoria/:id/orden-merito (generar
+// y confirmar) cuando hay ediciones sin evaluaciones completas: `message` trae
+// el resumen truncado que ya usa el toast, y estas listas traen el nombre de
+// cada proyecto entero para mostrarlo en un panel con scroll.
+export interface DetalleMeritoIncompleto {
+  accion: 'generar' | 'confirmar'
+  umbral: number | null
+  sinInstitucional: string[]
+  sinCruzadasCompletas: string[]
+  conInconsistenciaSinResolver: string[]
+}
+
 export interface EvaluacionEdicionDetalle {
   convocatoria: {
     id: string;
