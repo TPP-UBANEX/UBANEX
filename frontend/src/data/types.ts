@@ -588,6 +588,8 @@ export interface MonitoreoEvaluacion {
       inconsistente: boolean;
       diferencia: number;
       umbral: number;
+      terceraDesignada: boolean;
+      terceraConfirmada: boolean;
     } | null;
   }>;
 }

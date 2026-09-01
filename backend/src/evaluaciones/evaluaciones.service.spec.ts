@@ -3,6 +3,7 @@ import { EvaluacionesService } from './evaluaciones.service';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoEvaluacion } from '../common/enums/estado-evaluacion.enum';
+import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
 import { EvaluacionCruzada } from './evaluacion-cruzada.entity';
@@ -102,8 +103,16 @@ function construirEscenario(ordenCreacion: number[]): Fixture {
       checklist: {},
     } as unknown as EvaluacionInstitucional);
     cruzadas.push({
-      id: `cz${n}`,
+      id: `cz${n}p`,
       edicionId: id,
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { item1: 0 },
+    } as unknown as EvaluacionCruzada);
+    cruzadas.push({
+      id: `cz${n}a`,
+      edicionId: id,
+      tipo: TipoEvaluacionCruzada.Ajena,
       estado: EstadoEvaluacion.Confirmada,
       items: { item1: 0 },
     } as unknown as EvaluacionCruzada);
@@ -203,8 +212,16 @@ function construirEscenarioFlex(
         checklist: {},
       } as unknown as EvaluacionInstitucional);
       cruzadas.push({
-        id: `cz${n}`,
+        id: `cz${n}p`,
         edicionId: id,
+        tipo: TipoEvaluacionCruzada.Propia,
+        estado: EstadoEvaluacion.Confirmada,
+        items: { item1: 0 },
+      } as unknown as EvaluacionCruzada);
+      cruzadas.push({
+        id: `cz${n}a`,
+        edicionId: id,
+        tipo: TipoEvaluacionCruzada.Ajena,
         estado: EstadoEvaluacion.Confirmada,
         items: { item1: 0 },
       } as unknown as EvaluacionCruzada);
@@ -649,9 +666,17 @@ describe('EvaluacionesService.generarOrdenMerito - subcategorías booleanas', ()
       categorias: { n1: { valor: 7, fundamentacion: '' }, b1: { valor: true, fundamentacion: '' } },
       checklist: {},
     } as unknown as EvaluacionInstitucional;
-    const cruzada = {
-      id: 'cz1',
+    const cruzadaPropia = {
+      id: 'cz1p',
       edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 15 },
+    } as unknown as EvaluacionCruzada;
+    const cruzadaAjena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
       estado: EstadoEvaluacion.Confirmada,
       items: { it1: 15 },
     } as unknown as EvaluacionCruzada;
@@ -663,7 +688,7 @@ describe('EvaluacionesService.generarOrdenMerito - subcategorías booleanas', ()
     const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
     const svc = new EvaluacionesService(
       { find: jest.fn().mockResolvedValue([institucional]) } as any,
-      { find: jest.fn().mockResolvedValue([cruzada]) } as any,
+      { find: jest.fn().mockResolvedValue([cruzadaPropia, cruzadaAjena]) } as any,
       { findOne: jest.fn().mockResolvedValue(convocatoria) } as any,
       edicionRepo as any,
       dummy as any,
@@ -677,5 +702,212 @@ describe('EvaluacionesService.generarOrdenMerito - subcategorías booleanas', ()
     const [actualizada] = await svc.generarOrdenMerito('conv1', { id: 'u1' } as any);
     // 7 (numérica) + 15 (promedio cruzada) = 22. Si la booleana sumara serían 32.
     expect(actualizada.puntajeMerito).toBe(22);
+  });
+});
+
+describe('EvaluacionesService - completitud de cruzadas para el orden de mérito', () => {
+  const estructuraInst = {
+    categorias: [
+      {
+        id: 'c1',
+        nombre: 'Institucional',
+        subcategorias: [{ id: 'n1', texto: 'Numérica', tipoValor: 'numerico', minimo: 0, maximo: 10 }],
+      },
+    ],
+    checklist: [],
+  };
+  const estructuraCruz = {
+    categorias: [
+      { id: 'cc1', nombre: 'Cruzada', puntajeMaximo: 100, items: [{ id: 'it1', nombre: 'Item', puntajeMaximo: 100 }] },
+    ],
+  };
+
+  function construirConvocatoria(overrides: Partial<any> = {}) {
+    return {
+      id: 'conv1',
+      estado: EstadoConvocatoria.Evaluacion,
+      ordenMeritoConfirmado: false,
+      presupuestoTotal: null,
+      cuotaFederativa: 0,
+      umbralInconsistenciaCruzada: null,
+      templateEvaluacionInstitucional: { estructura: estructuraInst },
+      templateEvaluacionCruzada: { estructura: estructuraCruz },
+      ...overrides,
+    } as unknown as Convocatoria;
+  }
+
+  function construirEdicion(overrides: Partial<any> = {}) {
+    return {
+      id: 'e1',
+      convocatoriaId: 'conv1',
+      unidadAcademicaId: 'uaA',
+      unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      presupuestoSolicitado: { montoTotal: 100 },
+      estado: EstadoEdicion.EnEvaluacion,
+      proyecto: { nombre: 'P1' },
+      ordenMerito: null,
+      puntajeMerito: null,
+      adjudicacionPropuesta: null,
+      mecanismoAdjudicacion: null,
+      ...overrides,
+    } as unknown as Edicion;
+  }
+
+  function construirInstitucional(overrides: Partial<any> = {}) {
+    return {
+      id: 'i1',
+      edicionId: 'e1',
+      estado: EstadoEvaluacion.Confirmada,
+      categorias: { n1: { valor: 7, fundamentacion: '' } },
+      checklist: {},
+      ...overrides,
+    } as unknown as EvaluacionInstitucional;
+  }
+
+  function armar(
+    convocatoria: Convocatoria,
+    ediciones: Edicion[],
+    institucionales: EvaluacionInstitucional[],
+    cruzadas: EvaluacionCruzada[],
+  ): EvaluacionesService {
+    const edicionConConvocatoria = ediciones.map((ed) => ({ ...ed, convocatoria } as unknown as Edicion));
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue(edicionConConvocatoria),
+      count: jest.fn().mockResolvedValue(0),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      { find: jest.fn().mockResolvedValue(institucionales) } as any,
+      { find: jest.fn().mockResolvedValue(cruzadas) } as any,
+      { findOne: jest.fn().mockResolvedValue(convocatoria), save: jest.fn().mockImplementation((c) => c) } as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    jest.spyOn(svc as any, 'validarEsAutoridadRectorado').mockImplementation(() => undefined);
+    return svc;
+  }
+
+  it('generarOrdenMerito bloquea si a una edición le falta la Ajena y nombra el proyecto', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion();
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+
+    const svc = armar(convocatoria, [edicion], [institucional], [propia]);
+    await expect(svc.generarOrdenMerito('conv1', { id: 'u1' } as any)).rejects.toThrow(
+      /Faltan las evaluaciones cruzadas propia y ajena completas en: P1/,
+    );
+  });
+
+  it('confirmarOrdenMerito bloquea si la diferencia entre propia y ajena llega al umbral (40) y no hay tercera confirmada', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion({ ordenMerito: 1, puntajeMerito: 50 });
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 90 },
+    } as unknown as EvaluacionCruzada;
+    const ajena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+
+    const svc = armar(convocatoria, [edicion], [institucional], [propia, ajena]);
+    await expect(svc.confirmarOrdenMerito('conv1', { id: 'u1' } as any)).rejects.toThrow(
+      /Diferencia de 40 o más puntos.*P1.*tercera/,
+    );
+  });
+
+  it('una TerceraUa en Borrador no desbloquea la inconsistencia', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion({ ordenMerito: 1, puntajeMerito: 50 });
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 90 },
+    } as unknown as EvaluacionCruzada;
+    const ajena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+    const tercera = {
+      id: 'cz1t',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.TerceraUa,
+      estado: EstadoEvaluacion.Borrador,
+      items: { it1: 70 },
+    } as unknown as EvaluacionCruzada;
+
+    const svc = armar(convocatoria, [edicion], [institucional], [propia, ajena, tercera]);
+    await expect(svc.confirmarOrdenMerito('conv1', { id: 'u1' } as any)).rejects.toThrow(
+      /Diferencia de 40 o más puntos/,
+    );
+  });
+
+  it('con TerceraUa confirmada, generar y confirmar el orden de mérito pasan y el puntaje usa solo la tercera', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion();
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 90 },
+    } as unknown as EvaluacionCruzada;
+    const ajena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+    const tercera = {
+      id: 'cz1t',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.TerceraUa,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 70 },
+    } as unknown as EvaluacionCruzada;
+
+    const svcGenerar = armar(convocatoria, [edicion], [institucional], [propia, ajena, tercera]);
+    const [actualizada] = await svcGenerar.generarOrdenMerito('conv1', { id: 'u1' } as any);
+    // 7 (institucional) + 70 (solo la tercera, no el promedio de las tres) = 77.
+    expect(actualizada.puntajeMerito).toBe(77);
+
+    const svcConfirmar = armar(convocatoria, [edicion], [institucional], [propia, ajena, tercera]);
+    await expect(svcConfirmar.confirmarOrdenMerito('conv1', { id: 'u1' } as any)).resolves.toBeTruthy();
+  });
+
+  it('no bloquea ediciones que no están EnEvaluacion', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion({ estado: EstadoEdicion.PendienteDeCambios });
+
+    const svc = armar(convocatoria, [edicion], [], []);
+    await expect(svc.generarOrdenMerito('conv1', { id: 'u1' } as any)).resolves.toBeTruthy();
   });
 });

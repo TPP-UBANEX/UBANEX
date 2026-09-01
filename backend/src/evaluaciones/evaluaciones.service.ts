@@ -50,6 +50,9 @@ import {
 // subcategorías numéricas de la institucional suman: las booleanas son banderas
 // informativas y no aportan puntaje (igual que el checklist). La asignación de
 // fondos la define el presupuesto + cuota federativa, no un umbral de nota.
+// Si hay una tercera evaluación cruzada (TerceraUa) confirmada, reemplaza a la
+// Propia y a la Ajena en el promedio: no se promedian las tres, la tercera
+// resuelve la inconsistencia y las descarta (ver cruzadasVigentes).
 
 const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
 
@@ -406,12 +409,13 @@ export class EvaluacionesService {
     const maxCruzada = (estructuraCruzada.categorias ?? [])
       .flatMap((c) => c.items ?? [])
       .reduce<number>((suma, item) => suma + (item.puntajeMaximo ?? 0), 0);
+    const cruzadasVigentes = this.cruzadasVigentes(cruzadasConfirmadas);
     const promedioCruzada =
-      cruzadasConfirmadas.reduce<number>((suma, c) => {
+      cruzadasVigentes.reduce<number>((suma, c) => {
         const items = (c.items ?? {}) as Record<string, number>;
         const total = Object.values(items).reduce<number>((acc, v) => acc + Number(v), 0);
         return suma + total;
-      }, 0) / cruzadasConfirmadas.length;
+      }, 0) / cruzadasVigentes.length;
 
     const checklist = (institucional.checklist ?? {}) as Record<string, boolean>;
     const checklistCompleto = (estructuraInst.checklist ?? []).every(
@@ -434,13 +438,27 @@ export class EvaluacionesService {
     return Object.values(cruzada.items ?? {}).reduce<number>((suma, v) => suma + Number(v), 0);
   }
 
+  // Si hay una TerceraUa confirmada, su puntaje reemplaza al de la Propia y la
+  // Ajena (mecanismo de resolución de inconsistencia extraordinaria): no se
+  // promedian las tres, la tercera las descarta.
+  private cruzadasVigentes(cruzadasConfirmadas: EvaluacionCruzada[]): EvaluacionCruzada[] {
+    const tercera = cruzadasConfirmadas.find((c) => c.tipo === TipoEvaluacionCruzada.TerceraUa);
+    return tercera ? [tercera] : cruzadasConfirmadas;
+  }
+
   // Detecta una inconsistencia extraordinaria entre la evaluación Propia y la
-  // Ajena: ambas confirmadas y con diferencia de puntaje que supera el umbral
-  // de la convocatoria. Devuelve null si aún no hay par confirmado.
+  // Ajena: ambas confirmadas y con diferencia de puntaje que llega o supera el
+  // umbral de la convocatoria. Devuelve null si aún no hay par confirmado.
   private calcularInconsistencia(
     cruzadas: EvaluacionCruzada[],
     umbral: number | null,
-  ): { inconsistente: boolean; diferencia: number; umbral: number } | null {
+  ): {
+    inconsistente: boolean;
+    diferencia: number;
+    umbral: number;
+    terceraDesignada: boolean;
+    terceraConfirmada: boolean;
+  } | null {
     const propia = cruzadas.find(c => c.tipo === TipoEvaluacionCruzada.Propia);
     const ajena = cruzadas.find(c => c.tipo === TipoEvaluacionCruzada.Ajena);
     if (
@@ -453,10 +471,13 @@ export class EvaluacionesService {
     }
     const diferencia = Math.abs(this.puntajeCruzada(propia) - this.puntajeCruzada(ajena));
     const umbralEfectivo = umbral ?? UMBRAL_INCONSISTENCIA_DEFAULT;
+    const tercera = cruzadas.find((c) => c.tipo === TipoEvaluacionCruzada.TerceraUa);
     return {
-      inconsistente: diferencia > umbralEfectivo,
+      inconsistente: diferencia >= umbralEfectivo,
       diferencia,
       umbral: umbralEfectivo,
+      terceraDesignada: !!tercera,
+      terceraConfirmada: tercera?.estado === EstadoEvaluacion.Confirmada,
     };
   }
 
@@ -475,28 +496,14 @@ export class EvaluacionesService {
     return this.calcularPuntaje(institucional, cruzadasConfirmadas, edicion);
   }
 
-  // Genera el orden de mérito automático de una convocatoria: rankea las
-  // ediciones por notaFinal (suma del promedio de evaluaciones cruzadas y la
-  // evaluación institucional) y propone una adjudicación borrador (no
-  // definitiva) respetando la cuota federativa
-  // mínima por unidad académica. No pisa el ordenMerito ya seteado a mano.
-  async generarOrdenMerito(convocatoriaId: string, usuario: Usuario): Promise<Edicion[]> {
-    this.validarEsRectorado(usuario);
-
-    const convocatoria = await this.convocatoriaRepo.findOne({
-      where: { id: convocatoriaId },
-      relations: {
-        templateEvaluacionInstitucional: true,
-        templateEvaluacionCruzada: true,
-      },
-    });
-    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
-    if (convocatoria.ordenMeritoConfirmado) {
-      throw new BadRequestException(
-        'El orden de mérito ya está confirmado y no puede volver a generarse',
-      );
-    }
-
+  // Carga las ediciones de la convocatoria junto con su evaluación
+  // institucional vigente y sus evaluaciones cruzadas, indexadas por edición.
+  // Compartido por generarOrdenMerito y confirmarOrdenMerito.
+  private async cargarDatosMerito(convocatoriaId: string): Promise<{
+    ediciones: Edicion[];
+    instPorEdicion: Map<string, EvaluacionInstitucional>;
+    cruzadasPorEdicion: Map<string, EvaluacionCruzada[]>;
+  }> {
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId },
       order: { id: 'ASC' },
@@ -532,23 +539,114 @@ export class EvaluacionesService {
       cruzadasPorEdicion.set(c.edicionId, arr);
     }
 
-    // El orden de mérito solo se genera si TODAS las ediciones que están en la
-    // etapa de evaluación fueron evaluadas (institucional confirmada + al
-    // menos una cruzada confirmada). Si falta alguna, se bloquea la operación.
-    const sinEvaluar = ediciones.filter((ed) => {
-      if (ed.estado !== EstadoEdicion.EnEvaluacion) return false;
+    return { ediciones, instPorEdicion, cruzadasPorEdicion };
+  }
+
+  // El orden de mérito solo se puede generar o confirmar si TODAS las
+  // ediciones que están en etapa de evaluación fueron evaluadas: institucional
+  // confirmada + Propia y Ajena confirmadas, y si la diferencia entre Propia y
+  // Ajena llega o supera el umbral de inconsistencia, además una TerceraUa
+  // confirmada que las reemplaza. Si falta algo, se bloquea la operación
+  // listando los proyectos afectados.
+  private validarEdicionesListasParaMerito(
+    accion: 'generar' | 'confirmar',
+    ediciones: Edicion[],
+    instPorEdicion: Map<string, EvaluacionInstitucional>,
+    cruzadasPorEdicion: Map<string, EvaluacionCruzada[]>,
+    umbral: number | null,
+  ): void {
+    const sinInstitucional: string[] = [];
+    const sinCruzadasCompletas: string[] = [];
+    const conInconsistenciaSinResolver: string[] = [];
+    let diferenciaMaxima = 0;
+
+    for (const ed of ediciones) {
+      if (ed.estado !== EstadoEdicion.EnEvaluacion) continue;
+      const nombre = ed.proyecto?.nombre ?? ed.id;
+
       const inst = instPorEdicion.get(ed.id) ?? null;
-      const tieneInst = !!inst && inst.estado === EstadoEvaluacion.Confirmada;
-      const tieneCruzada = (cruzadasPorEdicion.get(ed.id) ?? []).some(
-        (c) => c.estado === EstadoEvaluacion.Confirmada,
+      if (!inst || inst.estado !== EstadoEvaluacion.Confirmada) {
+        sinInstitucional.push(nombre);
+        continue;
+      }
+
+      const cruzadas = cruzadasPorEdicion.get(ed.id) ?? [];
+      const propiaConfirmada = cruzadas.some(
+        (c) => c.tipo === TipoEvaluacionCruzada.Propia && c.estado === EstadoEvaluacion.Confirmada,
       );
-      return !tieneInst || !tieneCruzada;
-    });
-    if (sinEvaluar.length > 0) {
-      throw new BadRequestException(
-        'No se puede generar el orden de mérito: hay proyectos en evaluación que aún no fueron evaluados',
+      const ajenaConfirmada = cruzadas.some(
+        (c) => c.tipo === TipoEvaluacionCruzada.Ajena && c.estado === EstadoEvaluacion.Confirmada,
+      );
+      if (!propiaConfirmada || !ajenaConfirmada) {
+        sinCruzadasCompletas.push(nombre);
+        continue;
+      }
+
+      const inconsistencia = this.calcularInconsistencia(cruzadas, umbral);
+      if (inconsistencia?.inconsistente && !inconsistencia.terceraConfirmada) {
+        conInconsistenciaSinResolver.push(nombre);
+        diferenciaMaxima = Math.max(diferenciaMaxima, inconsistencia.umbral);
+      }
+    }
+
+    if (
+      sinInstitucional.length === 0 &&
+      sinCruzadasCompletas.length === 0 &&
+      conInconsistenciaSinResolver.length === 0
+    ) {
+      return;
+    }
+
+    const verbo = accion === 'generar' ? 'generar' : 'confirmar';
+    const partes: string[] = [`No se puede ${verbo} el orden de mérito.`];
+    if (sinInstitucional.length > 0) {
+      partes.push(`Falta la evaluación institucional en: ${sinInstitucional.join(', ')}.`);
+    }
+    if (sinCruzadasCompletas.length > 0) {
+      partes.push(
+        `Faltan las evaluaciones cruzadas propia y ajena completas en: ${sinCruzadasCompletas.join(', ')}.`,
       );
     }
+    if (conInconsistenciaSinResolver.length > 0) {
+      partes.push(
+        `Diferencia de ${diferenciaMaxima} o más puntos entre la propia y la ajena sin tercera evaluación confirmada en: ${conInconsistenciaSinResolver.join(', ')}. Designá una tercera Unidad Académica.`,
+      );
+    }
+    throw new BadRequestException(partes.join(' '));
+  }
+
+  // Genera el orden de mérito automático de una convocatoria: rankea las
+  // ediciones por notaFinal (suma del promedio de evaluaciones cruzadas y la
+  // evaluación institucional) y propone una adjudicación borrador (no
+  // definitiva) respetando la cuota federativa
+  // mínima por unidad académica. No pisa el ordenMerito ya seteado a mano.
+  async generarOrdenMerito(convocatoriaId: string, usuario: Usuario): Promise<Edicion[]> {
+    this.validarEsRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+      },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.ordenMeritoConfirmado) {
+      throw new BadRequestException(
+        'El orden de mérito ya está confirmado y no puede volver a generarse',
+      );
+    }
+
+    const { ediciones, instPorEdicion, cruzadasPorEdicion } =
+      await this.cargarDatosMerito(convocatoriaId);
+
+    this.validarEdicionesListasParaMerito(
+      'generar',
+      ediciones,
+      instPorEdicion,
+      cruzadasPorEdicion,
+      convocatoria.umbralInconsistenciaCruzada,
+    );
 
     // Puntaje por edición (solo las que tienen evaluaciones confirmadas).
     const puntajes = new Map<string, { notaFinal: number; checklistCompleto: boolean }>();
@@ -894,6 +992,16 @@ export class EvaluacionesService {
     if (convocatoria.ordenMeritoConfirmado) {
       return convocatoria;
     }
+
+    const { ediciones, instPorEdicion, cruzadasPorEdicion } =
+      await this.cargarDatosMerito(convocatoriaId);
+    this.validarEdicionesListasParaMerito(
+      'confirmar',
+      ediciones,
+      instPorEdicion,
+      cruzadasPorEdicion,
+      convocatoria.umbralInconsistenciaCruzada,
+    );
 
     const sinOrden = await this.edicionRepo.count({
       where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion, ordenMerito: IsNull() },

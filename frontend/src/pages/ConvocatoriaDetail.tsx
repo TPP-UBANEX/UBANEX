@@ -351,7 +351,9 @@ export function ConvocatoriaDetail() {
       aplicarOrdenMerito(actualizadas);
       toast.success('Orden de mérito generado');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar el orden de mérito');
+      toast.error(err instanceof Error ? err.message : 'Error al generar el orden de mérito', {
+        duration: 8000,
+      });
     } finally {
       setGenerando(false);
     }
@@ -366,7 +368,9 @@ export function ConvocatoriaDetail() {
       setConfirmarMeritoOpen(false);
       toast.success('Orden de mérito confirmado y fijado');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al confirmar el orden de mérito');
+      toast.error(err instanceof Error ? err.message : 'Error al confirmar el orden de mérito', {
+        duration: 8000,
+      });
     } finally {
       setConfirmando(false);
     }
@@ -841,13 +845,13 @@ export function ConvocatoriaDetail() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Umbral de inconsistencia (3ra UA) · vacío = default 20 pts
+                        Umbral de inconsistencia (3ra UA) · vacío = default 40 pts
                       </p>
                       <Input
                         type="number"
                         min={0}
                         className="mt-1"
-                        placeholder="20"
+                        placeholder="40"
                         value={editForm.umbralInconsistenciaCruzada}
                         onChange={e => setEditForm(f => ({ ...f, umbralInconsistenciaCruzada: e.target.value }))}
                       />

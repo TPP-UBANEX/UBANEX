@@ -1206,10 +1206,17 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
                 </TableCell>
                 <TableCell>
                   {yaTieneTercera(cruzadas) ? (
-                    <Badge variant="outline">
-                      {cruzadas.find((c) => c.tipo === TipoEvaluacionCruzada.TerceraUa)?.evaluador
-                        ?.nombreCompleto ?? 'Designada'}
-                    </Badge>
+                    <div className="flex flex-col gap-1.5">
+                      {inconsistencia?.terceraConfirmada && (
+                        <Badge variant="secondary" className="w-fit">
+                          Resuelta por 3ra UA
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="w-fit">
+                        {cruzadas.find((c) => c.tipo === TipoEvaluacionCruzada.TerceraUa)?.evaluador
+                          ?.nombreCompleto ?? 'Designada'}
+                      </Badge>
+                    </div>
                   ) : inconsistencia?.inconsistente ? (
                     <div className="flex flex-col gap-1.5">
                       <Badge variant="destructive" className="w-fit">
