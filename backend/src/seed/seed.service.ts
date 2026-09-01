@@ -1990,9 +1990,18 @@ export class SeedService {
     for (const anio of anios) {
       const conv = this.convs.get(anio)!;
       const camposConv = await this.camposDeConvocatoria(conv);
-      const usadosConv = new Set<string>();
       const estadosPermitidos = this.estadosEdicionPorConvocatoria(conv.estado);
       if (estadosPermitidos.length === 0) continue;
+
+      // Los usuarios que ya participan de la convocatoria (de corridas anteriores) no pueden
+      // volver a elegirse: `participacion_convocatoria` tiene un unique (usuarioId, convocatoriaId)
+      // y el INSERT masivo de flushEdicionesMasivas lo violaría. Sin esto el seed deja de ser
+      // idempotente y tumba el backend en cada reinicio con la base ya poblada.
+      const participacionesExistentes = await this.participacionRepo.find({
+        where: { convocatoriaId: conv.id },
+        select: { usuarioId: true },
+      });
+      const usadosConv = new Set(participacionesExistentes.map((p) => p.usuarioId));
 
       const edicionesExistentes = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id },
