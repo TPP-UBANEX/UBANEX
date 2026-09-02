@@ -49,4 +49,7 @@ cd frontend && npm install && npm run dev        # SPA en :5173
 
 - [`docs/project_context.md`](docs/project_context.md) — documento de requerimientos (contexto, proceso UBANEX, roles, alcance) y estado de avance.
 - [`docs/dominio/modelo.md`](docs/dominio/modelo.md) — modelo de dominio (diagramas de clases + reglas de negocio).
+- [`docs/Documentacion Funcional.md`](docs/Documentacion%20Funcional.md) — síntesis funcional operativa (actores, módulos, ciclo de vida, matriz de permisos, estado de implementación).
+- [`docs/Documentacion Tecnica.md`](docs/Documentacion%20Tecnica.md) — documentación técnica (arquitectura, módulos backend, endpoints, frontend, persistencia, testing).
+- [`docs/Documentacion de Infraestructura.md`](docs/Documentacion%20de%20Infraestructura.md) — entornos, Docker Compose, despliegue en Render, variables de entorno y migraciones.
 - [`AGENTS.md`](AGENTS.md) — convenciones de código y flujo de trabajo.
