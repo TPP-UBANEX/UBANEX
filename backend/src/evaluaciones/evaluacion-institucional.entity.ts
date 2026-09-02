@@ -70,9 +70,8 @@ export class EvaluacionInstitucional {
 
   // Fijo y obligatorio para confirmar (ver evaluaciones.service.ts#faltantes), a diferencia de
   // `categorias`/`checklist` que son configurables por convocatoria vía el template. Vive fuera
-  // del template a propósito: si fuera una subcategoría booleana, sumaría PUNTAJE_BOOLEANO al
-  // puntaje de mérito además de mover el presupuesto a adjudicar (ver
-  // proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar), y el template puede editarse o
+  // del template a propósito: mueve el presupuesto a adjudicar (ver
+  // proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar) y el template puede editarse o
   // borrarse por convocatoria.
   @Column({ type: 'boolean', nullable: true })
   esPse: boolean | null;

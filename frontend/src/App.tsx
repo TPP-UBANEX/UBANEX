@@ -57,7 +57,13 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Toaster richColors position="top-right" />
+        <Toaster
+          richColors
+          position="top-right"
+          toastOptions={{
+            classNames: { toast: 'max-h-[50vh] overflow-y-auto', description: 'break-words' },
+          }}
+        />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

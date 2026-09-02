@@ -270,6 +270,10 @@ export interface Convocatoria {
   umbralInsumos?: number;
   porcentajeExtraPse?: number;
   ordenMeritoConfirmado: boolean;
+  // Resolución de adjudicación (paso posterior a confirmar el orden de mérito).
+  adjudicacionEmitida?: boolean;
+  resolucionUrl?: string | null;
+  fechaResolucion?: string | null;
   umbralInconsistenciaCruzada: number | null;
   formulario?: Formulario;
 }
@@ -314,6 +318,7 @@ export interface Edicion {
   adjudicacionPropuesta?: boolean | null;
   mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
   puntajeMerito?: number | null;
+  montoAdjudicado?: number | null;
   creadoEn: string;
   actualizadoEn: string;
   // Calculados en el backend (no persistidos).
@@ -328,6 +333,42 @@ export interface Edicion {
   // Viene de la evaluación institucional (EvaluacionInstitucional.esPse), no del proyecto; ver
   // calcularPresupuestoAAdjudicar en lib/presupuesto.ts. Presente solo en el listado "todas".
   esPse?: boolean;
+}
+
+export interface AdjudicacionResumenItem {
+  edicionId: string;
+  proyectoId: string;
+  proyectoNombre: string | null;
+  unidadAcademica: { id: string; nombre: string } | null;
+  estadoEdicion: EstadoEdicion;
+  ordenMerito: number | null;
+  puntajeMerito: number | null;
+  adjudicacionPropuesta: boolean | null;
+  mecanismoAdjudicacion: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
+  montoAdjudicado: number | null;
+  presupuestoAAdjudicar: number;
+  tieneAval: boolean;
+}
+
+export interface AdjudicacionResumen {
+  convocatoria: {
+    id: string;
+    ordenMeritoConfirmado: boolean;
+    adjudicacionEmitida: boolean;
+    resolucionUrl: string | null;
+    fechaResolucion: string | null;
+  };
+  items: AdjudicacionResumenItem[];
+}
+
+export interface GuardarAdjudicacionDto {
+  resolucionUrl?: string | null;
+  fechaResolucion?: string;
+}
+
+export interface EmitirAdjudicacionDto {
+  resolucionUrl: string;
+  fechaResolucion: string;
 }
 
 export interface Presupuesto {
@@ -547,6 +588,8 @@ export interface MonitoreoEvaluacion {
       inconsistente: boolean;
       diferencia: number;
       umbral: number;
+      terceraDesignada: boolean;
+      terceraConfirmada: boolean;
     } | null;
   }>;
 }
@@ -556,6 +599,18 @@ export interface CandidatoTerceraUa {
   nombreCompleto: string
   email: string
   unidadAcademica: { id: string; nombre: string } | null
+}
+
+// Body del 400 que devuelve /evaluaciones/convocatoria/:id/orden-merito (generar
+// y confirmar) cuando hay ediciones sin evaluaciones completas: `message` trae
+// el resumen truncado que ya usa el toast, y estas listas traen el nombre de
+// cada proyecto entero para mostrarlo en un panel con scroll.
+export interface DetalleMeritoIncompleto {
+  accion: 'generar' | 'confirmar'
+  umbral: number | null
+  sinInstitucional: string[]
+  sinCruzadasCompletas: string[]
+  conInconsistenciaSinResolver: string[]
 }
 
 export interface EvaluacionEdicionDetalle {
@@ -573,6 +628,8 @@ export interface EvaluacionEdicionDetalle {
     categorias: Record<string, { valor: number | boolean; fundamentacion?: string | null }> | null;
     checklist: Record<string, boolean> | null;
     esPse: boolean | null;
+    puntaje: number | null;
+    puntajeMaximo: number | null;
   } | null;
   cruzadas: Array<{
     id: string;
@@ -804,7 +861,10 @@ export interface Notificacion {
   creadoEn: string;
 }
 
-export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+export const estadoBadge: Record<
+  string,
+  'default' | 'secondary' | 'destructive' | 'outline' | 'success'
+> = {
   configuracion: 'outline',
   presentacion: 'default',
   evaluacion: 'secondary',
@@ -841,7 +901,7 @@ export const estadoBadge: Record<string, 'default' | 'secondary' | 'destructive'
   Aceptada: 'default',
   Rechazada: 'destructive',
   MasInformacion: 'outline',
-  Confirmada: 'default',
+  Confirmada: 'success',
   Completada: 'default',
 };
 

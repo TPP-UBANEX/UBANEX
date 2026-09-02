@@ -1,5 +1,20 @@
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
+// Error de API que conserva el status y el body completo (más allá de
+// `message`): algunos endpoints devuelven un `detalle` estructurado además
+// del mensaje de texto, para que la UI pueda mostrarlo sin depender de
+// parsear el string (ver /evaluaciones/convocatoria/:id/orden-merito).
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly body: unknown,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 function getToken(): string | null {
   return localStorage.getItem('token');
 }
@@ -21,9 +36,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     cache: 'no-store',
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    const mensaje = body?.message || res.statusText;
-    throw new Error(mensaje);
+    const responseBody = await res.json().catch(() => null);
+    // class-validator devuelve `message` como array de strings.
+    const mensaje =
+      (Array.isArray(responseBody?.message)
+        ? responseBody.message.join(' ')
+        : responseBody?.message) || res.statusText;
+    throw new ApiError(mensaje, res.status, responseBody);
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
@@ -368,6 +387,29 @@ export const api = {
         `/evaluaciones/edicion/${edicionId}/adjudicacion-propuesta`,
         { adjudicado, mecanismo },
       ),
+    adjudicacion: {
+      obtener: (convocatoriaId: string) =>
+        get<import('@/data/types').AdjudicacionResumen>(
+          `/evaluaciones/convocatoria/${convocatoriaId}/adjudicacion`,
+        ),
+      guardarBorrador: (
+        convocatoriaId: string,
+        data: import('@/data/types').GuardarAdjudicacionDto,
+      ) =>
+        request<import('@/data/types').Convocatoria>(
+          'PUT',
+          `/evaluaciones/convocatoria/${convocatoriaId}/adjudicacion`,
+          data,
+        ),
+      emitir: (
+        convocatoriaId: string,
+        data: import('@/data/types').EmitirAdjudicacionDto,
+      ) =>
+        post<{
+          convocatoria: import('@/data/types').Convocatoria;
+          ediciones: import('@/data/types').Edicion[];
+        }>(`/evaluaciones/convocatoria/${convocatoriaId}/adjudicacion/emitir`, data),
+    },
     edicion: (edicionId: string) =>
       get<import('@/data/types').EvaluacionEdicionDetalle>(`/evaluaciones/edicion/${edicionId}`),
     institucionales: {

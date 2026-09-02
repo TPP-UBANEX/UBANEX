@@ -336,7 +336,7 @@ classDiagram
 - El `Emparejamiento` define pares de unidades académicas por convocatoria. Con 14 unidades resultan exactamente 7 parejas. Cada unidad solo está emparejada con otra única.
 - Cada `Edicion` recibe:
   - **1** evaluación institucional (realizada por la Secretaría de Extensión de su UA).
-  - **0 a 3** evaluaciones cruzadas (propia + ajena + eventual tercera UA de resolución).
+  - **0 a 3** evaluaciones cruzadas (propia + ajena + eventual tercera UA de resolución). Para poder generar o confirmar el orden de mérito, cada edición en evaluación necesita la institucional **y** la propia **y** la ajena confirmadas (ver más abajo si además hay inconsistencia).
 - `EvaluacionInstitucional` y `EvaluacionCruzada` tienen estado `Borrador | Confirmada`.
 - La confirmación de `EvaluacionInstitucional` la realiza un usuario con rol autoridad de la Secretaría. La de `EvaluacionCruzada` la confirma el propio evaluador.
 - `EvaluacionInstitucional.esPse` marca al proyecto como Práctica Social Educativa. Es un campo fijo y obligatorio para confirmar, independiente del template. **No suma puntaje**: su único efecto es habilitar el extra de `porcentajeExtraPse` en el presupuesto a adjudicar (ver §Adjudicación y Orden de Mérito).
@@ -344,8 +344,9 @@ classDiagram
 #### Inconsistencia y tercera evaluación
 
 - `TipoEvaluacionCruzada.TerceraUa` es la evaluación adicional que se pide cuando la Propia y la Ajena difieren demasiado.
-- `calcularInconsistencia` (en `evaluaciones.service.ts`) compara el puntaje de la evaluación **Propia** contra el de la **Ajena** una vez que ambas están confirmadas. Si la diferencia supera `Convocatoria.umbralInconsistenciaCruzada` (o el default 40 si es `null`), la edición se marca como inconsistente.
+- `calcularInconsistencia` (en `evaluaciones.service.ts`) compara el puntaje de la evaluación **Propia** contra el de la **Ajena** una vez que ambas están confirmadas. Si la diferencia alcanza o supera `Convocatoria.umbralInconsistenciaCruzada` (o el default 40 si es `null`), la edición se marca como inconsistente.
 - Ante una inconsistencia, se puede **designar** a un evaluador de una tercera unidad académica (`designar-tercera`), eligiéndolo del listado de candidatos válidos (`tercera-candidatos`). Esa tercera evaluación se carga y confirma como cualquier cruzada.
+- Mientras la inconsistencia no esté resuelta (TerceraUa confirmada), se bloquea tanto generar como confirmar el orden de mérito de la convocatoria. Una vez confirmada, la TerceraUa **reemplaza** a la Propia y a la Ajena en el cálculo del puntaje de la edición (no se promedian las tres).
 
 #### Estructura de TemplateEvaluacionInstitucional
 
@@ -353,6 +354,7 @@ classDiagram
   - nombre / texto del criterio
   - tipo de valor (numérico con mínimo y máximo, o booleano) — excluyentes
   - fundamentación opcional (texto)
+  - Solo las subcategorías **numéricas** suman a la ponderación; las **booleanas** son banderas informativas y no aportan puntaje (igual que el checklist).
 - **Checklist** — sección aparte de ítems booleanos que no suma a la ponderación final. Es independiente de las categorías.
 
 #### Estructura de TemplateEvaluacionCruzada
@@ -667,11 +669,11 @@ classDiagram
 - El orden de mérito se genera **on demand** (`evaluaciones.service.ts#generarOrdenMerito`,
   lo dispara Rectorado), no automáticamente al cerrar la evaluación. Recalcula
   `ordenMerito` y `puntajeMerito` de todas las ediciones con evaluación confirmada.
-- **Nota final** (`calcularPuntaje`): cada "Sí" de la evaluación institucional vale 10 pts
-  (`PUNTAJE_BOOLEANO`); a eso se le suma el **promedio de las evaluaciones cruzadas
-  confirmadas**. `notaFinal = round((promedioCruzadas + puntajeInstitucional) * 10) / 10`.
-  Los ítems numéricos institucionales suman su valor directo. `esPse` **no** entra en la
-  nota. Desempate: nota final desc → checklist completo → id.
+- **Nota final** (`calcularPuntaje`): el puntaje institucional es la suma de las subcategorías
+  **numéricas** (su valor directo); las subcategorías booleanas no suman. A eso se le agrega el
+  **promedio de las evaluaciones cruzadas confirmadas**.
+  `notaFinal = round((promedioCruzadas + puntajeInstitucional) * 10) / 10`. `esPse` **no** entra
+  en la nota. Desempate: nota final desc → checklist completo → id.
 - **Adjudicación propuesta**: a partir de las notas se arma una propuesta borrador
   (`adjudicacionPropuesta` + `mecanismoAdjudicacion`), limitada por `presupuestoTotal`.
   Lo que se descuenta del presupuesto es el **presupuesto a adjudicar** de cada edición

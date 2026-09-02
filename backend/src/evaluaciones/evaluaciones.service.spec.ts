@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { BadRequestException } from '@nestjs/common';
 import { EvaluacionesService } from './evaluaciones.service';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
+import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoEvaluacion } from '../common/enums/estado-evaluacion.enum';
+import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { EvaluacionInstitucional } from './evaluacion-institucional.entity';
 import { EvaluacionCruzada } from './evaluacion-cruzada.entity';
@@ -101,8 +104,16 @@ function construirEscenario(ordenCreacion: number[]): Fixture {
       checklist: {},
     } as unknown as EvaluacionInstitucional);
     cruzadas.push({
-      id: `cz${n}`,
+      id: `cz${n}p`,
       edicionId: id,
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { item1: 0 },
+    } as unknown as EvaluacionCruzada);
+    cruzadas.push({
+      id: `cz${n}a`,
+      edicionId: id,
+      tipo: TipoEvaluacionCruzada.Ajena,
       estado: EstadoEvaluacion.Confirmada,
       items: { item1: 0 },
     } as unknown as EvaluacionCruzada);
@@ -202,8 +213,16 @@ function construirEscenarioFlex(
         checklist: {},
       } as unknown as EvaluacionInstitucional);
       cruzadas.push({
-        id: `cz${n}`,
+        id: `cz${n}p`,
         edicionId: id,
+        tipo: TipoEvaluacionCruzada.Propia,
+        estado: EstadoEvaluacion.Confirmada,
+        items: { item1: 0 },
+      } as unknown as EvaluacionCruzada);
+      cruzadas.push({
+        id: `cz${n}a`,
+        edicionId: id,
+        tipo: TipoEvaluacionCruzada.Ajena,
         estado: EstadoEvaluacion.Confirmada,
         items: { item1: 0 },
       } as unknown as EvaluacionCruzada);
@@ -426,5 +445,652 @@ describe('EvaluacionesService.actualizarPropuestaAdjudicacion - presupuesto', ()
     await expect(
       svc.actualizarPropuestaAdjudicacion('e1', true, MecanismoAdjudicacion.Merito, { id: 'u1' } as any),
     ).rejects.toThrow(/No hay presupuesto disponible/);
+  });
+});
+
+describe('EvaluacionesService - resolución de adjudicación', () => {
+  function construir(overrides: Partial<any> = {}) {
+    const convocatoria = {
+      id: 'conv1',
+      estado: EstadoConvocatoria.Evaluacion,
+      ordenMeritoConfirmado: true,
+      adjudicacionEmitida: false,
+      resolucionUrl: null,
+      fechaResolucion: null,
+      adjudicacionEmitidaPorId: null,
+      porcentajeExtraInsumos: 0,
+      porcentajeExtraPse: 0,
+      umbralInsumos: 40,
+      ...overrides,
+    } as any;
+
+    const ediciones: any[] = [
+      {
+        id: 'e1',
+        convocatoriaId: 'conv1',
+        estado: EstadoEdicion.EnEvaluacion,
+        adjudicacionPropuesta: true,
+        avalUrl: 'https://drive/e1',
+        montoAdjudicado: null,
+        presupuestoSolicitado: { montoTotal: 100 },
+        proyecto: { nombre: 'Proyecto 1' },
+        unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      },
+      {
+        id: 'e2',
+        convocatoriaId: 'conv1',
+        estado: EstadoEdicion.EnEvaluacion,
+        adjudicacionPropuesta: true,
+        avalUrl: 'https://drive/e2',
+        montoAdjudicado: null,
+        presupuestoSolicitado: { montoTotal: 200 },
+        proyecto: { nombre: 'Proyecto 2' },
+        unidadAcademica: { id: 'uaB', nombre: 'Facultad B' },
+      },
+      {
+        id: 'e3',
+        convocatoriaId: 'conv1',
+        estado: EstadoEdicion.EnEvaluacion,
+        adjudicacionPropuesta: false,
+        avalUrl: null,
+        montoAdjudicado: null,
+        presupuestoSolicitado: { montoTotal: 150 },
+        proyecto: { nombre: 'Proyecto 3' },
+        unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      },
+    ];
+
+    const convocatoriaRepo = {
+      findOne: jest.fn().mockResolvedValue(convocatoria),
+      save: jest.fn().mockImplementation((c) => Promise.resolve(c)),
+    };
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue(ediciones),
+      save: jest.fn().mockImplementation((e) => Promise.resolve(e)),
+      manager: { transaction: jest.fn().mockImplementation((cb) => cb({ save: jest.fn() })) },
+    };
+    const institucionalRepo = { find: jest.fn().mockResolvedValue([]) };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const auditoria = { registrar: jest.fn() };
+    const svc = new EvaluacionesService(
+      institucionalRepo as any,
+      dummy as any,
+      convocatoriaRepo as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      auditoria as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    jest.spyOn(svc as any, 'validarEsAutoridadRectorado').mockImplementation(() => undefined);
+    return { svc, convocatoria, ediciones, convocatoriaRepo, auditoria };
+  }
+
+  const usuario = { id: 'u1', nombreCompleto: 'Auth Rectorado' } as any;
+
+  it('rechaza emitir si el orden de mérito no está confirmado', async () => {
+    const { svc } = construir({ ordenMeritoConfirmado: false });
+    await expect(
+      svc.emitirAdjudicacion('conv1', {
+        resolucionUrl: 'https://res',
+        fechaResolucion: '2026-07-20',
+      } as any, usuario),
+    ).rejects.toThrow(/orden de mérito/i);
+  });
+
+  it('rechaza emitir si una edición adjudicada no tiene aval, sin tocar estados', async () => {
+    const { svc, ediciones, convocatoria } = construir();
+    ediciones[1].avalUrl = null;
+    await expect(
+      svc.emitirAdjudicacion('conv1', {
+        resolucionUrl: 'https://res',
+        fechaResolucion: '2026-07-20',
+      } as any, usuario),
+    ).rejects.toThrow(/aval/i);
+    expect(ediciones.map((e) => e.estado)).toEqual([
+      EstadoEdicion.EnEvaluacion,
+      EstadoEdicion.EnEvaluacion,
+      EstadoEdicion.EnEvaluacion,
+    ]);
+    expect(convocatoria.adjudicacionEmitida).toBe(false);
+  });
+
+  it('emite: adjudicadas → Adjudicado con el monto de la fórmula, resto → NoAdjudicado, convocatoria sigue en Evaluación', async () => {
+    const { svc, ediciones, convocatoria, auditoria } = construir();
+    const res = await svc.emitirAdjudicacion('conv1', {
+      resolucionUrl: '  https://res/RESCS-1  ',
+      fechaResolucion: '2026-07-20',
+    } as any, usuario);
+
+    // Monto fijo = presupuesto a adjudicar (sin extras en el fixture → = solicitado).
+    expect(ediciones.find((e) => e.id === 'e1').estado).toBe(EstadoEdicion.Adjudicado);
+    expect(ediciones.find((e) => e.id === 'e1').montoAdjudicado).toBe(100);
+    expect(ediciones.find((e) => e.id === 'e2').montoAdjudicado).toBe(200);
+    expect(ediciones.find((e) => e.id === 'e3').estado).toBe(EstadoEdicion.NoAdjudicado);
+    expect(convocatoria.adjudicacionEmitida).toBe(true);
+    expect(convocatoria.resolucionUrl).toBe('https://res/RESCS-1');
+    expect(convocatoria.fechaResolucion).toBe('2026-07-20');
+    expect(convocatoria.adjudicacionEmitidaPorId).toBe('u1');
+    expect(convocatoria.estado).toBe(EstadoConvocatoria.Evaluacion);
+    expect(auditoria.registrar).toHaveBeenCalled();
+    expect(res.convocatoria.adjudicacionEmitida).toBe(true);
+  });
+
+  it('rechaza una segunda emisión (inmutable)', async () => {
+    const { svc } = construir({ adjudicacionEmitida: true });
+    await expect(
+      svc.emitirAdjudicacion('conv1', {
+        resolucionUrl: 'https://res',
+        fechaResolucion: '2026-07-20',
+      } as any, usuario),
+    ).rejects.toThrow(/ya fue emitida/i);
+  });
+
+  it('guardar borrador solo persiste la resolución, sin tocar estados', async () => {
+    const { svc, ediciones, convocatoria } = construir();
+    await svc.guardarBorradorAdjudicacion('conv1', {
+      resolucionUrl: 'https://res/borrador',
+      fechaResolucion: '2026-07-19',
+    } as any, usuario);
+    expect(ediciones.every((e) => e.estado === EstadoEdicion.EnEvaluacion)).toBe(true);
+    expect(ediciones.every((e) => e.montoAdjudicado == null)).toBe(true);
+    expect(convocatoria.resolucionUrl).toBe('https://res/borrador');
+    expect(convocatoria.fechaResolucion).toBe('2026-07-19');
+    expect(convocatoria.adjudicacionEmitida).toBe(false);
+  });
+
+  it('le antepone https:// al link de la resolución si no trae esquema', async () => {
+    const { svc, convocatoria } = construir();
+    await svc.guardarBorradorAdjudicacion('conv1', {
+      resolucionUrl: 'drive.google.com/file/d/x',
+    } as any, usuario);
+    expect(convocatoria.resolucionUrl).toBe('https://drive.google.com/file/d/x');
+
+    await svc.emitirAdjudicacion('conv1', {
+      resolucionUrl: 'intranet.uba.ar/RESCS-2026-1',
+      fechaResolucion: '2026-07-20',
+    } as any, usuario);
+    expect(convocatoria.resolucionUrl).toBe('https://intranet.uba.ar/RESCS-2026-1');
+  });
+});
+
+describe('EvaluacionesService.generarOrdenMerito - subcategorías booleanas', () => {
+  it('las subcategorías booleanas no suman al puntaje de mérito', async () => {
+    const estructuraInst = {
+      categorias: [
+        {
+          id: 'c1',
+          nombre: 'Institucional',
+          subcategorias: [
+            { id: 'n1', texto: 'Numérica', tipoValor: 'numerico', minimo: 0, maximo: 10 },
+            { id: 'b1', texto: 'Booleana', tipoValor: 'booleano', minimo: null, maximo: null },
+          ],
+        },
+      ],
+      checklist: [],
+    };
+    const estructuraCruz = {
+      categorias: [
+        { id: 'cc1', nombre: 'Cruzada', puntajeMaximo: 20, items: [{ id: 'it1', nombre: 'Item', puntajeMaximo: 20 }] },
+      ],
+    };
+    const convocatoria = {
+      id: 'conv1',
+      ordenMeritoConfirmado: false,
+      presupuestoTotal: null,
+      cuotaFederativa: 0,
+      templateEvaluacionInstitucional: { estructura: estructuraInst },
+      templateEvaluacionCruzada: { estructura: estructuraCruz },
+    } as unknown as Convocatoria;
+
+    const edicion = {
+      id: 'e1',
+      convocatoriaId: 'conv1',
+      unidadAcademicaId: 'uaA',
+      unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      convocatoria,
+      presupuestoSolicitado: { montoTotal: 100 },
+      estado: EstadoEdicion.EnEvaluacion,
+      proyecto: { nombre: 'P1' },
+      ordenMerito: null,
+      puntajeMerito: null,
+      adjudicacionPropuesta: null,
+      mecanismoAdjudicacion: null,
+    } as unknown as Edicion;
+
+    const institucional = {
+      id: 'i1',
+      edicionId: 'e1',
+      estado: EstadoEvaluacion.Confirmada,
+      categorias: { n1: { valor: 7, fundamentacion: '' }, b1: { valor: true, fundamentacion: '' } },
+      checklist: {},
+    } as unknown as EvaluacionInstitucional;
+    const cruzadaPropia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 15 },
+    } as unknown as EvaluacionCruzada;
+    const cruzadaAjena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 15 },
+    } as unknown as EvaluacionCruzada;
+
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue([edicion]),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      { find: jest.fn().mockResolvedValue([institucional]) } as any,
+      { find: jest.fn().mockResolvedValue([cruzadaPropia, cruzadaAjena]) } as any,
+      { findOne: jest.fn().mockResolvedValue(convocatoria) } as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+
+    const [actualizada] = await svc.generarOrdenMerito('conv1', { id: 'u1' } as any);
+    // 7 (numérica) + 15 (promedio cruzada) = 22. Si la booleana sumara serían 32.
+    expect(actualizada.puntajeMerito).toBe(22);
+  });
+});
+
+describe('EvaluacionesService - completitud de cruzadas para el orden de mérito', () => {
+  const estructuraInst = {
+    categorias: [
+      {
+        id: 'c1',
+        nombre: 'Institucional',
+        subcategorias: [{ id: 'n1', texto: 'Numérica', tipoValor: 'numerico', minimo: 0, maximo: 10 }],
+      },
+    ],
+    checklist: [],
+  };
+  const estructuraCruz = {
+    categorias: [
+      { id: 'cc1', nombre: 'Cruzada', puntajeMaximo: 100, items: [{ id: 'it1', nombre: 'Item', puntajeMaximo: 100 }] },
+    ],
+  };
+
+  function construirConvocatoria(overrides: Partial<any> = {}) {
+    return {
+      id: 'conv1',
+      estado: EstadoConvocatoria.Evaluacion,
+      ordenMeritoConfirmado: false,
+      presupuestoTotal: null,
+      cuotaFederativa: 0,
+      umbralInconsistenciaCruzada: null,
+      templateEvaluacionInstitucional: { estructura: estructuraInst },
+      templateEvaluacionCruzada: { estructura: estructuraCruz },
+      ...overrides,
+    } as unknown as Convocatoria;
+  }
+
+  function construirEdicion(overrides: Partial<any> = {}) {
+    return {
+      id: 'e1',
+      convocatoriaId: 'conv1',
+      unidadAcademicaId: 'uaA',
+      unidadAcademica: { id: 'uaA', nombre: 'Facultad A' },
+      presupuestoSolicitado: { montoTotal: 100 },
+      estado: EstadoEdicion.EnEvaluacion,
+      proyecto: { nombre: 'P1' },
+      ordenMerito: null,
+      puntajeMerito: null,
+      adjudicacionPropuesta: null,
+      mecanismoAdjudicacion: null,
+      ...overrides,
+    } as unknown as Edicion;
+  }
+
+  function construirInstitucional(overrides: Partial<any> = {}) {
+    return {
+      id: 'i1',
+      edicionId: 'e1',
+      estado: EstadoEvaluacion.Confirmada,
+      categorias: { n1: { valor: 7, fundamentacion: '' } },
+      checklist: {},
+      ...overrides,
+    } as unknown as EvaluacionInstitucional;
+  }
+
+  function armar(
+    convocatoria: Convocatoria,
+    ediciones: Edicion[],
+    institucionales: EvaluacionInstitucional[],
+    cruzadas: EvaluacionCruzada[],
+  ): EvaluacionesService {
+    const edicionConConvocatoria = ediciones.map((ed) => ({ ...ed, convocatoria } as unknown as Edicion));
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue(edicionConConvocatoria),
+      count: jest.fn().mockResolvedValue(0),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      { find: jest.fn().mockResolvedValue(institucionales) } as any,
+      { find: jest.fn().mockResolvedValue(cruzadas) } as any,
+      { findOne: jest.fn().mockResolvedValue(convocatoria), save: jest.fn().mockImplementation((c) => c) } as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    jest.spyOn(svc as any, 'validarEsAutoridadRectorado').mockImplementation(() => undefined);
+    return svc;
+  }
+
+  it('generarOrdenMerito bloquea si a una edición le falta la Ajena y nombra el proyecto', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion();
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+
+    const svc = armar(convocatoria, [edicion], [institucional], [propia]);
+    await expect(svc.generarOrdenMerito('conv1', { id: 'u1' } as any)).rejects.toThrow(
+      /Faltan las evaluaciones cruzadas propia y ajena completas en: P1/,
+    );
+  });
+
+  it('confirmarOrdenMerito bloquea si la diferencia entre propia y ajena llega al umbral (40) y no hay tercera confirmada', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion({ ordenMerito: 1, puntajeMerito: 50 });
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 90 },
+    } as unknown as EvaluacionCruzada;
+    const ajena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+
+    const svc = armar(convocatoria, [edicion], [institucional], [propia, ajena]);
+    await expect(svc.confirmarOrdenMerito('conv1', { id: 'u1' } as any)).rejects.toThrow(
+      /Diferencia de 40 o más puntos.*P1.*tercera/,
+    );
+  });
+
+  it('una TerceraUa en Borrador no desbloquea la inconsistencia', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion({ ordenMerito: 1, puntajeMerito: 50 });
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 90 },
+    } as unknown as EvaluacionCruzada;
+    const ajena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+    const tercera = {
+      id: 'cz1t',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.TerceraUa,
+      estado: EstadoEvaluacion.Borrador,
+      items: { it1: 70 },
+    } as unknown as EvaluacionCruzada;
+
+    const svc = armar(convocatoria, [edicion], [institucional], [propia, ajena, tercera]);
+    await expect(svc.confirmarOrdenMerito('conv1', { id: 'u1' } as any)).rejects.toThrow(
+      /Diferencia de 40 o más puntos/,
+    );
+  });
+
+  it('con TerceraUa confirmada, generar y confirmar el orden de mérito pasan y el puntaje usa solo la tercera', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion();
+    const institucional = construirInstitucional();
+    const propia = {
+      id: 'cz1p',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Propia,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 90 },
+    } as unknown as EvaluacionCruzada;
+    const ajena = {
+      id: 'cz1a',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.Ajena,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 50 },
+    } as unknown as EvaluacionCruzada;
+    const tercera = {
+      id: 'cz1t',
+      edicionId: 'e1',
+      tipo: TipoEvaluacionCruzada.TerceraUa,
+      estado: EstadoEvaluacion.Confirmada,
+      items: { it1: 70 },
+    } as unknown as EvaluacionCruzada;
+
+    const svcGenerar = armar(convocatoria, [edicion], [institucional], [propia, ajena, tercera]);
+    const [actualizada] = await svcGenerar.generarOrdenMerito('conv1', { id: 'u1' } as any);
+    // 7 (institucional) + 70 (solo la tercera, no el promedio de las tres) = 77.
+    expect(actualizada.puntajeMerito).toBe(77);
+
+    const svcConfirmar = armar(convocatoria, [edicion], [institucional], [propia, ajena, tercera]);
+    await expect(svcConfirmar.confirmarOrdenMerito('conv1', { id: 'u1' } as any)).resolves.toBeTruthy();
+  });
+
+  it('no bloquea ediciones que no están EnEvaluacion', async () => {
+    const convocatoria = construirConvocatoria();
+    const edicion = construirEdicion({ estado: EstadoEdicion.PendienteDeCambios });
+
+    const svc = armar(convocatoria, [edicion], [], []);
+    await expect(svc.generarOrdenMerito('conv1', { id: 'u1' } as any)).resolves.toBeTruthy();
+  });
+
+  it('con muchas ediciones sin institucional, el mensaje se acota a 5 nombres y el detalle trae la lista completa', async () => {
+    const convocatoria = construirConvocatoria();
+    const nombres = Array.from({ length: 8 }, (_, i) => `P${i + 1}`);
+    const ediciones = nombres.map((nombre, i) =>
+      construirEdicion({ id: `e${i + 1}`, proyecto: { nombre } }),
+    );
+
+    const svc = armar(convocatoria, ediciones, [], []);
+    let error: BadRequestException | undefined;
+    try {
+      await svc.generarOrdenMerito('conv1', { id: 'u1' } as any);
+    } catch (e) {
+      error = e as BadRequestException;
+    }
+
+    expect(error).toBeInstanceOf(BadRequestException);
+    const response = error!.getResponse() as {
+      message: string;
+      detalle: { sinInstitucional: string[] };
+    };
+    expect(response.message).toContain('P1, P2, P3, P4, P5 y 3 más');
+    expect(response.message).not.toContain('P8');
+    expect(response.detalle.sinInstitucional).toEqual(nombres);
+  });
+});
+
+describe('EvaluacionesService.generarOrdenMerito - Fase 3 swap por presupuesto restante', () => {
+  // Construye un escenario con 2 UAs (A y B), cuota federativa 1, donde cada
+  // proyecto define su propio puntaje y costo (`presupuestoSolicitado.montoTotal`).
+  function construirConCostos(
+    aProyectos: Array<{ id: string; puntaje: number; costo: number }>,
+    bProyectos: Array<{ id: string; puntaje: number; costo: number }>,
+    presupuestoTotal: number,
+  ): Fixture {
+    const estructuraInst = {
+      categorias: [
+        {
+          id: 'c1',
+          nombre: 'Evaluación',
+          subcategorias: [
+            {
+              id: 'sub1',
+              texto: 'Puntaje total',
+              tipoValor: 'numerico',
+              minimo: 0,
+              maximo: 100,
+              fundamentacion: null,
+            },
+          ],
+        },
+      ],
+      checklist: [],
+    };
+    const estructuraCruz = {
+      categorias: [
+        {
+          id: 'cc1',
+          nombre: 'Evaluación',
+          puntajeMaximo: 100,
+          items: [{ id: 'item1', nombre: 'Puntaje total', puntajeMaximo: 100 }],
+        },
+      ],
+    };
+    const convocatoria = {
+      id: 'conv1',
+      ordenMeritoConfirmado: false,
+      presupuestoTotal,
+      cuotaFederativa: 1,
+      templateEvaluacionInstitucional: { estructura: estructuraInst },
+      templateEvaluacionCruzada: { estructura: estructuraCruz },
+    } as unknown as Convocatoria;
+
+    const ediciones: Edicion[] = [];
+    const institucionales: EvaluacionInstitucional[] = [];
+    const cruzadas: EvaluacionCruzada[] = [];
+    const uas: Record<string, { id: string; nombre: string }> = {
+      A: { id: 'uaA', nombre: 'Facultad A' },
+      B: { id: 'uaB', nombre: 'Facultad B' },
+    };
+    const push = (clave: string, p: { id: string; puntaje: number; costo: number }) => {
+      const ua = uas[clave];
+      ediciones.push({
+        id: p.id,
+        unidadAcademicaId: ua.id,
+        unidadAcademica: ua as any,
+        convocatoria,
+        presupuestoSolicitado: { montoTotal: p.costo } as any,
+        estado: EstadoEdicion.EnEvaluacion,
+        proyecto: {} as any,
+        ordenMerito: null,
+        puntajeMerito: null,
+        adjudicacionPropuesta: null,
+        mecanismoAdjudicacion: null,
+      } as unknown as Edicion);
+      institucionales.push({
+        id: `${p.id}i`,
+        edicionId: p.id,
+        estado: EstadoEvaluacion.Confirmada,
+        categorias: { sub1: { valor: p.puntaje, fundamentacion: '' } },
+        checklist: {},
+      } as unknown as EvaluacionInstitucional);
+      cruzadas.push({
+        id: `${p.id}p`,
+        edicionId: p.id,
+        tipo: TipoEvaluacionCruzada.Propia,
+        estado: EstadoEvaluacion.Confirmada,
+        items: { item1: 0 },
+      } as unknown as EvaluacionCruzada);
+      cruzadas.push({
+        id: `${p.id}a`,
+        edicionId: p.id,
+        tipo: TipoEvaluacionCruzada.Ajena,
+        estado: EstadoEvaluacion.Confirmada,
+        items: { item1: 0 },
+      } as unknown as EvaluacionCruzada);
+    };
+    aProyectos.forEach((p) => push('A', p));
+    bProyectos.forEach((p) => push('B', p));
+    return { convocatoria, ediciones, institucionales, cruzadas };
+  }
+
+  function armarService(fixture: Fixture): EvaluacionesService {
+    const institucionalRepo = { find: jest.fn().mockResolvedValue(fixture.institucionales) };
+    const cruzadaRepo = { find: jest.fn().mockResolvedValue(fixture.cruzadas) };
+    const convocatoriaRepo = { findOne: jest.fn().mockResolvedValue(fixture.convocatoria) };
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue(fixture.ediciones),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      institucionalRepo as any,
+      cruzadaRepo as any,
+      convocatoriaRepo as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    return svc;
+  }
+
+  function mecanismoDe(ediciones: Edicion[], id: string): string | null {
+    const e = ediciones.find((x) => x.id === id);
+    return e?.adjudicacionPropuesta ? e.mecanismoAdjudicacion ?? null : null;
+  }
+
+  it('si la UA de mayor mérito tiene solo candidatos que no entran, pasa a la siguiente UA y usa su candidato barato', async () => {
+    const usuario = { id: 'u1' } as any;
+    // Presupuesto 150: alcanza para la cuota de A (90) y B (55), dejando un
+    // remanente de 5. La UA A (mejor mérito) solo tiene candidatos de costo 80
+    // que no entran; la UA B tiene un candidato barato de 5 que sí entra.
+    const fixture = construirConCostos(
+      [
+        { id: 'a1', puntaje: 100, costo: 90 },
+        { id: 'a2', puntaje: 50, costo: 80 },
+        { id: 'a3', puntaje: 40, costo: 80 },
+      ],
+      [
+        { id: 'b1', puntaje: 90, costo: 55 },
+        { id: 'b2', puntaje: 49, costo: 5 },
+        { id: 'b3', puntaje: 39, costo: 70 },
+      ],
+      150,
+    );
+    const ediciones = await armarService(fixture).generarOrdenMerito('conv1', usuario);
+    const porId = Object.fromEntries(ediciones.map((e) => [e.id, e]));
+
+    // La UA A conserva su cuota (no hay candidato que entre en el remanente).
+    expect(mecanismoDe(ediciones, 'a1')).toBe('CUOTA_FEDERATIVA');
+    // Fase 3 descartó A (sus candidatos no caben) y canjeó la cuota de B
+    // promoviéndola a MERITO para financiar el candidato barato b2 como cuota.
+    expect(porId['b1'].adjudicacionPropuesta).toBe(true);
+    expect(porId['b1'].mecanismoAdjudicacion).toBe('MERITO');
+    expect(porId['b2'].adjudicacionPropuesta).toBe(true);
+    expect(porId['b2'].mecanismoAdjudicacion).toBe('CUOTA_FEDERATIVA');
+    expect(porId['b3'].adjudicacionPropuesta).toBe(false);
   });
 });

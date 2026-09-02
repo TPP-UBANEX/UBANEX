@@ -81,6 +81,20 @@ export class Edicion {
   })
   puntajeMerito: number | null;
 
+  // Monto que fija la resolución de adjudicación para esta edición. Se precarga
+  // con el presupuesto a adjudicar y Rectorado puede ajustarlo antes de emitir.
+  @Column({
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    nullable: true,
+    transformer: {
+      to: (v: number | null) => v,
+      from: (v: string | null) => (v == null ? null : Number(v)),
+    },
+  })
+  montoAdjudicado: number | null;
+
   @CreateDateColumn()
   creadoEn: Date;
 

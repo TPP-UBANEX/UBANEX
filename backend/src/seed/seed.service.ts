@@ -78,6 +78,7 @@ import {
   generarPresupuesto,
   generarEvaluacionInstitucional,
   generarEvaluacionCruzada,
+  itemsCruzadaFactor,
   slugUa,
   clonarCamposConIdsNuevos,
 } from './seed.utils';
@@ -1356,12 +1357,12 @@ export class SeedService {
 
   private async seedConvocatorias(): Promise<void> {
     const especificaciones: Array<{ anio: number; estado: EstadoConvocatoria; umbralInconsistenciaCruzada?: number }> = [
-      { anio: 2023, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 20 },
-      { anio: 2024, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 20 },
-      { anio: 2025, estado: EstadoConvocatoria.Ejecucion, umbralInconsistenciaCruzada: 20 },
-      { anio: 2026, estado: EstadoConvocatoria.Evaluacion, umbralInconsistenciaCruzada: 20 },
-      { anio: 2027, estado: EstadoConvocatoria.Presentacion, umbralInconsistenciaCruzada: 20 },
-      { anio: 2028, estado: EstadoConvocatoria.Configuracion, umbralInconsistenciaCruzada: 20 },
+      { anio: 2023, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 40 },
+      { anio: 2024, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 40 },
+      { anio: 2025, estado: EstadoConvocatoria.Ejecucion, umbralInconsistenciaCruzada: 40 },
+      { anio: 2026, estado: EstadoConvocatoria.Evaluacion, umbralInconsistenciaCruzada: 40 },
+      { anio: 2027, estado: EstadoConvocatoria.Presentacion, umbralInconsistenciaCruzada: 40 },
+      { anio: 2028, estado: EstadoConvocatoria.Configuracion, umbralInconsistenciaCruzada: 40 },
     ];
 
     for (const spec of especificaciones) {
@@ -1989,9 +1990,18 @@ export class SeedService {
     for (const anio of anios) {
       const conv = this.convs.get(anio)!;
       const camposConv = await this.camposDeConvocatoria(conv);
-      const usadosConv = new Set<string>();
       const estadosPermitidos = this.estadosEdicionPorConvocatoria(conv.estado);
       if (estadosPermitidos.length === 0) continue;
+
+      // Los usuarios que ya participan de la convocatoria (de corridas anteriores) no pueden
+      // volver a elegirse: `participacion_convocatoria` tiene un unique (usuarioId, convocatoriaId)
+      // y el INSERT masivo de flushEdicionesMasivas lo violaría. Sin esto el seed deja de ser
+      // idempotente y tumba el backend en cada reinicio con la base ya poblada.
+      const participacionesExistentes = await this.participacionRepo.find({
+        where: { convocatoriaId: conv.id },
+        select: { usuarioId: true },
+      });
+      const usadosConv = new Set(participacionesExistentes.map((p) => p.usuarioId));
 
       const edicionesExistentes = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id },
@@ -2347,9 +2357,23 @@ export class SeedService {
 
   private async seedEmparejamientos(): Promise<void> {
     for (const conv of this.convs.values()) {
-      const existentes = await this.emparejamientoRepo.find({ where: { convocatoriaId: conv.id } });
-      if (existentes.length > 0) continue;
+      await this.crearEmparejamientosDe(conv);
+    }
+  }
 
+  // Crea (si no existen) los pares de EMPAREJAMIENTO_DEFAULT para una convocatoria
+  // puntual y completa this.parMap. Reutilizable por las convocatorias de prueba,
+  // que también necesitan Propia/Ajena resueltas por UA emparejada.
+  //
+  // this.parMap se completa siempre, exista o no ya la fila en esta convocatoria:
+  // los pares son fijos por nombre de UA (no varían entre convocatorias), así que
+  // no depende de haber creado filas en esta corrida — a diferencia del código
+  // anterior, que sólo llenaba el mapa dentro del `if` de creación y lo dejaba
+  // vacío (y por lo tanto sin cruzadas Ajena nuevas) en cualquier re-corrida del
+  // seed sobre una base ya sembrada.
+  private async crearEmparejamientosDe(conv: Convocatoria): Promise<void> {
+    const existentes = await this.emparejamientoRepo.find({ where: { convocatoriaId: conv.id } });
+    if (existentes.length === 0) {
       for (const [nombreA, nombreB] of EMPAREJAMIENTO_DEFAULT) {
         const uaA = this.uaMap.get(nombreA);
         const uaB = this.uaMap.get(nombreB);
@@ -2364,10 +2388,15 @@ export class SeedService {
             unidadBId: uaB.id,
           }),
         );
-        this.parMap.set(uaA.id, uaB.id);
-        this.parMap.set(uaB.id, uaA.id);
       }
       console.log(`  ${EMPAREJAMIENTO_DEFAULT.length} pares para convocatoria ${conv.nombre}`);
+    }
+    for (const [nombreA, nombreB] of EMPAREJAMIENTO_DEFAULT) {
+      const uaA = this.uaMap.get(nombreA);
+      const uaB = this.uaMap.get(nombreB);
+      if (!uaA || !uaB) continue;
+      this.parMap.set(uaA.id, uaB.id);
+      this.parMap.set(uaB.id, uaA.id);
     }
   }
 
@@ -2558,6 +2587,13 @@ export class SeedService {
         const pool = this.usuariosPorUa.get(uaId);
         return (pool?.evaluadores ?? []).filter((e) => ids.has(e.id));
       };
+      // Caso demo del mecanismo de tercera UA, sólo en 2026: la primera edición
+      // interfacultad que reciba Propia y Ajena a la vez queda con items en
+      // extremos opuestos (diferencia 82 pts, por encima del umbral 40) y SIN
+      // TerceraUa, para poder ver el bloqueo y el botón "Designar 3ra UA" en el
+      // monitoreo. Determinista: la iteración es por `id` ASC y el Rng tiene
+      // semilla fija.
+      let demoPendienteAsignada = false;
 
       const instRows: EvaluacionInstitucional[] = [];
       const cruzadaRows: EvaluacionCruzada[] = [];
@@ -2621,8 +2657,27 @@ export class SeedService {
           const evaluadorPropia = candidatosPropia.length > 0
             ? candidatosPropia[this.rng.entero(0, candidatosPropia.length - 1)]
             : undefined;
+          const uaPar = this.parMap.get(ed.unidadAcademicaId);
+          const candidatosAjena = uaPar ? aprobadosDe(uaPar) : [];
+          const evaluadorAjena = candidatosAjena.length > 0
+            ? candidatosAjena[this.rng.entero(0, candidatosAjena.length - 1)]
+            : undefined;
+
+          const esDemoPendiente =
+            anio === 2026 &&
+            !demoPendienteAsignada &&
+            !!evaluadorPropia &&
+            !!evaluadorAjena &&
+            !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`) &&
+            !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`);
+
           if (evaluadorPropia && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`)) {
-            const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
+            const generada = esDemoPendiente
+              ? {
+                  items: itemsCruzadaFactor(estructuraCruzada, 1),
+                  observaciones: 'Evaluación de prueba (caso demo de inconsistencia).',
+                }
+              : generarEvaluacionCruzada(estructuraCruzada, this.rng);
             cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Propia}`);
             cruzadaRows.push(
               this.cruzadaEvalRepo.create({
@@ -2638,6 +2693,30 @@ export class SeedService {
             );
             cruzadaMeta.push({ usuario: evaluadorPropia, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Propia });
           }
+          if (evaluadorAjena && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`)) {
+            const generada = esDemoPendiente
+              ? {
+                  items: itemsCruzadaFactor(estructuraCruzada, 0),
+                  observaciones: 'Evaluación de prueba (caso demo de inconsistencia).',
+                }
+              : generarEvaluacionCruzada(estructuraCruzada, this.rng);
+            cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`);
+            cruzadaRows.push(
+              this.cruzadaEvalRepo.create({
+                convocatoriaId: conv.id,
+                edicionId: ed.id,
+                evaluadorId: evaluadorAjena.id,
+                tipo: TipoEvaluacionCruzada.Ajena,
+                templateId: convConTemplates.templateEvaluacionCruzadaId,
+                estado: EstadoEvaluacion.Confirmada,
+                items: generada.items,
+                observaciones: generada.observaciones,
+              }),
+            );
+            cruzadaMeta.push({ usuario: evaluadorAjena, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Ajena });
+          }
+          if (esDemoPendiente) demoPendienteAsignada = true;
+          continue;
         }
 
         const uaPar = this.parMap.get(ed.unidadAcademicaId);
@@ -2744,6 +2823,20 @@ export class SeedService {
     console.log(`  ${cargados} avales cargados`);
   }
 
+  // Carga el aval en TODAS las ediciones en evaluación de una convocatoria, para
+  // que las convocatorias de prueba puedan completar el flujo de adjudicación
+  // (el aval es requisito para emitir la resolución).
+  private async cargarAvalesDeConvocatoria(convocatoriaId: string): Promise<void> {
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion },
+    });
+    for (const ed of ediciones) {
+      if (ed.avalUrl) continue;
+      ed.avalUrl = `https://drive.google.com/file/d/aval-${ed.id.slice(0, 8)}/view`;
+      await this.edicionRepo.save(ed);
+    }
+  }
+
   // ─────────── Convocatoria de prueba: orden de mérito ───────────
   // Convocatoria pequeña y realista con TODAS las UAs, evaluaciones confirmadas
   // y cuota federativa mínima por UA = 2, para probar el "Generar orden de mérito automático".
@@ -2788,6 +2881,7 @@ export class SeedService {
       topePresupuestoConsolidado: 2_500_000,
     });
     await this.asegurarTemplatesConvocatoria(conv);
+    await this.crearEmparejamientosDe(conv);
 
     const convConTemplates = await this.convocatoriaRepo.findOne({
       where: { id: conv.id },
@@ -2877,27 +2971,80 @@ export class SeedService {
           }),
         );
 
-        // Cruzada confirmada (ajena) con un evaluador de la UA.
-        const evaluador = pool.evaluadores[i % pool.evaluadores.length];
-        const generadaCruz = esAlta
-          ? generarEvaluacionCruzada(estructuraCruzada, this.rng, 'alta')
-          : esBaja
-            ? generarEvaluacionCruzada(estructuraCruzada, this.rng, 'baja')
-            : esMixtaAlta
-              ? generarEvaluacionCruzada(estructuraCruzada, this.rng, 'alta90')
-              : generarEvaluacionCruzada(estructuraCruzada, this.rng, 'media');
-        await this.cruzadaEvalRepo.save(
+        // Cruzadas confirmadas: Propia (evaluador de la propia UA) + Ajena
+        // (evaluador de la UA emparejada). El orden de mérito exige ambas
+        // confirmadas para poder generarse/confirmarse (ver
+        // evaluaciones.service.ts#validarEdicionesListasParaMerito).
+        const modoCruzada = esAlta ? 'alta' : esBaja ? 'baja' : esMixtaAlta ? 'alta90' : 'media';
+        const evaluadorPropia = pool.evaluadores[i % pool.evaluadores.length];
+        const uaParId = this.parMap.get(ua.id);
+        const poolAjena = uaParId ? this.usuariosPorUa.get(uaParId) : undefined;
+        const evaluadorAjena = poolAjena?.evaluadores?.length
+          ? poolAjena.evaluadores[i % poolAjena.evaluadores.length]
+          : undefined;
+
+        if (!evaluadorAjena) {
+          console.warn(`  Sin evaluador Ajena disponible para ${nombreProyecto} (UA emparejada sin pool)`);
+          continue;
+        }
+
+        // Caso demo del mecanismo de tercera UA: un proyecto de banda "mixta"
+        // (no el de puntaje alto de su UA) con Propia y Ajena en extremos
+        // opuestos —82 pts de diferencia, por encima del umbral (40)— resuelto
+        // por una TerceraUa confirmada, que reemplaza a ambas en el puntaje
+        // cruzado en vez de promediarse con ellas (ver
+        // evaluaciones.service.ts#cruzadasVigentes).
+        const esDemoInconsistenciaResuelta = ua.nombre === 'Facultad de Ciencias Sociales' && i === 3;
+
+        const generadaPropia = generarEvaluacionCruzada(estructuraCruzada, this.rng, modoCruzada);
+        const generadaAjena = generarEvaluacionCruzada(estructuraCruzada, this.rng, modoCruzada);
+        await this.cruzadaEvalRepo.save([
           this.cruzadaEvalRepo.create({
             convocatoriaId: conv.id,
             edicionId: edicion.id,
-            evaluadorId: evaluador.id,
+            evaluadorId: evaluadorPropia.id,
+            tipo: TipoEvaluacionCruzada.Propia,
+            templateId: convConTemplates.templateEvaluacionCruzadaId,
+            estado: EstadoEvaluacion.Confirmada,
+            items: esDemoInconsistenciaResuelta
+              ? itemsCruzadaFactor(estructuraCruzada, 1)
+              : generadaPropia.items,
+            observaciones: generadaPropia.observaciones,
+          }),
+          this.cruzadaEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            evaluadorId: evaluadorAjena.id,
             tipo: TipoEvaluacionCruzada.Ajena,
             templateId: convConTemplates.templateEvaluacionCruzadaId,
             estado: EstadoEvaluacion.Confirmada,
-            items: generadaCruz.items,
-            observaciones: generadaCruz.observaciones,
+            items: esDemoInconsistenciaResuelta
+              ? itemsCruzadaFactor(estructuraCruzada, 0)
+              : generadaAjena.items,
+            observaciones: generadaAjena.observaciones,
           }),
-        );
+        ]);
+
+        if (esDemoInconsistenciaResuelta) {
+          const uaTercera = this.uas.find((u) => u.id !== ua.id && u.id !== uaParId);
+          const evaluadorTercera = uaTercera
+            ? this.usuariosPorUa.get(uaTercera.id)?.evaluadores?.[0]
+            : undefined;
+          if (evaluadorTercera) {
+            await this.cruzadaEvalRepo.save(
+              this.cruzadaEvalRepo.create({
+                convocatoriaId: conv.id,
+                edicionId: edicion.id,
+                evaluadorId: evaluadorTercera.id,
+                tipo: TipoEvaluacionCruzada.TerceraUa,
+                templateId: convConTemplates.templateEvaluacionCruzadaId,
+                estado: EstadoEvaluacion.Confirmada,
+                items: itemsCruzadaFactor(estructuraCruzada, 0.5),
+                observaciones: 'Tercera evaluación (UA de resolución) — caso demo de inconsistencia.',
+              }),
+            );
+          }
+        }
       }
     }
 
@@ -2911,6 +3058,7 @@ export class SeedService {
         (presupuestoTotalConvocatoria / montoTotalAcumulado) * 100,
       )}% del costo total de los proyectos)`,
     );
+    await this.cargarAvalesDeConvocatoria(conv.id);
     console.log(`  ${NOMBRE}: lista para probar el orden de mérito`);
   }
 
@@ -3046,6 +3194,7 @@ export class SeedService {
       topePresupuestoNoConsolidado: 1_800_000,
       topePresupuestoConsolidado: 3_000_000,
     });
+    await this.crearEmparejamientosDe(conv);
 
     const autor = this.admin;
     let generados = 0;
@@ -3075,7 +3224,22 @@ export class SeedService {
           observaciones: 'Evaluación de prueba (escenario Excel)',
         }),
       );
-      await this.cruzadaEvalRepo.save(
+      // Propia + Ajena confirmadas con items en 0: el promedio cruzado sigue
+      // siendo 0 y se conserva notaFinal === puntajeO. El evaluador de la
+      // Propia debe ser distinto del autor por el índice único
+      // (evaluadorId, edicionId) de EvaluacionCruzada.
+      const evaluadorPropia = this.usuariosPorUa.get(ua.id)?.evaluadores?.[0] ?? this.romero;
+      await this.cruzadaEvalRepo.save([
+        this.cruzadaEvalRepo.create({
+          convocatoriaId: conv.id,
+          edicionId: edicion.id,
+          evaluadorId: evaluadorPropia.id,
+          tipo: TipoEvaluacionCruzada.Propia,
+          templateId: templateCruz.id,
+          estado: EstadoEvaluacion.Confirmada,
+          items: { [idItem]: 0 },
+          observaciones: 'Evaluación de prueba (escenario Excel)',
+        }),
         this.cruzadaEvalRepo.create({
           convocatoriaId: conv.id,
           edicionId: edicion.id,
@@ -3086,9 +3250,10 @@ export class SeedService {
           items: { [idItem]: 0 },
           observaciones: 'Evaluación de prueba (escenario Excel)',
         }),
-      );
+      ]);
       generados++;
     }
+    await this.cargarAvalesDeConvocatoria(conv.id);
     console.log(`  ${NOMBRE}: ${generados} proyectos generados (presupuesto 148605613.50)`);
   }
 

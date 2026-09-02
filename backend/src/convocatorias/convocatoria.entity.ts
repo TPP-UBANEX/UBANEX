@@ -4,6 +4,7 @@ import { Formulario } from '../formularios/formulario.entity';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
 import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
+import { Usuario } from '../usuarios/usuario.entity';
 
 @Entity()
 export class Convocatoria {
@@ -90,6 +91,26 @@ export class Convocatoria {
 
   @Column({ type: 'boolean', default: false })
   ordenMeritoConfirmado: boolean;
+
+  // Resolución de adjudicación: paso posterior a confirmar el orden de mérito.
+  // Rectorado carga el link a la resolución (no se suben archivos) y la fecha, y
+  // al emitir las ediciones pasan a Adjudicado / NoAdjudicado. Inmutable una vez
+  // emitida.
+  @Column({ type: 'boolean', default: false })
+  adjudicacionEmitida: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  resolucionUrl: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  fechaResolucion: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  adjudicacionEmitidaPorId: string | null;
+
+  @ManyToOne(() => Usuario, { nullable: true })
+  @JoinColumn({ name: 'adjudicacionEmitidaPorId' })
+  adjudicacionEmitidaPor: Usuario | null;
 
   @ManyToOne(() => TemplateAutoevaluacionImpacto, { nullable: true })
   @JoinColumn({ name: 'templateAutoevaluacionImpactoId' })

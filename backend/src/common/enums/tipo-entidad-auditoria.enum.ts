@@ -4,4 +4,5 @@ export enum TipoEntidadAuditoria {
   HITO = 'hito',
   AUTOEVALUACION_IMPACTO = 'autoevaluacion-impacto',
   INFORME_FINAL = 'informe-final',
+  ADJUDICACION = 'adjudicacion',
 }

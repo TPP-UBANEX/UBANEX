@@ -29,6 +29,8 @@ import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { MecanismoAdjudicacion } from '../common/enums/mecanismo-adjudicacion.enum';
 import { TipoEvaluacionCruzada } from '../common/enums/tipo-evaluacion-cruzada.enum';
 import { calcularPresupuestoAAdjudicar } from '../proyectos/presupuesto.util';
+import { puedeAdjudicarse } from '../proyectos/adjudicacion';
+import { GuardarAdjudicacionDto, EmitirAdjudicacionDto } from './dto/adjudicacion.dto';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import {
@@ -44,10 +46,13 @@ import {
 
 // ── Fórmula del resumen final de evaluación ─────────────────────────────
 // El puntaje final (mérito) es la suma cruda del promedio de las evaluaciones
-// cruzadas confirmadas más la evaluación institucional confirmada. Cada "Sí"
-// del formulario suma PUNTAJE_BOOLEANO puntos. La asignación de fondos la
-// define el presupuesto + cuota federativa, no un umbral de nota.
-const PUNTAJE_BOOLEANO = 10;
+// cruzadas confirmadas más la evaluación institucional confirmada. Solo las
+// subcategorías numéricas de la institucional suman: las booleanas son banderas
+// informativas y no aportan puntaje (igual que el checklist). La asignación de
+// fondos la define el presupuesto + cuota federativa, no un umbral de nota.
+// Si hay una tercera evaluación cruzada (TerceraUa) confirmada, reemplaza a la
+// Propia y a la Ajena en el promedio: no se promedian las tres, la tercera
+// resuelve la inconsistencia y las descarta (ver cruzadasVigentes).
 
 const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
 
@@ -300,7 +305,18 @@ export class EvaluacionesService {
     const algunaCruzadaConfirmada = cruzadas.some((c) => c.estado === EstadoEvaluacion.Confirmada);
 
     const cruzadasConfirmadas = cruzadas.filter((c) => c.estado === EstadoEvaluacion.Confirmada);
-    const resumen = this.calcularResumen(institucional, cruzadasConfirmadas, edicion);
+    const resumen = this.calcularResumen(
+      institucional,
+      cruzadasConfirmadas,
+      edicion,
+      esSecretariaUA || esRectorado,
+    );
+    const puntajeInst = verDetalleInst
+      ? this.puntajeInstitucional(
+          edicion.convocatoria?.templateEvaluacionInstitucional?.estructura ?? null,
+          institucional?.categorias ?? null,
+        )
+      : null;
 
     return {
       convocatoria: {
@@ -328,6 +344,8 @@ export class EvaluacionesService {
             categorias: verDetalleInst ? institucional.categorias : null,
             checklist: verDetalleInst ? institucional.checklist : null,
             esPse: verDetalleInst ? institucional.esPse : null,
+            puntaje: puntajeInst?.puntaje ?? null,
+            puntajeMaximo: puntajeInst?.maximo ?? null,
           }
         : null,
       cruzadas: cruzadas.map((c) => {
@@ -388,27 +406,21 @@ export class EvaluacionesService {
 
     // Deliberadamente no incluye `institucional.esPse`: ese campo mueve el presupuesto a
     // adjudicar (ver presupuesto.util.ts#calcularPresupuestoAAdjudicar), no el puntaje.
-    const subcategorias = (estructuraInst.categorias ?? []).flatMap((c) => c.subcategorias ?? []);
-    const respuestas = (institucional.categorias ?? {}) as Record<string, { valor?: unknown }>;
-    const maxInst = subcategorias.reduce<number>((suma, sub) => {
-      if (sub.tipoValor === 'numerico') return suma + (sub.maximo ?? PUNTAJE_BOOLEANO);
-      return suma + PUNTAJE_BOOLEANO;
-    }, 0);
-    const puntajeInst = subcategorias.reduce<number>((suma, sub) => {
-      const respuesta = respuestas[sub.id]?.valor;
-      if (sub.tipoValor === 'numerico') return suma + Number(respuesta ?? 0);
-      return suma + (respuesta === true ? PUNTAJE_BOOLEANO : 0);
-    }, 0);
+    const { puntaje: puntajeInst, maximo: maxInst } = this.puntajeInstitucional(
+      estructuraInst,
+      institucional.categorias,
+    )!;
 
     const maxCruzada = (estructuraCruzada.categorias ?? [])
       .flatMap((c) => c.items ?? [])
       .reduce<number>((suma, item) => suma + (item.puntajeMaximo ?? 0), 0);
+    const cruzadasVigentes = this.cruzadasVigentes(cruzadasConfirmadas);
     const promedioCruzada =
-      cruzadasConfirmadas.reduce<number>((suma, c) => {
+      cruzadasVigentes.reduce<number>((suma, c) => {
         const items = (c.items ?? {}) as Record<string, number>;
         const total = Object.values(items).reduce<number>((acc, v) => acc + Number(v), 0);
         return suma + total;
-      }, 0) / cruzadasConfirmadas.length;
+      }, 0) / cruzadasVigentes.length;
 
     const checklist = (institucional.checklist ?? {}) as Record<string, boolean>;
     const checklistCompleto = (estructuraInst.checklist ?? []).every(
@@ -427,17 +439,55 @@ export class EvaluacionesService {
     };
   }
 
+  // Puntaje de la evaluación institucional: solo las subcategorías numéricas
+  // puntúan, las booleanas y el checklist son informativos. Deliberadamente
+  // no incluye `esPse` (ver comentario en calcularPuntaje). Compartido por
+  // calcularPuntaje y por evaluacionDeEdicion (para mostrar el "Puntaje
+  // total" institucional aunque aún no haya orden de mérito).
+  private puntajeInstitucional(
+    estructuraInst: EstructuraTemplateInstitucional | null,
+    respuestas: Record<string, unknown> | null,
+  ): { puntaje: number; maximo: number } | null {
+    if (!estructuraInst) return null;
+    const subcategorias = (estructuraInst.categorias ?? []).flatMap((c) => c.subcategorias ?? []);
+    const valores = (respuestas ?? {}) as Record<string, { valor?: unknown }>;
+    const maximo = subcategorias.reduce<number>(
+      (suma, sub) => (sub.tipoValor === 'numerico' ? suma + (sub.maximo ?? 0) : suma),
+      0,
+    );
+    const puntaje = subcategorias.reduce<number>(
+      (suma, sub) =>
+        sub.tipoValor === 'numerico' ? suma + Number(valores[sub.id]?.valor ?? 0) : suma,
+      0,
+    );
+    return { puntaje, maximo };
+  }
+
   private puntajeCruzada(cruzada: EvaluacionCruzada): number {
     return Object.values(cruzada.items ?? {}).reduce<number>((suma, v) => suma + Number(v), 0);
   }
 
+  // Si hay una TerceraUa confirmada, su puntaje reemplaza al de la Propia y la
+  // Ajena (mecanismo de resolución de inconsistencia extraordinaria): no se
+  // promedian las tres, la tercera las descarta.
+  private cruzadasVigentes(cruzadasConfirmadas: EvaluacionCruzada[]): EvaluacionCruzada[] {
+    const tercera = cruzadasConfirmadas.find((c) => c.tipo === TipoEvaluacionCruzada.TerceraUa);
+    return tercera ? [tercera] : cruzadasConfirmadas;
+  }
+
   // Detecta una inconsistencia extraordinaria entre la evaluación Propia y la
-  // Ajena: ambas confirmadas y con diferencia de puntaje que supera el umbral
-  // de la convocatoria. Devuelve null si aún no hay par confirmado.
+  // Ajena: ambas confirmadas y con diferencia de puntaje que llega o supera el
+  // umbral de la convocatoria. Devuelve null si aún no hay par confirmado.
   private calcularInconsistencia(
     cruzadas: EvaluacionCruzada[],
     umbral: number | null,
-  ): { inconsistente: boolean; diferencia: number; umbral: number } | null {
+  ): {
+    inconsistente: boolean;
+    diferencia: number;
+    umbral: number;
+    terceraDesignada: boolean;
+    terceraConfirmada: boolean;
+  } | null {
     const propia = cruzadas.find(c => c.tipo === TipoEvaluacionCruzada.Propia);
     const ajena = cruzadas.find(c => c.tipo === TipoEvaluacionCruzada.Ajena);
     if (
@@ -450,10 +500,13 @@ export class EvaluacionesService {
     }
     const diferencia = Math.abs(this.puntajeCruzada(propia) - this.puntajeCruzada(ajena));
     const umbralEfectivo = umbral ?? UMBRAL_INCONSISTENCIA_DEFAULT;
+    const tercera = cruzadas.find((c) => c.tipo === TipoEvaluacionCruzada.TerceraUa);
     return {
-      inconsistente: diferencia > umbralEfectivo,
+      inconsistente: diferencia >= umbralEfectivo,
       diferencia,
       umbral: umbralEfectivo,
+      terceraDesignada: !!tercera,
+      terceraConfirmada: tercera?.estado === EstadoEvaluacion.Confirmada,
     };
   }
 
@@ -461,39 +514,32 @@ export class EvaluacionesService {
   // ejecución (o cerrada) y tanto la evaluación institucional como al menos
   // una cruzada fueron confirmadas. Es determinista: las evaluaciones
   // confirmadas son inmutables, así que no hace falta persistirlo.
+  // Mientras la edición sigue EnEvaluacion, se adelanta igualmente para
+  // secretaría de la UA y rectorado (`puedeVerAnticipado`): son quienes
+  // publican el orden de mérito y necesitan ver la nota final antes que el
+  // director del proyecto.
   private calcularResumen(
     institucional: EvaluacionInstitucional | null,
     cruzadasConfirmadas: EvaluacionCruzada[],
     edicion: Edicion,
+    puedeVerAnticipado: boolean,
   ) {
-    if (edicion.estado !== EstadoEdicion.EnEjecucion && edicion.estado !== EstadoEdicion.Cerrado) {
+    const edicionPublicada =
+      edicion.estado === EstadoEdicion.EnEjecucion || edicion.estado === EstadoEdicion.Cerrado;
+    if (!edicionPublicada && !puedeVerAnticipado) {
       return null;
     }
     return this.calcularPuntaje(institucional, cruzadasConfirmadas, edicion);
   }
 
-  // Genera el orden de mérito automático de una convocatoria: rankea las
-  // ediciones por notaFinal (suma del promedio de evaluaciones cruzadas y la
-  // evaluación institucional) y propone una adjudicación borrador (no
-  // definitiva) respetando la cuota federativa
-  // mínima por unidad académica. No pisa el ordenMerito ya seteado a mano.
-  async generarOrdenMerito(convocatoriaId: string, usuario: Usuario): Promise<Edicion[]> {
-    this.validarEsRectorado(usuario);
-
-    const convocatoria = await this.convocatoriaRepo.findOne({
-      where: { id: convocatoriaId },
-      relations: {
-        templateEvaluacionInstitucional: true,
-        templateEvaluacionCruzada: true,
-      },
-    });
-    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
-    if (convocatoria.ordenMeritoConfirmado) {
-      throw new BadRequestException(
-        'El orden de mérito ya está confirmado y no puede volver a generarse',
-      );
-    }
-
+  // Carga las ediciones de la convocatoria junto con su evaluación
+  // institucional vigente y sus evaluaciones cruzadas, indexadas por edición.
+  // Compartido por generarOrdenMerito y confirmarOrdenMerito.
+  private async cargarDatosMerito(convocatoriaId: string): Promise<{
+    ediciones: Edicion[];
+    instPorEdicion: Map<string, EvaluacionInstitucional>;
+    cruzadasPorEdicion: Map<string, EvaluacionCruzada[]>;
+  }> {
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId },
       order: { id: 'ASC' },
@@ -529,23 +575,135 @@ export class EvaluacionesService {
       cruzadasPorEdicion.set(c.edicionId, arr);
     }
 
-    // El orden de mérito solo se genera si TODAS las ediciones que están en la
-    // etapa de evaluación fueron evaluadas (institucional confirmada + al
-    // menos una cruzada confirmada). Si falta alguna, se bloquea la operación.
-    const sinEvaluar = ediciones.filter((ed) => {
-      if (ed.estado !== EstadoEdicion.EnEvaluacion) return false;
+    return { ediciones, instPorEdicion, cruzadasPorEdicion };
+  }
+
+  // El orden de mérito solo se puede generar o confirmar si TODAS las
+  // ediciones que están en etapa de evaluación fueron evaluadas: institucional
+  // confirmada + Propia y Ajena confirmadas, y si la diferencia entre Propia y
+  // Ajena llega o supera el umbral de inconsistencia, además una TerceraUa
+  // confirmada que las reemplaza. Si falta algo, se bloquea la operación
+  // listando los proyectos afectados.
+  private validarEdicionesListasParaMerito(
+    accion: 'generar' | 'confirmar',
+    ediciones: Edicion[],
+    instPorEdicion: Map<string, EvaluacionInstitucional>,
+    cruzadasPorEdicion: Map<string, EvaluacionCruzada[]>,
+    umbral: number | null,
+  ): void {
+    const sinInstitucional: string[] = [];
+    const sinCruzadasCompletas: string[] = [];
+    const conInconsistenciaSinResolver: string[] = [];
+    let diferenciaMaxima = 0;
+
+    for (const ed of ediciones) {
+      if (ed.estado !== EstadoEdicion.EnEvaluacion) continue;
+      const nombre = ed.proyecto?.nombre ?? ed.id;
+
       const inst = instPorEdicion.get(ed.id) ?? null;
-      const tieneInst = !!inst && inst.estado === EstadoEvaluacion.Confirmada;
-      const tieneCruzada = (cruzadasPorEdicion.get(ed.id) ?? []).some(
-        (c) => c.estado === EstadoEvaluacion.Confirmada,
+      if (!inst || inst.estado !== EstadoEvaluacion.Confirmada) {
+        sinInstitucional.push(nombre);
+        continue;
+      }
+
+      const cruzadas = cruzadasPorEdicion.get(ed.id) ?? [];
+      const propiaConfirmada = cruzadas.some(
+        (c) => c.tipo === TipoEvaluacionCruzada.Propia && c.estado === EstadoEvaluacion.Confirmada,
       );
-      return !tieneInst || !tieneCruzada;
-    });
-    if (sinEvaluar.length > 0) {
-      throw new BadRequestException(
-        'No se puede generar el orden de mérito: hay proyectos en evaluación que aún no fueron evaluados',
+      const ajenaConfirmada = cruzadas.some(
+        (c) => c.tipo === TipoEvaluacionCruzada.Ajena && c.estado === EstadoEvaluacion.Confirmada,
+      );
+      if (!propiaConfirmada || !ajenaConfirmada) {
+        sinCruzadasCompletas.push(nombre);
+        continue;
+      }
+
+      const inconsistencia = this.calcularInconsistencia(cruzadas, umbral);
+      if (inconsistencia?.inconsistente && !inconsistencia.terceraConfirmada) {
+        conInconsistenciaSinResolver.push(nombre);
+        diferenciaMaxima = Math.max(diferenciaMaxima, inconsistencia.umbral);
+      }
+    }
+
+    if (
+      sinInstitucional.length === 0 &&
+      sinCruzadasCompletas.length === 0 &&
+      conInconsistenciaSinResolver.length === 0
+    ) {
+      return;
+    }
+
+    // Un mensaje con el nombre de cada edición faltante se vuelve ilegible
+    // cuando son decenas o cientos (convocatorias grandes): el mensaje se
+    // acota a los primeros `tope` nombres + "y N más", y el listado completo
+    // viaja aparte en `detalle` para que la UI lo muestre en un panel con
+    // scroll en vez de un toast desbordado.
+    const listar = (nombres: string[], tope = 5): string => {
+      if (nombres.length <= tope) return nombres.join(', ');
+      return `${nombres.slice(0, tope).join(', ')} y ${nombres.length - tope} más`;
+    };
+
+    const verbo = accion === 'generar' ? 'generar' : 'confirmar';
+    const partes: string[] = [`No se puede ${verbo} el orden de mérito.`];
+    if (sinInstitucional.length > 0) {
+      partes.push(`Falta la evaluación institucional en: ${listar(sinInstitucional)}.`);
+    }
+    if (sinCruzadasCompletas.length > 0) {
+      partes.push(
+        `Faltan las evaluaciones cruzadas propia y ajena completas en: ${listar(sinCruzadasCompletas)}.`,
       );
     }
+    if (conInconsistenciaSinResolver.length > 0) {
+      partes.push(
+        `Diferencia de ${diferenciaMaxima} o más puntos entre la propia y la ajena sin tercera evaluación confirmada en: ${listar(conInconsistenciaSinResolver)}. Designá una tercera Unidad Académica.`,
+      );
+    }
+    throw new BadRequestException({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: partes.join(' '),
+      detalle: {
+        accion,
+        umbral: diferenciaMaxima || null,
+        sinInstitucional,
+        sinCruzadasCompletas,
+        conInconsistenciaSinResolver,
+      },
+    });
+  }
+
+  // Genera el orden de mérito automático de una convocatoria: rankea las
+  // ediciones por notaFinal (suma del promedio de evaluaciones cruzadas y la
+  // evaluación institucional) y propone una adjudicación borrador (no
+  // definitiva) respetando la cuota federativa
+  // mínima por unidad académica. No pisa el ordenMerito ya seteado a mano.
+  async generarOrdenMerito(convocatoriaId: string, usuario: Usuario): Promise<Edicion[]> {
+    this.validarEsRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+      relations: {
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+      },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.ordenMeritoConfirmado) {
+      throw new BadRequestException(
+        'El orden de mérito ya está confirmado y no puede volver a generarse',
+      );
+    }
+
+    const { ediciones, instPorEdicion, cruzadasPorEdicion } =
+      await this.cargarDatosMerito(convocatoriaId);
+
+    this.validarEdicionesListasParaMerito(
+      'generar',
+      ediciones,
+      instPorEdicion,
+      cruzadasPorEdicion,
+      convocatoria.umbralInconsistenciaCruzada,
+    );
 
     // Puntaje por edición (solo las que tienen evaluaciones confirmadas).
     const puntajes = new Map<string, { notaFinal: number; checklistCompleto: boolean }>();
@@ -761,9 +919,12 @@ export class EvaluacionesService {
     // en cada iteración se toma la CUOTA FEDERATIVA financiada de MAYOR puntaje
     // de TODA la convocatoria cuya UA aún tenga un proyecto no financiado; se
     // promueve a MERITO y se financia como CUOTA FEDERATIVA el no-financiado de
-    // mayor puntaje de ESA MISMA UA. Si el reemplazo no cabe en el presupuesto,
-    // se corta (no se promueve una CUOTA FEDERATIVA de menor mérito mientras
-    // exista una mayor sin promover).
+    // mayor puntaje de ESA MISMA UA. Si el reemplazo de mayor puntaje no cabe en
+    // el presupuesto, se prueban los candidatos más baratos de esa misma UA; si
+    // ninguno cabe, se descarta la UA (agotada) y se pasa a la CUOTA FEDERATIVA
+    // de la siguiente UA con candidato que entre, aprovechando el presupuesto
+    // sobrante en lugar de cortar el proceso.
+    const uasAgotadas = new Set<string>();
     while (true) {
       const uasConNoFinanciado = new Set(
         elegiblesConPuntaje
@@ -775,21 +936,34 @@ export class EvaluacionesService {
           (ed) =>
             propuesta.get(ed.id) &&
             mecanismo.get(ed.id) === MecanismoAdjudicacion.CuotaFederativa &&
-            uasConNoFinanciado.has(ed.unidadAcademicaId),
+            uasConNoFinanciado.has(ed.unidadAcademicaId) &&
+            !uasAgotadas.has(ed.unidadAcademicaId),
         )
         .sort(porPuntajeEstable)[0];
       if (!mejorCuota) break;
       const ua = mejorCuota.unidadAcademicaId;
-      const u = elegiblesConPuntaje
+      const candidatos = elegiblesConPuntaje
         .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
-        .sort(porPuntajeDesc)[0]; // mayor puntaje -> nueva CUOTA FEDERATIVA (contigua a MERITO)
-      if (!u) break;
-      const costoU = costo(u);
-      if (disponible != null && costoU > disponible) break;
-      mecanismo.set(mejorCuota.id, MecanismoAdjudicacion.Merito); // promover la CUOTA FEDERATIVA de mayor mérito
-      propuesta.set(u.id, true);
-      mecanismo.set(u.id, MecanismoAdjudicacion.CuotaFederativa); // nueva CUOTA FEDERATIVA de la misma UA
-      descontar(costoU);
+        .sort(porPuntajeDesc); // mayor puntaje primero -> nueva CUOTA FEDERATIVA (contigua a MERITO)
+      if (candidatos.length === 0) break;
+
+      let canjeRealizado = false;
+      for (const u of candidatos) {
+        const costoU = costo(u);
+        if (disponible != null && costoU > disponible) continue; // probar candidato más barato
+        mecanismo.set(mejorCuota.id, MecanismoAdjudicacion.Merito); // promover la CUOTA FEDERATIVA de mayor mérito
+        propuesta.set(u.id, true);
+        mecanismo.set(u.id, MecanismoAdjudicacion.CuotaFederativa); // nueva CUOTA FEDERATIVA de la misma UA
+        descontar(costoU);
+        canjeRealizado = true;
+        break;
+      }
+
+      // Ningún candidato de esta UA entra en el remanente: se descarta y el
+      // siguiente ciclo busca la mejor CUOTA FEDERATIVA de otra UA.
+      if (!canjeRealizado) {
+        uasAgotadas.add(ua);
+      }
     }
 
     // Aplicar: todas las ediciones se recalculan según la propuesta automática;
@@ -892,6 +1066,16 @@ export class EvaluacionesService {
       return convocatoria;
     }
 
+    const { ediciones, instPorEdicion, cruzadasPorEdicion } =
+      await this.cargarDatosMerito(convocatoriaId);
+    this.validarEdicionesListasParaMerito(
+      'confirmar',
+      ediciones,
+      instPorEdicion,
+      cruzadasPorEdicion,
+      convocatoria.umbralInconsistenciaCruzada,
+    );
+
     const sinOrden = await this.edicionRepo.count({
       where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion, ordenMerito: IsNull() },
     });
@@ -907,6 +1091,200 @@ export class EvaluacionesService {
       this.logger.error(`Error enviando notificaciones de adjudicación: ${String(err)}`),
     );
     return guardada;
+  }
+
+  // ───────────── Resolución de adjudicación ─────────────
+  // Tercer paso, posterior a confirmar el orden de mérito: Rectorado carga el
+  // link a la resolución (no se suben archivos), la fecha y el monto por
+  // proyecto, y al emitir las ediciones pasan a Adjudicado / NoAdjudicado.
+  // Requisito: cada edición adjudicada debe tener el aval del decano cargado.
+
+  // Normaliza el link de la resolución: si no trae esquema, se le antepone https://
+  private normalizarResolucionUrl(url: string | null | undefined): string | null {
+    const v = (url ?? '').trim();
+    if (!v) return null;
+    return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  }
+
+  private validarConvocatoriaParaAdjudicacion(convocatoria: Convocatoria): void {
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
+    if (!convocatoria.ordenMeritoConfirmado) {
+      throw new BadRequestException(
+        'El orden de mérito todavía no fue confirmado; no se puede trabajar la resolución de adjudicación',
+      );
+    }
+    if (convocatoria.adjudicacionEmitida) {
+      throw new BadRequestException(
+        'La resolución de adjudicación ya fue emitida y no puede modificarse',
+      );
+    }
+  }
+
+  async obtenerAdjudicacion(convocatoriaId: string, usuario: Usuario) {
+    this.validarEsRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId },
+      relations: { proyecto: true, unidadAcademica: true },
+    });
+    const institucionales = await this.institucionalRepo.find({
+      where: { convocatoriaId },
+      select: { edicionId: true, esPse: true },
+    });
+    const esPsePorEdicion = new Map(institucionales.map((i) => [i.edicionId, i.esPse === true]));
+
+    const items = ediciones
+      .map((e) => ({
+        edicionId: e.id,
+        proyectoId: e.proyectoId,
+        proyectoNombre: e.proyecto?.nombre ?? null,
+        unidadAcademica: e.unidadAcademica
+          ? { id: e.unidadAcademica.id, nombre: e.unidadAcademica.nombre }
+          : null,
+        estadoEdicion: e.estado,
+        ordenMerito: e.ordenMerito,
+        puntajeMerito: e.puntajeMerito,
+        adjudicacionPropuesta: e.adjudicacionPropuesta,
+        mecanismoAdjudicacion: e.mecanismoAdjudicacion ?? null,
+        montoAdjudicado: e.montoAdjudicado,
+        presupuestoAAdjudicar: calcularPresupuestoAAdjudicar(
+          e.presupuestoSolicitado,
+          convocatoria,
+          esPsePorEdicion.get(e.id),
+        ).total,
+        tieneAval: puedeAdjudicarse(e),
+      }))
+      .sort((a, b) => {
+        if (a.ordenMerito == null && b.ordenMerito == null) return 0;
+        if (a.ordenMerito == null) return 1;
+        if (b.ordenMerito == null) return -1;
+        return a.ordenMerito - b.ordenMerito;
+      });
+
+    return {
+      convocatoria: {
+        id: convocatoria.id,
+        ordenMeritoConfirmado: convocatoria.ordenMeritoConfirmado,
+        adjudicacionEmitida: convocatoria.adjudicacionEmitida,
+        resolucionUrl: convocatoria.resolucionUrl,
+        fechaResolucion: convocatoria.fechaResolucion,
+      },
+      items,
+    };
+  }
+
+  async guardarBorradorAdjudicacion(
+    convocatoriaId: string,
+    dto: GuardarAdjudicacionDto,
+    usuario: Usuario,
+  ): Promise<Convocatoria> {
+    this.validarEsRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    this.validarConvocatoriaParaAdjudicacion(convocatoria);
+
+    if (dto.resolucionUrl !== undefined) {
+      convocatoria.resolucionUrl = this.normalizarResolucionUrl(dto.resolucionUrl);
+    }
+    if (dto.fechaResolucion !== undefined) {
+      convocatoria.fechaResolucion = dto.fechaResolucion || null;
+    }
+    const guardada = await this.convocatoriaRepo.save(convocatoria);
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EDICION,
+      descripcion: 'Guardó el borrador de la resolución de adjudicación',
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.ADJUDICACION,
+      entidadId: convocatoriaId,
+    });
+
+    return guardada;
+  }
+
+  async emitirAdjudicacion(
+    convocatoriaId: string,
+    dto: EmitirAdjudicacionDto,
+    usuario: Usuario,
+  ): Promise<{ convocatoria: Convocatoria; ediciones: Edicion[] }> {
+    this.validarEsAutoridadRectorado(usuario);
+
+    const convocatoria = await this.convocatoriaRepo.findOne({ where: { id: convocatoriaId } });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    this.validarConvocatoriaParaAdjudicacion(convocatoria);
+
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId },
+      relations: { proyecto: true, unidadAcademica: true },
+    });
+    const institucionales = await this.institucionalRepo.find({
+      where: { convocatoriaId },
+      select: { edicionId: true, esPse: true },
+    });
+    const esPsePorEdicion = new Map(institucionales.map((i) => [i.edicionId, i.esPse === true]));
+
+    const adjudicadas = ediciones.filter((e) => e.adjudicacionPropuesta === true);
+    if (adjudicadas.length === 0) {
+      throw new BadRequestException(
+        'No hay ediciones propuestas para adjudicación en el orden de mérito',
+      );
+    }
+
+    // Gate del aval: toda edición adjudicada necesita el aval firmado del decano.
+    const faltanAval = adjudicadas.filter((e) => !puedeAdjudicarse(e));
+    if (faltanAval.length > 0) {
+      const nombres = faltanAval.map((e) => e.proyecto?.nombre ?? e.id).join(', ');
+      throw new BadRequestException(
+        `No se puede emitir la resolución: faltan los avales de: ${nombres}`,
+      );
+    }
+
+    for (const edicion of ediciones) {
+      if (edicion.adjudicacionPropuesta === true) {
+        edicion.estado = EstadoEdicion.Adjudicado;
+        // El monto adjudicado es fijo: sale de la fórmula presupuesto a adjudicar
+        // (solicitado + extra insumos + extra PSE), la misma que usa el orden de
+        // mérito. No se edita a mano.
+        edicion.montoAdjudicado = calcularPresupuestoAAdjudicar(
+          edicion.presupuestoSolicitado,
+          convocatoria,
+          esPsePorEdicion.get(edicion.id),
+        ).total;
+      } else if (edicion.estado === EstadoEdicion.EnEvaluacion) {
+        edicion.estado = EstadoEdicion.NoAdjudicado;
+      }
+    }
+
+    await this.edicionRepo.manager.transaction(async (manager) => {
+      await manager.save(ediciones);
+      convocatoria.adjudicacionEmitida = true;
+      convocatoria.resolucionUrl = this.normalizarResolucionUrl(dto.resolucionUrl);
+      convocatoria.fechaResolucion = dto.fechaResolucion;
+      convocatoria.adjudicacionEmitidaPorId = usuario.id;
+      await manager.save(convocatoria);
+    });
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      accion: TipoAccionAuditoria.EDICION,
+      descripcion: 'Emitió la resolución de adjudicación',
+      responsableId: usuario.id,
+      responsableNombre: usuario.nombreCompleto,
+      entidad: TipoEntidadAuditoria.ADJUDICACION,
+      entidadId: convocatoriaId,
+    });
+
+    return { convocatoria, ediciones };
   }
 
   // Al confirmar el orden de mérito (cierre definitivo de la convocatoria) se
