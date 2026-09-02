@@ -27,6 +27,11 @@
 
 No hay un entorno de *staging* definido en el repositorio; solo local y producción.
 
+**URL pública de producción:** el frontend (`ubanex-frontend`) se sirve en
+**https://ubanex.onrender.com**. El `VITE_API_URL` del frontend apunta a la URL pública
+del servicio `ubanex-api`. Al ser plan `free`, ambos servicios sufren *cold starts* tras
+un rato de inactividad (primera request ~30–60 s).
+
 ## 2. Entorno local — Docker Compose
 
 Definido en [`docker-compose.yml`](../docker-compose.yml), 3 servicios:
