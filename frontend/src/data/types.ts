@@ -664,15 +664,43 @@ export interface GuardarEvaluacionCruzadaDto {
   observaciones?: string;
 }
 
+export enum EstadoComprobante {
+  EnRevision = 'EnRevision',
+  Aceptado = 'Aceptado',
+  Rechazado = 'Rechazado',
+}
+
 export interface Rendicion {
   id: string;
-  proyectoId: string;
-  proyectoTitulo?: string;
-  rubro: string;
+  edicionId: string;
+  rubro: TipoRubro;
   monto: number;
-  estado: string;
+  descripcion?: string;
   fecha: string;
+  comprobanteUrl: string;
+  motivoRechazo?: string | null;
+  estado: EstadoComprobante;
+  creadoPor?: Usuario;
+  creadoEn: string;
+}
+
+export interface CrearRendicionDto {
+  edicionId: string;
+  rubro: TipoRubro;
+  monto: number;
+  descripcion?: string;
+  fecha: string;
+  comprobanteUrl: string;
+}
+
+export interface ActualizarRendicionDto {
+  rubro?: TipoRubro;
+  monto?: number;
+  descripcion?: string;
+  fecha?: string;
   comprobanteUrl?: string;
+  motivoRechazo?: string;
+  estado?: EstadoComprobante;
 }
 
 export enum TipoCampo {

@@ -25,6 +25,7 @@ import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import { HitosEjecucionTab } from '@/components/HitosEjecucionTab'
+import { ComprobantesTab } from '@/components/ComprobantesTab'
 import { AutoevaluacionTab } from '@/components/AutoevaluacionTab'
 import { InformeFinalTab } from '@/components/InformeFinalTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
@@ -53,7 +54,7 @@ const OPCIONES_ES_INSUMO = [
   { value: 'false', label: 'No' },
 ]
 
-const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'autoevaluacion', 'informe-final', 'sugerencias']
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'comprobantes', 'autoevaluacion', 'informe-final', 'sugerencias']
 
 /** Antepone https:// si el link no trae protocolo, para que no se resuelva como ruta relativa. */
 const conProtocolo = (url: string) => {
@@ -211,6 +212,10 @@ export function ProyectoDetail() {
   const esSecretariaMismaUA = esSecretaria && esMismaUA
   const esDirector = directores.some(d => d.usuarioId === user?.id)
   const puedeEditarEjecucion = esPropietario || esDirector
+  const puedeGestionarComprobantes = Boolean(
+    (!!esSecretariaMismaUA || !!esRectoradoAmplio) &&
+      [EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado].includes(edicion?.estado as EstadoEdicion),
+  )
 
   const nombreUnidadesAcademicas = () => {
     const principal = edicion?.unidadAcademica?.nombre
@@ -677,6 +682,7 @@ export function ProyectoDetail() {
           <TabsTrigger value="presupuesto">Presupuesto solicitado</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
+          <TabsTrigger value="comprobantes">Comprobantes</TabsTrigger>
           <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
           <TabsTrigger value="informe-final">Informe final</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
@@ -903,6 +909,20 @@ export function ProyectoDetail() {
                 </p>
               </CardContent>
             </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="comprobantes" className="mt-4">
+          {edicion ? (
+            <ComprobantesTab
+              edicionId={edicion.id}
+              estado={edicion.estado}
+              puedeEditar={puedeEditarEjecucion}
+              puedeGestionarEstado={puedeGestionarComprobantes}
+              presupuesto={edicion.presupuestoSolicitado}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
         </TabsContent>
 

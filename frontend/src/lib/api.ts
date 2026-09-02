@@ -574,10 +574,14 @@ export const api = {
     eliminar: (id: string) => del(`/notificaciones/${id}`),
   },
   rendiciones: {
-    list: (proyectoId?: string) => {
-      const qs = proyectoId ? `?proyectoId=${proyectoId}` : '';
-      return get<import('@/data/types').Rendicion[]>(`/rendiciones${qs}`);
-    },
+    listar: (edicionId: string) =>
+      get<import('@/data/types').Rendicion[]>(`/rendiciones?edicionId=${encodeURIComponent(edicionId)}`),
+    crear: (data: import('@/data/types').CrearRendicionDto) =>
+      post<import('@/data/types').Rendicion>('/rendiciones', data),
+    actualizar: (id: string, data: import('@/data/types').ActualizarRendicionDto) =>
+      patch<import('@/data/types').Rendicion>(`/rendiciones/${id}`, data),
+    eliminar: (id: string) =>
+      del(`/rendiciones/${id}`),
   },
   ejecucion: {
     hitos: {

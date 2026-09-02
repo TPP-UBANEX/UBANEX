@@ -31,6 +31,8 @@ import { BienPresupuesto, Presupuesto, ViaticoPresupuesto } from '../proyectos/p
 import { etiquetaCampoPresupuesto, PREFIJO_RUTA_PRESUPUESTO } from '../proyectos/presupuesto.util';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { TipoPersona } from '../common/enums/tipo-persona.enum';
+import { EstadoComprobante } from '../common/enums/estado-comprobante.enum';
+import { Rendicion } from '../rendiciones/rendicion.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
@@ -165,6 +167,7 @@ export class SeedService {
   private readonly autoevaluacionRepo: Repository<AutoevaluacionImpacto>;
   private readonly informeRepo: Repository<InformeFinal>;
   private readonly templateAutoevalRepo: Repository<TemplateAutoevaluacionImpacto>;
+  private readonly rendicionRepo: Repository<Rendicion>;
 
   private readonly rng = new Rng(20260810);
   private readonly uaMap = new Map<string, UnidadAcademica>();
@@ -239,6 +242,7 @@ export class SeedService {
     this.autoevaluacionRepo = dataSource.getRepository(AutoevaluacionImpacto);
     this.informeRepo = dataSource.getRepository(InformeFinal);
     this.templateAutoevalRepo = dataSource.getRepository(TemplateAutoevaluacionImpacto);
+    this.rendicionRepo = dataSource.getRepository(Rendicion);
 
     this.camposFormularioEstandar = [
       {
@@ -3484,6 +3488,7 @@ export class SeedService {
 
   private async seedEjecucion(): Promise<void> {
     await this.seedHitos();
+    await this.seedRendiciones();
     await this.seedAutoevaluaciones();
     await this.seedInformesFinales();
   }
@@ -3565,6 +3570,50 @@ export class SeedService {
     const d = new Date(`${fecha}T00:00:00`);
     d.setDate(d.getDate() + dias);
     return d.toISOString().slice(0, 10);
+  }
+
+  private async seedRendiciones(): Promise<void> {
+    const ediciones = await this.edicionesCalificadasEjecucion();
+    const yaSembradas = new Set((await this.rendicionRepo.find({ select: { edicionId: true } })).map((r) => r.edicionId));
+
+    const filas: Rendicion[] = [];
+    for (const edicion of ediciones) {
+      if (yaSembradas.has(edicion.id)) continue;
+      const rng = this.rngDeEdicion(`${edicion.id}:rend`);
+      const rubros = edicion.presupuestoSolicitado?.rubros?.length
+        ? edicion.presupuestoSolicitado.rubros.map((r) => r.tipo)
+        : Object.values(TipoRubro);
+      if (rubros.length === 0) continue;
+
+      const cantidad = rng.entero(1, 3);
+      const anio = edicion.anioEdicion ?? edicion.convocatoria.anio ?? 2025;
+      const inicio = edicion.convocatoria.fechaInicioEjecucion ?? this.crearFecha(anio, 8, 1);
+      for (let i = 0; i < cantidad; i++) {
+        const monto = Math.round((rng.entero(2_000, 80_000)) / 100) * 100;
+        filas.push(
+          this.rendicionRepo.create({
+            edicionId: edicion.id,
+            rubro: rng.pick(rubros),
+            monto,
+            descripcion: rng.bool() ? 'Gasto documentado de ejecución' : 'Adquisición / servicio durante la ejecución',
+            fecha: this.sumarDias(inicio, rng.entero(0, 90) + i * 30),
+            comprobanteUrl: 'https://example.com/comprobante.pdf',
+            estado: rng.pick([
+              EstadoComprobante.EnRevision,
+              EstadoComprobante.EnRevision,
+              EstadoComprobante.Aceptado,
+            ]),
+            creadoPorId: edicion.creadoPorId,
+          }),
+        );
+      }
+    }
+
+    for (let i = 0; i < filas.length; i += TAMANIO_LOTE) {
+      const chunk = filas.slice(i, i + TAMANIO_LOTE);
+      await this.rendicionRepo.insert(chunk.map((r) => r));
+      this.progreso.sumar(chunk.length);
+    }
   }
 
   private async seedAutoevaluaciones(): Promise<void> {
