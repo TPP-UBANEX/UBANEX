@@ -937,3 +937,160 @@ describe('EvaluacionesService - completitud de cruzadas para el orden de mérito
     expect(response.detalle.sinInstitucional).toEqual(nombres);
   });
 });
+
+describe('EvaluacionesService.generarOrdenMerito - Fase 3 swap por presupuesto restante', () => {
+  // Construye un escenario con 2 UAs (A y B), cuota federativa 1, donde cada
+  // proyecto define su propio puntaje y costo (`presupuestoSolicitado.montoTotal`).
+  function construirConCostos(
+    aProyectos: Array<{ id: string; puntaje: number; costo: number }>,
+    bProyectos: Array<{ id: string; puntaje: number; costo: number }>,
+    presupuestoTotal: number,
+  ): Fixture {
+    const estructuraInst = {
+      categorias: [
+        {
+          id: 'c1',
+          nombre: 'Evaluación',
+          subcategorias: [
+            {
+              id: 'sub1',
+              texto: 'Puntaje total',
+              tipoValor: 'numerico',
+              minimo: 0,
+              maximo: 100,
+              fundamentacion: null,
+            },
+          ],
+        },
+      ],
+      checklist: [],
+    };
+    const estructuraCruz = {
+      categorias: [
+        {
+          id: 'cc1',
+          nombre: 'Evaluación',
+          puntajeMaximo: 100,
+          items: [{ id: 'item1', nombre: 'Puntaje total', puntajeMaximo: 100 }],
+        },
+      ],
+    };
+    const convocatoria = {
+      id: 'conv1',
+      ordenMeritoConfirmado: false,
+      presupuestoTotal,
+      cuotaFederativa: 1,
+      templateEvaluacionInstitucional: { estructura: estructuraInst },
+      templateEvaluacionCruzada: { estructura: estructuraCruz },
+    } as unknown as Convocatoria;
+
+    const ediciones: Edicion[] = [];
+    const institucionales: EvaluacionInstitucional[] = [];
+    const cruzadas: EvaluacionCruzada[] = [];
+    const uas: Record<string, { id: string; nombre: string }> = {
+      A: { id: 'uaA', nombre: 'Facultad A' },
+      B: { id: 'uaB', nombre: 'Facultad B' },
+    };
+    const push = (clave: string, p: { id: string; puntaje: number; costo: number }) => {
+      const ua = uas[clave];
+      ediciones.push({
+        id: p.id,
+        unidadAcademicaId: ua.id,
+        unidadAcademica: ua as any,
+        convocatoria,
+        presupuestoSolicitado: { montoTotal: p.costo } as any,
+        estado: EstadoEdicion.EnEvaluacion,
+        proyecto: {} as any,
+        ordenMerito: null,
+        puntajeMerito: null,
+        adjudicacionPropuesta: null,
+        mecanismoAdjudicacion: null,
+      } as unknown as Edicion);
+      institucionales.push({
+        id: `${p.id}i`,
+        edicionId: p.id,
+        estado: EstadoEvaluacion.Confirmada,
+        categorias: { sub1: { valor: p.puntaje, fundamentacion: '' } },
+        checklist: {},
+      } as unknown as EvaluacionInstitucional);
+      cruzadas.push({
+        id: `${p.id}p`,
+        edicionId: p.id,
+        tipo: TipoEvaluacionCruzada.Propia,
+        estado: EstadoEvaluacion.Confirmada,
+        items: { item1: 0 },
+      } as unknown as EvaluacionCruzada);
+      cruzadas.push({
+        id: `${p.id}a`,
+        edicionId: p.id,
+        tipo: TipoEvaluacionCruzada.Ajena,
+        estado: EstadoEvaluacion.Confirmada,
+        items: { item1: 0 },
+      } as unknown as EvaluacionCruzada);
+    };
+    aProyectos.forEach((p) => push('A', p));
+    bProyectos.forEach((p) => push('B', p));
+    return { convocatoria, ediciones, institucionales, cruzadas };
+  }
+
+  function armarService(fixture: Fixture): EvaluacionesService {
+    const institucionalRepo = { find: jest.fn().mockResolvedValue(fixture.institucionales) };
+    const cruzadaRepo = { find: jest.fn().mockResolvedValue(fixture.cruzadas) };
+    const convocatoriaRepo = { findOne: jest.fn().mockResolvedValue(fixture.convocatoria) };
+    const edicionRepo = {
+      find: jest.fn().mockResolvedValue(fixture.ediciones),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const dummy = { find: jest.fn(), save: jest.fn(), findOne: jest.fn() };
+    const svc = new EvaluacionesService(
+      institucionalRepo as any,
+      cruzadaRepo as any,
+      convocatoriaRepo as any,
+      edicionRepo as any,
+      dummy as any,
+      dummy as any,
+      dummy as any,
+      { send: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
+    );
+    jest.spyOn(svc as any, 'validarEsRectorado').mockImplementation(() => undefined);
+    return svc;
+  }
+
+  function mecanismoDe(ediciones: Edicion[], id: string): string | null {
+    const e = ediciones.find((x) => x.id === id);
+    return e?.adjudicacionPropuesta ? e.mecanismoAdjudicacion ?? null : null;
+  }
+
+  it('si la UA de mayor mérito tiene solo candidatos que no entran, pasa a la siguiente UA y usa su candidato barato', async () => {
+    const usuario = { id: 'u1' } as any;
+    // Presupuesto 150: alcanza para la cuota de A (90) y B (55), dejando un
+    // remanente de 5. La UA A (mejor mérito) solo tiene candidatos de costo 80
+    // que no entran; la UA B tiene un candidato barato de 5 que sí entra.
+    const fixture = construirConCostos(
+      [
+        { id: 'a1', puntaje: 100, costo: 90 },
+        { id: 'a2', puntaje: 50, costo: 80 },
+        { id: 'a3', puntaje: 40, costo: 80 },
+      ],
+      [
+        { id: 'b1', puntaje: 90, costo: 55 },
+        { id: 'b2', puntaje: 49, costo: 5 },
+        { id: 'b3', puntaje: 39, costo: 70 },
+      ],
+      150,
+    );
+    const ediciones = await armarService(fixture).generarOrdenMerito('conv1', usuario);
+    const porId = Object.fromEntries(ediciones.map((e) => [e.id, e]));
+
+    // La UA A conserva su cuota (no hay candidato que entre en el remanente).
+    expect(mecanismoDe(ediciones, 'a1')).toBe('CUOTA_FEDERATIVA');
+    // Fase 3 descartó A (sus candidatos no caben) y canjeó la cuota de B
+    // promoviéndola a MERITO para financiar el candidato barato b2 como cuota.
+    expect(porId['b1'].adjudicacionPropuesta).toBe(true);
+    expect(porId['b1'].mecanismoAdjudicacion).toBe('MERITO');
+    expect(porId['b2'].adjudicacionPropuesta).toBe(true);
+    expect(porId['b2'].mecanismoAdjudicacion).toBe('CUOTA_FEDERATIVA');
+    expect(porId['b3'].adjudicacionPropuesta).toBe(false);
+  });
+});

@@ -919,9 +919,12 @@ export class EvaluacionesService {
     // en cada iteración se toma la CUOTA FEDERATIVA financiada de MAYOR puntaje
     // de TODA la convocatoria cuya UA aún tenga un proyecto no financiado; se
     // promueve a MERITO y se financia como CUOTA FEDERATIVA el no-financiado de
-    // mayor puntaje de ESA MISMA UA. Si el reemplazo no cabe en el presupuesto,
-    // se corta (no se promueve una CUOTA FEDERATIVA de menor mérito mientras
-    // exista una mayor sin promover).
+    // mayor puntaje de ESA MISMA UA. Si el reemplazo de mayor puntaje no cabe en
+    // el presupuesto, se prueban los candidatos más baratos de esa misma UA; si
+    // ninguno cabe, se descarta la UA (agotada) y se pasa a la CUOTA FEDERATIVA
+    // de la siguiente UA con candidato que entre, aprovechando el presupuesto
+    // sobrante en lugar de cortar el proceso.
+    const uasAgotadas = new Set<string>();
     while (true) {
       const uasConNoFinanciado = new Set(
         elegiblesConPuntaje
@@ -933,21 +936,34 @@ export class EvaluacionesService {
           (ed) =>
             propuesta.get(ed.id) &&
             mecanismo.get(ed.id) === MecanismoAdjudicacion.CuotaFederativa &&
-            uasConNoFinanciado.has(ed.unidadAcademicaId),
+            uasConNoFinanciado.has(ed.unidadAcademicaId) &&
+            !uasAgotadas.has(ed.unidadAcademicaId),
         )
         .sort(porPuntajeEstable)[0];
       if (!mejorCuota) break;
       const ua = mejorCuota.unidadAcademicaId;
-      const u = elegiblesConPuntaje
+      const candidatos = elegiblesConPuntaje
         .filter((ed) => ed.unidadAcademicaId === ua && !propuesta.get(ed.id))
-        .sort(porPuntajeDesc)[0]; // mayor puntaje -> nueva CUOTA FEDERATIVA (contigua a MERITO)
-      if (!u) break;
-      const costoU = costo(u);
-      if (disponible != null && costoU > disponible) break;
-      mecanismo.set(mejorCuota.id, MecanismoAdjudicacion.Merito); // promover la CUOTA FEDERATIVA de mayor mérito
-      propuesta.set(u.id, true);
-      mecanismo.set(u.id, MecanismoAdjudicacion.CuotaFederativa); // nueva CUOTA FEDERATIVA de la misma UA
-      descontar(costoU);
+        .sort(porPuntajeDesc); // mayor puntaje primero -> nueva CUOTA FEDERATIVA (contigua a MERITO)
+      if (candidatos.length === 0) break;
+
+      let canjeRealizado = false;
+      for (const u of candidatos) {
+        const costoU = costo(u);
+        if (disponible != null && costoU > disponible) continue; // probar candidato más barato
+        mecanismo.set(mejorCuota.id, MecanismoAdjudicacion.Merito); // promover la CUOTA FEDERATIVA de mayor mérito
+        propuesta.set(u.id, true);
+        mecanismo.set(u.id, MecanismoAdjudicacion.CuotaFederativa); // nueva CUOTA FEDERATIVA de la misma UA
+        descontar(costoU);
+        canjeRealizado = true;
+        break;
+      }
+
+      // Ningún candidato de esta UA entra en el remanente: se descarta y el
+      // siguiente ciclo busca la mejor CUOTA FEDERATIVA de otra UA.
+      if (!canjeRealizado) {
+        uasAgotadas.add(ua);
+      }
     }
 
     // Aplicar: todas las ediciones se recalculan según la propuesta automática;
