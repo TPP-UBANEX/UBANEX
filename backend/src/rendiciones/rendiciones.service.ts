@@ -14,11 +14,13 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { EstadoComprobante } from '../common/enums/estado-comprobante.enum';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
+import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { Notificacion } from '../sugerencias/notificacion.entity';
 
 @Injectable()
 export class RendicionesService {
@@ -31,6 +33,10 @@ export class RendicionesService {
     private readonly convocatoriaRepo: Repository<Convocatoria>,
     @InjectRepository(ParticipacionConvocatoria)
     private readonly participacionRepo: Repository<ParticipacionConvocatoria>,
+    @InjectRepository(Notificacion)
+    private readonly notificacionRepo: Repository<Notificacion>,
+    @InjectRepository(Usuario)
+    private readonly usuarioRepo: Repository<Usuario>,
     private readonly auditoria: AuditoriaService,
   ) {}
 
@@ -49,7 +55,7 @@ export class RendicionesService {
   private async obtenerEdicion(edicionId: string): Promise<Edicion> {
     const edicion = await this.edicionRepo.findOne({
       where: { id: edicionId },
-      relations: { convocatoria: true },
+      relations: { convocatoria: true, proyecto: true },
     });
     if (!edicion) throw new NotFoundException('Edición no encontrada');
     return edicion;
@@ -94,6 +100,75 @@ export class RendicionesService {
     });
     if (esDirector) return;
     throw new ForbiddenException('No tenés acceso a los comprobantes de esta edición');
+  }
+
+  /**
+   * Destinatarios de gestión de comprobantes: Rectorado (todas las UAs) y
+   * Secretaría de la misma unidad académica de la edición. Excluye al autor.
+   */
+  private async resolverDestinatariosGestion(edicion: Edicion, excluirId: string): Promise<Usuario[]> {
+    const usuarios = await this.usuarioRepo
+      .createQueryBuilder('u')
+      .where('u.habilitado = :habilitado', { habilitado: true })
+      .andWhere(
+        "(u.roles LIKE :rectorado OR (u.roles LIKE :secretaria AND u.unidadAcademicaId = :uaId))",
+        {
+          rectorado: '%Rectorado%',
+          secretaria: '%Secretaria%',
+          uaId: edicion.unidadAcademicaId,
+        },
+      )
+      .getMany();
+    return usuarios.filter(u => u.id !== excluirId);
+  }
+
+  private async notificarGestion(
+    edicion: Edicion,
+    rendicion: Rendicion,
+    tipo: TipoNotificacion,
+    mensaje: string,
+    excluirId: string,
+  ): Promise<void> {
+    const destinatarios = await this.resolverDestinatariosGestion(edicion, excluirId);
+    for (const d of destinatarios) {
+      await this.notificacionRepo.save(
+        this.notificacionRepo.create({ usuarioId: d.id, tipo, mensaje, rendicionId: rendicion.id }),
+      );
+    }
+  }
+
+  private async notificarAutor(
+    rendicion: Rendicion,
+    tipo: TipoNotificacion,
+    mensaje: string,
+    autorId: string | null,
+  ): Promise<void> {
+    if (!autorId) return;
+    await this.notificacionRepo.save(
+      this.notificacionRepo.create({ usuarioId: autorId, tipo, mensaje, rendicionId: rendicion.id }),
+    );
+  }
+
+  /**
+   * Notifica al director y codirector del proyecto cuando se acepta o rechaza un comprobante.
+   */
+  private async notificarDirectores(
+    edicion: Edicion,
+    rendicion: Rendicion,
+    tipo: TipoNotificacion,
+    mensaje: string,
+    excluirId: string,
+  ): Promise<void> {
+    const directores = await this.participacionRepo.find({
+      where: { edicionId: edicion.id, rol: RolEjecucion.DirectorDeProyecto },
+      relations: { usuario: true },
+    });
+    for (const d of directores) {
+      if (!d.usuario || d.usuarioId === excluirId) continue;
+      await this.notificacionRepo.save(
+        this.notificacionRepo.create({ usuarioId: d.usuarioId, tipo, mensaje, rendicionId: rendicion.id }),
+      );
+    }
   }
 
   /**
@@ -227,6 +302,15 @@ export class RendicionesService {
     });
     const guardado = await this.repo.save(rendicion);
 
+    const proyectoNombre = edicion.proyecto?.nombre ?? 'el proyecto';
+    await this.notificarGestion(
+      edicion,
+      guardado,
+      TipoNotificacion.NUEVO_COMPROBANTE,
+      `${usuario.nombreCompleto} cargó un comprobante de $${dto.monto.toLocaleString('es-AR')} (${dto.rubro}) en el proyecto "${proyectoNombre}"`,
+      usuario.id,
+    );
+
     await this.auditoria.registrar({
       usuarioId: usuario.id,
       accion: TipoAccionAuditoria.CREACION,
@@ -266,8 +350,22 @@ export class RendicionesService {
       } else if (dto.estado === EstadoComprobante.Aceptado) {
         rendicion.motivoRechazo = null;
       }
+      const estadoPrevio = rendicion.estado;
       rendicion.estado = dto.estado;
       await this.repo.save(rendicion);
+
+      const proyectoNombre = edicion.proyecto?.nombre ?? 'el proyecto';
+      if (estadoPrevio !== dto.estado) {
+        if (dto.estado === EstadoComprobante.Aceptado) {
+          const msg = `${usuario.nombreCompleto} aceptó tu comprobante de $${rendicion.monto.toLocaleString('es-AR')} (${rendicion.rubro}) en el proyecto "${proyectoNombre}"`;
+          await this.notificarAutor(rendicion, TipoNotificacion.COMPROBANTE_ACEPTADO, msg, rendicion.creadoPorId);
+          await this.notificarDirectores(edicion, rendicion, TipoNotificacion.COMPROBANTE_ACEPTADO, msg, rendicion.creadoPorId);
+        } else if (dto.estado === EstadoComprobante.Rechazado) {
+          const msg = `${usuario.nombreCompleto} rechazó tu comprobante de $${rendicion.monto.toLocaleString('es-AR')} (${rendicion.rubro}) en el proyecto "${proyectoNombre}". Motivo: ${rendicion.motivoRechazo}`;
+          await this.notificarAutor(rendicion, TipoNotificacion.COMPROBANTE_RECHAZADO, msg, rendicion.creadoPorId);
+          await this.notificarDirectores(edicion, rendicion, TipoNotificacion.COMPROBANTE_RECHAZADO, msg, rendicion.creadoPorId);
+        }
+      }
       return rendicion;
     }
 
@@ -298,10 +396,22 @@ export class RendicionesService {
     }
     // Si estaba rechazado y el director lo vuelve a editar, pasa nuevamente a EnRevisión
     // y se limpia el motivo de rechazo.
+    const estabaRechazado = rendicion.estado === EstadoComprobante.Rechazado;
     rendicion.estado = EstadoComprobante.EnRevision;
     rendicion.motivoRechazo = null;
 
     const guardado = await this.repo.save(rendicion);
+
+    if (estabaRechazado) {
+      const proyectoNombre = edicion.proyecto?.nombre ?? 'el proyecto';
+      await this.notificarGestion(
+        edicion,
+        guardado,
+        TipoNotificacion.NUEVO_COMPROBANTE,
+        `${usuario.nombreCompleto} corrigió el comprobante de $${guardado.monto.toLocaleString('es-AR')} (${guardado.rubro}) en el proyecto "${proyectoNombre}"`,
+        usuario.id,
+      );
+    }
 
     await this.auditoria.registrar({
       usuarioId: usuario.id,

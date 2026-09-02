@@ -178,6 +178,7 @@ export class SugerenciasService {
       relations: {
         sugerencia: { edicion: { proyecto: true }, sugeridoPor: true },
         participacion: { convocatoria: true, usuario: true },
+        rendicion: { edicion: { proyecto: true }, creadoPor: true },
       },
       order: { creadoEn: 'DESC' },
       take: 50,

@@ -849,6 +849,9 @@ export enum TipoNotificacion {
   PROPUESTA_EVALUADOR = 'PROPUESTA_EVALUADOR',
   RESULTADO_EVALUADOR = 'RESULTADO_EVALUADOR',
   RESULTADO_ADJUDICACION = 'RESULTADO_ADJUDICACION',
+  NUEVO_COMPROBANTE = 'NUEVO_COMPROBANTE',
+  COMPROBANTE_ACEPTADO = 'COMPROBANTE_ACEPTADO',
+  COMPROBANTE_RECHAZADO = 'COMPROBANTE_RECHAZADO',
 }
 
 export interface SugerenciaCambio {
@@ -884,6 +887,8 @@ export interface Notificacion {
   sugerencia?: (SugerenciaCambio & { edicion: Edicion }) | null;
   participacionId?: string | null;
   participacion?: ParticipacionConvocatoria & { convocatoria: Convocatoria };
+  rendicionId?: string | null;
+  rendicion?: { id: string; edicionId: string; rubro: string; monto: number; estado: string; creadoPor?: Usuario } | null;
   mensaje: string;
   leida: boolean;
   creadoEn: string;

@@ -5,6 +5,7 @@ import {
 import { Usuario } from '../usuarios/usuario.entity';
 import { SugerenciaCambio } from './sugerencia-cambio.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
+import { Rendicion } from '../rendiciones/rendicion.entity';
 import { TipoNotificacion } from '../common/enums/tipo-notificacion.enum';
 
 @Entity()
@@ -35,6 +36,13 @@ export class Notificacion {
 
   @Column({ type: 'uuid', nullable: true })
   participacionId: string | null;
+
+  @ManyToOne(() => Rendicion, { nullable: true })
+  @JoinColumn({ name: 'rendicionId' })
+  rendicion: Rendicion;
+
+  @Column({ type: 'uuid', nullable: true })
+  rendicionId: string | null;
 
   @Column({ type: 'text' })
   mensaje: string;
