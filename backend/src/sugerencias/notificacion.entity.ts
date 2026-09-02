@@ -37,7 +37,7 @@ export class Notificacion {
   @Column({ type: 'uuid', nullable: true })
   participacionId: string | null;
 
-  @ManyToOne(() => Rendicion, { nullable: true })
+  @ManyToOne(() => Rendicion, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'rendicionId' })
   rendicion: Rendicion;
 
