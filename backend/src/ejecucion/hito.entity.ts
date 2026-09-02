@@ -33,6 +33,10 @@ export class Hito {
   @Column({ type: 'text', nullable: true })
   integrantes: string | null;
 
+  // Links (absolutos) que el director agrega para mostrar avances del hito.
+  @Column({ type: 'json', nullable: true })
+  links: string[] | null;
+
   @Column({ type: 'varchar' })
   categoria: CategoriaHito;
 

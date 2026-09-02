@@ -1,7 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, MaxLength, IsIn, IsDateString } from 'class-validator';
+import {
+  IsString, IsNotEmpty, IsOptional, MaxLength, IsIn, IsDateString, IsArray, ArrayMaxSize,
+} from 'class-validator';
 import { CategoriaHito } from '../../common/enums/categoria-hito.enum';
 
 const CATEGORIAS_VALIDAS = Object.values(CategoriaHito);
+
+export const HITO_LINKS_MAX = 20;
+export const HITO_LINK_MAX_LENGTH = 2048;
 
 export class CrearHitoDto {
   @IsString()
@@ -26,6 +31,13 @@ export class CrearHitoDto {
   @IsString()
   @MaxLength(1000)
   integrantes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(HITO_LINKS_MAX)
+  @IsString({ each: true })
+  @MaxLength(HITO_LINK_MAX_LENGTH, { each: true })
+  links?: string[];
 
   @IsIn(CATEGORIAS_VALIDAS)
   categoria: CategoriaHito;
@@ -55,6 +67,13 @@ export class ActualizarHitoDto {
   @IsString()
   @MaxLength(1000)
   integrantes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(HITO_LINKS_MAX)
+  @IsString({ each: true })
+  @MaxLength(HITO_LINK_MAX_LENGTH, { each: true })
+  links?: string[];
 
   @IsOptional()
   @IsIn(CATEGORIAS_VALIDAS)
