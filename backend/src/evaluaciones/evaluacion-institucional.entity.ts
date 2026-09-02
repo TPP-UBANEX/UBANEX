@@ -68,6 +68,14 @@ export class EvaluacionInstitucional {
   @Column({ nullable: true, type: 'text' })
   observaciones: string | null;
 
+  // Fijo y obligatorio para confirmar (ver evaluaciones.service.ts#faltantes), a diferencia de
+  // `categorias`/`checklist` que son configurables por convocatoria vía el template. Vive fuera
+  // del template a propósito: mueve el presupuesto a adjudicar (ver
+  // proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar) y el template puede editarse o
+  // borrarse por convocatoria.
+  @Column({ type: 'boolean', nullable: true })
+  esPse: boolean | null;
+
   @CreateDateColumn()
   creadoEn: Date;
 

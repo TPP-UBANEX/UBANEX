@@ -5,7 +5,8 @@
 | Capa | Tecnología |
 |------|-----------|
 | Frontend | React 18, TypeScript 5, Vite 5, TailwindCSS 3, shadcn/ui, React Router 7 |
-| Backend | NestJS 10, TypeScript 5, TypeORM 1.x, PostgreSQL |
+| Backend | NestJS 10, TypeScript 5, TypeORM, PostgreSQL |
+| Contenedores | Docker Compose |
 | Infra | Render, GitHub |
 
 ## Estructura del proyecto
@@ -31,7 +32,9 @@ UBANEX/
 │       ├── lib/         # Utilidades (api.ts, utils.ts)
 │       └── data/        # Tipos TypeScript
 └── docs/
-    └── project_context.md
+    ├── project_context.md   # Requerimientos + estado de avance
+    └── dominio/
+        └── modelo.md        # Modelo de dominio (diagramas + reglas)
 ```
 
 ## Convenciones de código
@@ -48,7 +51,7 @@ UBANEX/
 - Los endpoints REST usan plural: `GET /convocatorias`, `POST /proyectos`.
 - Entidades TypeORM decoradas con `@Entity()`, `@PrimaryGeneratedColumn()`, etc.
 - Inyectar dependencias via constructor `private readonly servicio: Servicio`.
-- Usar DTOs para validación de entrada (con `class-validator` cuando se agregue).
+- Usar DTOs con `class-validator` para validación de entrada (ya en uso en todo el backend, ver `<modulo>/dto/*.dto.ts`).
 
 ### Frontend (React)
 - Una carpeta por página en `pages/`, componentes compartidos en `components/`.
@@ -120,7 +123,7 @@ Después de tocarlo: `make reset-seed` y confirmar que arranca sin errores y que
 afectada muestra los datos bien.
 
 ## Lo que NO hacer
-- No modificar `docs/project_context.md` (documentación de requerimientos).
+- No modificar el cuerpo de requerimientos de `docs/project_context.md` (§1–§15); sí se mantiene al día su sección "Estado actual". El modelo de dominio vive en `docs/dominio/modelo.md`.
 - No instalar librerías sin verificar que no exista ya una alternativa en el proyecto.
 - No generar archivos fuera de `backend/` o `frontend/` a menos que sea necesario.
 - **No hacer commit ni push sin autorización explícita del usuario.**

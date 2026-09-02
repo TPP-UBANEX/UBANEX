@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Put, Query, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Query, Body, Param, UseGuards } from '@nestjs/common';
 import { EvaluacionesService } from './evaluaciones.service';
 import { GuardarEvaluacionInstitucionalDto } from './dto/guardar-evaluacion-institucional.dto';
 import { GuardarEvaluacionCruzadaDto } from './dto/guardar-evaluacion-cruzada.dto';
 import { DesignarTerceraEvaluadorDto } from './dto/designar-tercera-evaluador.dto';
 import { ListarEvaluacionesDto } from './dto/listar-evaluaciones.dto';
+import { ActualizarPropuestaAdjudicacionDto } from './dto/actualizar-propuesta-adjudicacion.dto';
+import { GuardarAdjudicacionDto, EmitirAdjudicacionDto } from './dto/adjudicacion.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -20,6 +22,86 @@ export class EvaluacionesController {
   @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
   monitoreo(@Query() dto: ListarEvaluacionesDto) {
     return this.service.monitoreo(dto.convocatoriaId ?? '', dto);
+  }
+
+  @Get('convocatoria/:convocatoriaId/orden-merito/ua')
+  @Roles(RolUsuario.AutoridadDeSecretaria, RolUsuario.AsistenteDeSecretaria)
+  ordenMeritoUa(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.ordenMeritoPorUa(convocatoriaId, usuario);
+  }
+
+  @Get('convocatoria/:convocatoriaId/orden-merito/docente')
+  @Roles(RolUsuario.Docente)
+  ordenMeritoDocente(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.ordenMeritoPorDocente(convocatoriaId, usuario);
+  }
+
+  @Post('convocatoria/:convocatoriaId/orden-merito')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  generarOrdenMerito(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.generarOrdenMerito(convocatoriaId, usuario);
+  }
+
+  @Patch('edicion/:edicionId/adjudicacion-propuesta')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  actualizarPropuestaAdjudicacion(
+    @Param('edicionId') edicionId: string,
+    @Body() dto: ActualizarPropuestaAdjudicacionDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.actualizarPropuestaAdjudicacion(
+      edicionId,
+      dto.adjudicado,
+      dto.mecanismo,
+      usuario,
+    );
+  }
+
+  @Post('convocatoria/:convocatoriaId/confirmar-orden-merito')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  confirmarOrdenMerito(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.confirmarOrdenMerito(convocatoriaId, usuario);
+  }
+
+  @Get('convocatoria/:convocatoriaId/adjudicacion')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  obtenerAdjudicacion(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.obtenerAdjudicacion(convocatoriaId, usuario);
+  }
+
+  @Put('convocatoria/:convocatoriaId/adjudicacion')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  guardarBorradorAdjudicacion(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @Body() dto: GuardarAdjudicacionDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.guardarBorradorAdjudicacion(convocatoriaId, dto, usuario);
+  }
+
+  @Post('convocatoria/:convocatoriaId/adjudicacion/emitir')
+  @Roles(RolUsuario.AutoridadDeRectorado)
+  emitirAdjudicacion(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @Body() dto: EmitirAdjudicacionDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.emitirAdjudicacion(convocatoriaId, dto, usuario);
   }
 
   @Get('edicion/:edicionId')
@@ -120,6 +202,15 @@ export class EvaluacionesController {
     @CurrentUser() usuario: Usuario,
   ) {
     return this.service.confirmarCruzada(convocatoriaId, edicionId, usuario);
+  }
+
+  @Get('cruzadas/:edicionId/tercera-candidatos')
+  @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
+  candidatosTercera(
+    @Param('edicionId') edicionId: string,
+    @Query('convocatoriaId') convocatoriaId: string,
+  ) {
+    return this.service.listarCandidatosTercera(convocatoriaId, edicionId);
   }
 
   @Post('cruzadas/:edicionId/designar-tercera')

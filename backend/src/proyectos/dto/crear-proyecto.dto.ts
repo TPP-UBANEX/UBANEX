@@ -15,10 +15,7 @@ export class CrearProyectoDto {
   @IsInt()
   anioEdicion?: number;
 
-  @IsOptional()
-  @IsBoolean()
-  esConsolidado?: boolean;
-
+  // Un proyecto nuevo nunca nace consolidado: el estado se deriva del historial.
   @IsOptional()
   @IsBoolean()
   esInterfacultad?: boolean;

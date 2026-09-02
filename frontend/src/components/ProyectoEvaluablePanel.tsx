@@ -3,8 +3,8 @@ import { Badge } from '@/components/ui/badge'
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { TipoRubro, estadoBadge, estadoEdicionLabel } from '@/data/types'
-import type { CampoFormulario, Edicion } from '@/data/types'
-import { formatearMoneda } from '@/lib/presupuesto'
+import type { CampoFormulario, Convocatoria, Edicion } from '@/data/types'
+import { calcularPresupuestoAAdjudicar, formatearMoneda } from '@/lib/presupuesto'
 
 const tipoRubroLabels: Record<TipoRubro, string> = {
   [TipoRubro.ViaticosYSeguros]: 'Viáticos y Seguros',
@@ -15,14 +15,23 @@ const tipoRubroLabels: Record<TipoRubro, string> = {
 export function ProyectoEvaluablePanel({
   edicion,
   campos,
+  convocatoria,
+  esPse,
 }: {
   edicion: Edicion | null
   campos: CampoFormulario[]
+  // Presentes solo para Secretaría/Rectorado (ver Evaluacion.tsx): el desglose de insumos/PSE no
+  // se le muestra al docente para no incentivar a marcar todo como insumo.
+  convocatoria?: Convocatoria | null
+  esPse?: boolean
 }) {
   if (!edicion) return null
 
-  const presupuesto = edicion.presupuesto
+  const presupuesto = edicion.presupuestoSolicitado
   const secciones = agruparCamposEnSecciones(campos)
+  const aAdjudicar = convocatoria
+    ? calcularPresupuestoAAdjudicar(presupuesto, convocatoria, esPse ?? false)
+    : null
 
   return (
     <div className="space-y-4 min-w-0">
@@ -59,14 +68,18 @@ export function ProyectoEvaluablePanel({
             </div>
             <div>
               <span className="text-muted-foreground">Consolidado:</span>{' '}
-              {edicion.proyecto?.esConsolidado ? 'Sí' : 'No'}
+              {edicion.proyecto?.esConsolidado === true
+                ? 'Sí'
+                : edicion.proyecto?.esConsolidado === false
+                  ? 'No'
+                  : 'Automático'}
             </div>
             <div>
               <span className="text-muted-foreground">Interfacultad:</span>{' '}
               {edicion.proyecto?.esInterfacultad ? 'Sí' : 'No'}
             </div>
             <div>
-              <span className="text-muted-foreground">Presupuesto:</span>{' '}
+              <span className="text-muted-foreground">Presupuesto solicitado:</span>{' '}
               {presupuesto ? formatearMoneda(presupuesto.montoTotal) : '-'}
             </div>
           </div>
@@ -80,6 +93,30 @@ export function ProyectoEvaluablePanel({
                   <span className="text-muted-foreground">{formatearMoneda(rubro.subtotal)}</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {aAdjudicar && (
+            <div className="pt-2 space-y-1 border-t">
+              <p className="text-xs text-muted-foreground font-medium">Presupuesto a adjudicar</p>
+              <div className="flex items-center justify-between text-sm">
+                <span>Insumos ({aAdjudicar.porcentajeInsumos.toFixed(1)}% del solicitado)</span>
+                <span className={aAdjudicar.aplicaExtraInsumos ? 'font-medium' : 'text-muted-foreground'}>
+                  {aAdjudicar.aplicaExtraInsumos
+                    ? `+${formatearMoneda(aAdjudicar.extraInsumos)}`
+                    : 'No aplica extra'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span>PSE</span>
+                <span className={aAdjudicar.esPse ? 'font-medium' : 'text-muted-foreground'}>
+                  {aAdjudicar.esPse ? `+${formatearMoneda(aAdjudicar.extraPse)}` : 'No aplica extra'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm font-medium pt-1 border-t">
+                <span>Total a adjudicar</span>
+                <span>{formatearMoneda(aAdjudicar.total)}</span>
+              </div>
             </div>
           )}
         </CardContent>

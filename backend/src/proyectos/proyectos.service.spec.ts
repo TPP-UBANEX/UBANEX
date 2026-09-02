@@ -11,6 +11,8 @@ import { Edicion } from './edicion.entity';
 import { Presupuesto } from './presupuesto.interface';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
+import { Formulario } from '../formularios/formulario.entity';
+import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
@@ -31,6 +33,7 @@ describe('ProyectosService', () => {
   const findParticipaciones = jest.fn<() => Promise<ParticipacionConvocatoria[]>>();
   const deleteParticipaciones = jest.fn<(criteria: unknown) => Promise<unknown>>();
   const findOneManager = jest.fn<() => Promise<unknown>>();
+  const findManager = jest.fn<() => Promise<unknown[]>>();
 
   const proyectoRepo = {
     update: updateProyecto,
@@ -42,7 +45,7 @@ describe('ProyectosService', () => {
     find: findEdiciones,
     save: saveEdicion,
     softDelete: softDeleteEdicion,
-    manager: { findOne: findOneManager },
+    manager: { findOne: findOneManager, find: findManager },
   } as unknown as Repository<Edicion>;
 
   const participacionRepo = {
@@ -52,8 +55,15 @@ describe('ProyectosService', () => {
   } as unknown as Repository<ParticipacionConvocatoria>;
 
   const emparejamientoRepo = {} as unknown as Repository<Emparejamiento>;
+  const formularioRepo = {} as unknown as Repository<Formulario>;
+  const findInstitucionales = jest.fn<() => Promise<EvaluacionInstitucional[]>>().mockResolvedValue([]);
+  const institucionalRepo = {
+    find: findInstitucionales,
+  } as unknown as Repository<EvaluacionInstitucional>;
 
-  const service = new ProyectosService(proyectoRepo, edicionRepo, participacionRepo, emparejamientoRepo);
+  const service = new ProyectosService(
+    proyectoRepo, edicionRepo, participacionRepo, emparejamientoRepo, formularioRepo, institucionalRepo,
+  );
 
   function edicion(overrides: Partial<Edicion> = {}): Edicion {
     return {
@@ -144,6 +154,7 @@ describe('ProyectosService', () => {
 
     beforeEach(() => {
       findOneManager.mockResolvedValue(convocatoria);
+      findManager.mockResolvedValue([{ id: 'convocatoria-1', anio: 2026 }]);
       findOneProyecto.mockResolvedValue(proyecto);
       findEdiciones.mockResolvedValue([]);
       saveEdicion.mockResolvedValue(undefined);
@@ -152,7 +163,7 @@ describe('ProyectosService', () => {
     it('rechaza un presupuesto mal formado y no lo persiste', async () => {
       findOneEdicion.mockResolvedValue(edicion({ convocatoria } as unknown as Partial<Edicion>));
       const dto = {
-        presupuesto: {
+        presupuestoSolicitado: {
           montoTotal: 1,
           rubros: [{ tipo: 'Sueldos', subtotal: -5, partidas: [] }],
         },
@@ -167,7 +178,7 @@ describe('ProyectosService', () => {
     it('persiste el presupuesto normalizado en vez del que llegó mentido', async () => {
       findOneEdicion.mockResolvedValue(edicion({ convocatoria } as unknown as Partial<Edicion>));
       const dto = {
-        presupuesto: {
+        presupuestoSolicitado: {
           montoTotal: 1,
           rubros: [
             { tipo: TipoRubro.ViaticosYSeguros, subtotal: 999, partidas: [] },
@@ -185,9 +196,37 @@ describe('ProyectosService', () => {
 
       expect(saveEdicion).toHaveBeenCalledTimes(1);
       const guardada = (saveEdicion.mock.calls[0] as unknown as [Edicion])[0];
-      const presupuesto = guardada.presupuesto as Presupuesto;
+      const presupuesto = guardada.presupuestoSolicitado as Presupuesto;
       expect(presupuesto.montoTotal).toBe(1000);
       expect(presupuesto.rubros[1].subtotal).toBe(1000);
+    });
+
+    it('rechaza guardar un presupuesto que supera el tope de la convocatoria y no lo persiste', async () => {
+      const convocatoriaConTope = {
+        id: 'convocatoria-1', formulario: null, topePresupuestoNoConsolidado: 500, topePresupuestoConsolidado: 5000,
+      } as unknown as Convocatoria;
+      findOneEdicion.mockResolvedValue(
+        edicion({ convocatoria: convocatoriaConTope } as unknown as Partial<Edicion>),
+      );
+      const dto = {
+        presupuestoSolicitado: {
+          montoTotal: 1,
+          rubros: [
+            { tipo: TipoRubro.ViaticosYSeguros, subtotal: 0, partidas: [] },
+            {
+              tipo: TipoRubro.BienesDeConsumo,
+              subtotal: 0,
+              partidas: [{ descripcion: 'Papel', cantidad: 10, precioUnitario: 100, monto: 1 }],
+            },
+            { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: [] },
+          ],
+        },
+      } as unknown as Parameters<typeof service.actualizarEdicion>[2];
+
+      await expect(
+        service.actualizarEdicion('proyecto-1', 'edicion-1', dto, creador),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveEdicion).not.toHaveBeenCalled();
     });
   });
 
@@ -217,6 +256,7 @@ describe('ProyectosService', () => {
 
     beforeEach(() => {
       findOneManager.mockResolvedValue(convocatoriaConEjecucion);
+      findManager.mockResolvedValue([{ id: 'convocatoria-1', anio: 2026 }]);
       findParticipaciones.mockResolvedValue(dosDirectores);
       findOneProyecto.mockResolvedValue(proyecto);
       findEdiciones.mockResolvedValue([]);
@@ -225,7 +265,9 @@ describe('ProyectosService', () => {
 
     it('rechaza el envío si el presupuesto está vacío', async () => {
       findOneEdicion.mockResolvedValue(
-        edicion({ convocatoria: convocatoriaConEjecucion, presupuesto: null } as unknown as Partial<Edicion>),
+        edicion({
+          convocatoria: convocatoriaConEjecucion, presupuestoSolicitado: null,
+        } as unknown as Partial<Edicion>),
       );
 
       await expect(
@@ -263,7 +305,7 @@ describe('ProyectosService', () => {
       };
       findOneEdicion.mockResolvedValue(
         edicion({
-          convocatoria: convocatoriaConEjecucion, presupuesto: presupuestoCompleto,
+          convocatoria: convocatoriaConEjecucion, presupuestoSolicitado: presupuestoCompleto,
         } as unknown as Partial<Edicion>),
       );
 
@@ -272,6 +314,50 @@ describe('ProyectosService', () => {
       expect(saveEdicion).toHaveBeenCalledTimes(1);
       const guardada = (saveEdicion.mock.calls[0] as unknown as [Edicion])[0];
       expect(guardada.estado).toBe(EstadoEdicion.Presentado);
+    });
+
+    it('rechaza el envío si el presupuesto (ya guardado) supera el tope de la convocatoria', async () => {
+      // Simula una edición que llegó excedida sin pasar por el PATCH (p. ej. copiada de la
+      // edición anterior al crear una edición nueva, o el tope bajó después de guardarse).
+      const presupuestoCompleto: Presupuesto = {
+        montoTotal: 6100,
+        rubros: [
+          {
+            tipo: TipoRubro.ViaticosYSeguros,
+            subtotal: 1000,
+            partidas: [{
+              tipoPersona: TipoPersona.Docente,
+              descripcion: 'Viáticos',
+              periodoInicio: '2027-08-01',
+              periodoFin: '2027-09-01',
+              monto: 1000,
+            }],
+          },
+          {
+            tipo: TipoRubro.BienesDeConsumo,
+            subtotal: 5000,
+            partidas: [{ descripcion: 'Papel', cantidad: 10, precioUnitario: 500, monto: 5000 }],
+          },
+          {
+            tipo: TipoRubro.BienesDeUso,
+            subtotal: 100,
+            partidas: [{ descripcion: 'Equipo', cantidad: 1, precioUnitario: 100, monto: 100 }],
+          },
+        ],
+      };
+      const convocatoriaConTope = {
+        ...convocatoriaConEjecucion, topePresupuestoNoConsolidado: 5000, topePresupuestoConsolidado: 50000,
+      } as unknown as Convocatoria;
+      findOneEdicion.mockResolvedValue(
+        edicion({
+          convocatoria: convocatoriaConTope, presupuestoSolicitado: presupuestoCompleto,
+        } as unknown as Partial<Edicion>),
+      );
+
+      await expect(
+        service.enviarEdicion('proyecto-1', 'edicion-1', docenteValidado),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(saveEdicion).not.toHaveBeenCalled();
     });
   });
 
@@ -285,6 +371,7 @@ describe('ProyectosService', () => {
 
     beforeEach(() => {
       findOneManager.mockResolvedValue(convocatoria);
+      findManager.mockResolvedValue([{ id: 'convocatoria-1', anio: 2026 }]);
       findOneProyecto.mockResolvedValue(proyecto);
       findEdiciones.mockResolvedValue([]);
       saveEdicion.mockResolvedValue(undefined);

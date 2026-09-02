@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 interface ProyectoDisponible {
   proyectoId: string
   proyectoNombre: string
-  esConsolidado: boolean
+  esConsolidado: boolean | null
 }
 
 export function ResubirProyectoDialog({

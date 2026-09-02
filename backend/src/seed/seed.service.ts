@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DataSource, In, Not, Repository } from 'typeorm';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { UnidadesAcademicasService } from '../unidades-academicas/unidades-academicas.service';
@@ -26,7 +28,7 @@ import { Convocatoria } from '../convocatorias/convocatoria.entity';
 import { Proyecto } from '../proyectos/proyecto.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { BienPresupuesto, Presupuesto, ViaticoPresupuesto } from '../proyectos/presupuesto.interface';
-import { etiquetaCampoPresupuesto } from '../proyectos/presupuesto.util';
+import { etiquetaCampoPresupuesto, PREFIJO_RUTA_PRESUPUESTO } from '../proyectos/presupuesto.util';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { TipoPersona } from '../common/enums/tipo-persona.enum';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
@@ -35,6 +37,10 @@ import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity'
 import { EMPAREJAMIENTO_DEFAULT } from '../convocatorias/emparejamiento-default';
 import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/template-evaluacion-institucional.entity';
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
+import {
+  EstructuraTemplateInstitucional,
+  EstructuraTemplateCruzada,
+} from '../templates-evaluacion/estructura-template';
 import {
   TEMPLATE_INSTITUCIONAL_DEFAULT,
   TEMPLATE_CRUZADA_DEFAULT,
@@ -72,6 +78,7 @@ import {
   generarPresupuesto,
   generarEvaluacionInstitucional,
   generarEvaluacionCruzada,
+  itemsCruzadaFactor,
   slugUa,
   clonarCamposConIdsNuevos,
 } from './seed.utils';
@@ -164,6 +171,7 @@ export class SeedService {
   private readonly uas: UnidadAcademica[] = [];
   private readonly convs = new Map<number, Convocatoria>();
   private readonly usuariosPorUa = new Map<string, PoolUa>();
+  private readonly docentesPruebaCache = new Map<string, Usuario[]>();
   private readonly parMap = new Map<string, string>();
   private readonly titulosUsados = new Set<string>();
   private readonly aprobadosPorConvUa = new Map<string, Map<string, Set<string>>>();
@@ -302,6 +310,7 @@ export class SeedService {
     console.log('\n=== SEED: Proyectos y Ediciones ===');
     await this.seedProyectosCanonicos();
     await this.seedProyectosMasivos([2023, 2024, 2025, 2026, 2027]);
+    await this.seedAvales();
 
     console.log('\n=== SEED: Participaciones ===');
     await this.seedParticipacionesCanonicas();
@@ -313,6 +322,12 @@ export class SeedService {
     console.log('\n=== SEED: Evaluaciones ===');
     await this.seedEvaluacionesCanonicas();
     await this.seedEvaluacionesMasivas([2023, 2024, 2025, 2026]);
+
+    console.log('\n=== SEED: Convocatoria de prueba (orden de mérito) ===');
+    await this.seedConvocatoriaPruebaOrdenMerito();
+
+    console.log('\n=== SEED: Escenario Excel (orden de mérito con datos reales) ===');
+    await this.seedEscenarioExcel();
 
     console.log('\n=== SEED: Sugerencias ===');
     await this.seedSugerencias();
@@ -434,12 +449,13 @@ export class SeedService {
     return creados;
   }
 
-  private generarPerfilDocente(): {
+  private generarPerfilDocente(completo = true): {
     genero?: Genero;
     cargoDocente?: CargoDocente;
     tipoDesignacionDocente?: TipoDesignacionDocente;
     personaConDiscapacidad?: boolean;
     telefono?: string;
+    direccionLocalidad?: string;
   } {
     const cargoes = [
       CargoDocente.ProfesorTitular,
@@ -455,13 +471,23 @@ export class SeedService {
       TipoDesignacionDocente.Suplente,
     ];
     const generos = [Genero.Masculino, Genero.Femenino, Genero.Otro, Genero.PrefieroNoResponder];
-    return {
+    const localidades = [
+      'Caballito, CABA', 'La Plata, Buenos Aires', 'Morón, Buenos Aires',
+      'Quilmes, Buenos Aires', 'Rosario, Santa Fe', 'Córdoba Capital',
+      'Vicente López, Buenos Aires', 'San Isidro, Buenos Aires',
+    ];
+    const perfil = {
       genero: this.rng.pick(generos),
       cargoDocente: this.rng.pick(cargoes),
       tipoDesignacionDocente: this.rng.pick(designaciones),
       personaConDiscapacidad: this.rng.bool(0.05),
       telefono: `11 ${String(this.rng.entero(1000, 9999))} ${String(this.rng.entero(1000, 9999))}`,
+      direccionLocalidad: this.rng.pick(localidades),
     };
+    // Un perfil "incompleto" deja sin cargar la dirección/localidad: alcanza para que
+    // el docente figure como "perfil incompleto" (ej. en el alta de evaluadores).
+    if (!completo) delete (perfil as { direccionLocalidad?: string }).direccionLocalidad;
+    return perfil;
   }
 
   private async seedPoolsUa(
@@ -523,7 +549,11 @@ export class SeedService {
         unidadAcademicaId: ua.id,
         areaDocente: this.rng.pick(areas),
         estadoValidacionDocente: estado,
-        ...(estado === EstadoValidacionDocente.Validado ? this.generarPerfilDocente() : {}),
+        // ~20% de los validados quedan con el perfil incompleto (para ver ese grupo
+        // en el alta de evaluadores); el resto, completos y listos para seleccionar.
+        ...(estado === EstadoValidacionDocente.Validado
+          ? this.generarPerfilDocente(!this.rng.bool(0.2))
+          : {}),
       };
     });
 
@@ -1143,10 +1173,19 @@ export class SeedService {
   private async seedConvocatoria(data: Partial<Convocatoria>): Promise<Convocatoria> {
     const existe = await this.convocatoriaRepo.findOne({ where: { nombre: data.nombre } });
     if (existe) {
+      let huboCambios = false;
       if (data.estado && existe.estado !== data.estado) {
         existe.estado = data.estado;
-        await this.convocatoriaRepo.save(existe);
+        huboCambios = true;
         console.log(`  ${existe.nombre} — estado reconciliado a ${existe.estado}`);
+      }
+      if (existe.umbralInconsistenciaCruzada == null && data.umbralInconsistenciaCruzada != null) {
+        existe.umbralInconsistenciaCruzada = data.umbralInconsistenciaCruzada;
+        huboCambios = true;
+        console.log(`  ${existe.nombre} — umbral de inconsistencia reconciliado a ${existe.umbralInconsistenciaCruzada}`);
+      }
+      if (huboCambios) {
+        await this.convocatoriaRepo.save(existe);
       }
       return existe;
     }
@@ -1317,13 +1356,13 @@ export class SeedService {
   }
 
   private async seedConvocatorias(): Promise<void> {
-    const especificaciones: Array<{ anio: number; estado: EstadoConvocatoria }> = [
-      { anio: 2023, estado: EstadoConvocatoria.Cierre },
-      { anio: 2024, estado: EstadoConvocatoria.Cierre },
-      { anio: 2025, estado: EstadoConvocatoria.Ejecucion },
-      { anio: 2026, estado: EstadoConvocatoria.Evaluacion },
-      { anio: 2027, estado: EstadoConvocatoria.Presentacion },
-      { anio: 2028, estado: EstadoConvocatoria.Configuracion },
+    const especificaciones: Array<{ anio: number; estado: EstadoConvocatoria; umbralInconsistenciaCruzada?: number }> = [
+      { anio: 2023, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 40 },
+      { anio: 2024, estado: EstadoConvocatoria.Cierre, umbralInconsistenciaCruzada: 40 },
+      { anio: 2025, estado: EstadoConvocatoria.Ejecucion, umbralInconsistenciaCruzada: 40 },
+      { anio: 2026, estado: EstadoConvocatoria.Evaluacion, umbralInconsistenciaCruzada: 40 },
+      { anio: 2027, estado: EstadoConvocatoria.Presentacion, umbralInconsistenciaCruzada: 40 },
+      { anio: 2028, estado: EstadoConvocatoria.Configuracion, umbralInconsistenciaCruzada: 40 },
     ];
 
     for (const spec of especificaciones) {
@@ -1341,7 +1380,13 @@ export class SeedService {
         fechaFinEvaluacion: this.crearFecha(anio, 7, 15),
         fechaInicioEjecucion: this.crearFecha(anio, 8, 1),
         fechaFinEjecucion: this.crearFecha(anio + 1, 2, 28),
+        umbralInconsistenciaCruzada: spec.umbralInconsistenciaCruzada,
         formularioId,
+        cuotaFederativa: 1,
+        // Holgados respecto de lo que genera generarPresupuesto (~$840.000 en el peor caso), para
+        // que el seed no falle guardando ediciones por superar el tope.
+        topePresupuestoNoConsolidado: 1_200_000,
+        topePresupuestoConsolidado: 2_500_000,
       });
       await this.asegurarTemplatesConvocatoria(conv);
       this.convs.set(anio, conv);
@@ -1360,7 +1405,7 @@ export class SeedService {
     datosFormulario?: object,
     esInterfacultad = false,
     unidadAcademicaAdicionalId?: string,
-    esConsolidado = false,
+    esConsolidado: boolean | null = null,
   ): Promise<Edicion> {
     const existeProyecto = await this.proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
     if (existeProyecto) {
@@ -1413,7 +1458,7 @@ export class SeedService {
         creadoPorId: creadoPor.id,
         unidadAcademicaId: unidadAcademica.id,
         anioEdicion: convocatoria.anio,
-        presupuesto: presupuesto || null,
+        presupuestoSolicitado: presupuesto || null,
         datosFormulario: datosFormulario ?? null,
       }),
     );
@@ -1682,6 +1727,94 @@ export class SeedService {
       undefined,
       true,
     );
+
+    await this.seedProyectoConsolidadoHistorico();
+  }
+
+  /**
+   * Proyecto consolidado por historial real: mismo equipo directivo adjudicado en 4 convocatorias
+   * consecutivas (2023–2026) y con una edición presentada en 2027 (convocatoria en Presentación).
+   * Como la racha llega a 4, al pasar la 2027 a Evaluación su edición debe saltear la etapa y
+   * quedar Adjudicada automáticamente. `esConsolidado` queda en null (automático) para que se vea
+   * la derivación, no el override.
+   */
+  private async seedProyectoConsolidadoHistorico(): Promise<void> {
+    const derecho = this.uaMap.get('Facultad de Derecho')!;
+    const director = await this.seedDocente(
+      {
+        nombreCompleto: 'Dra. Consolidado Histórico',
+        email: 'consolidado@uba.ar',
+        password: '123456',
+        roles: [RolUsuario.Docente],
+        unidadAcademicaId: derecho.id,
+        telefono: '11 4444 5555',
+        genero: Genero.Femenino,
+        personaConDiscapacidad: false,
+        cargoDocente: CargoDocente.ProfesorTitular,
+        tipoDesignacionDocente: TipoDesignacionDocente.Regular,
+        areaDocente: 'Extensión Universitaria',
+        direccionLocalidad: 'Caballito, CABA',
+      },
+      EstadoValidacionDocente.Validado,
+    );
+
+    const nombreProyecto = 'Escuela de Oficios Comunitaria (consolidado histórico)';
+    let proyecto = await this.proyectoRepo.findOne({ where: { nombre: nombreProyecto } });
+    if (!proyecto) {
+      proyecto = await this.proyectoRepo.save(
+        this.proyectoRepo.create({
+          nombre: nombreProyecto,
+          creadoPorId: director.id,
+          esConsolidado: null,
+          esInterfacultad: false,
+        }),
+      );
+    }
+
+    const plan: Array<{ anio: number; estado: EstadoEdicion }> = [
+      { anio: 2023, estado: EstadoEdicion.Adjudicado },
+      { anio: 2024, estado: EstadoEdicion.Adjudicado },
+      { anio: 2025, estado: EstadoEdicion.Adjudicado },
+      { anio: 2026, estado: EstadoEdicion.Adjudicado },
+      { anio: 2027, estado: EstadoEdicion.Presentado },
+    ];
+
+    for (const { anio, estado } of plan) {
+      const conv = this.convs.get(anio);
+      if (!conv) continue;
+      const campos = await this.camposDeConvocatoria(conv);
+      let edicion = await this.edicionRepo.findOne({
+        where: { proyectoId: proyecto.id, convocatoriaId: conv.id },
+      });
+      if (!edicion) {
+        edicion = await this.edicionRepo.save(
+          this.edicionRepo.create({
+            proyectoId: proyecto.id,
+            convocatoriaId: conv.id,
+            estado,
+            creadoPorId: director.id,
+            unidadAcademicaId: derecho.id,
+            anioEdicion: anio,
+            presupuestoSolicitado: generarPresupuesto(this.rng, anio),
+            datosFormulario: this.seedDatosFormulario(campos, {
+              resumen: 'Escuela de oficios comunitaria sostenida por el mismo equipo directivo año a año.',
+              area: 'Educación',
+              poblaciones: ['Comunidad general'],
+              antecedentes: true,
+              anio,
+            }),
+          }),
+        );
+      }
+      await this.seedParticipacion({
+        usuarioId: director.id,
+        convocatoriaId: conv.id,
+        rol: RolEjecucion.DirectorDeProyecto,
+        edicionId: edicion.id,
+        esDirectorPrincipal: true,
+        asignadoPorId: this.authDerecho.id,
+      });
+    }
   }
 
   private tituloUnico(base: string): string {
@@ -1731,6 +1864,26 @@ export class SeedService {
     return undefined;
   }
 
+  /** Docente real de la UA (con cargo) para autorar proyectos de prueba; las
+   *  pools de algunas UAs no traen docentes, así que se consulta la BD. */
+  private async docenteParaPrueba(uaId: string, usados: Set<string>): Promise<Usuario | undefined> {
+    let lista = this.docentesPruebaCache.get(uaId);
+    if (!lista) {
+      lista = await this.usuarioRepo
+        .createQueryBuilder('u')
+        .where('u."unidadAcademicaId" = :uaId', { uaId })
+        .andWhere('u.roles LIKE :rol', { rol: `%${RolUsuario.Docente}%` })
+        .andWhere('u."cargoDocente" IS NOT NULL')
+        .getMany();
+      this.docentesPruebaCache.set(uaId, lista);
+    }
+    const disponibles = lista.filter(d => !usados.has(d.id));
+    if (disponibles.length === 0) return undefined;
+    const u = disponibles[this.rng.entero(0, disponibles.length - 1)];
+    usados.add(u.id);
+    return u;
+  }
+
   /** Codirector de la UA adicional si el proyecto es interfacultad, sino del pool propio. */
   private elegirCodirector(
     pool: PoolUa,
@@ -1774,7 +1927,7 @@ export class SeedService {
         creadoPorId: plan.directorId,
         unidadAcademicaId: plan.uaId,
         anioEdicion: anio,
-        presupuesto: plan.presupuesto,
+        presupuestoSolicitado: plan.presupuesto,
         datosFormulario: plan.datos,
       });
       edicion.id = crypto.randomUUID();
@@ -1837,9 +1990,18 @@ export class SeedService {
     for (const anio of anios) {
       const conv = this.convs.get(anio)!;
       const camposConv = await this.camposDeConvocatoria(conv);
-      const usadosConv = new Set<string>();
       const estadosPermitidos = this.estadosEdicionPorConvocatoria(conv.estado);
       if (estadosPermitidos.length === 0) continue;
+
+      // Los usuarios que ya participan de la convocatoria (de corridas anteriores) no pueden
+      // volver a elegirse: `participacion_convocatoria` tiene un unique (usuarioId, convocatoriaId)
+      // y el INSERT masivo de flushEdicionesMasivas lo violaría. Sin esto el seed deja de ser
+      // idempotente y tumba el backend en cada reinicio con la base ya poblada.
+      const participacionesExistentes = await this.participacionRepo.find({
+        where: { convocatoriaId: conv.id },
+        select: { usuarioId: true },
+      });
+      const usadosConv = new Set(participacionesExistentes.map((p) => p.usuarioId));
 
       const edicionesExistentes = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id },
@@ -1881,6 +2043,8 @@ export class SeedService {
         if ((edicionesPorUa.get(ua.id) ?? 0) >= PROYECTOS_MASIVOS_MINIMO) continue;
 
         // 1) Consolidados de 2025 → en 2026 pasan directo a la adjudicación (saltean evaluación).
+        // Se fuerza el override manual `esConsolidado = true` como demo del salteo; el cálculo
+        // automático por historial de adjudicaciones se deriva aparte (ver consolidacion.ts).
         if (anio === 2026) {
           const candidatos = this.consolidados2025.get(ua.id) ?? [];
           for (const cand of candidatos) {
@@ -1945,7 +2109,7 @@ export class SeedService {
           const proyecto = this.proyectoRepo.create({
             nombre: titulo,
             creadoPorId: director.id,
-            esConsolidado: false,
+            esConsolidado: null,
             esInterfacultad,
             unidadAcademicaAdicionalId: uaAdicionalId,
           });
@@ -2062,7 +2226,7 @@ export class SeedService {
         usuarioId,
         tipo: TipoNotificacion.RESULTADO_EVALUADOR,
         participacionId: p.id,
-        mensaje: `Tu propuesta como evaluador en la convocatoria "${convocatoriaNombre}" fue aprobada`,
+        mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${convocatoriaNombre}"`,
         leida: false,
       }),
     );
@@ -2145,22 +2309,6 @@ export class SeedService {
 
         const cupoRestante = Math.max(0, 3 - aprobadosEnUa.length);
         const aAprobar = tomar(cupoRestante);
-        // Igual que el cupo de aprobados: se crea uno por estado sólo si la UA
-        // todavía no tiene ninguno, para no sumar una tanda en cada arranque.
-        const yaTieneEstado = (estado: EstadoPropuestaEvaluador): boolean =>
-          existentes.some(
-            (p) =>
-              p.rol === RolEjecucion.Evaluador &&
-              p.estado === estado &&
-              p.usuario?.unidadAcademicaId === ua.id,
-          );
-        const propuesto = yaTieneEstado(EstadoPropuestaEvaluador.Propuesto)
-          ? undefined
-          : tomar(1)[0];
-        const aceptada = yaTieneEstado(EstadoPropuestaEvaluador.Aceptada) ? undefined : tomar(1)[0];
-        const declinada = yaTieneEstado(EstadoPropuestaEvaluador.Declinada)
-          ? undefined
-          : tomar(1)[0];
 
         for (const evaluador of aAprobar) {
           evaluadorRows.push(
@@ -2175,62 +2323,10 @@ export class SeedService {
           notifMeta.push({
             usuarioId: evaluador.id,
             tipo: TipoNotificacion.RESULTADO_EVALUADOR,
-            mensaje: `Tu propuesta como evaluador en la convocatoria "${conv.nombre}" fue aprobada`,
+            mensaje: `Fuiste dado de alta como evaluador en la convocatoria "${conv.nombre}"`,
             leida: false,
           });
           aprobadosUa.get(ua.id)?.add(evaluador.id);
-        }
-
-        if (propuesto) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: propuesto.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Propuesto,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: propuesto.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: false,
-          });
-        }
-        if (aceptada) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: aceptada.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Aceptada,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: aceptada.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: true,
-          });
-        }
-        if (declinada) {
-          evaluadorRows.push(
-            this.participacionRepo.create({
-              usuarioId: declinada.id,
-              convocatoriaId: conv.id,
-              rol: RolEjecucion.Evaluador,
-              estado: EstadoPropuestaEvaluador.Declinada,
-              asignadoPorId: pool.secretaria.id,
-            }),
-          );
-          notifMeta.push({
-            usuarioId: declinada.id,
-            tipo: TipoNotificacion.PROPUESTA_EVALUADOR,
-            mensaje: `Fuiste propuesto como evaluador en la convocatoria "${conv.nombre}"`,
-            leida: true,
-          });
         }
       }
 
@@ -2261,9 +2357,23 @@ export class SeedService {
 
   private async seedEmparejamientos(): Promise<void> {
     for (const conv of this.convs.values()) {
-      const existentes = await this.emparejamientoRepo.find({ where: { convocatoriaId: conv.id } });
-      if (existentes.length > 0) continue;
+      await this.crearEmparejamientosDe(conv);
+    }
+  }
 
+  // Crea (si no existen) los pares de EMPAREJAMIENTO_DEFAULT para una convocatoria
+  // puntual y completa this.parMap. Reutilizable por las convocatorias de prueba,
+  // que también necesitan Propia/Ajena resueltas por UA emparejada.
+  //
+  // this.parMap se completa siempre, exista o no ya la fila en esta convocatoria:
+  // los pares son fijos por nombre de UA (no varían entre convocatorias), así que
+  // no depende de haber creado filas en esta corrida — a diferencia del código
+  // anterior, que sólo llenaba el mapa dentro del `if` de creación y lo dejaba
+  // vacío (y por lo tanto sin cruzadas Ajena nuevas) en cualquier re-corrida del
+  // seed sobre una base ya sembrada.
+  private async crearEmparejamientosDe(conv: Convocatoria): Promise<void> {
+    const existentes = await this.emparejamientoRepo.find({ where: { convocatoriaId: conv.id } });
+    if (existentes.length === 0) {
       for (const [nombreA, nombreB] of EMPAREJAMIENTO_DEFAULT) {
         const uaA = this.uaMap.get(nombreA);
         const uaB = this.uaMap.get(nombreB);
@@ -2278,10 +2388,15 @@ export class SeedService {
             unidadBId: uaB.id,
           }),
         );
-        this.parMap.set(uaA.id, uaB.id);
-        this.parMap.set(uaB.id, uaA.id);
       }
       console.log(`  ${EMPAREJAMIENTO_DEFAULT.length} pares para convocatoria ${conv.nombre}`);
+    }
+    for (const [nombreA, nombreB] of EMPAREJAMIENTO_DEFAULT) {
+      const uaA = this.uaMap.get(nombreA);
+      const uaB = this.uaMap.get(nombreB);
+      if (!uaA || !uaB) continue;
+      this.parMap.set(uaA.id, uaB.id);
+      this.parMap.set(uaB.id, uaA.id);
     }
   }
 
@@ -2325,7 +2440,13 @@ export class SeedService {
     });
     if (!conv) return;
 
-    const institucional = async (edicionId: string, autoridad: Usuario, categorias: Record<string, unknown>, observaciones: string): Promise<void> => {
+    const institucional = async (
+      edicionId: string,
+      autoridad: Usuario,
+      categorias: Record<string, unknown>,
+      observaciones: string,
+      esPse = false,
+    ): Promise<void> => {
       const existente = await this.institucionalEvalRepo.findOne({ where: { edicionId } });
       if (existente) return;
       if (!conv.templateEvaluacionInstitucionalId) return;
@@ -2340,6 +2461,7 @@ export class SeedService {
           categorias,
           checklist: { 'check-superposicion': true, 'check-presupuesto': true, 'check-documentacion': true },
           observaciones,
+          esPse,
         }),
       );
       await this.auditoriaRepo.save(this.construirHistorialEvaluacion({
@@ -2398,6 +2520,7 @@ export class SeedService {
         'sub-devolucion': { valor: true },
       },
       'El proyecto está muy bien articulado con el territorio y su equipo tiene una trayectoria sólida.',
+      true,
     );
     await cruzada(this.p5.id, this.evaluadorDerecho, TipoEvaluacionCruzada.Propia, {
       'item-problema': 9, 'item-objetivos': 7, 'item-metodologia': 6, 'item-participacion-diseno': 7,
@@ -2445,6 +2568,7 @@ export class SeedService {
       const ediciones = await this.edicionRepo.find({
         where: { convocatoriaId: conv.id, estado: Not(EstadoEdicion.Borrador) },
         relations: { proyecto: true },
+        order: { id: 'ASC' },
       });
       const [instExistentes, cruzadaExistentes] = await Promise.all([
         this.institucionalEvalRepo.find({ where: { convocatoriaId: conv.id }, select: { edicionId: true } }),
@@ -2463,6 +2587,13 @@ export class SeedService {
         const pool = this.usuariosPorUa.get(uaId);
         return (pool?.evaluadores ?? []).filter((e) => ids.has(e.id));
       };
+      // Caso demo del mecanismo de tercera UA, sólo en 2026: la primera edición
+      // interfacultad que reciba Propia y Ajena a la vez queda con items en
+      // extremos opuestos (diferencia 82 pts, por encima del umbral 40) y SIN
+      // TerceraUa, para poder ver el bloqueo y el botón "Designar 3ra UA" en el
+      // monitoreo. Determinista: la iteración es por `id` ASC y el Rng tiene
+      // semilla fija.
+      let demoPendienteAsignada = false;
 
       const instRows: EvaluacionInstitucional[] = [];
       const cruzadaRows: EvaluacionCruzada[] = [];
@@ -2507,6 +2638,7 @@ export class SeedService {
                 categorias: generada.categorias,
                 checklist: generada.checklist,
                 observaciones: generada.observaciones,
+                esPse: generada.esPse,
               }),
             );
             instMeta.push({
@@ -2525,8 +2657,27 @@ export class SeedService {
           const evaluadorPropia = candidatosPropia.length > 0
             ? candidatosPropia[this.rng.entero(0, candidatosPropia.length - 1)]
             : undefined;
+          const uaPar = this.parMap.get(ed.unidadAcademicaId);
+          const candidatosAjena = uaPar ? aprobadosDe(uaPar) : [];
+          const evaluadorAjena = candidatosAjena.length > 0
+            ? candidatosAjena[this.rng.entero(0, candidatosAjena.length - 1)]
+            : undefined;
+
+          const esDemoPendiente =
+            anio === 2026 &&
+            !demoPendienteAsignada &&
+            !!evaluadorPropia &&
+            !!evaluadorAjena &&
+            !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`) &&
+            !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`);
+
           if (evaluadorPropia && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Propia}`)) {
-            const generada = generarEvaluacionCruzada(estructuraCruzada, this.rng);
+            const generada = esDemoPendiente
+              ? {
+                  items: itemsCruzadaFactor(estructuraCruzada, 1),
+                  observaciones: 'Evaluación de prueba (caso demo de inconsistencia).',
+                }
+              : generarEvaluacionCruzada(estructuraCruzada, this.rng);
             cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Propia}`);
             cruzadaRows.push(
               this.cruzadaEvalRepo.create({
@@ -2542,6 +2693,30 @@ export class SeedService {
             );
             cruzadaMeta.push({ usuario: evaluadorPropia, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Propia });
           }
+          if (evaluadorAjena && !cruzadaSet.has(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`)) {
+            const generada = esDemoPendiente
+              ? {
+                  items: itemsCruzadaFactor(estructuraCruzada, 0),
+                  observaciones: 'Evaluación de prueba (caso demo de inconsistencia).',
+                }
+              : generarEvaluacionCruzada(estructuraCruzada, this.rng);
+            cruzadaSet.add(`${ed.id}::${TipoEvaluacionCruzada.Ajena}`);
+            cruzadaRows.push(
+              this.cruzadaEvalRepo.create({
+                convocatoriaId: conv.id,
+                edicionId: ed.id,
+                evaluadorId: evaluadorAjena.id,
+                tipo: TipoEvaluacionCruzada.Ajena,
+                templateId: convConTemplates.templateEvaluacionCruzadaId,
+                estado: EstadoEvaluacion.Confirmada,
+                items: generada.items,
+                observaciones: generada.observaciones,
+              }),
+            );
+            cruzadaMeta.push({ usuario: evaluadorAjena, edicionId: ed.id, tipo: TipoEvaluacionCruzada.Ajena });
+          }
+          if (esDemoPendiente) demoPendienteAsignada = true;
+          continue;
         }
 
         const uaPar = this.parMap.get(ed.unidadAcademicaId);
@@ -2620,6 +2795,508 @@ export class SeedService {
     }
   }
 
+  // ─────────────────── Avales ───────────────────
+
+  /**
+   * El aval (link al PDF firmado por el decano) lo carga la Secretaría mientras la
+   * edición está presentada o en evaluación. Se siembra en ~la mitad de esas
+   * ediciones para que "Tiene aval: Sí/No" se vea en ambos casos.
+   */
+  private async seedAvales(): Promise<void> {
+    const ediciones = await this.edicionRepo.find({
+      where: {
+        estado: In([
+          EstadoEdicion.Presentado,
+          EstadoEdicion.PendienteDeCambios,
+          EstadoEdicion.EnEvaluacion,
+        ]),
+      },
+    });
+    let cargados = 0;
+    for (const ed of ediciones) {
+      if (ed.avalUrl) continue;
+      if (!this.rngDeEdicion(`${ed.id}:aval`).bool(0.5)) continue;
+      ed.avalUrl = `https://drive.google.com/file/d/aval-${ed.id.slice(0, 8)}/view`;
+      await this.edicionRepo.save(ed);
+      cargados++;
+    }
+    console.log(`  ${cargados} avales cargados`);
+  }
+
+  // Carga el aval en TODAS las ediciones en evaluación de una convocatoria, para
+  // que las convocatorias de prueba puedan completar el flujo de adjudicación
+  // (el aval es requisito para emitir la resolución).
+  private async cargarAvalesDeConvocatoria(convocatoriaId: string): Promise<void> {
+    const ediciones = await this.edicionRepo.find({
+      where: { convocatoriaId, estado: EstadoEdicion.EnEvaluacion },
+    });
+    for (const ed of ediciones) {
+      if (ed.avalUrl) continue;
+      ed.avalUrl = `https://drive.google.com/file/d/aval-${ed.id.slice(0, 8)}/view`;
+      await this.edicionRepo.save(ed);
+    }
+  }
+
+  // ─────────── Convocatoria de prueba: orden de mérito ───────────
+  // Convocatoria pequeña y realista con TODAS las UAs, evaluaciones confirmadas
+  // y cuota federativa mínima por UA = 2, para probar el "Generar orden de mérito automático".
+  private async seedConvocatoriaPruebaOrdenMerito(): Promise<void> {
+    const NOMBRE = 'Convocatoria de Prueba - Orden de Mérito';
+    const existe = await this.convocatoriaRepo.findOne({ where: { nombre: NOMBRE } });
+    if (existe) {
+      console.log(`  (ya existe) ${NOMBRE}`);
+      return;
+    }
+
+    const nombreForm = 'Formulario de Prueba - Orden de Mérito';
+    let formularioId = (await this.formularioRepo.findOne({ where: { nombre: nombreForm } }))?.id;
+    if (!formularioId) {
+      const copia = await this.formularioRepo.save(
+        this.formularioRepo.create({
+          nombre: nombreForm,
+          esDefault: false,
+          esPlantilla: false,
+          campos: this.formularioDefault.campos
+            ? clonarCamposConIdsNuevos(this.formularioDefault.campos)
+            : null,
+        }),
+      );
+      formularioId = copia.id;
+    }
+    const conv = await this.seedConvocatoria({
+      nombre: NOMBRE,
+      descripcion:
+        'Convocatoria de prueba con todas las UAs y evaluaciones confirmadas para validar el orden de mérito automático.',
+      anio: 2026,
+      estado: EstadoConvocatoria.Evaluacion,
+      fechaInicioPresentacion: this.crearFecha(2026, 3, 1),
+      fechaFinPresentacion: this.crearFecha(2026, 4, 30),
+      fechaInicioEvaluacion: this.crearFecha(2026, 5, 15),
+      fechaFinEvaluacion: this.crearFecha(2026, 7, 15),
+      fechaInicioEjecucion: this.crearFecha(2026, 8, 1),
+      fechaFinEjecucion: this.crearFecha(2027, 2, 28),
+      formularioId: formularioId ?? undefined,
+      cuotaFederativa: 2,
+      topePresupuestoNoConsolidado: 1_200_000,
+      topePresupuestoConsolidado: 2_500_000,
+    });
+    await this.asegurarTemplatesConvocatoria(conv);
+    await this.crearEmparejamientosDe(conv);
+
+    const convConTemplates = await this.convocatoriaRepo.findOne({
+      where: { id: conv.id },
+      relations: { templateEvaluacionInstitucional: true, templateEvaluacionCruzada: true },
+    });
+    const estructuraInst = convConTemplates?.templateEvaluacionInstitucional?.estructura;
+    const estructuraCruzada = convConTemplates?.templateEvaluacionCruzada?.estructura;
+    if (
+      !estructuraInst ||
+      !estructuraCruzada ||
+      !convConTemplates?.templateEvaluacionInstitucionalId ||
+      !convConTemplates?.templateEvaluacionCruzadaId
+    ) {
+      console.log('  No se pudieron cargar los templates de evaluación; se omite la convocatoria de prueba');
+      return;
+    }
+
+    console.log(`  ${NOMBRE}: generando proyectos y evaluaciones por UA`);
+    const PROYECTOS_POR_UA = 4;
+    let montoTotalAcumulado = 0;
+    const usadosTest = new Set<string>();
+
+    for (const ua of this.uas) {
+      const pool = this.usuariosPorUa.get(ua.id);
+      if (!pool || pool.evaluadores.length === 0) continue;
+
+      for (let i = 0; i < PROYECTOS_POR_UA; i++) {
+        // Autor docente del proyecto de prueba (no la secretaría), para reflejar
+        // el equipo real. Se evita reusar al mismo docente dentro de la prueba.
+        const docente = (await this.docenteParaPrueba(ua.id, usadosTest)) ?? pool.secretaria;
+        const nombreProyecto = `${ua.nombre} - Proyecto de Prueba ${i + 1}`;
+        const presupuesto = generarPresupuesto(this.rng, 2026);
+        montoTotalAcumulado += Number(presupuesto.montoTotal ?? 0);
+        const edicion = await this.seedProyectoConEdicion(
+          nombreProyecto,
+          docente,
+          ua,
+          conv,
+          EstadoEdicion.EnEvaluacion,
+          presupuesto,
+        );
+        if (!edicion) continue;
+
+        // Participación del director (docente) del proyecto de prueba.
+        await this.participacionRepo.save(
+          this.participacionRepo.create({
+            usuarioId: docente.id,
+            convocatoriaId: conv.id,
+            rol: RolEjecucion.DirectorDeProyecto,
+            edicionId: edicion.id,
+            esDirectorPrincipal: true,
+            asignadoPorId: pool.secretaria.id,
+            estado: null,
+          }),
+        );
+
+        // Banda de puntaje por UA para probar el orden de mérito:
+        //  - alta:  ningún proyecto < 80  (Ingeniería, Derecho, Odontología)
+        //  - baja:  ningún proyecto > 20  (CBC, Medicina, Agronomía)
+        //  - mixta: comportamiento original (2 al azar + 2 bajos)
+        const esAlta =
+          ua.nombre === 'Facultad de Ingeniería' ||
+          ua.nombre === 'Facultad de Derecho' ||
+          ua.nombre === 'Facultad de Odontología';
+        const esBaja =
+          ua.nombre === 'Ciclo Básico Común (CBC)' ||
+          ua.nombre === 'Facultad de Medicina' ||
+          ua.nombre === 'Facultad de Agronomía';
+        // Las UA no afectadas por las bandas alta/baja: 1 proyecto > 90 y el
+        // resto < 50 (usa el proyecto i=0 para el puntaje alto).
+        const esMixtaAlta = !esAlta && !esBaja && i === 0;
+
+        const generadaInst = esAlta || esMixtaAlta
+          ? this.generarCategoriasAltas(estructuraInst)
+          : this.generarCategoriasBajas(estructuraInst);
+        await this.institucionalEvalRepo.save(
+          this.institucionalEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            templateId: convConTemplates.templateEvaluacionInstitucionalId,
+            estado: EstadoEvaluacion.Confirmada,
+            realizadoPorId: pool.secretaria.id,
+            confirmadoPorId: pool.secretaria.id,
+            categorias: generadaInst.categorias,
+            checklist: generadaInst.checklist,
+            observaciones: generadaInst.observaciones,
+          }),
+        );
+
+        // Cruzadas confirmadas: Propia (evaluador de la propia UA) + Ajena
+        // (evaluador de la UA emparejada). El orden de mérito exige ambas
+        // confirmadas para poder generarse/confirmarse (ver
+        // evaluaciones.service.ts#validarEdicionesListasParaMerito).
+        const modoCruzada = esAlta ? 'alta' : esBaja ? 'baja' : esMixtaAlta ? 'alta90' : 'media';
+        const evaluadorPropia = pool.evaluadores[i % pool.evaluadores.length];
+        const uaParId = this.parMap.get(ua.id);
+        const poolAjena = uaParId ? this.usuariosPorUa.get(uaParId) : undefined;
+        const evaluadorAjena = poolAjena?.evaluadores?.length
+          ? poolAjena.evaluadores[i % poolAjena.evaluadores.length]
+          : undefined;
+
+        if (!evaluadorAjena) {
+          console.warn(`  Sin evaluador Ajena disponible para ${nombreProyecto} (UA emparejada sin pool)`);
+          continue;
+        }
+
+        // Caso demo del mecanismo de tercera UA: un proyecto de banda "mixta"
+        // (no el de puntaje alto de su UA) con Propia y Ajena en extremos
+        // opuestos —82 pts de diferencia, por encima del umbral (40)— resuelto
+        // por una TerceraUa confirmada, que reemplaza a ambas en el puntaje
+        // cruzado en vez de promediarse con ellas (ver
+        // evaluaciones.service.ts#cruzadasVigentes).
+        const esDemoInconsistenciaResuelta = ua.nombre === 'Facultad de Ciencias Sociales' && i === 3;
+
+        const generadaPropia = generarEvaluacionCruzada(estructuraCruzada, this.rng, modoCruzada);
+        const generadaAjena = generarEvaluacionCruzada(estructuraCruzada, this.rng, modoCruzada);
+        await this.cruzadaEvalRepo.save([
+          this.cruzadaEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            evaluadorId: evaluadorPropia.id,
+            tipo: TipoEvaluacionCruzada.Propia,
+            templateId: convConTemplates.templateEvaluacionCruzadaId,
+            estado: EstadoEvaluacion.Confirmada,
+            items: esDemoInconsistenciaResuelta
+              ? itemsCruzadaFactor(estructuraCruzada, 1)
+              : generadaPropia.items,
+            observaciones: generadaPropia.observaciones,
+          }),
+          this.cruzadaEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            evaluadorId: evaluadorAjena.id,
+            tipo: TipoEvaluacionCruzada.Ajena,
+            templateId: convConTemplates.templateEvaluacionCruzadaId,
+            estado: EstadoEvaluacion.Confirmada,
+            items: esDemoInconsistenciaResuelta
+              ? itemsCruzadaFactor(estructuraCruzada, 0)
+              : generadaAjena.items,
+            observaciones: generadaAjena.observaciones,
+          }),
+        ]);
+
+        if (esDemoInconsistenciaResuelta) {
+          const uaTercera = this.uas.find((u) => u.id !== ua.id && u.id !== uaParId);
+          const evaluadorTercera = uaTercera
+            ? this.usuariosPorUa.get(uaTercera.id)?.evaluadores?.[0]
+            : undefined;
+          if (evaluadorTercera) {
+            await this.cruzadaEvalRepo.save(
+              this.cruzadaEvalRepo.create({
+                convocatoriaId: conv.id,
+                edicionId: edicion.id,
+                evaluadorId: evaluadorTercera.id,
+                tipo: TipoEvaluacionCruzada.TerceraUa,
+                templateId: convConTemplates.templateEvaluacionCruzadaId,
+                estado: EstadoEvaluacion.Confirmada,
+                items: itemsCruzadaFactor(estructuraCruzada, 0.5),
+                observaciones: 'Tercera evaluación (UA de resolución) — caso demo de inconsistencia.',
+              }),
+            );
+          }
+        }
+      }
+    }
+
+    // Presupuesto global: se fija por debajo del 70% anterior para admitir
+    // menos proyectos y dejar en evidencia el tope presupuestario (la cuota
+    // mínimo de 2×14=28 igualmente garantiza al menos 2 por UA).
+    const presupuestoTotalConvocatoria = Math.round(montoTotalAcumulado * 0.52 * 100) / 100;
+    await this.convocatoriaRepo.update(conv.id, { presupuestoTotal: presupuestoTotalConvocatoria });
+    console.log(
+      `  ${NOMBRE}: presupuesto total ${presupuestoTotalConvocatoria} (cubre ~${Math.round(
+        (presupuestoTotalConvocatoria / montoTotalAcumulado) * 100,
+      )}% del costo total de los proyectos)`,
+    );
+    await this.cargarAvalesDeConvocatoria(conv.id);
+    console.log(`  ${NOMBRE}: lista para probar el orden de mérito`);
+  }
+
+  // ─────────────────── Escenario desde Excel (orden de mérito real) ───────────────────
+  // Carga las filas de "ORDEN DE MERITO 7 11.xlsx" (extraídas a data/escenario-excel.json)
+  // como proyectos candidatos con su puntaje (columna O) y su costo (columna R = total
+  // monetario). El presupuesto de la convocatoria es 148.605.613,50, menor que la suma de
+  // los costos (≈181M), de modo que el algoritmo debe recortar y aplicar la cuota federativa por UA.
+  private async seedEscenarioExcel(): Promise<void> {
+    const MAPA_UA_EXCEL: Record<string, string> = {
+      Derecho: 'Facultad de Derecho',
+      Economicas: 'Facultad de Ciencias Económicas',
+      Sociales: 'Facultad de Ciencias Sociales',
+      'Filosofia y Letras': 'Facultad de Filosofía y Letras',
+      Ingenieria: 'Facultad de Ingeniería',
+      Medicina: 'Facultad de Medicina',
+      'Exactas Y Naturales': 'Facultad de Ciencias Exactas y Naturales',
+      'Arquitectura Diseño y Urbanismo': 'Facultad de Arquitectura, Diseño y Urbanismo',
+      Agronomía: 'Facultad de Agronomía',
+      'Farmacia y Bioquimíca': 'Facultad de Farmacia y Bioquímica',
+      Odontología: 'Facultad de Odontología',
+      Psicologia: 'Facultad de Psicología',
+      Veterinaria: 'Facultad de Ciencias Veterinarias',
+      'Ciclo Basico Comun': 'Ciclo Básico Común (CBC)',
+    };
+    const normalizarUa = (n: string): string => MAPA_UA_EXCEL[n] ?? n;
+    const NOMBRE = 'Convocatoria de Prueba - Escenario Excel';
+    const existe = await this.convocatoriaRepo.findOne({ where: { nombre: NOMBRE } });
+    if (existe) {
+      console.log(`  (ya existe) ${NOMBRE}`);
+      return;
+    }
+
+    let filas: Array<{
+      ua: string;
+      director: string;
+      codirector: string;
+      nombre: string;
+      importeG: number;
+      totalR: number;
+      puntajeO: number;
+    }>;
+    try {
+      const dataPath = fs.existsSync(path.join(__dirname, 'data', 'escenario-excel.json'))
+        ? path.join(__dirname, 'data', 'escenario-excel.json')
+        : path.join(process.cwd(), 'src', 'seed', 'data', 'escenario-excel.json');
+      filas = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    } catch {
+      console.log('  No se encontró data/escenario-excel.json; se omite el escenario Excel');
+      return;
+    }
+    if (!filas.length) return;
+
+    const uaRepo = this.dataSource.getRepository(UnidadAcademica);
+    const uaPorNombre = new Map<string, UnidadAcademica>();
+    for (const f of filas) {
+      const nombreUa = normalizarUa((f.ua ?? 'Sin UA').trim() || 'Sin UA');
+      if (!uaPorNombre.has(nombreUa)) {
+        const existente = await uaRepo.findOne({ where: { nombre: nombreUa } });
+        const ua = existente ?? (await uaRepo.save(uaRepo.create({ nombre: nombreUa })));
+        uaPorNombre.set(nombreUa, ua);
+      }
+    }
+
+    // Plantillas simples: 1 subcategoría institucional numérica (máx 100) y 1 ítem de
+    // cruzada (máx 100). Así notaFinal = puntajeInstitucional + 0 = puntajeO exacto.
+    const idSub = 'sub-inst-excel';
+    const idItem = 'item-cruz-excel';
+    const estructuraInst: EstructuraTemplateInstitucional = {
+      categorias: [
+        {
+          id: 'cat-inst-excel',
+          nombre: 'Evaluación',
+          subcategorias: [
+            {
+              id: idSub,
+              texto: 'Puntaje total',
+              tipoValor: 'numerico',
+              minimo: 0,
+              maximo: 100,
+              fundamentacion: null,
+            },
+          ],
+        },
+      ],
+      checklist: [],
+    };
+    const estructuraCruz: EstructuraTemplateCruzada = {
+      categorias: [
+        {
+          id: 'cat-cruz-excel',
+          nombre: 'Evaluación',
+          puntajeMaximo: 100,
+          items: [{ id: idItem, nombre: 'Puntaje total', puntajeMaximo: 100 }],
+        },
+      ],
+    };
+    const templateInst = await this.templateInstRepo.save(
+      this.templateInstRepo.create({
+        nombre: `Evaluación institucional ${NOMBRE}`,
+        esDefault: false,
+        esPlantilla: false,
+        estructura: estructuraInst,
+      }),
+    );
+    const templateCruz = await this.templateCruzadaRepo.save(
+      this.templateCruzadaRepo.create({
+        nombre: `Evaluación cruzada ${NOMBRE}`,
+        esDefault: false,
+        esPlantilla: false,
+        estructura: estructuraCruz,
+      }),
+    );
+
+    const conv = await this.seedConvocatoria({
+      nombre: NOMBRE,
+      descripcion:
+        'Escenario de prueba cargado desde el Excel "ORDEN DE MERITO 7 11" para validar el orden de mérito automático con datos reales.',
+      anio: 2026,
+      estado: EstadoConvocatoria.Evaluacion,
+      fechaInicioPresentacion: this.crearFecha(2026, 3, 1),
+      fechaFinPresentacion: this.crearFecha(2026, 4, 30),
+      fechaInicioEvaluacion: this.crearFecha(2026, 5, 15),
+      fechaFinEvaluacion: this.crearFecha(2026, 7, 15),
+      fechaInicioEjecucion: this.crearFecha(2026, 8, 1),
+      fechaFinEjecucion: this.crearFecha(2027, 2, 28),
+      formularioId: this.formularioDefault?.id,
+      cuotaFederativa: 6,
+      templateEvaluacionInstitucionalId: templateInst.id,
+      templateEvaluacionCruzadaId: templateCruz.id,
+      presupuestoTotal: 148605613.5,
+      // El mayor total individual del Excel es ~$1.694.925; se deja holgura sobre eso.
+      topePresupuestoNoConsolidado: 1_800_000,
+      topePresupuestoConsolidado: 3_000_000,
+    });
+    await this.crearEmparejamientosDe(conv);
+
+    const autor = this.admin;
+    let generados = 0;
+    for (const f of filas) {
+      const ua = uaPorNombre.get(normalizarUa((f.ua ?? 'Sin UA').trim() || 'Sin UA'))!;
+      const presupuesto: Presupuesto = { montoTotal: f.totalR, rubros: [] };
+      const edicion = await this.seedProyectoConEdicion(
+        f.nombre,
+        autor,
+        ua,
+        conv,
+        EstadoEdicion.EnEvaluacion,
+        presupuesto,
+      );
+      if (!edicion) continue;
+
+      await this.institucionalEvalRepo.save(
+        this.institucionalEvalRepo.create({
+          convocatoriaId: conv.id,
+          edicionId: edicion.id,
+          templateId: templateInst.id,
+          estado: EstadoEvaluacion.Confirmada,
+          realizadoPorId: autor.id,
+          confirmadoPorId: autor.id,
+          categorias: { [idSub]: { valor: f.puntajeO, fundamentacion: '' } },
+          checklist: {},
+          observaciones: 'Evaluación de prueba (escenario Excel)',
+        }),
+      );
+      // Propia + Ajena confirmadas con items en 0: el promedio cruzado sigue
+      // siendo 0 y se conserva notaFinal === puntajeO. El evaluador de la
+      // Propia debe ser distinto del autor por el índice único
+      // (evaluadorId, edicionId) de EvaluacionCruzada.
+      const evaluadorPropia = this.usuariosPorUa.get(ua.id)?.evaluadores?.[0] ?? this.romero;
+      await this.cruzadaEvalRepo.save([
+        this.cruzadaEvalRepo.create({
+          convocatoriaId: conv.id,
+          edicionId: edicion.id,
+          evaluadorId: evaluadorPropia.id,
+          tipo: TipoEvaluacionCruzada.Propia,
+          templateId: templateCruz.id,
+          estado: EstadoEvaluacion.Confirmada,
+          items: { [idItem]: 0 },
+          observaciones: 'Evaluación de prueba (escenario Excel)',
+        }),
+        this.cruzadaEvalRepo.create({
+          convocatoriaId: conv.id,
+          edicionId: edicion.id,
+          evaluadorId: autor.id,
+          tipo: TipoEvaluacionCruzada.Ajena,
+          templateId: templateCruz.id,
+          estado: EstadoEvaluacion.Confirmada,
+          items: { [idItem]: 0 },
+          observaciones: 'Evaluación de prueba (escenario Excel)',
+        }),
+      ]);
+      generados++;
+    }
+    await this.cargarAvalesDeConvocatoria(conv.id);
+    console.log(`  ${NOMBRE}: ${generados} proyectos generados (presupuesto 148605613.50)`);
+  }
+
+  private generarCategoriasAltas(estructura: EstructuraTemplateInstitucional): {
+    categorias: Record<string, unknown>;
+    checklist: Record<string, unknown>;
+    observaciones: string;
+  } {
+    const categorias: Record<string, unknown> = {};
+    for (const categoria of estructura.categorias ?? []) {
+      for (const sub of categoria.subcategorias ?? []) {
+        if (sub.tipoValor === 'numerico') {
+          categorias[sub.id] = { valor: sub.maximo ?? 10, fundamentacion: 'Prueba puntaje alto' };
+        } else {
+          categorias[sub.id] = { valor: true, fundamentacion: '' };
+        }
+      }
+    }
+    const checklist: Record<string, unknown> = {};
+    for (const item of estructura.checklist ?? []) checklist[item.id] = true;
+    return { categorias, checklist, observaciones: 'Evaluación de prueba con puntaje alto' };
+  }
+
+  private generarCategoriasBajas(estructura: EstructuraTemplateInstitucional): {
+    categorias: Record<string, unknown>;
+    checklist: Record<string, unknown>;
+    observaciones: string;
+  } {
+    const categorias: Record<string, unknown> = {};
+    for (const categoria of estructura.categorias ?? []) {
+      for (const sub of categoria.subcategorias ?? []) {
+        if (sub.tipoValor === 'numerico') {
+          categorias[sub.id] = { valor: 0, fundamentacion: 'Prueba puntaje bajo' };
+        } else {
+          categorias[sub.id] = { valor: false, fundamentacion: '' };
+        }
+      }
+    }
+    const checklist: Record<string, unknown> = {};
+    for (const item of estructura.checklist ?? []) checklist[item.id] = false;
+    return { categorias, checklist, observaciones: 'Evaluación de prueba con puntaje bajo' };
+  }
+
   // ─────────────────── Sugerencias ───────────────────
 
   /** Sugerencias de Secretaría para ediciones en PendienteDeCambios (sólo 2027). */
@@ -2631,6 +3308,7 @@ export class SeedService {
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId: conv.id, estado: EstadoEdicion.PendienteDeCambios },
       relations: { proyecto: true, creadoPor: true },
+      order: { id: 'ASC' },
     });
 
     for (const ed of ediciones) {
@@ -2658,6 +3336,15 @@ export class SeedService {
         );
         await this.notificarSugerencia(ed, pool.secretaria, sugerencia, campos);
         this.progreso.sumar(1);
+      }
+    }
+
+    // Invariante: una edición en PendienteDeCambios tiene al menos una sugerencia
+    // abierta. Si alguna quedó sin sugerencias, vuelve a Presentado.
+    for (const ed of ediciones) {
+      if ((await this.sugerenciaRepo.count({ where: { edicionId: ed.id } })) === 0) {
+        ed.estado = EstadoEdicion.Presentado;
+        await this.edicionRepo.save(ed);
       }
     }
   }
@@ -2690,7 +3377,7 @@ export class SeedService {
     }
 
     if (elegido.nombre === 'presupuesto') {
-      const sugerida = this.primeraPartidaSugerible(ed.presupuesto);
+      const sugerida = this.primeraPartidaSugerible(ed.presupuestoSolicitado);
       if (!sugerida) return undefined;
       return {
         campo: sugerida.campo,
@@ -2743,7 +3430,7 @@ export class SeedService {
       const valorSugerido = Math.round(valorActual * 0.8 * 100) / 100;
 
       return {
-        campo: `presupuesto.rubros[${rubroIdx}].partidas[${partidaIdx}].${campoNumerico}`,
+        campo: `${PREFIJO_RUTA_PRESUPUESTO}rubros[${rubroIdx}].partidas[${partidaIdx}].${campoNumerico}`,
         valorActual,
         valorSugerido,
       };
@@ -2763,7 +3450,11 @@ export class SeedService {
     });
     directores.forEach((d) => destinatarios.add(d.usuarioId));
 
-    const nombreCampo = this.nombreLegibleSugerencia(sugerencia.campo, campos, ed.presupuesto);
+    const nombreCampo = this.nombreLegibleSugerencia(
+      sugerencia.campo,
+      campos,
+      ed.presupuestoSolicitado,
+    );
     for (const usuarioId of destinatarios) {
       if (usuarioId === sugeridoPor.id) continue;
       await this.notificacionRepo.save(
@@ -2779,8 +3470,8 @@ export class SeedService {
 
   private nombreLegibleSugerencia(campo: string, campos: CampoFormulario[], presupuesto: Presupuesto | null): string {
     if (campo === 'nombre') return 'Nombre del proyecto';
-    if (campo.startsWith('presupuesto.')) {
-      return etiquetaCampoPresupuesto(presupuesto, campo.replace('presupuesto.', ''));
+    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
+      return etiquetaCampoPresupuesto(presupuesto, campo.replace(PREFIJO_RUTA_PRESUPUESTO, ''));
     }
     if (campo.startsWith('datosFormulario.')) {
       const id = campo.replace('datosFormulario.', '');

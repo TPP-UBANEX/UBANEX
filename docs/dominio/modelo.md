@@ -7,12 +7,21 @@ classDiagram
     class Convocatoria {
         +id: string
         +nombre: string
+        +descripcion: string
         +anio: number
         +estado: EstadoConvocatoria
         +fechasPresentacion: RangoFechas
         +fechasEvaluacion: RangoFechas
         +fechasEjecucion: RangoFechas
         +cuotaFederativa: number
+        +presupuestoTotal: number
+        +topePresupuestoConsolidado: number
+        +topePresupuestoNoConsolidado: number
+        +porcentajeExtraInsumos: number
+        +umbralInsumos: number
+        +porcentajeExtraPse: number
+        +umbralInconsistenciaCruzada: number
+        +ordenMeritoConfirmado: boolean
     }
 
     class EstadoConvocatoria {
@@ -111,6 +120,13 @@ classDiagram
 - Tanto `AutoridadDeRectorado` como `AsistenteDeRectorado` pueden configurar el `Formulario` de una convocatoria.
 - El `Formulario` de una convocatoria es siempre propio (`esPlantilla: false`) y se crea recién la primera vez que se guardan campos; hasta ese momento la convocatoria no tiene formulario asociado. Elegir una plantilla como punto de partida copia sus `CampoFormulario` (con `id` regenerados) sin referenciar ni modificar la plantilla original, y esos campos se siguen editando libremente antes de guardar.
 - `cuotaFederativa` define el mínimo de proyectos a adjudicar por unidad académica en esa convocatoria.
+- El mecanismo de adjudicación de una edición (`Edicion.mecanismoAdjudicacion`) es `MERITO` o `CUOTA_FEDERATIVA` (enum `MecanismoAdjudicacion`): indica si el proyecto fue adjudicado por mérito global o porque cubría el piso de cuota federativa de su unidad académica.
+- **Presupuesto de la convocatoria** (todos opcionales; `numeric`, llegan como string vía TypeORM):
+  - `presupuestoTotal`: monto total a repartir. `null` = sin límite. El corte del orden de mérito descuenta de acá el **presupuesto a adjudicar** de cada edición (ver §Adjudicación y Orden de Mérito), no el solicitado.
+  - `topePresupuestoConsolidado` / `topePresupuestoNoConsolidado`: tope por proyecto sobre el total **solicitado** (no el adjudicado), según si el proyecto cuenta como consolidado a efectos del tope (`consolidacion.ts#esConsolidadoParaTope`). `null`/`0` = sin tope. Se valida al guardar y al enviar la edición (`presupuesto.util.ts`).
+  - `porcentajeExtraInsumos` (default 35), `umbralInsumos` (default 40), `porcentajeExtraPse` (default 15): parametrizan el cálculo del presupuesto a adjudicar (`presupuesto.util.ts#calcularPresupuestoAAdjudicar`).
+- `umbralInconsistenciaCruzada` (default 40 si es `null`): diferencia de puntaje entre la evaluación cruzada Propia y la Ajena a partir de la cual se considera que hay una inconsistencia extraordinaria y se habilita designar una tercera evaluación (ver §Evaluación).
+- `ordenMeritoConfirmado`: mientras es `false`, el orden de mérito y la adjudicación propuesta se pueden regenerar o ajustar a mano; al ponerse en `true` (`confirmarOrdenMerito`) quedan fijos y se notifica a los directores.
 
 ---
 
@@ -121,7 +137,7 @@ classDiagram
     class Proyecto {
         +id: string
         +nombre: string
-        +esConsolidado: boolean
+        +esConsolidado: boolean | null
         +esInterfacultad: boolean
     }
 
@@ -130,7 +146,13 @@ classDiagram
         +estado: EstadoEdicion
         +anioEdicion: number
         +datosFormulario: object
+        +presupuestoSolicitado: Presupuesto
+        +avalUrl: string
         +creadoPor: Usuario
+        +ordenMerito: number
+        +puntajeMerito: number
+        +adjudicacionPropuesta: boolean
+        +mecanismoAdjudicacion: MecanismoAdjudicacion
     }
 
     class EstadoEdicion {
@@ -178,6 +200,7 @@ classDiagram
         +cantidad: number
         +precioUnitario: number
         +monto: number
+        +esInsumo: boolean
     }
 
     class TipoPersona {
@@ -211,13 +234,20 @@ classDiagram
 ### Notas
 
 - `Proyecto` es una entidad raíz con datos estables que persisten entre años (ej: nombre, `esConsolidado`, `esInterfacultad`).
-- `esConsolidado = true` indica que el proyecto tiene el mismo equipo directivo 2 años consecutivos. Su Edición saltea la etapa `Evaluacion` en la convocatoria actual.
+- **Consolidación** (ver `backend/src/proyectos/consolidacion.ts`): un proyecto se consolida al **adjudicarse en 3 convocatorias consecutivas**. Con `A` = convocatorias inmediatamente anteriores (sin huecos) en las que la edición quedó `Adjudicado`:
+  - `esConsolidadoDerivado = A >= 3` (la 4ta participación consecutiva ya está consolidada, pero **igual se evalúa**).
+  - `salteaEvaluacion = A >= 4 && A par`: desde la 5ta participación alterna (5ta saltea, 6ta evalúa, 7ma saltea…). Un hueco (no participó o `NoAdjudicado`) reinicia `A`.
+  - Al pasar la convocatoria a `Evaluacion`, las ediciones que saltean van directo a `Adjudicado` (no entran a `EnEvaluacion`); esto alimenta la racha de las convocatorias siguientes.
+- `esConsolidado` es un **override manual tri-estado**: `null` = automático (derivado del historial), `true`/`false` = forzado por Rectorado. El estado efectivo es `override ?? derivado`; un `false` forzado nunca saltea. Un proyecto nuevo nace en `null`; solo Rectorado edita el override.
+- El orden de mérito y la adjudicación propuesta ya están implementados y viven en columnas de `Edicion` (`ordenMerito`, `puntajeMerito`, `adjudicacionPropuesta`, `mecanismoAdjudicacion`); ver §Adjudicación y Orden de Mérito. El estado `Adjudicado` se setea hoy por el salteo auto-adjudicado de consolidados y por el seed; la transición masiva a `Adjudicado`/`NoAdjudicado` al cerrar la evaluación todavía no está construida.
+- `avalUrl` es el link al aval (PDF firmado por el decano), lo carga la Secretaría de la UA de la edición. Es requisito para la adjudicación pero no bloquea el pase a evaluación.
 - `esInterfacultad = true` indica que el proyecto involucra a más de una unidad académica. Es un dato autodeclarado al crear el proyecto; no tiene reglas de negocio asociadas todavía.
 - `Edicion` representa la instancia de un proyecto dentro de una convocatoria específica. Un proyecto puede tener múltiples ediciones a lo largo del tiempo.
 - El estado `NoAdjudicado` es terminal (no hay suplencia).
 - El `Presupuesto` se compone de exactamente 3 rubros fijos: `ViaticosYSeguros`, `BienesDeConsumo` y `BienesDeUso`.
 - `Viatico` tiene un `tipoPersona` (Docente o Estudiante). Ambos tipos suman al subtotal del rubro `ViaticosYSeguros`.
 - Las partidas de presupuesto no pueden tener montos negativos, y cada rubro presenta un reporte solo si tiene al menos una partida por completo (todos sus campos obligatorios completos).
+- Cada `Bien` (Bienes de Consumo y de Uso) puede marcarse como `esInsumo`. Si los insumos superan el `umbralInsumos` % del total solicitado, la edición gana un extra de `porcentajeExtraInsumos` % en su presupuesto **a adjudicar** (no en el solicitado). Ver §Adjudicación y Orden de Mérito.
 - El backend recalcula siempre los subtotales por rubro y el total (ignora los montos que envía el front), así que el total es la suma exacta de las partidas.
 - Un `Viatico` lleva `periodoInicio` y `periodoFin` (fechas que deben caer dentro del rango de `fechasEjecucion` de la convocatoria).
 - Las sugerencias de cambio de presupuesto (así como las de demás campos de la edición) se implementan con el patrón de ediciones entrantes (ver sección Sugerencias).
@@ -254,6 +284,7 @@ classDiagram
         +id: string
         +estado: EstadoEvaluacion
         +observaciones: string
+        +esPse: boolean
     }
 
     class EvaluacionCruzada {
@@ -272,6 +303,7 @@ classDiagram
         <<enumeration>>
         Propia
         Ajena
+        TerceraUa
     }
 
     class Usuario {
@@ -304,9 +336,17 @@ classDiagram
 - El `Emparejamiento` define pares de unidades académicas por convocatoria. Con 14 unidades resultan exactamente 7 parejas. Cada unidad solo está emparejada con otra única.
 - Cada `Edicion` recibe:
   - **1** evaluación institucional (realizada por la Secretaría de Extensión de su UA).
-  - **0 a 3** evaluaciones cruzadas (propia + ajena + eventual tercera UA de resolución).
+  - **0 a 3** evaluaciones cruzadas (propia + ajena + eventual tercera UA de resolución). Para poder generar o confirmar el orden de mérito, cada edición en evaluación necesita la institucional **y** la propia **y** la ajena confirmadas (ver más abajo si además hay inconsistencia).
 - `EvaluacionInstitucional` y `EvaluacionCruzada` tienen estado `Borrador | Confirmada`.
 - La confirmación de `EvaluacionInstitucional` la realiza un usuario con rol autoridad de la Secretaría. La de `EvaluacionCruzada` la confirma el propio evaluador.
+- `EvaluacionInstitucional.esPse` marca al proyecto como Práctica Social Educativa. Es un campo fijo y obligatorio para confirmar, independiente del template. **No suma puntaje**: su único efecto es habilitar el extra de `porcentajeExtraPse` en el presupuesto a adjudicar (ver §Adjudicación y Orden de Mérito).
+
+#### Inconsistencia y tercera evaluación
+
+- `TipoEvaluacionCruzada.TerceraUa` es la evaluación adicional que se pide cuando la Propia y la Ajena difieren demasiado.
+- `calcularInconsistencia` (en `evaluaciones.service.ts`) compara el puntaje de la evaluación **Propia** contra el de la **Ajena** una vez que ambas están confirmadas. Si la diferencia alcanza o supera `Convocatoria.umbralInconsistenciaCruzada` (o el default 40 si es `null`), la edición se marca como inconsistente.
+- Ante una inconsistencia, se puede **designar** a un evaluador de una tercera unidad académica (`designar-tercera`), eligiéndolo del listado de candidatos válidos (`tercera-candidatos`). Esa tercera evaluación se carga y confirma como cualquier cruzada.
+- Mientras la inconsistencia no esté resuelta (TerceraUa confirmada), se bloquea tanto generar como confirmar el orden de mérito de la convocatoria. Una vez confirmada, la TerceraUa **reemplaza** a la Propia y a la Ajena en el cálculo del puntaje de la edición (no se promedian las tres).
 
 #### Estructura de TemplateEvaluacionInstitucional
 
@@ -314,6 +354,7 @@ classDiagram
   - nombre / texto del criterio
   - tipo de valor (numérico con mínimo y máximo, o booleano) — excluyentes
   - fundamentación opcional (texto)
+  - Solo las subcategorías **numéricas** suman a la ponderación; las **booleanas** son banderas informativas y no aportan puntaje (igual que el checklist).
 - **Checklist** — sección aparte de ítems booleanos que no suma a la ponderación final. Es independiente de las categorías.
 
 #### Estructura de TemplateEvaluacionCruzada
@@ -411,7 +452,7 @@ classDiagram
 - **Estudiante**: 0 a N. Se registra solo. Puede crear proyectos. Completa datos de perfil académico: `carrera`, `direccionLocalidad`, `genero`, `personaConDiscapacidad`, `porcentajeCarrera`.
 - **Docente**: 0 a N. Se registra solo, requiere validación por Autoridad de Secretaría de su UA. Su perfil docente incluye `cargoDocente`, `tipoDesignacionDocente` y `areaDocente`. Puede ser asignado como Director o Evaluador en una convocatoria mediante `ParticipacionConvocatoria`.
 - **Director de Proyecto**: rol de ejecución asignado por convocatoria. Máximo 2 participaciones como director por convocatoria.
-- **Evaluador**: rol de ejecución por convocatoria. No se asigna de forma directa: lo **propone** una Autoridad o un Asistente de Secretaría, y la propuesta recorre el circuito descrito más abajo hasta quedar `Aprobado`.
+- **Evaluador**: rol de ejecución por convocatoria. Lo **da de alta directamente una Autoridad de Rectorado**, según la resolución oficial: la participación se crea ya en estado `Aprobado` (ver más abajo).
 - Los roles se dividen en dos **grupos** excluyentes:
   - **Gestión**: AutoridadDeRectorado, AsistenteDeRectorado, AutoridadDeSecretaria, AsistenteDeSecretaria
   - **Ejecución**: Estudiante, Docente (roles globales en `RolUsuario`), DirectorDeProyecto, Evaluador (roles por convocatoria en `RolEjecucion` vía `ParticipacionConvocatoria`)
@@ -420,17 +461,14 @@ classDiagram
 - `ParticipacionConvocatoria` asigna un `RolEjecucion` (DirectorDeProyecto o Evaluador) a un usuario dentro de una convocatoria específica. Un usuario puede tener múltiples participaciones en distintas convocatorias, pero solo un rol por convocatoria.
 - `creadoPor` referencia al Usuario que creó la cuenta (aplica para todo tipo de usuarios).
 
-#### Propuesta de evaluadores
+#### Alta de evaluadores
 
 - `estado` solo aplica cuando el `rol` de la participación es `Evaluador`. Para `DirectorDeProyecto` no tiene valor.
-- Al proponer un evaluador, la participación se crea en estado `Propuesto`. El ciclo de vida es:
-  - `Propuesto → Aceptada | Declinada`: responde **únicamente el docente propuesto**, nadie puede responder por él.
-  - `Aceptada → Aprobado | Rechazado`: decide una **Autoridad de Rectorado**. Solo las propuestas ya aceptadas por el docente pueden aprobarse o rechazarse.
-  - `Declinada` y `Rechazado` son terminales. Un evaluador cuenta como tal recién cuando llega a `Aprobado`.
-- Cada paso del circuito notifica a los involucrados (mail + notificación en la aplicación): al docente cuando se lo propone y cuando Rectorado resuelve, y a la Secretaría de su UA cuando el docente responde y cuando Rectorado resuelve.
-- Solo la Secretaría puede proponer, y únicamente a docentes validados **de su propia Unidad Académica**.
-- Cada Unidad Académica tiene un cupo de **3 evaluadores activos** por convocatoria. Cuentan como activos los estados `Propuesto`, `Aceptada` y `Aprobado`; `Declinada` y `Rechazado` no ocupan cupo.
-- Ser evaluador y presentar proyectos en la misma convocatoria es **incompatible en ambos sentidos**: no se puede proponer como evaluador a un docente que ya creó ediciones en esa convocatoria, ni un docente con una propuesta de evaluador activa puede crear proyectos en ella.
+- Una **Autoridad de Rectorado** da de alta a los evaluadores directamente, leyendo la resolución oficial (decidida fuera del sistema). La participación se crea ya en estado `Aprobado`: no hay pasos de propuesta ni de aceptación por parte del docente. El docente recibe una notificación in-app + mail informativa del alta, sin acción que responder.
+- La **baja** de un evaluador también la realiza exclusivamente una Autoridad de Rectorado (elimina la participación). La Secretaría solo **consulta** los evaluadores de su UA; no los gestiona.
+- Cada Unidad Académica tiene un cupo de **3 evaluadores** por convocatoria.
+- Ser evaluador y presentar proyectos en la misma convocatoria es **incompatible en ambos sentidos**: no se puede dar de alta como evaluador a un docente que ya creó ediciones en esa convocatoria, ni un docente que ya es evaluador en ella puede crear proyectos. Por eso el listado de candidatos excluye a quienes ya son director/codirector o crearon proyectos en la convocatoria — el conflicto no llega a producirse.
+- Los valores `Propuesto`, `Aceptada`, `Declinada` y `Rechazado` del enum `EstadoPropuestaEvaluador` corresponden al circuito anterior (Secretaría proponía → docente aceptaba → Rectorado aprobaba) y ya no se producen; se conservan solo por compatibilidad de datos históricos.
 
 ---
 
@@ -472,6 +510,7 @@ classDiagram
         RESPUESTA_SUGERENCIA
         PROPUESTA_EVALUADOR
         RESULTADO_EVALUADOR
+        RESULTADO_ADJUDICACION
     }
 
     SugerenciaCambio --> Edicion : sobre
@@ -500,14 +539,21 @@ classDiagram
 - Destinatarios según el tipo:
   - `NUEVA_SUGERENCIA`: el creador de la edición y sus directores, salvo quien haya hecho la sugerencia.
   - `RESPUESTA_SUGERENCIA`: quien había hecho la sugerencia.
-  - `PROPUESTA_EVALUADOR` y `RESULTADO_EVALUADOR`: el docente propuesto como evaluador.
-- Las notificaciones del circuito de sugerencias existen **solo dentro de la aplicación**; las del circuito de evaluadores se acompañan además de un mail.
-- En el circuito de evaluadores la Secretaría recibe **mail pero no notificación en la aplicación** cuando el docente responde y cuando Rectorado resuelve. La notificación in-app es siempre para el docente.
-- El destinatario puede marcar sus notificaciones como leídas (de a una o todas) o eliminarlas. Cuando el docente responde una propuesta, su notificación `PROPUESTA_EVALUADOR` queda marcada como leída automáticamente, y si se desasigna una participación se eliminan las notificaciones asociadas a ella.
+  - `RESULTADO_EVALUADOR`: el docente dado de alta como evaluador. Al darlo de alta se le crea esta notificación in-app y se le envía además un mail informativo. (`PROPUESTA_EVALUADOR` corresponde al circuito anterior y ya no se produce.)
+  - `RESULTADO_ADJUDICACION`: el director (`creadoPor`) de cada edición, cuando se confirma el orden de mérito (`confirmarOrdenMerito`). Le informa si su proyecto quedó adjudicado o no. In-app.
+- Las notificaciones del circuito de sugerencias existen **solo dentro de la aplicación**; la de alta de evaluador se acompaña además de un mail al docente.
+- El destinatario puede marcar sus notificaciones como leídas (de a una o todas) o eliminarlas. Si se da de baja una participación de evaluador se eliminan las notificaciones asociadas a ella.
 
 ---
 
 ## Rendición
+
+> **Estado: no implementado.** Hoy `Rendicion` es una tabla mínima de solo lectura
+> (`estado: string` con default `'pendiente'`); `rendiciones.service.ts` solo expone un
+> `findAll`. La entidad `Comprobante`, la carga por rubro y el flujo de revisión
+> (`EnRevision → Aceptado | Rechazado` con comentario y reemplazo) todavía no existen.
+> El enum `EstadoComprobante` está definido pero sin uso. El diagrama de abajo es el
+> diseño objetivo.
 
 ```mermaid
 classDiagram
@@ -566,6 +612,12 @@ classDiagram
 
     class CategoriaHito {
         <<enumeration>>
+        Organizacion
+        Capacitacion
+        ActividadConLaComunidad
+        Articulacion
+        Difusion
+        InformeParcial
     }
 
     Edicion --> Hito : tiene (0 a N)
@@ -575,7 +627,7 @@ classDiagram
 ### Notas
 
 - Los directores registran `Hito`s durante la etapa `Ejecucion` para documentar las actividades realizadas con su equipo.
-- `CategoriaHito` es un enumerado fijo (valores por definir).
+- `CategoriaHito` es un enumerado fijo: `Organizacion`, `Capacitacion`, `ActividadConLaComunidad`, `Articulacion`, `Difusion`, `InformeParcial`.
 - `integrantes` es texto libre (nombres de estudiantes y colaboradores), no referencia a `Usuario`.
 - El director puede editar o eliminar hitos mientras la edición esté en etapa `Ejecucion`.
 - Visibilidad: solo usuarios de la Secretaría de la UA correspondiente y de Rectorado pueden consultar los hitos de un proyecto.
@@ -584,42 +636,62 @@ classDiagram
 
 ## Adjudicación y Orden de Mérito
 
+No hay entidades `OrdenDeMerito` ni `Adjudicacion` separadas: el resultado se guarda en
+columnas de `Edicion` más un flag en `Convocatoria`.
+
 ```mermaid
 classDiagram
-    class OrdenDeMerito {
-        +id: string
+    class Edicion {
+        +ordenMerito: number
+        +puntajeMerito: number
+        +adjudicacionPropuesta: boolean
+        +mecanismoAdjudicacion: MecanismoAdjudicacion
     }
 
-    class PuestoEnOrden {
-        +posicion: number
-        +notaFinal: number
+    class Convocatoria {
+        +ordenMeritoConfirmado: boolean
+        +presupuestoTotal: number
+        +cuotaFederativa: number
     }
 
-    class Adjudicacion {
-        +id: string
-        +fechaResolucion: Date
+    class MecanismoAdjudicacion {
+        <<enumeration>>
+        MERITO
+        CUOTA_FEDERATIVA
     }
 
-    class EdicionAdjudicada {
-        +montoAsignado: number
-    }
-
-    Convocatoria --> OrdenDeMerito : tiene (1 a 1)
-    OrdenDeMerito *-- PuestoEnOrden : contiene
-    PuestoEnOrden --> Edicion : proyecto
-
-    Convocatoria --> Adjudicacion : tiene (1 a 1)
-    Adjudicacion *-- EdicionAdjudicada : incluye
-    EdicionAdjudicada --> Edicion : proyecto adjudicado
+    Convocatoria "1" --> "*" Edicion : rankea y adjudica
+    Edicion *-- MecanismoAdjudicacion : mecanismoAdjudicacion
 ```
 
 ### Notas
 
-- `OrdenDeMerito` se genera automáticamente al finalizar la etapa `Evaluacion`. Ordena todos los proyectos evaluados por `notaFinal` descendente.
-- La `notaFinal` se calcula combinando la evaluación institucional (1) y las evaluaciones cruzadas (2). La fórmula exacta se definirá posteriormente.
-- Los proyectos con `esConsolidado = true` aparecen primeros en el orden de mérito, ordenados por nota final entre sí.
-- `Adjudicacion` es la resolución formal emitida por Rectorado que selecciona proyectos del orden de mérito y les asigna un monto.
-- `cuotaFederativa` actúa como piso: si al aplicar el orden de mérito una UA tiene menos proyectos adjudicados que la cuota, se toman los siguientes mejores proyectos de esa UA aunque tengan menor nota que otros de UAs que ya superaron la cuota.
+- El orden de mérito se genera **on demand** (`evaluaciones.service.ts#generarOrdenMerito`,
+  lo dispara Rectorado), no automáticamente al cerrar la evaluación. Recalcula
+  `ordenMerito` y `puntajeMerito` de todas las ediciones con evaluación confirmada.
+- **Nota final** (`calcularPuntaje`): el puntaje institucional es la suma de las subcategorías
+  **numéricas** (su valor directo); las subcategorías booleanas no suman. A eso se le agrega el
+  **promedio de las evaluaciones cruzadas confirmadas**.
+  `notaFinal = round((promedioCruzadas + puntajeInstitucional) * 10) / 10`. `esPse` **no** entra
+  en la nota. Desempate: nota final desc → checklist completo → id.
+- **Adjudicación propuesta**: a partir de las notas se arma una propuesta borrador
+  (`adjudicacionPropuesta` + `mecanismoAdjudicacion`), limitada por `presupuestoTotal`.
+  Lo que se descuenta del presupuesto es el **presupuesto a adjudicar** de cada edición
+  (solicitado + extra por insumos + extra por PSE, ver §Proyecto y Edición y
+  `presupuesto.util.ts#calcularPresupuestoAAdjudicar`), no el solicitado.
+- **Cuota federativa** como piso por UA, con un algoritmo de 3 pasos:
+  1. *Mérito global*: se financian las mejores ediciones por nota, con tope de mérito por
+     UA (`n − cuota`) y reservando el costo del piso de cuota.
+  2. *Piso de cuota*: por cada UA se financian como `CUOTA_FEDERATIVA` sus `cuota` mejores
+     ediciones aún no financiadas.
+  3. *Swap por excedente*: con el remanente, se promueve a `MERITO` la cuota de mayor nota
+     y se financia como cuota la siguiente de esa UA (iterativo).
+- Rectorado puede ajustar la propuesta a mano (`actualizarPropuestaAdjudicacion`) mientras
+  `ordenMeritoConfirmado` sea `false`.
+- `confirmarOrdenMerito` fija el resultado (ya no se puede regenerar ni ajustar) y notifica
+  a cada director (`RESULTADO_ADJUDICACION`).
+- Los proyectos consolidados que saltean evaluación entran como `Adjudicado` antes de este
+  cálculo (ver §Proyecto y Edición).
 
 ---
 
@@ -652,6 +724,7 @@ classDiagram
 - El sistema autogenera el `contenido` inicial a partir de los hitos registrados durante la ejecución. El director puede editarlo libremente y opcionalmente adjuntar un `archivoAdjunto` (PDF).
 - Cuando la convocatoria pasa a `Cierre`, se exige que el `InformeFinal` esté `Confirmado` **y** que la `AutoevaluacionImpacto` esté `Completada` para que la `Edicion` pase a `Cerrado`.
 - Una vez confirmado, queda como registro definitivo (nadie lo aprueba).
+- **Estado de implementación**: existen las confirmaciones individuales (`informe-final/confirmar`, `autoevaluacion/completar`), pero la transición de la `Edicion` a `Cerrado` que valida los tres requisitos (informe + autoevaluación + rendición aceptada) todavía no está construida. `EstadoEdicion.Cerrado` hoy solo lo produce el seed.
 
 ---
 

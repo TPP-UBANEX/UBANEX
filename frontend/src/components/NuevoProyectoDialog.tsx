@@ -40,7 +40,6 @@ export function NuevoProyectoDialog({
   const [nombre, setNombre] = useState('')
   const [convocatoriaId, setConvocatoriaId] = useState('')
   const [anioEdicion, setAnioEdicion] = useState<number | null>(new Date().getFullYear())
-  const [esConsolidado, setEsConsolidado] = useState(false)
   const [esInterfacultad, setEsInterfacultad] = useState(false)
 
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
@@ -74,7 +73,6 @@ export function NuevoProyectoDialog({
         nombre,
         convocatoriaId,
         anioEdicion: anioEdicion ?? undefined,
-        esConsolidado,
         esInterfacultad,
       })
       setOpen(false)
@@ -92,7 +90,6 @@ export function NuevoProyectoDialog({
     setNombre('')
     if (!convocatoriaFija) setConvocatoriaId('')
     setAnioEdicion(new Date().getFullYear())
-    setEsConsolidado(false)
     setEsInterfacultad(false)
   }
 
@@ -167,7 +164,6 @@ export function NuevoProyectoDialog({
               />
             </div>
 
-            <RadioGroup value={esConsolidado} onChange={setEsConsolidado} label="¿Es consolidado?" />
             <RadioGroup value={esInterfacultad} onChange={setEsInterfacultad} label="¿Es interfacultad?" />
           </div>
 

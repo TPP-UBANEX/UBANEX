@@ -1,66 +1,66 @@
-import { useEffect, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { api } from '@/lib/api'
+import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { api } from '@/lib/api';
 import {
   EstadoEdicion,
   EstadoEvaluacion,
   TipoEvaluacionCruzada,
   estadoBadge,
   estadoConvocatoriaLabel,
-} from '@/data/types'
-import type { EvaluacionEdicionDetalle } from '@/data/types'
+} from '@/data/types';
+import type { EvaluacionEdicionDetalle } from '@/data/types';
 
 const tipoCruzadaLabel: Record<TipoEvaluacionCruzada, string> = {
   [TipoEvaluacionCruzada.Propia]: 'Propia',
   [TipoEvaluacionCruzada.Ajena]: 'Ajena',
   [TipoEvaluacionCruzada.TerceraUa]: 'Tercera UA',
-}
+};
 
 const estadosSinEvaluacion = [
   EstadoEdicion.Borrador,
   EstadoEdicion.Presentado,
   EstadoEdicion.PendienteDeCambios,
-]
+];
 
 function estadoEvaluacionLabel(estado: EstadoEvaluacion) {
-  return estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador'
+  return estado === EstadoEvaluacion.Confirmada ? 'Confirmada' : 'Borrador';
 }
 
 export function EvaluacionesProyectoTab({
   edicionId,
   estado,
 }: {
-  edicionId?: string
-  estado?: EstadoEdicion
+  edicionId?: string;
+  estado?: EstadoEdicion;
 }) {
-  const [data, setData] = useState<EvaluacionEdicionDetalle | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<EvaluacionEdicionDetalle | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!edicionId) return
-    let activo = true
-    setLoading(true)
-    setError(null)
+    if (!edicionId) return;
+    let activo = true;
+    setLoading(true);
+    setError(null);
     api.evaluaciones
       .edicion(edicionId)
       .then((d) => {
-        if (activo) setData(d)
+        if (activo) setData(d);
       })
       .catch((e) => {
-        if (activo) setError(e instanceof Error ? e.message : 'Error al cargar las evaluaciones')
+        if (activo) setError(e instanceof Error ? e.message : 'Error al cargar las evaluaciones');
       })
       .finally(() => {
-        if (activo) setLoading(false)
-      })
+        if (activo) setLoading(false);
+      });
     return () => {
-      activo = false
-    }
-  }, [edicionId])
+      activo = false;
+    };
+  }, [edicionId]);
 
-  if (!edicionId) return null
+  if (!edicionId) return null;
 
   if (estado && estadosSinEvaluacion.includes(estado)) {
     return (
@@ -71,7 +71,7 @@ export function EvaluacionesProyectoTab({
           </p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (loading) {
@@ -83,7 +83,7 @@ export function EvaluacionesProyectoTab({
           <Skeleton className="h-24 w-full" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (error) {
@@ -93,73 +93,73 @@ export function EvaluacionesProyectoTab({
           <p className="text-sm text-muted-foreground text-center py-4">{error}</p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  if (!data) return null
+  if (!data) return null;
 
-  const inst = data.institucional
-  const cruzadas = data.cruzadas
-  const sinEvaluaciones = !inst && cruzadas.length === 0
+  const inst = data.institucional;
+  const cruzadas = data.cruzadas;
+  const sinEvaluaciones = !inst && cruzadas.length === 0;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {data.convocatoria.nombre ?? 'Convocatoria'}
-          {data.convocatoria.estado
-            ? ` · ${estadoConvocatoriaLabel[data.convocatoria.estado] ?? data.convocatoria.estado}`
-            : ''}
-        </span>
-      </div>
-
-      {data.resumen && (
-        <Card
-          className={
-            data.resumen.adjudicado ? 'border-emerald-300' : 'border-red-300'
-          }
-        >
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Resultado final</CardTitle>
-            <Badge
-              variant={
-                estadoBadge[data.resumen.adjudicado ? 'Adjudicado' : 'NoAdjudicado'] ?? 'outline'
-              }
-            >
-              {data.resumen.adjudicado ? 'Adjudicado' : 'No adjudicado'}
-            </Badge>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Nota final</p>
-              <p className="text-2xl font-bold">
-                {data.resumen.notaFinal}
-                <span className="text-sm font-medium text-muted-foreground"> / 100</span>
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Evaluación institucional</p>
-              <p className="text-lg font-semibold">
-                {data.resumen.puntajeInstitucional}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Resultado final</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {data.convocatoria.nombre ?? 'Convocatoria'}
+            {data.convocatoria.estado
+              ? ` · ${estadoConvocatoriaLabel[data.convocatoria.estado] ?? data.convocatoria.estado}`
+              : ''}
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Nota final</p>
+            <p className="text-3xl font-bold">
+              {data.resumen ? data.resumen.notaFinal : '—'}
+              {data.resumen && (
                 <span className="text-sm font-medium text-muted-foreground">
-                  {' '}/ {data.resumen.puntajeInstitucionalMaximo}
+                  {' '}
+                  / {data.resumen.puntajeInstitucionalMaximo + data.resumen.puntajeCruzadaMaximo}
                 </span>
+              )}
+            </p>
+            {!data.resumen && (
+              <p className="text-xs text-muted-foreground">
+                Se calcula al confirmarse la evaluación institucional y las evaluaciones cruzadas.
               </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Evaluación cruzada (promedio)</p>
-              <p className="text-lg font-semibold">
-                {data.resumen.puntajeCruzadaPromedio != null
-                  ? data.resumen.puntajeCruzadaPromedio
-                  : '—'}
+            )}
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Evaluación institucional</p>
+            <p className="text-lg font-semibold">
+              {data.resumen ? data.resumen.puntajeInstitucional : '—'}
+              {data.resumen && (
                 <span className="text-sm font-medium text-muted-foreground">
-                  {' '}/ {data.resumen.puntajeCruzadaMaximo}
+                  {' '}
+                  / {data.resumen.puntajeInstitucionalMaximo}
                 </span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              )}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Evaluación cruzada (promedio)</p>
+            <p className="text-lg font-semibold">
+              {data.resumen?.puntajeCruzadaPromedio != null
+                ? data.resumen.puntajeCruzadaPromedio
+                : '—'}
+              {data.resumen && (
+                <span className="text-sm font-medium text-muted-foreground">
+                  {' '}
+                  / {data.resumen.puntajeCruzadaMaximo}
+                </span>
+              )}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {sinEvaluaciones ? (
         <Card>
@@ -182,7 +182,9 @@ export function EvaluacionesProyectoTab({
             </CardHeader>
             <CardContent className="space-y-4">
               {!inst ? (
-                <p className="text-sm text-muted-foreground">Sin evaluación institucional registrada.</p>
+                <p className="text-sm text-muted-foreground">
+                  Sin evaluación institucional registrada.
+                </p>
               ) : (
                 <>
                   {data.estructuraInstitucional && inst.categorias ? (
@@ -191,14 +193,14 @@ export function EvaluacionesProyectoTab({
                         <div key={cat.id} className="space-y-3">
                           <h3 className="text-sm font-semibold border-b pb-1">{cat.nombre}</h3>
                           {cat.subcategorias.map((sub) => {
-                            const resp = inst.categorias?.[sub.id]
+                            const resp = inst.categorias?.[sub.id];
                             return (
                               <div key={sub.id} className="space-y-1">
                                 <div className="flex items-start justify-between gap-4">
                                   <p className="text-sm flex-1">{sub.texto}</p>
                                   <span className="text-sm font-medium shrink-0">
                                     {sub.tipoValor === 'numerico'
-                                      ? (resp?.valor as number | undefined) ?? '—'
+                                      ? ((resp?.valor as number | undefined) ?? '—')
                                       : resp?.valor === true
                                         ? 'Sí'
                                         : resp?.valor === false
@@ -212,13 +214,15 @@ export function EvaluacionesProyectoTab({
                                   </p>
                                 ) : null}
                               </div>
-                            )
+                            );
                           })}
                         </div>
                       ))}
                       {data.estructuraInstitucional.checklist.length > 0 && (
                         <div className="space-y-2">
-                          <h3 className="text-sm font-semibold border-b pb-1">Checklist institucional</h3>
+                          <h3 className="text-sm font-semibold border-b pb-1">
+                            Checklist institucional
+                          </h3>
                           {data.estructuraInstitucional.checklist.map((item) => (
                             <div key={item.id} className="flex items-center justify-between gap-4">
                               <p className="text-sm flex-1">{item.texto}</p>
@@ -233,12 +237,27 @@ export function EvaluacionesProyectoTab({
                           ))}
                         </div>
                       )}
+                      {inst.esPse !== null && (
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-sm flex-1">¿Es una Práctica Social Educativa?</p>
+                          <span className="text-sm font-medium shrink-0">
+                            {inst.esPse ? 'Sí' : 'No'}
+                          </span>
+                        </div>
+                      )}
                       {inst.observaciones ? (
                         <div className="space-y-1">
                           <h3 className="text-sm font-semibold border-b pb-1">Observaciones</h3>
                           <p className="text-sm whitespace-pre-wrap">{inst.observaciones}</p>
                         </div>
                       ) : null}
+                      <div className="border-t pt-2 flex items-center justify-between">
+                        <span className="text-sm font-medium">Puntaje total</span>
+                        <span className="text-sm font-bold shrink-0">
+                          {inst.puntaje ?? '—'}
+                          {inst.puntajeMaximo != null ? ` / ${inst.puntajeMaximo}` : ''}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -247,7 +266,9 @@ export function EvaluacionesProyectoTab({
                   )}
                   {(inst.realizadoPor || inst.confirmadoPor) && (
                     <div className="text-xs text-muted-foreground space-y-1">
-                      {inst.realizadoPor && <p>Realizada por: {inst.realizadoPor.nombreCompleto}</p>}
+                      {inst.realizadoPor && (
+                        <p>Realizada por: {inst.realizadoPor.nombreCompleto}</p>
+                      )}
                       {inst.confirmadoPor && (
                         <p>Confirmada por: {inst.confirmadoPor.nombreCompleto}</p>
                       )}
@@ -264,7 +285,9 @@ export function EvaluacionesProyectoTab({
             </CardHeader>
             <CardContent className="space-y-4">
               {cruzadas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin evaluaciones cruzadas registradas.</p>
+                <p className="text-sm text-muted-foreground">
+                  Sin evaluaciones cruzadas registradas.
+                </p>
               ) : (
                 cruzadas.map((c) => (
                   <div key={c.id} className="rounded-md border p-3 space-y-2">
@@ -285,9 +308,14 @@ export function EvaluacionesProyectoTab({
                           <div key={cat.id} className="space-y-1">
                             <p className="text-xs font-semibold">{cat.nombre}</p>
                             {cat.items.map((item) => (
-                              <div key={item.id} className="flex items-center justify-between gap-4 text-sm">
+                              <div
+                                key={item.id}
+                                className="flex items-center justify-between gap-4 text-sm"
+                              >
                                 <span className="flex-1">{item.nombre}</span>
-                                <span className="font-medium shrink-0">{c.items?.[item.id] ?? '—'}</span>
+                                <span className="font-medium shrink-0">
+                                  {c.items?.[item.id] ?? '—'}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -302,7 +330,8 @@ export function EvaluacionesProyectoTab({
                       </div>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        La evaluación aún está en borrador; el resultado se publicará al confirmarse.
+                        La evaluación aún está en borrador; el resultado se publicará al
+                        confirmarse.
                       </p>
                     )}
                     {c.observaciones ? (
@@ -318,5 +347,5 @@ export function EvaluacionesProyectoTab({
         </div>
       )}
     </div>
-  )
+  );
 }
