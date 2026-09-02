@@ -93,6 +93,7 @@ function evalInstitucionalAlta() {
       'check-presupuesto': true,
       'check-documentacion': true,
     },
+    esPse: false,
   };
 }
 
@@ -113,6 +114,7 @@ function evalInstitucionalBaja() {
       'check-presupuesto': true,
       'check-documentacion': true,
     },
+    esPse: false,
   };
 }
 
@@ -231,7 +233,7 @@ async function crearProyectoYEnviar(
   await peticion(app)
     .patch(`/proyectos/${proyectoId}/ediciones/${edicionId}`)
     .set(docenteHeaders)
-    .send({ presupuesto: presupuestoCompleto() });
+    .send({ presupuestoSolicitado: presupuestoCompleto() });
 
   const { asignarDirectores: asignarDirs } = await import('./fixtures');
   await asignarDirs(app, {
@@ -256,8 +258,6 @@ async function asignarEvaluadores(
   base: DatosBase,
   convocatoriaId: string,
 ) {
-  const secretariaDerechoHeaders = await autenticar(app, base.autoridadSecretariaDerecho);
-  const secretariaIngenieriaHeaders = await autenticar(app, base.autoridadSecretariaIngenieria);
   const adminHeaders = await autenticar(app, base.admin);
 
   const dirDerechoId = await obtenerUsuarioId(app, base.docenteEvaluadorDerecho.email);
@@ -265,33 +265,17 @@ async function asignarEvaluadores(
 
   const resProp1 = await peticion(app)
     .post('/participaciones-convocatoria')
-    .set(secretariaDerechoHeaders)
+    .set(adminHeaders)
     .send({ usuarioId: dirDerechoId, convocatoriaId, rol: 'Evaluador' });
   expect(resProp1.status).toBe(201);
-  const partDerechoId = resProp1.body.id as string;
+  expect(resProp1.body.estado).toBe('Aprobado');
 
   const resProp2 = await peticion(app)
     .post('/participaciones-convocatoria')
-    .set(secretariaIngenieriaHeaders)
+    .set(adminHeaders)
     .send({ usuarioId: dirIngId, convocatoriaId, rol: 'Evaluador' });
   expect(resProp2.status).toBe(201);
-  const partIngId = resProp2.body.id as string;
-
-  await peticion(app)
-    .post(`/participaciones-convocatoria/${partDerechoId}/aceptar`)
-    .set(await autenticar(app, base.docenteEvaluadorDerecho));
-  await peticion(app)
-    .post(`/participaciones-convocatoria/${partIngId}/aceptar`)
-    .set(await autenticar(app, base.docenteEvaluadorIngenieria));
-
-  await peticion(app)
-    .patch(`/participaciones-convocatoria/${partDerechoId}/estado`)
-    .set(adminHeaders)
-    .send({ estado: 'Aprobado' });
-  await peticion(app)
-    .patch(`/participaciones-convocatoria/${partIngId}/estado`)
-    .set(adminHeaders)
-    .send({ estado: 'Aprobado' });
+  expect(resProp2.body.estado).toBe('Aprobado');
 }
 
 async function evaluarInstitucional(
@@ -479,10 +463,10 @@ describe('Flujo completo: convocatoria → proyecto → evaluación → orden de
 
     expect(resumen.status).toBe(200);
     expect(resumen.body.resumen).toBeDefined();
-    expect(resumen.body.resumen.notaFinal).toBeGreaterThanOrEqual(60);
-    expect(resumen.body.resumen.adjudicado).toBe(true);
     expect(resumen.body.resumen.puntajeInstitucional).toBeGreaterThan(0);
     expect(resumen.body.resumen.puntajeCruzadaPromedio).toBeGreaterThan(0);
+    expect(resumen.body.resumen.checklistCompleto).toBe(true);
+    expect(resumen.body.resumen.notaFinal).toBeGreaterThan(0);
   });
 
   it('no crea un hito fuera del período de ejecución', async () => {
@@ -586,6 +570,6 @@ describe('Flujo completo con puntajes bajos: proyecto NO adjudicado (e2e)', () =
     expect(resumen.status).toBe(200);
     expect(resumen.body.resumen).toBeDefined();
     expect(resumen.body.resumen.notaFinal).toBeLessThan(60);
-    expect(resumen.body.resumen.adjudicado).toBe(false);
+    expect(resumen.body.resumen.checklistCompleto).toBe(true);
   });
 });

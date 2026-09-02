@@ -10,7 +10,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:integration": "jest --config test/jest-e2e.json --runInBand"
+    "test:integration": "jest --config test/jest-e2e.json --runInBand",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/ormconfig.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/ormconfig.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/ormconfig.ts"

@@ -110,7 +110,7 @@ describe('Ciclo de convocatoria y presentación de proyectos (e2e)', () => {
       .patch(`/proyectos/${proyectoId}/ediciones/${edicionId}`)
       .set({ Authorization: `Bearer ${token}` })
       .send({
-        presupuesto: {
+        presupuestoSolicitado: {
           montoTotal: 1,
           rubros: [{ tipo: 'Sueldos', subtotal: -5, partidas: [] }],
         },
@@ -131,7 +131,7 @@ describe('Ciclo de convocatoria y presentación de proyectos (e2e)', () => {
       .patch(`/proyectos/${proyectoId}/ediciones/${edicionId}`)
       .set({ Authorization: `Bearer ${token}` })
       .send({
-        presupuesto: {
+        presupuestoSolicitado: {
           montoTotal: 1,
           rubros: [
             {
@@ -161,7 +161,7 @@ describe('Ciclo de convocatoria y presentación de proyectos (e2e)', () => {
         },
       });
     expect(res.status).toBe(200);
-    const presupuesto = res.body.ediciones[0].presupuesto as {
+    const presupuesto = res.body.ediciones[0].presupuestoSolicitado as {
       montoTotal: number;
       rubros: Array<{ subtotal: number }>;
     };
@@ -198,7 +198,7 @@ describe('Ciclo de convocatoria y presentación de proyectos (e2e)', () => {
       .patch(`/proyectos/${proyectoId}/ediciones/${edicionId}`)
       .set(authHeaders)
       .send({
-        presupuesto: {
+        presupuestoSolicitado: {
           montoTotal: 1,
           rubros: [
             {
