@@ -72,18 +72,36 @@ function conProtocolo(url: string) {
   return /^https?:\/\//i.test(u) ? u : `https://${u}`
 }
 
+function esGoogleDrive(url: string): boolean {
+  const v = url.trim()
+  if (!v) return false
+  const normalizado = /^https?:\/\//i.test(v) ? v : `https://${v}`
+  let host: string
+  try {
+    host = new URL(normalizado).hostname.toLowerCase()
+  } catch {
+    return false
+  }
+  const permitidos = ['drive.google.com', 'drive.usercontent.google.com', 'docs.google.com']
+  return permitidos.some(d => host === d || host.endsWith(`.${d}`))
+}
+
 export function ComprobantesTab({
   edicionId,
   estado,
   puedeEditar,
   puedeGestionarEstado,
   presupuesto,
+  fechaInicioEjecucion,
+  fechaFinEjecucion,
 }: {
   edicionId?: string
   estado?: EstadoEdicion
   puedeEditar: boolean
   puedeGestionarEstado: boolean
   presupuesto?: Presupuesto | null
+  fechaInicioEjecucion?: string
+  fechaFinEjecucion?: string
 }) {
   const [comprobantes, setComprobantes] = useState<Rendicion[]>([])
   const [loading, setLoading] = useState(true)
@@ -177,7 +195,7 @@ export function ComprobantesTab({
     setForm({
       ...formVacio,
       rubro: rubrosDisponibles[0] ?? formVacio.rubro,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: fechaInicioEjecucion ?? new Date().toISOString().slice(0, 10),
     })
     setModalOpen(true)
   }
@@ -205,8 +223,20 @@ export function ComprobantesTab({
       toast.error('El link al comprobante es obligatorio')
       return
     }
+    if (!esGoogleDrive(form.comprobanteUrl)) {
+      toast.error('El link debe ser de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com)')
+      return
+    }
     if (!form.fecha) {
       toast.error('La fecha es obligatoria')
+      return
+    }
+    if (fechaInicioEjecucion && form.fecha < fechaInicioEjecucion) {
+      toast.error('La fecha debe ser posterior o igual al inicio del período de ejecución')
+      return
+    }
+    if (fechaFinEjecucion && form.fecha > fechaFinEjecucion) {
+      toast.error('La fecha debe ser anterior o igual al fin del período de ejecución')
       return
     }
     if (!rubrosDisponibles.includes(form.rubro)) {
@@ -478,9 +508,16 @@ export function ComprobantesTab({
                   <label className="text-xs font-medium">Fecha *</label>
                   <Input
                     type="date"
+                    min={fechaInicioEjecucion}
+                    max={fechaFinEjecucion}
                     value={form.fecha}
                     onChange={e => actualizarCampo('fecha', e.target.value)}
                   />
+                  {(fechaInicioEjecucion || fechaFinEjecucion) && (
+                    <p className="text-xs text-muted-foreground">
+                      Período de ejecución: entre {fechaInicioEjecucion ?? '-'} y {fechaFinEjecucion ?? '-'}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -494,13 +531,13 @@ export function ComprobantesTab({
               <div className="space-y-1.5">
                 <label className="text-xs font-medium">Link al comprobante *</label>
                 <Input
-                  placeholder="https://..."
+                  placeholder="https://drive.google.com/file/d/..."
                   maxLength={2048}
                   value={form.comprobanteUrl}
                   onChange={e => actualizarCampo('comprobanteUrl', e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Pegá el link (PDF o imagen). Si no lleva protocolo, se le agrega https:// automáticamente.
+                  Solo se aceptan links de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com). Si no lleva protocolo, se le agrega https:// automáticamente.
                 </p>
               </div>
             </div>

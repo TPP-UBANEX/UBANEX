@@ -160,6 +160,43 @@ export class RendicionesService {
     }
   }
 
+  /** Valida que la fecha del comprobante esté dentro del período de ejecución de la convocatoria. */
+  private validarFechaEnEjecucion(edicion: Edicion, fecha: string): void {
+    const { fechaInicioEjecucion, fechaFinEjecucion } = edicion.convocatoria ?? {};
+    if (fechaInicioEjecucion && fecha < fechaInicioEjecucion) {
+      throw new BadRequestException(
+        'La fecha del comprobante debe ser posterior o igual al inicio del período de ejecución',
+      );
+    }
+    if (fechaFinEjecucion && fecha > fechaFinEjecucion) {
+      throw new BadRequestException(
+        'La fecha del comprobante debe ser anterior o igual al fin del período de ejecución',
+      );
+    }
+  }
+
+  /** Normaliza el link (agrega https:// si falta) y valida que sea de Google Drive. */
+  private validarLinkGoogleDrive(url: string): string {
+    const v = url.trim();
+    if (!v) {
+      throw new BadRequestException('El link al comprobante es obligatorio');
+    }
+    const normalizado = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+    let host: string;
+    try {
+      host = new URL(normalizado).hostname.toLowerCase();
+    } catch {
+      throw new BadRequestException('El link al comprobante no es una URL válida');
+    }
+    const permitidos = ['drive.google.com', 'drive.usercontent.google.com', 'docs.google.com'];
+    if (!permitidos.some((d) => host === d || host.endsWith(`.${d}`))) {
+      throw new BadRequestException(
+        'El link al comprobante debe ser de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com)',
+      );
+    }
+    return normalizado;
+  }
+
   async listarPorEdicion(edicionId: string, usuario: Usuario): Promise<Rendicion[]> {
     const edicion = await this.obtenerEdicion(edicionId);
     await this.validarAccesoLectura(edicion, usuario);
@@ -175,6 +212,7 @@ export class RendicionesService {
     await this.validarEtapaEjecucion(edicion);
     await this.validarDirectorOCreador(edicion, usuario);
     await this.validarPresupuesto(edicion, { rubro: dto.rubro, monto: dto.monto });
+    await this.validarFechaEnEjecucion(edicion, dto.fecha);
 
     const rendicion = this.repo.create({
       edicionId: edicion.id,
@@ -182,7 +220,7 @@ export class RendicionesService {
       monto: dto.monto,
       descripcion: dto.descripcion ?? null,
       fecha: dto.fecha,
-      comprobanteUrl: dto.comprobanteUrl.trim(),
+      comprobanteUrl: this.validarLinkGoogleDrive(dto.comprobanteUrl),
       motivoRechazo: null,
       estado: EstadoComprobante.EnRevision,
       creadoPorId: usuario.id,
@@ -247,17 +285,16 @@ export class RendicionesService {
       rubro: nuevoRubro,
       monto: nuevoMonto,
     });
+    if (dto.fecha !== undefined) {
+      await this.validarFechaEnEjecucion(edicion, dto.fecha);
+    }
 
     if (dto.rubro !== undefined) rendicion.rubro = dto.rubro;
     if (dto.monto !== undefined) rendicion.monto = dto.monto;
     if (dto.descripcion !== undefined) rendicion.descripcion = dto.descripcion;
     if (dto.fecha !== undefined) rendicion.fecha = dto.fecha;
     if (dto.comprobanteUrl !== undefined) {
-      const link = dto.comprobanteUrl.trim();
-      if (!link) {
-        throw new BadRequestException('El link al comprobante es obligatorio');
-      }
-      rendicion.comprobanteUrl = link;
+      rendicion.comprobanteUrl = this.validarLinkGoogleDrive(dto.comprobanteUrl);
     }
     // Si estaba rechazado y el director lo vuelve a editar, pasa nuevamente a EnRevisión
     // y se limpia el motivo de rechazo.

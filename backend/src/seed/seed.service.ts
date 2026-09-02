@@ -3597,7 +3597,7 @@ export class SeedService {
             monto,
             descripcion: rng.bool() ? 'Gasto documentado de ejecución' : 'Adquisición / servicio durante la ejecución',
             fecha: this.sumarDias(inicio, rng.entero(0, 90) + i * 30),
-            comprobanteUrl: 'https://example.com/comprobante.pdf',
+            comprobanteUrl: 'https://drive.google.com/file/d/comprobante-seed/view',
             estado: rng.pick([
               EstadoComprobante.EnRevision,
               EstadoComprobante.EnRevision,

@@ -920,6 +920,8 @@ export function ProyectoDetail() {
               puedeEditar={puedeEditarEjecucion}
               puedeGestionarEstado={puedeGestionarComprobantes}
               presupuesto={edicion.presupuestoSolicitado}
+              fechaInicioEjecucion={edicion.convocatoria?.fechaInicioEjecucion ?? undefined}
+              fechaFinEjecucion={edicion.convocatoria?.fechaFinEjecucion ?? undefined}
             />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
