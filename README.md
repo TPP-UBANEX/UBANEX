@@ -1,5 +1,9 @@
 # UBANEX
 
+<p align="center">
+  <img src="frontend/src/assets/logo-dark.svg" alt="UBANEX" width="420">
+</p>
+
 Sistema de gestión integral para las convocatorias de extensión universitaria de la UBA
 (inicialmente UBANEX): digitaliza y estructura el ciclo completo de una convocatoria
 —presentación, evaluación, adjudicación y orden de mérito, ejecución y seguimiento,
