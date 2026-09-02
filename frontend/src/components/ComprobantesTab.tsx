@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -347,121 +347,158 @@ export function ComprobantesTab({
           </Button>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         {!enEjecucion ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             La rendición de comprobantes está disponible durante la ejecución del proyecto.
           </p>
         ) : loading ? (
           <Skeleton className="h-32 w-full" />
-        ) : comprobantes.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Aún no se cargaron comprobantes de gastos.
-          </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rubro</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Comprobante</TableHead>
-                <TableHead>Estado</TableHead>
-                {puedeGestionarEstado && <TableHead className="w-28">Revisión</TableHead>}
-                {permitidoEditar && <TableHead className="w-16 text-right">Acciones</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {comprobantes.map(c => (
-                <TableRow key={c.id}>
-                  <TableCell className="text-sm">
-                    <Badge variant="outline">{rubroLabel(c.rubro)}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{c.fecha}</TableCell>
-                  <TableCell className="text-sm max-w-[220px]">{c.descripcion || '-'}</TableCell>
-                  <TableCell className="text-sm font-medium">{formatearMoneda(c.monto)}</TableCell>
-                  <TableCell className="text-sm">
-                    <a
-                      href={conProtocolo(c.comprobanteUrl)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary underline"
-                    >
-                      Ver comprobante
-                    </a>
-                  </TableCell>
-                  <TableCell>
-                    <EstadoBadge estado={c.estado} />
-                    {c.estado === EstadoComprobante.Rechazado && c.motivoRechazo && (
-                      <p className="mt-1 max-w-[220px] text-xs text-destructive">
-                        Motivo: {c.motivoRechazo}
-                      </p>
-                    )}
-                  </TableCell>
-                  {puedeGestionarEstado && c.estado === EstadoComprobante.EnRevision && (
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={cambiandoEstadoId === c.id}
-                          onClick={() => cambiarEstado(c, EstadoComprobante.Aceptado)}
-                        >
-                          {cambiandoEstadoId === c.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Check className="h-3 w-3 text-green-600" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={cambiandoEstadoId === c.id}
-                          onClick={() => cambiarEstado(c, EstadoComprobante.Rechazado)}
-                        >
-                          <X className="h-3 w-3 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                  {puedeGestionarEstado && c.estado !== EstadoComprobante.EnRevision && (
-                    <TableCell className="text-sm text-muted-foreground">
-                      {estadoComprobanteLabel[c.estado]}
-                    </TableCell>
-                  )}
-                  {permitidoEditar && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={c.estado === EstadoComprobante.Aceptado}
-                          onClick={() => abrirEditar(c)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={
-                            eliminandoId === c.id || c.estado === EstadoComprobante.Aceptado
-                          }
-                          onClick={() => eliminar(c.id)}
-                        >
-                          {eliminandoId === c.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <>
+            <div className="space-y-2 rounded-md border p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Consumo del presupuesto</p>
+              {rubrosDisponibles.map(rubro => {
+                const gastado = sumas.porRubro[rubro] ?? 0
+                const subtotal = subtotalDeRubro(rubro)
+                const excede = subtotal > 0 && gastado > subtotal
+                return (
+                  <div key={rubro} className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{rubroLabel(rubro)}</span>
+                    <span className={excede ? 'text-destructive' : 'text-muted-foreground'}>
+                      {formatearMoneda(gastado)} <span className="text-muted-foreground/70">/ {formatearMoneda(subtotal)}</span>
+                    </span>
+                  </div>
+                )
+              })}
+              <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">
+                <span>Total</span>
+                <span>{formatearMoneda(sumas.total)} / {formatearMoneda(topeTotal())}</span>
+              </div>
+            </div>
+
+            {comprobantes.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Aún no se cargaron comprobantes de gastos.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Monto</TableHead>
+                    <TableHead>Comprobante</TableHead>
+                    <TableHead>Estado</TableHead>
+                    {puedeGestionarEstado && <TableHead className="w-28">Revisión</TableHead>}
+                    {permitidoEditar && <TableHead className="w-16 text-right">Acciones</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rubrosDisponibles.map(rubro => {
+                    const filas = comprobantes.filter(c => c.rubro === rubro)
+                    if (filas.length === 0) return null
+                    return (
+                      <Fragment key={rubro}>
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableCell
+                            colSpan={5 + (puedeGestionarEstado ? 1 : 0) + (permitidoEditar ? 1 : 0)}
+                            className="font-semibold"
+                          >
+                            {rubroLabel(rubro)} — Subtotal: {formatearMoneda(sumas.porRubro[rubro] ?? 0)}
+                          </TableCell>
+                        </TableRow>
+                        {filas.map(c => (
+                          <TableRow key={c.id}>
+                            <TableCell className="text-sm">{c.fecha}</TableCell>
+                            <TableCell className="text-sm max-w-[220px]">{c.descripcion || '-'}</TableCell>
+                            <TableCell className="text-sm font-medium">{formatearMoneda(c.monto)}</TableCell>
+                            <TableCell className="text-sm">
+                              <a
+                                href={conProtocolo(c.comprobanteUrl)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline"
+                              >
+                                Ver comprobante
+                              </a>
+                            </TableCell>
+                            <TableCell>
+                              <EstadoBadge estado={c.estado} />
+                              {c.estado === EstadoComprobante.Rechazado && c.motivoRechazo && (
+                                <p className="mt-1 max-w-[220px] text-xs text-destructive">
+                                  Motivo: {c.motivoRechazo}
+                                </p>
+                              )}
+                            </TableCell>
+                            {puedeGestionarEstado && c.estado === EstadoComprobante.EnRevision && (
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={cambiandoEstadoId === c.id}
+                                    onClick={() => cambiarEstado(c, EstadoComprobante.Aceptado)}
+                                  >
+                                    {cambiandoEstadoId === c.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Check className="h-3 w-3 text-green-600" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={cambiandoEstadoId === c.id}
+                                    onClick={() => cambiarEstado(c, EstadoComprobante.Rechazado)}
+                                  >
+                                    <X className="h-3 w-3 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
+                            {puedeGestionarEstado && c.estado !== EstadoComprobante.EnRevision && (
+                              <TableCell className="text-sm text-muted-foreground">
+                                {estadoComprobanteLabel[c.estado]}
+                              </TableCell>
+                            )}
+                            {permitidoEditar && (
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={c.estado === EstadoComprobante.Aceptado}
+                                    onClick={() => abrirEditar(c)}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={
+                                      eliminandoId === c.id || c.estado === EstadoComprobante.Aceptado
+                                    }
+                                    onClick={() => eliminar(c.id)}
+                                  >
+                                    {eliminandoId === c.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    )}
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </Fragment>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </>
         )}
 
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
