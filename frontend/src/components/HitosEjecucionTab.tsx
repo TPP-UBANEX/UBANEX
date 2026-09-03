@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { conProtocolo } from '@/lib/utils'
 import type { Hito, CrearHitoDto, Convocatoria } from '@/data/types'
 import {
   CategoriaHito,
@@ -36,7 +37,7 @@ import {
   EstadoEdicion,
 } from '@/data/types'
 import { TextoLargoColapsable } from '@/components/CampoFormularioInput'
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Link2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface HitoFormState {
@@ -45,6 +46,7 @@ interface HitoFormState {
   fechaInicio: string
   fechaFin: string
   integrantes: string
+  links: string[]
   categoria: CategoriaHito
 }
 
@@ -54,8 +56,11 @@ const formVacio: HitoFormState = {
   fechaInicio: '',
   fechaFin: '',
   integrantes: '',
+  links: [],
   categoria: CategoriaHito.Organizacion,
 }
+
+const MAX_LINKS = 20
 
 const CATEGORIAS = Object.values(CategoriaHito) as CategoriaHito[]
 
@@ -116,6 +121,7 @@ export function HitosEjecucionTab({
       fechaInicio: hito.fechaInicio ?? '',
       fechaFin: hito.fechaFin ?? '',
       integrantes: hito.integrantes ?? '',
+      links: hito.links?.length ? [...hito.links] : [],
       categoria: hito.categoria,
     })
     setModalOpen(true)
@@ -146,6 +152,7 @@ export function HitosEjecucionTab({
         fechaInicio: form.fechaInicio || undefined,
         fechaFin: form.fechaFin || undefined,
         integrantes: form.integrantes.trim() || undefined,
+        links: form.links.map((l) => l.trim()).filter(Boolean),
         categoria: form.categoria,
       }
       if (editandoId) {
@@ -180,6 +187,20 @@ export function HitosEjecucionTab({
 
   const actualizarCampo = (campo: keyof HitoFormState, valor: string) =>
     setForm((prev) => ({ ...prev, [campo]: valor }))
+
+  const actualizarLink = (i: number, valor: string) =>
+    setForm((prev) => ({
+      ...prev,
+      links: prev.links.map((l, idx) => (idx === i ? valor : l)),
+    }))
+
+  const agregarLink = () =>
+    setForm((prev) =>
+      prev.links.length >= MAX_LINKS ? prev : { ...prev, links: [...prev.links, ''] },
+    )
+
+  const quitarLink = (i: number) =>
+    setForm((prev) => ({ ...prev, links: prev.links.filter((_, idx) => idx !== i) }))
 
   return (
     <Card>
@@ -217,6 +238,22 @@ export function HitosEjecucionTab({
                     {hito.descripcion && (
                       <div className="mt-0.5">
                         <TextoLargoColapsable texto={hito.descripcion} />
+                      </div>
+                    )}
+                    {hito.links && hito.links.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                        {hito.links.map((link, i) => (
+                          <a
+                            key={i}
+                            href={conProtocolo(link)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary underline break-all"
+                          >
+                            <Link2 className="h-3 w-3 shrink-0" />
+                            {link}
+                          </a>
+                        ))}
                       </div>
                     )}
                   </TableCell>
@@ -261,7 +298,7 @@ export function HitosEjecucionTab({
 
         {permitidoEditar && (
           <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editandoId ? 'Editar hito' : 'Nuevo hito'}</DialogTitle>
                 <DialogDescription>
@@ -331,6 +368,42 @@ export function HitosEjecucionTab({
                     value={form.descripcion}
                     onChange={(e) => actualizarCampo('descripcion', e.target.value)}
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Links</label>
+                  <p className="text-xs text-muted-foreground">
+                    Enlaces para mostrar lo que se va haciendo (fotos, documentos, publicaciones).
+                    Si no incluís <code>https://</code> se agrega solo.
+                  </p>
+                  {form.links.length > 0 && (
+                    <div className="space-y-2">
+                      {form.links.map((link, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Input
+                            placeholder="https://…"
+                            value={link}
+                            onChange={(e) => actualizarLink(i, e.target.value)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => quitarLink(i)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={agregarLink}
+                    disabled={form.links.length >= MAX_LINKS}
+                  >
+                    <Link2 className="h-3 w-3 mr-1" />Agregar link
+                  </Button>
                 </div>
               </div>
               <DialogFooter>
