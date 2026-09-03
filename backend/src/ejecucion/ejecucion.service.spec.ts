@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { EjecucionService } from './ejecucion.service';
+import { EjecucionService, normalizarLinksHito } from './ejecucion.service';
 import { Hito } from './hito.entity';
 import { AutoevaluacionImpacto } from './autoevaluacion-impacto.entity';
 import { InformeFinal } from './informe-final.entity';
@@ -15,6 +15,25 @@ import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+
+describe('normalizarLinksHito', () => {
+  it('antepone https:// a los links sin protocolo y deja los que ya lo tienen', () => {
+    expect(
+      normalizarLinksHito(['ejemplo.com', 'http://x.com', 'https://y.com/a']),
+    ).toEqual(['https://ejemplo.com', 'http://x.com', 'https://y.com/a']);
+  });
+
+  it('trimea y descarta los vacíos', () => {
+    expect(normalizarLinksHito(['  drive.google.com/foo  ', '', '   '])).toEqual([
+      'https://drive.google.com/foo',
+    ]);
+  });
+
+  it('devuelve [] para null / undefined', () => {
+    expect(normalizarLinksHito(undefined)).toEqual([]);
+    expect(normalizarLinksHito(null)).toEqual([]);
+  });
+});
 
 describe('EjecucionService — validación de fechas de hitos', () => {
   const findOneEdicion = jest.fn<() => Promise<Edicion | null>>();
