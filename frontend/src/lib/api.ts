@@ -316,6 +316,11 @@ export const api = {
       patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/aval`, data),
     eliminarEdicion: (id: string, edicionId: string) =>
       del(`/proyectos/${id}/ediciones/${edicionId}`),
+    cerrarEdicion: (id: string, edicionId: string) =>
+      post<import('@/data/types').Proyecto>(
+        `/proyectos/${id}/ediciones/${edicionId}/cerrar`,
+        {},
+      ),
     resubir: (id: string, data: { convocatoriaId: string; anioEdicion?: number }) =>
       post<import('@/data/types').Proyecto>(`/proyectos/${id}/resubir`, data),
     disponiblesParaResubir: (convocatoriaId: string, search?: string) => {

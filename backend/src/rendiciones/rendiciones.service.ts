@@ -62,17 +62,27 @@ export class RendicionesService {
   }
 
   private async validarEtapaEjecucion(edicion: Edicion): Promise<void> {
-    const esEjecucionOCierre =
-      edicion.estado === EstadoEdicion.EnEjecucion || edicion.estado === EstadoEdicion.Cerrado;
-    const convocatoriaEnEjecucion =
-      edicion.convocatoria?.estado === EstadoConvocatoria.Ejecucion ||
-      edicion.convocatoria?.estado === EstadoConvocatoria.Cierre;
-    if (!esEjecucionOCierre) {
-      throw new BadRequestException('El proyecto no está en etapa de ejecución');
+    if (edicion.estado !== EstadoEdicion.EnEjecucion) {
+      throw new BadRequestException(
+        this.motivoBloqueoComprobantes(edicion),
+      );
     }
-    if (!convocatoriaEnEjecucion) {
-      throw new BadRequestException('La convocatoria no está en etapa de ejecución');
+    if (edicion.convocatoria?.estado !== EstadoConvocatoria.Ejecucion) {
+      throw new BadRequestException(
+        this.motivoBloqueoComprobantes(edicion),
+      );
     }
+  }
+
+  /** Explica por qué no se pueden gestionar comprobantes (edición o convocatoria cerrada). */
+  private motivoBloqueoComprobantes(edicion: Edicion): string {
+    if (edicion.estado === EstadoEdicion.Cerrado) {
+      return 'La edición está cerrada; no se pueden gestionar comprobantes';
+    }
+    if (edicion.convocatoria?.estado === EstadoConvocatoria.Cierre) {
+      return 'La convocatoria está cerrada; no se pueden gestionar comprobantes';
+    }
+    return 'El proyecto no está en etapa de ejecución';
   }
 
   /** El usuario debe ser creador o director del proyecto (acceso de escritura). */

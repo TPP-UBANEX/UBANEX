@@ -114,7 +114,7 @@ export class EjecucionService {
   async crearHito(edicionId: string, dto: CrearHitoDto, usuario: Usuario) {
     const edicion = await this.obtenerEdicion(edicionId);
     await this.validarDirectorOCreador(edicion, usuario);
-    this.validarEtapaEjecucion(edicion);
+    this.validarEtapaEjecucionActiva(edicion);
     this.validarFechasHito(edicion, dto);
 
     const hito = await this.hitoRepo.save(
@@ -147,7 +147,7 @@ export class EjecucionService {
     const hito = await this.obtenerHito(id);
     const edicion = await this.obtenerEdicion(hito.edicionId);
     await this.validarDirectorOCreador(edicion, usuario);
-    this.validarEtapaEjecucion(edicion);
+    this.validarEtapaEjecucionActiva(edicion);
     this.validarFechasHito(edicion, {
       fechaInicio: dto.fechaInicio ?? hito.fechaInicio ?? undefined,
       fechaFin: dto.fechaFin ?? hito.fechaFin ?? undefined,
@@ -179,7 +179,7 @@ export class EjecucionService {
     const hito = await this.obtenerHito(id);
     const edicion = await this.obtenerEdicion(hito.edicionId);
     await this.validarDirectorOCreador(edicion, usuario);
-    this.validarEtapaEjecucion(edicion);
+    this.validarEtapaEjecucionActiva(edicion);
 
     await this.hitoRepo.softRemove(hito);
 
@@ -474,6 +474,31 @@ export class EjecucionService {
     if (!esEjecucionOCierre || !convocatoriaEnEjecucion) {
       throw new BadRequestException('La edición no está en etapa de ejecución');
     }
+  }
+
+  /**
+   * Como `validarEtapaEjecucion` pero exige que la convocatoria esté activa en
+   * ejecución (no cerrada) y la edición en `EnEjecucion` (no `Cerrado`). Se usa
+   * para las operaciones que quedan bloqueadas al cerrar la edición o la
+   * convocatoria (hitos), a diferencia del informe final y la autoevaluación.
+   */
+  private validarEtapaEjecucionActiva(edicion: Edicion): void {
+    if (edicion.estado !== EstadoEdicion.EnEjecucion) {
+      throw new BadRequestException(this.motivoBloqueoHitos(edicion));
+    }
+    if (edicion.convocatoria?.estado !== EstadoConvocatoria.Ejecucion) {
+      throw new BadRequestException(this.motivoBloqueoHitos(edicion));
+    }
+  }
+
+  private motivoBloqueoHitos(edicion: Edicion): string {
+    if (edicion.estado === EstadoEdicion.Cerrado) {
+      return 'La edición está cerrada; no se pueden gestionar hitos';
+    }
+    if (edicion.convocatoria?.estado === EstadoConvocatoria.Cierre) {
+      return 'La convocatoria está cerrada; no se pueden gestionar hitos';
+    }
+    return 'La edición no está en etapa de ejecución';
   }
 
   /**

@@ -131,9 +131,9 @@ export function ComprobantesTab({
     cargar()
   }, [cargar])
 
-  const enEjecucion =
-    estado === EstadoEdicion.EnEjecucion || estado === EstadoEdicion.Cerrado
+  const enEjecucion = estado === EstadoEdicion.EnEjecucion
   const permitidoEditar = enEjecucion && puedeEditar
+  const permitidoGestionarEstado = enEjecucion && puedeGestionarEstado
 
   const rubrosDisponibles = useMemo(() => {
     if (!presupuesto?.rubros?.length) return []
@@ -390,7 +390,7 @@ export function ComprobantesTab({
                     <TableHead>Monto</TableHead>
                     <TableHead>Comprobante</TableHead>
                     <TableHead>Estado</TableHead>
-                    {puedeGestionarEstado && <TableHead className="w-28">Revisión</TableHead>}
+                    {permitidoGestionarEstado && <TableHead className="w-28">Revisión</TableHead>}
                     {permitidoEditar && <TableHead className="w-16 text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -402,7 +402,7 @@ export function ComprobantesTab({
                       <Fragment key={rubro}>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
                           <TableCell
-                            colSpan={5 + (puedeGestionarEstado ? 1 : 0) + (permitidoEditar ? 1 : 0)}
+                            colSpan={5 + (permitidoGestionarEstado ? 1 : 0) + (permitidoEditar ? 1 : 0)}
                             className="font-semibold"
                           >
                             {rubroLabel(rubro)} — Subtotal: {formatearMoneda(sumas.porRubro[rubro] ?? 0)}
@@ -431,7 +431,7 @@ export function ComprobantesTab({
                                 </p>
                               )}
                             </TableCell>
-                            {puedeGestionarEstado && c.estado === EstadoComprobante.EnRevision && (
+                            {permitidoGestionarEstado && c.estado === EstadoComprobante.EnRevision && (
                               <TableCell>
                                 <div className="flex gap-1">
                                   <Button
@@ -457,7 +457,7 @@ export function ComprobantesTab({
                                 </div>
                               </TableCell>
                             )}
-                            {puedeGestionarEstado && c.estado !== EstadoComprobante.EnRevision && (
+                            {permitidoGestionarEstado && c.estado !== EstadoComprobante.EnRevision && (
                               <TableCell className="text-sm text-muted-foreground">
                                 {estadoComprobanteLabel[c.estado]}
                               </TableCell>

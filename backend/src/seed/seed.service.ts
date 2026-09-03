@@ -339,6 +339,9 @@ export class SeedService {
     console.log('\n=== SEED: Ejecución (hitos, autoevaluación, informe) ===');
     await this.seedEjecucion();
 
+    console.log('\n=== SEED: Escenario de prueba de cierres ===');
+    await this.seedEscenarioCierreTest();
+
     console.log('\n=== SEED COMPLETADO ===\n');
     await this.mostrarResumen();
   }
@@ -3727,6 +3730,382 @@ export class SeedService {
         `Integrantes: ${h.integrantes ?? '—'}\n${h.descripcion ?? ''}`.trim(),
     );
     return 'Informe final de la edición.\n\nActividades ejecutadas:\n\n' + cuerpos.join('\n\n');
+  }
+
+  /**
+   * Escenario dedicado para probar los dos cierres (de convocatoria y de edición).
+   *
+   * Crea una convocatoria en `Ejecucion` con ejecución en el futuro y 10 ediciones
+   * completas (director + codirector + evaluaciones + hitos + rendiciones +
+   * autoevaluación + informe) en un mix de estados, de modo de ejercitar todos
+   * los caminos de una: ediciones ya cerradas, ediciones listas para cerrar y
+   * ediciones que bloquean el cierre (por comprobantes en revisión, informe sin
+   * confirmar o autoevaluación sin completar). Idempotente: no duplica nada.
+   */
+  private async seedEscenarioCierreTest(): Promise<void> {
+    const NOMBRE = 'UBANEX · Escenario de Prueba Cierre';
+    const ANIO = 2026;
+
+    const nombreFormulario = 'Formulario estándar UBANEX (escenario de cierre)';
+    let formulario = await this.formularioRepo.findOne({ where: { nombre: nombreFormulario } });
+    if (!formulario) {
+      formulario = await this.formularioRepo.save(
+        this.formularioRepo.create({
+          nombre: nombreFormulario,
+          esDefault: false,
+          esPlantilla: false,
+          campos: this.formularioDefault.campos
+            ? clonarCamposConIdsNuevos(this.formularioDefault.campos)
+            : null,
+        }),
+      );
+    }
+    const formularioId = formulario.id;
+    const conv = await this.seedConvocatoria({
+      nombre: NOMBRE,
+      descripcion: 'Convocatoria de prueba para ejercitar el cierre de convocatoria y de edición.',
+      anio: ANIO,
+      estado: EstadoConvocatoria.Ejecucion,
+      fechaInicioPresentacion: this.crearFecha(ANIO, 3, 1),
+      fechaFinPresentacion: this.crearFecha(ANIO, 4, 30),
+      fechaInicioEvaluacion: this.crearFecha(ANIO, 5, 15),
+      fechaFinEvaluacion: this.crearFecha(ANIO, 7, 15),
+      // Execución en el FUTURO (hoy es 2026): así cerrar la convocatoria desde la
+      // UI no falla por la regla "fecha no puede ser anterior a hoy" y se prueba
+      // el condicionante real (comprobantes en revisión).
+      fechaInicioEjecucion: this.crearFecha(ANIO + 1, 8, 1),
+      fechaFinEjecucion: this.crearFecha(ANIO + 2, 2, 28),
+      umbralInconsistenciaCruzada: 40,
+      formularioId,
+      cuotaFederativa: 1,
+      topePresupuestoNoConsolidado: 1_200_000,
+      topePresupuestoConsolidado: 2_500_000,
+    });
+    await this.asegurarTemplatesConvocatoria(conv);
+
+    const convConTemplates = await this.convocatoriaRepo.findOne({
+      where: { id: conv.id },
+      relations: {
+        formulario: true,
+        templateEvaluacionInstitucional: true,
+        templateEvaluacionCruzada: true,
+        templateAutoevaluacionImpacto: true,
+      },
+    });
+    if (!convConTemplates) return;
+    const campos = convConTemplates.formulario?.campos ?? [];
+    const templateInst = convConTemplates.templateEvaluacionInstitucional;
+    const templateCruzada = convConTemplates.templateEvaluacionCruzada;
+    const templateAutoeval = convConTemplates.templateAutoevaluacionImpacto;
+
+    const presupuesto = (): Presupuesto => ({
+      montoTotal: 400000,
+      rubros: [
+        {
+          tipo: TipoRubro.ViaticosYSeguros,
+          subtotal: 150000,
+          partidas: [
+            {
+              tipoPersona: TipoPersona.Docente, descripcion: 'Viáticos para docentes',
+              periodoInicio: `${ANIO + 1}-08-01`, periodoFin: `${ANIO + 1}-12-15`, monto: 80000,
+            },
+            {
+              tipoPersona: TipoPersona.Estudiante, descripcion: 'Viáticos para estudiantes',
+              periodoInicio: `${ANIO + 1}-08-01`, periodoFin: `${ANIO + 1}-12-15`, monto: 70000,
+            },
+          ],
+        },
+        { tipo: TipoRubro.BienesDeConsumo, subtotal: 150000, partidas: [{ descripcion: 'Materiales e insumos', cantidad: 50, precioUnitario: 3000, monto: 150000 }] },
+        { tipo: TipoRubro.BienesDeUso, subtotal: 100000, partidas: [{ descripcion: 'Equipamiento', cantidad: 2, precioUnitario: 50000, monto: 100000 }] },
+      ],
+    });
+
+    const datosFormulario = (resumen: string, area: string) =>
+      this.seedDatosFormulario(campos, {
+        resumen,
+        area,
+        poblaciones: ['Comunidad general'],
+        antecedentes: true,
+        anio: ANIO + 1,
+      });
+
+    const secretariaDe = (uaId: string): Usuario => {
+      if (uaId === this.uaMap.get('Facultad de Ingeniería')!.id) return this.authIngenieria;
+      if (uaId === this.uaMap.get('Facultad de Medicina')!.id) return this.authMedicina;
+      return this.authDerecho;
+    };
+
+    // Cada elemento se inserta con guard por edición → idempotente.
+    const asegurarHitos = async (edicion: Edicion, director: Usuario): Promise<Hito[]> => {
+      const ya = await this.hitoRepo.find({ where: { edicionId: edicion.id }, order: { fechaInicio: 'ASC' } });
+      if (ya.length > 0) return ya;
+      const inicio = `${ANIO + 1}-08-03`;
+      const filas = SeedService.TITULOS_HITOS.slice(0, 3).map((t, i) =>
+        this.hitoRepo.create({
+          edicionId: edicion.id,
+          titulo: t.titulo,
+          descripcion: t.descripcion,
+          fechaInicio: this.sumarDias(inicio, i * 40),
+          fechaFin: this.sumarDias(inicio, i * 40 + 30),
+          integrantes: t.integrantes,
+          categoria: t.categoria,
+          creadoPorId: director.id,
+        }),
+      );
+      await this.hitoRepo.save(filas);
+      this.progreso.sumar(filas.length);
+      return filas;
+    };
+
+    const asegurarRendiciones = async (
+      edicion: Edicion,
+      director: Usuario,
+      estados: EstadoComprobante[],
+    ): Promise<void> => {
+      const ya = await this.rendicionRepo.count({ where: { edicionId: edicion.id } });
+      if (ya > 0) return;
+      const filas = estados.map((estado, i) =>
+        this.rendicionRepo.create({
+          edicionId: edicion.id,
+          rubro: TipoRubro.BienesDeConsumo,
+          monto: 12000 + i * 5000,
+          descripcion: 'Gasto documentado del escenario de prueba de cierre',
+          fecha: this.sumarDias(`${ANIO + 1}-08-05`, i * 15),
+          comprobanteUrl: 'https://drive.google.com/file/d/comprobante-cierre-test/view',
+          estado,
+          creadoPorId: director.id,
+        }),
+      );
+      await this.rendicionRepo.save(filas);
+      this.progreso.sumar(filas.length);
+    };
+
+    const asegurarAutoevaluacion = async (
+      edicion: Edicion,
+      director: Usuario,
+      estado: EstadoAutoevaluacion,
+    ): Promise<void> => {
+      if (!templateAutoeval?.estructura) return;
+      const ya = await this.autoevaluacionRepo.findOne({ where: { edicionId: edicion.id } });
+      if (ya) return;
+      const rng = this.rngDeEdicion(`${edicion.id}:auto:test`);
+      const respuestas: Record<string, unknown> = {};
+      for (const pregunta of templateAutoeval.estructura.preguntas) {
+        respuestas[pregunta.id] = this.respuestaParaPregunta(pregunta, rng);
+      }
+      await this.autoevaluacionRepo.save(
+        this.autoevaluacionRepo.create({
+          edicionId: edicion.id,
+          convocatoriaId: edicion.convocatoriaId,
+          templateId: templateAutoeval.id,
+          estado,
+          realizadoPorId: director.id,
+          confirmadoPorId: estado === EstadoAutoevaluacion.Completada ? director.id : null,
+          respuestas,
+        }),
+      );
+      this.progreso.sumar(1);
+    };
+
+    const asegurarInforme = async (
+      edicion: Edicion,
+      director: Usuario,
+      estado: EstadoInforme,
+      hitos: Hito[],
+    ): Promise<void> => {
+      const ya = await this.informeRepo.findOne({ where: { edicionId: edicion.id } });
+      if (ya) return;
+      await this.informeRepo.save(
+        this.informeRepo.create({
+          edicionId: edicion.id,
+          convocatoriaId: edicion.convocatoriaId,
+          estado,
+          contenido: this.cuerpoInforme(hitos),
+          actualizadoPorId: director.id,
+          confirmadoPorId: estado === EstadoInforme.Confirmado ? director.id : null,
+          confirmadoEn: estado === EstadoInforme.Confirmado ? new Date() : null,
+        }),
+      );
+      this.progreso.sumar(1);
+    };
+
+    const asegurarEvaluaciones = async (edicion: Edicion, ua: UnidadAcademica): Promise<void> => {
+      const secretaria = secretariaDe(ua.id);
+      const yaInst = await this.institucionalEvalRepo.findOne({ where: { edicionId: edicion.id } });
+      if (!yaInst && templateInst?.estructura && templateInst.id) {
+        const generada = generarEvaluacionInstitucional(templateInst.estructura, this.rng, true);
+        const guardada = await this.institucionalEvalRepo.save(
+          this.institucionalEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            templateId: templateInst.id,
+            estado: EstadoEvaluacion.Confirmada,
+            realizadoPorId: secretaria.id,
+            confirmadoPorId: secretaria.id,
+            categorias: generada.categorias,
+            checklist: generada.checklist,
+            observaciones: generada.observaciones,
+            esPse: generada.esPse,
+          }),
+        );
+        await this.auditoriaRepo.save(
+          this.construirHistorialEvaluacion({
+            evaluacionId: guardada.id,
+            entidad: TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
+            usuario: secretaria,
+            descripcionGuardado: 'Guardó la evaluación institucional',
+            descripcionConfirmacion: 'Confirmó la evaluación institucional',
+            confirmada: true,
+          }),
+        );
+        this.progreso.sumar(1);
+      }
+
+      if (!templateCruzada?.estructura || !templateCruzada.id) return;
+      const [yaPropia, yaAjena] = await Promise.all([
+        this.cruzadaEvalRepo.findOne({ where: { edicionId: edicion.id, tipo: TipoEvaluacionCruzada.Propia } }),
+        this.cruzadaEvalRepo.findOne({ where: { edicionId: edicion.id, tipo: TipoEvaluacionCruzada.Ajena } }),
+      ]);
+      if (!yaPropia && this.evaluadorDerecho) {
+        const generada = generarEvaluacionCruzada(templateCruzada.estructura, this.rng);
+        const guardada = await this.cruzadaEvalRepo.save(
+          this.cruzadaEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            evaluadorId: this.evaluadorDerecho.id,
+            tipo: TipoEvaluacionCruzada.Propia,
+            templateId: templateCruzada.id,
+            estado: EstadoEvaluacion.Confirmada,
+            items: generada.items,
+            observaciones: generada.observaciones,
+          }),
+        );
+        await this.auditoriaRepo.save(
+          this.construirHistorialEvaluacion({
+            evaluacionId: guardada.id,
+            entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
+            usuario: this.evaluadorDerecho,
+            descripcionGuardado: `Guardó la evaluación cruzada (${TipoEvaluacionCruzada.Propia})`,
+            descripcionConfirmacion: `Confirmó la evaluación cruzada (${TipoEvaluacionCruzada.Propia})`,
+            confirmada: true,
+          }),
+        );
+        this.progreso.sumar(1);
+      }
+      if (!yaAjena && this.evaluadorEconomicas) {
+        const generada = generarEvaluacionCruzada(templateCruzada.estructura, this.rng);
+        const guardada = await this.cruzadaEvalRepo.save(
+          this.cruzadaEvalRepo.create({
+            convocatoriaId: conv.id,
+            edicionId: edicion.id,
+            evaluadorId: this.evaluadorEconomicas.id,
+            tipo: TipoEvaluacionCruzada.Ajena,
+            templateId: templateCruzada.id,
+            estado: EstadoEvaluacion.Confirmada,
+            items: generada.items,
+            observaciones: generada.observaciones,
+          }),
+        );
+        await this.auditoriaRepo.save(
+          this.construirHistorialEvaluacion({
+            evaluacionId: guardada.id,
+            entidad: TipoEntidadAuditoria.EVALUACION_CRUZADA,
+            usuario: this.evaluadorEconomicas,
+            descripcionGuardado: `Guardó la evaluación cruzada (${TipoEvaluacionCruzada.Ajena})`,
+            descripcionConfirmacion: `Confirmó la evaluación cruzada (${TipoEvaluacionCruzada.Ajena})`,
+            confirmada: true,
+          }),
+        );
+        this.progreso.sumar(1);
+      }
+    };
+
+    const esCierrable = EstadoComprobante.Aceptado;
+
+    type Escenario = {
+      nombre: string;
+      area: string;
+      director: Usuario;
+      codirector: Usuario;
+      ua: UnidadAcademica;
+      estado: EstadoEdicion;
+      informe: EstadoInforme;
+      autoeval: EstadoAutoevaluacion;
+      rendiciones: EstadoComprobante[];
+    };
+
+    const derecho = this.uaMap.get('Facultad de Derecho')!;
+    const ingenieria = this.uaMap.get('Facultad de Ingeniería')!;
+    const medicina = this.uaMap.get('Facultad de Medicina')!;
+
+    // Un usuario sólo puede participar en UNA edición por convocatoria (unique
+    // usuarioId+convocatoriaId y edicionId de una sola fila). Por eso director y
+    // codirector deben ser USUARIOS DISTINTOS entre sí y entre proyectos: se
+    // toman de un pool global y nunca se reutilizan.
+    const usados = new Set<string>();
+    let proximoDocente: (ua: UnidadAcademica) => Usuario = () => {
+      throw new Error('proximoDocente sin inicializar');
+    };
+    proximoDocente = (ua: UnidadAcademica): Usuario => {
+      const pool = this.usuariosPorUa.get(ua.id);
+      const docentes = pool?.docentes ?? [];
+      for (let i = 0; i < docentes.length; i++) {
+        const candidato = docentes[i];
+        if (!usados.has(candidato.id)) {
+          usados.add(candidato.id);
+          return candidato;
+        }
+      }
+      throw new Error(`Seed: sin docentes disponibles en ${ua.nombre} para el escenario de cierre`);
+    };
+
+    const esp: Array<
+      Omit<Escenario, 'director' | 'codirector'> & { ua: UnidadAcademica }
+    > = [
+      { nombre: 'Proyecto Cierre 01 · ya cerrado', area: 'Cultura', ua: derecho, estado: EstadoEdicion.Cerrado, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [] },
+      { nombre: 'Proyecto Cierre 02 · ya cerrado c/ comprobantes aceptados', area: 'Salud', ua: derecho, estado: EstadoEdicion.Cerrado, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [esCierrable, esCierrable] },
+      { nombre: 'Proyecto Cierre 03 · ya cerrado c/ mix comprobantes', area: 'Tecnología', ua: ingenieria, estado: EstadoEdicion.Cerrado, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [esCierrable, esCierrable, EstadoComprobante.Rechazado] },
+      { nombre: 'Proyecto Cierre 04 · listo para cerrar', area: 'Ambiente', ua: ingenieria, estado: EstadoEdicion.EnEjecucion, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [esCierrable, esCierrable] },
+      { nombre: 'Proyecto Cierre 05 · listo para cerrar', area: 'Educación', ua: medicina, estado: EstadoEdicion.EnEjecucion, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [esCierrable] },
+      { nombre: 'Proyecto Cierre 06 · bloquea por comprobante', area: 'Cultura', ua: medicina, estado: EstadoEdicion.EnEjecucion, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [esCierrable, EstadoComprobante.EnRevision] },
+      { nombre: 'Proyecto Cierre 07 · bloquea por informe', area: 'Tecnología', ua: derecho, estado: EstadoEdicion.EnEjecucion, informe: EstadoInforme.Borrador, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [esCierrable] },
+      { nombre: 'Proyecto Cierre 08 · bloquea por autoevaluación', area: 'Salud', ua: ingenieria, estado: EstadoEdicion.EnEjecucion, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Borrador, rendiciones: [esCierrable] },
+      { nombre: 'Proyecto Cierre 09 · bloquea c/ 3º comprobante en revisión', area: 'Ambiente', ua: derecho, estado: EstadoEdicion.EnEjecucion, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [esCierrable, EstadoComprobante.EnRevision, EstadoComprobante.EnRevision] },
+      { nombre: 'Proyecto Cierre 10 · bloquea c/ todos en revisión', area: 'Educación', ua: ingenieria, estado: EstadoEdicion.EnEjecucion, informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, rendiciones: [EstadoComprobante.EnRevision, EstadoComprobante.EnRevision, EstadoComprobante.EnRevision] },
+    ];
+
+    const escenarios: Escenario[] = esp.map((e) => ({
+      ...e,
+      director: proximoDocente(e.ua),
+      codirector: proximoDocente(e.ua),
+    }));
+
+    for (const esc of escenarios) {
+      const ed = await this.seedProyectoConEdicion(
+        esc.nombre,
+        esc.director,
+        esc.ua,
+        conv,
+        esc.estado,
+        presupuesto(),
+        datosFormulario(
+          `Proyecto de prueba del escenario de cierre (${esc.area.toLowerCase()}).`,
+          esc.area,
+        ),
+      );
+      await this.seedParticipacion({ usuarioId: esc.director.id, convocatoriaId: conv.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: ed.id, esDirectorPrincipal: true, asignadoPorId: this.admin.id });
+      await this.seedParticipacion({ usuarioId: esc.codirector.id, convocatoriaId: conv.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: ed.id, esDirectorPrincipal: false, asignadoPorId: this.admin.id });
+
+      const hitos = await asegurarHitos(ed, esc.director);
+      await asegurarRendiciones(ed, esc.director, esc.rendiciones);
+      await asegurarAutoevaluacion(ed, esc.director, esc.autoeval);
+      await asegurarInforme(ed, esc.director, esc.informe, hitos);
+      await asegurarEvaluaciones(ed, esc.ua);
+    }
+
+    console.log(
+      `  ${NOMBRE} — ${escenarios.length} ediciones de prueba generadas (${escenarios.filter((e) => e.estado === EstadoEdicion.Cerrado).length} cerradas, ${escenarios.filter((e) => e.rendiciones.some((r) => r === EstadoComprobante.EnRevision)).length} con comprobantes en revisión)`,
+    );
   }
 
   // ─────────────────── Resumen ───────────────────

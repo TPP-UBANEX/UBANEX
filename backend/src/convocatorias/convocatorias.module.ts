@@ -10,6 +10,7 @@ import { TemplateEvaluacionInstitucional } from '../templates-evaluacion/templat
 import { TemplateEvaluacionCruzada } from '../templates-evaluacion/template-evaluacion-cruzada.entity';
 import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
 import { Edicion } from '../proyectos/edicion.entity';
+import { Rendicion } from '../rendiciones/rendicion.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Edicion } from '../proyectos/edicion.entity';
       TemplateEvaluacionCruzada,
       TemplateAutoevaluacionImpacto,
       Edicion,
+      Rendicion,
     ]),
   ],
   controllers: [ConvocatoriasController],

@@ -168,8 +168,10 @@ export function ConvocatoriaDetail() {
       await api.proyectos.iniciarEvaluacion(e.proyectoId, e.id);
       toast.success('Edición pasada a evaluación');
       setRefreshKey((k) => k + 1);
-    } catch {
-      toast.error('No se pudo pasar la edición a evaluación');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo pasar la edición a evaluación', {
+        duration: 8000,
+      });
     } finally {
       setPasandoEvaluacionId(null);
     }
@@ -529,8 +531,10 @@ export function ConvocatoriaDetail() {
       setConv(actualizada);
       toast.success('Convocatoria actualizada correctamente');
       setEditOpen(false);
-    } catch {
-      toast.error('Error al actualizar la convocatoria');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar la convocatoria', {
+        duration: 8000,
+      });
     } finally {
       setGuardando(false);
     }
@@ -547,8 +551,10 @@ export function ConvocatoriaDetail() {
       await api.convocatorias.eliminar(id!);
       toast.success('Convocatoria eliminada correctamente');
       navigate('/convocatorias');
-    } catch {
-      toast.error('Error al eliminar la convocatoria');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar la convocatoria', {
+        duration: 8000,
+      });
     }
   };
 

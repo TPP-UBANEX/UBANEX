@@ -41,7 +41,7 @@ import {
   formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, motivoTopeExcedido,
   normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
-import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
+import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 const OPCIONES_TIPO_PERSONA = [
@@ -86,6 +86,8 @@ export function ProyectoDetail() {
   const [enviando, setEnviando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
+  const [cerrando, setCerrando] = useState(false)
+  const [confirmarCerrar, setConfirmarCerrar] = useState(false)
 
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
@@ -216,6 +218,13 @@ export function ProyectoDetail() {
     (!!esSecretariaMismaUA || !!esRectoradoAmplio) &&
       [EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado].includes(edicion?.estado as EstadoEdicion),
   )
+  const convocatoriaEnEjecucionOCierre =
+    edicion?.convocatoria?.estado === EstadoConvocatoria.Ejecucion ||
+    edicion?.convocatoria?.estado === EstadoConvocatoria.Cierre
+  const puedeCerrarEdicion =
+    (esPropietario || esDirector) &&
+    edicion?.estado === EstadoEdicion.EnEjecucion &&
+    convocatoriaEnEjecucionOCierre
 
   const nombreUnidadesAcademicas = () => {
     const principal = edicion?.unidadAcademica?.nombre
@@ -403,6 +412,21 @@ export function ProyectoDetail() {
     }
   }
 
+  const handleCerrar = async () => {
+    if (!id || !edicion) return
+    setCerrando(true)
+    try {
+      await api.proyectos.cerrarEdicion(id, edicion.id)
+      toast.success('Edición cerrada')
+      setConfirmarCerrar(false)
+      await cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cerrar la edición')
+    } finally {
+      setCerrando(false)
+    }
+  }
+
   const handleSugerirClick = (campo: string, valorActual: string, label: string) => {
     const previa = sugerenciasPropias.find(s => s.campo === campo)
     setSugerenciaModal({
@@ -565,6 +589,11 @@ export function ProyectoDetail() {
                 Eliminar Proyecto
               </Button>
             </>
+          )}
+          {!editando && puedeCerrarEdicion && (
+            <Button variant="outline" onClick={() => setConfirmarCerrar(true)}>
+              <Lock className="h-4 w-4 mr-2" />Cerrar edición
+            </Button>
           )}
           {editando && (
             <>
@@ -1018,6 +1047,26 @@ export function ProyectoDetail() {
             <Button variant="destructive" onClick={handleEliminar} disabled={eliminando}>
               {eliminando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmarCerrar} onOpenChange={setConfirmarCerrar}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cerrar edición?</DialogTitle>
+            <DialogDescription>
+              Se requiere tener el informe final confirmado, la autoevaluación completada y
+              ningún comprobante en revisión. Una vez cerrada, la edición queda bloqueada para
+              nuevas modificaciones.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarCerrar(false)}>Cancelar</Button>
+            <Button onClick={handleCerrar} disabled={cerrando}>
+              {cerrando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Cerrar edición
             </Button>
           </DialogFooter>
         </DialogContent>

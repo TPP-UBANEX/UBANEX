@@ -109,4 +109,14 @@ export class ProyectosController {
   ) {
     return this.service.eliminarEdicion(id, edicionId, usuario);
   }
+
+  @Post(':id/ediciones/:edicionId/cerrar')
+  @Roles(RolUsuario.Estudiante, RolUsuario.Docente)
+  cerrarEdicion(
+    @Param('id') id: string,
+    @Param('edicionId') edicionId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.cerrarEdicion(id, edicionId, usuario);
+  }
 }
