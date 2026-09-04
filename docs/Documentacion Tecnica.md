@@ -69,7 +69,7 @@ Cada carpeta bajo `backend/src/` es un módulo de NestJS con el patrón:
 | `templates-evaluacion/` | Plantillas configurables de evaluación institucional y cruzada |
 | `participaciones-convocatoria/` | Alta/baja de directores y evaluadores por convocatoria |
 | `ejecucion/` | Hitos, informe final, autoevaluación de impacto y sus plantillas |
-| `rendiciones/` | Rendición (hoy solo lectura, ver §10 — sin flujo de revisión) |
+| `rendiciones/` | Rendición: carga de comprobantes por rubro y revisión (aceptar/rechazar) por Rectorado |
 | `sugerencias/` | Sugerencias de cambio y notificaciones |
 | `auditoria/` | Registro de acciones de auditoría |
 | `unidades-academicas/`, `carreras/`, `geo/` | Catálogos de referencia |
@@ -218,9 +218,9 @@ frontend/src/
 
 ## 6. Seed de datos
 
-- `backend/src/seed/` puebla datos de desarrollo (usuarios, convocatorias, proyectos, evaluaciones, etc.) de forma **idempotente** (no duplica si se corre más de una vez).
+- `backend/src/seed/` puebla un dataset **chico y curado a mano** (no generado por RNG) pensado para demo: ~46 usuarios (varios por rol y unidad académica, alguno con perfil incompleto o pendiente de validación) y una convocatoria por cada etapa del ciclo (`Configuracion`, `Presentacion`, `Evaluacion`, `Ejecucion`, `Cierre`), con proyectos/ediciones, evaluaciones, hitos, rendiciones, sugerencias y notificaciones coherentes con la etapa de cada una. Es **idempotente** (no duplica si se corre más de una vez).
 - Se activa con `UBANEX_SEED=true` **y** requiere `RENDER !== 'true'` (ver §4.1); en Render queda desactivado sin importar el valor de `UBANEX_SEED`.
-- No siembra datos de `Rendicion`: la tabla queda vacía en una base recién sembrada (ver §9 y §10).
+- El usuario `admin@uba.ar` se preserva siempre; todos los usuarios sembrados (incluido el admin) comparten la misma password (`admin`).
 - **Riesgo documentado**: el seed escribe con `repo.save()` directo, sin pasar por DTOs ni `class-validator`, y puede insertar datos que la API rechazaría; las columnas `json` no están tipadas por TypeScript. Ver tabla de mantenimiento en [`AGENTS.md`](../AGENTS.md#seed) — cualquier cambio en `Formulario.campos`, `Edicion.presupuesto`, `templates-default.ts` o entidades debe revisar el seed correspondiente y validarse con `make reset-seed`.
 
 ## 7. Testing
@@ -264,14 +264,14 @@ Resumen operativo (detalle completo en [`AGENTS.md`](../AGENTS.md)):
 | Evaluación institucional/cruzada, orden de mérito, adjudicación | `evaluaciones/`, `templates-evaluacion/` | `Evaluacion`, `ProyectoEvaluablePanel`, `EvaluacionesProyectoTab`, `AdjudicacionResolucionTab` |
 | Alta/baja de directores y evaluadores | `participaciones-convocatoria/` | `AsignacionEvaluadores`, `EvaluadorPerfilDialog` |
 | Hitos, informe final, autoevaluación | `ejecucion/` | `HitosEjecucionTab`, `InformeFinalTab`, `AutoevaluacionTab` |
-| Rendición (solo lectura, esquema real ver §10) | `rendiciones/` | — (sin UI dedicada aún) |
+| Rendición de comprobantes | `rendiciones/` | `ComprobantesTab` |
 | Sugerencias y notificaciones | `sugerencias/` | `SugerenciasTab`, `SugerirCambioModal`, `NotificacionesDropdown` |
 | Usuarios, validación docente, catálogos | `usuarios/`, `carreras/`, `geo/`, `unidades-academicas/` | `Usuarios`, `UsuarioDetail`, `ValidacionDocente` |
 | Auditoría | `auditoria/` | `UsuarioHistorial` |
 
 ## 10. Deuda técnica conocida
 
-- **Rendición**: la entidad real (`rendicion.entity.ts`) ya tiene columnas por fila (`proyectoId`, `rubro`, `monto`, `fecha`, `comprobanteUrl`, `estado` default `'pendiente'`), pero se relaciona con `Proyecto` y no con `Edicion` como plantea el diseño objetivo; falta entidad `Comprobante` separada, endpoints de alta/revisión y UI. `rendiciones.service.ts` solo expone `findAll`; el seed no la puebla.
+- **Rendición**: falta el historial/reemplazo de comprobantes rechazados (hoy un comprobante rechazado se re-edita en su misma fila) y la subida de archivos reales (el comprobante es un link). Ver [`dominio/modelo.md`](dominio/modelo.md#rendición) para el estado real de la entidad y el flujo implementado.
 - **Cierre automático de Edición**: no existe la transición que valida los 3 requisitos de cierre (informe + autoevaluación + rendición); hoy el estado `Cerrado` solo lo produce el seed.
 - **Almacenamiento de adjuntos**: no hay integración de storage de archivos; `TipoCampo.archivo` deshabilitado, avales se cargan como URL de texto.
 - **Frontend sin tests automatizados**: solo el backend tiene specs de Jest.
