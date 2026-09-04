@@ -5,10 +5,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, IsNull } from 'typeorm';
 import { Proyecto } from './proyecto.entity';
 import { Edicion } from './edicion.entity';
+import { InformeFinal } from '../ejecucion/informe-final.entity';
+import { AutoevaluacionImpacto } from '../ejecucion/autoevaluacion-impacto.entity';
+import { Rendicion } from '../rendiciones/rendicion.entity';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { ActualizarAvalDto } from './dto/actualizar-aval.dto';
+import { ActualizarVisibilidadComprobantesDto } from './dto/actualizar-visibilidad-comprobantes.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
@@ -18,6 +22,9 @@ import { ParticipacionConvocatoria } from '../participaciones-convocatoria/parti
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
+import { EstadoInforme } from '../common/enums/estado-informe.enum';
+import { EstadoAutoevaluacion } from '../common/enums/estado-autoevaluacion.enum';
+import { EstadoComprobante } from '../common/enums/estado-comprobante.enum';
 import { EstadoValidacionDocente } from '../common/enums/estado-validacion-docente.enum';
 import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
@@ -790,6 +797,79 @@ export class ProyectosService {
     }
 
     edicion.avalUrl = dto.avalUrl?.trim() || null;
+    await this.edicionRepo.save(edicion);
+
+    return this.obtenerProyecto(proyectoId);
+  }
+
+  /**
+   * El director decide si la Unidad Académica puede ver (solo lectura) los
+   * comprobantes de rendición de la edición. Solo creador/director lo puede
+   * togglear; la gestión de estados sigue siendo exclusiva de Rectorado.
+   */
+  async actualizarVisibilidadComprobantes(
+    proyectoId: string,
+    edicionId: string,
+    dto: ActualizarVisibilidadComprobantesDto,
+    usuario: Usuario,
+  ) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+    if (!(await this.esCreadorODirector(edicion, usuario))) {
+      throw new ForbiddenException('Solo el director del proyecto puede configurar esta visualización');
+    }
+    edicion.uaPuedeVerComprobantes = dto.uaPuedeVerComprobantes;
+    return this.edicionRepo.save(edicion);
+  }
+
+  async cerrarEdicion(proyectoId: string, edicionId: string, usuario: Usuario) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+    await this.validarAccesoEdicion(edicion, usuario);
+
+    if (edicion.estado !== EstadoEdicion.EnEjecucion) {
+      throw new BadRequestException(
+        `No se puede cerrar una edición en estado ${edicion.estado}`,
+      );
+    }
+    const estadoConvocatoria = edicion.convocatoria?.estado;
+    const convocatoriaEnEjecucionOCierre =
+      estadoConvocatoria === EstadoConvocatoria.Ejecucion ||
+      estadoConvocatoria === EstadoConvocatoria.Cierre;
+    if (!convocatoriaEnEjecucionOCierre) {
+      throw new BadRequestException(
+        'La convocatoria no está en etapa de ejecución o cierre',
+      );
+    }
+
+    const motivosFaltantes: string[] = [];
+
+    const comprobantesPendientes = await this.edicionRepo.manager.count(Rendicion, {
+      where: { edicionId, estado: EstadoComprobante.EnRevision },
+    });
+    if (comprobantesPendientes > 0) {
+      motivosFaltantes.push(`El proyecto tiene ${comprobantesPendientes} comprobante(s) en revisión`);
+    }
+
+    const informe = await this.edicionRepo.manager.findOne(InformeFinal, {
+      where: { edicionId },
+    });
+    if (!informe || informe.estado !== EstadoInforme.Confirmado) {
+      motivosFaltantes.push('El informe final no está confirmado');
+    }
+
+    const autoevaluacion = await this.edicionRepo.manager.findOne(AutoevaluacionImpacto, {
+      where: { edicionId },
+    });
+    if (!autoevaluacion || autoevaluacion.estado !== EstadoAutoevaluacion.Completada) {
+      motivosFaltantes.push('La autoevaluación no está completada');
+    }
+
+    if (motivosFaltantes.length > 0) {
+      throw new BadRequestException(
+        `No se puede cerrar la edición: ${motivosFaltantes.join('. ')}`,
+      );
+    }
+
+    edicion.estado = EstadoEdicion.Cerrado;
     await this.edicionRepo.save(edicion);
 
     return this.obtenerProyecto(proyectoId);

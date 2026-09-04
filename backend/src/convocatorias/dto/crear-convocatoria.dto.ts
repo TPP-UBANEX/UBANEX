@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsOptional, IsDateString, IsInt, IsNumber, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CrearConvocatoriaDto {
   @IsString()
@@ -11,6 +12,7 @@ export class CrearConvocatoriaDto {
 
   @IsInt()
   @Min(2020)
+  @Type(() => Number)
   anio: number;
 
   @IsDateString()
@@ -40,43 +42,51 @@ export class CrearConvocatoriaDto {
   @IsInt()
   @Min(0)
   @IsOptional()
+  @Type(() => Number)
   cuotaFederativa?: number;
 
   @IsNumber()
   @Min(0)
   @IsOptional()
+  @Type(() => Number)
   presupuestoTotal?: number;
 
   @IsNumber()
   @Min(0)
   @IsOptional()
+  @Type(() => Number)
   topePresupuestoNoConsolidado?: number;
 
   @IsNumber()
   @Min(0)
   @IsOptional()
+  @Type(() => Number)
   topePresupuestoConsolidado?: number;
 
   @IsNumber()
   @Min(0)
   @Max(100)
   @IsOptional()
+  @Type(() => Number)
   porcentajeExtraInsumos?: number;
 
   @IsNumber()
   @Min(0)
   @Max(100)
   @IsOptional()
+  @Type(() => Number)
   umbralInsumos?: number;
 
   @IsNumber()
   @Min(0)
   @Max(100)
   @IsOptional()
+  @Type(() => Number)
   porcentajeExtraPse?: number;
 
   @IsInt()
   @Min(0)
   @IsOptional()
+  @Type(() => Number)
   umbralInconsistenciaCruzada?: number;
 }

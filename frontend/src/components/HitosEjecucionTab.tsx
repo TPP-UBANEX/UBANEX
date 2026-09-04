@@ -99,8 +99,7 @@ export function HitosEjecucionTab({
     cargar()
   }, [cargar])
 
-  const enEjecucion =
-    estado === EstadoEdicion.EnEjecucion || estado === EstadoEdicion.Cerrado
+  const enEjecucion = estado === EstadoEdicion.EnEjecucion
   const permitidoEditar = enEjecucion && puedeEditar
   const limiteFechas = {
     min: convocatoria?.fechaInicioEjecucion ?? undefined,

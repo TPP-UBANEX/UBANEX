@@ -22,7 +22,9 @@ import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluac
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Edicion } from '../proyectos/edicion.entity';
+import { Rendicion } from '../rendiciones/rendicion.entity';
 import { EstadoConvocatoria } from '../common/enums/estado-convocatoria.enum';
+import { EstadoComprobante } from '../common/enums/estado-comprobante.enum';
 import { EstadoEdicion } from '../common/enums/estado-edicion.enum';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
@@ -55,6 +57,8 @@ export class ConvocatoriasService {
     private readonly templateAutoevaluacionRepo: Repository<TemplateAutoevaluacionImpacto>,
     @InjectRepository(Edicion)
     private readonly edicionRepo: Repository<Edicion>,
+    @InjectRepository(Rendicion)
+    private readonly rendicionRepo: Repository<Rendicion>,
   ) {}
 
   listar(usuario: Usuario, dto: ListarConvocatoriasDto): Promise<PaginatedResponse<Convocatoria>> {
@@ -137,16 +141,36 @@ export class ConvocatoriasService {
     const convocatoria = await this.repo.findOne({ where: { id }, relations: { formulario: true } });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
-    validarFechasConvocatoria({
-      fechaInicioPresentacion: dto.fechaInicioPresentacion ?? convocatoria.fechaInicioPresentacion,
-      fechaFinPresentacion: dto.fechaFinPresentacion ?? convocatoria.fechaFinPresentacion,
-      fechaInicioEvaluacion: dto.fechaInicioEvaluacion ?? convocatoria.fechaInicioEvaluacion,
-      fechaFinEvaluacion: dto.fechaFinEvaluacion ?? convocatoria.fechaFinEvaluacion,
-      fechaInicioEjecucion: dto.fechaInicioEjecucion ?? convocatoria.fechaInicioEjecucion,
-      fechaFinEjecucion: dto.fechaFinEjecucion ?? convocatoria.fechaFinEjecucion,
-    });
+    // Solo se validan las fechas cuando el PATCH envía un valor DISTINTO al
+    // actual. El frontend siempre envía todos los campos (incluidas las fechas
+    // sin cambios), así que comparar solo con "!== undefined" rechazaría
+    // cualquier cambio de estado si la convocatoria tiene fechas pasadas.
+    const cambiaFechas =
+      (dto.fechaInicioPresentacion !== undefined && dto.fechaInicioPresentacion !== convocatoria.fechaInicioPresentacion) ||
+      (dto.fechaFinPresentacion !== undefined && dto.fechaFinPresentacion !== convocatoria.fechaFinPresentacion) ||
+      (dto.fechaInicioEvaluacion !== undefined && dto.fechaInicioEvaluacion !== convocatoria.fechaInicioEvaluacion) ||
+      (dto.fechaFinEvaluacion !== undefined && dto.fechaFinEvaluacion !== convocatoria.fechaFinEvaluacion) ||
+      (dto.fechaInicioEjecucion !== undefined && dto.fechaInicioEjecucion !== convocatoria.fechaInicioEjecucion) ||
+      (dto.fechaFinEjecucion !== undefined && dto.fechaFinEjecucion !== convocatoria.fechaFinEjecucion);
+
+    if (cambiaFechas) {
+      validarFechasConvocatoria({
+        fechaInicioPresentacion: dto.fechaInicioPresentacion ?? convocatoria.fechaInicioPresentacion,
+        fechaFinPresentacion: dto.fechaFinPresentacion ?? convocatoria.fechaFinPresentacion,
+        fechaInicioEvaluacion: dto.fechaInicioEvaluacion ?? convocatoria.fechaInicioEvaluacion,
+        fechaFinEvaluacion: dto.fechaFinEvaluacion ?? convocatoria.fechaFinEvaluacion,
+        fechaInicioEjecucion: dto.fechaInicioEjecucion ?? convocatoria.fechaInicioEjecucion,
+        fechaFinEjecucion: dto.fechaFinEjecucion ?? convocatoria.fechaFinEjecucion,
+      });
+    }
 
     const estadoAnterior = convocatoria.estado;
+
+    if (dto.estado === EstadoConvocatoria.Cierre && estadoAnterior !== EstadoConvocatoria.Cierre) {
+      await this.validarCierreSinComprobantesPendientes(convocatoria.id);
+      this.validarFechaFinEjecucionParaCierre(dto.fechaFinEjecucion ?? convocatoria.fechaFinEjecucion);
+    }
+
     Object.assign(convocatoria, dto);
     const convocatoriaGuardada = await this.repo.save(convocatoria);
 
@@ -584,6 +608,46 @@ export class ConvocatoriasService {
 
     if (huboCambios) {
       await this.repo.save(convocatoria);
+    }
+  }
+
+  /**
+   * Condicionantes para cerrar una convocatoria:
+   * 1. No puede quedar ningún comprobante en revisión en ninguna de las
+   *    ediciones de esa convocatoria.
+   * 2. La fecha actual debe ser igual o posterior a la fecha de fin de
+   *    ejecución de la convocatoria.
+   */
+  private async validarCierreSinComprobantesPendientes(convocatoriaId: string): Promise<void> {
+    const pendientes = await this.rendicionRepo
+      .createQueryBuilder('r')
+      .innerJoin('r.edicion', 'e')
+      .where('e.convocatoriaId = :convocatoriaId', { convocatoriaId })
+      .andWhere('r.estado = :estado', { estado: EstadoComprobante.EnRevision })
+      .getCount();
+
+    if (pendientes > 0) {
+      throw new BadRequestException(
+        `No se puede cerrar la convocatoria: hay ${pendientes} comprobante(s) en revisión`,
+      );
+    }
+  }
+
+  /**
+   * Para cerrar una convocatoria la fecha actual debe ser igual o posterior a
+   * su fecha de fin de ejecución. Si la convocatoria no tiene fecha de fin de
+   * ejecución definida se permite el cierre.
+   */
+  private validarFechaFinEjecucionParaCierre(fechaFinEjecucion?: string | null): void {
+    if (!fechaFinEjecucion) return;
+
+    const hoy = new Date(new Date().toISOString().split('T')[0]);
+    const finEjecucion = new Date(fechaFinEjecucion);
+
+    if (hoy < finEjecucion) {
+      throw new BadRequestException(
+        'No se puede cerrar la convocatoria: la fecha actual debe ser igual o posterior a la fecha de fin de ejecución',
+      );
     }
   }
 }
