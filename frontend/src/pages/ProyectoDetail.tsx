@@ -208,12 +208,34 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
+  const uaSinAccesoComprobantes = esSecretariaMismaUA && !edicion?.uaPuedeVerComprobantes
   const esDirector = directores.some(d => d.usuarioId === user?.id)
   const puedeEditarEjecucion = esPropietario || esDirector
   const puedeGestionarComprobantes = Boolean(
-    (!!esSecretariaMismaUA || !!esRectoradoAmplio) &&
+    esRectoradoAmplio &&
       [EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado].includes(edicion?.estado as EstadoEdicion),
   )
+  // La UA solo ve los comprobantes si el director lo habilitó; y en ese
+  // caso es solo lectura (aceptar/rechazar es exclusivo de Rectorado).
+  const toggleVisibilidadComprobantes = async () => {
+    if (!id || !edicion) return
+    try {
+      const actualizada = await api.proyectos.actualizarVisibilidadComprobantes(id, edicion.id, {
+        uaPuedeVerComprobantes: !edicion.uaPuedeVerComprobantes,
+      })
+      setEdicion(actualizada)
+      toast.success(
+        actualizada.uaPuedeVerComprobantes
+          ? 'La Unidad Académica ahora puede ver los comprobantes'
+          : 'La Unidad Académica ya no puede ver los comprobantes',
+      )
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'No se pudo cambiar la visibilidad de los comprobantes',
+        { duration: 8000 },
+      )
+    }
+  }
   const convocatoriaEnEjecucionOCierre =
     edicion?.convocatoria?.estado === EstadoConvocatoria.Ejecucion ||
     edicion?.convocatoria?.estado === EstadoConvocatoria.Cierre
@@ -938,7 +960,45 @@ export function ProyectoDetail() {
         </TabsContent>
 
         <TabsContent value="comprobantes" className="mt-4">
-          {edicion ? (
+          {puedeEditarEjecucion && (
+            <Card className="mb-4">
+              <CardContent className="flex items-center justify-between gap-4 py-4">
+                <div>
+                  <p className="text-sm font-medium">Comprobantes visibles para la Unidad Académica</p>
+                  <p className="text-sm text-muted-foreground">
+                    La Unidad Académica podrá ver la sección en modo lectura. Aceptar y rechazar es solo de Rectorado.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!edicion?.uaPuedeVerComprobantes}
+                  onClick={toggleVisibilidadComprobantes}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    edicion?.uaPuedeVerComprobantes ? 'bg-primary' : 'bg-input'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      edicion?.uaPuedeVerComprobantes ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </CardContent>
+            </Card>
+          )}
+          {uaSinAccesoComprobantes ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+                <Lock className="h-6 w-6 text-muted-foreground" />
+                <p className="text-sm font-medium">Comprobantes no habilitados</p>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  El director del proyecto no habilitó la visualización de comprobantes para esta
+                  Unidad Académica. Contactalo para que la active si necesitás consultarlos.
+                </p>
+              </CardContent>
+            </Card>
+          ) : edicion ? (
             <ComprobantesTab
               edicionId={edicion.id}
               estado={edicion.estado}

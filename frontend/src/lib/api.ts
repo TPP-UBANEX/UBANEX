@@ -314,6 +314,15 @@ export const api = {
       ),
     actualizarAval: (id: string, edicionId: string, data: { avalUrl: string | null }) =>
       patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/aval`, data),
+    actualizarVisibilidadComprobantes: (
+      id: string,
+      edicionId: string,
+      data: import('@/data/types').ActualizarVisibilidadComprobantesDto,
+    ) =>
+      patch<import('@/data/types').Edicion>(
+        `/proyectos/${id}/ediciones/${edicionId}/visibilidad-comprobantes`,
+        data,
+      ),
     eliminarEdicion: (id: string, edicionId: string) =>
       del(`/proyectos/${id}/ediciones/${edicionId}`),
     cerrarEdicion: (id: string, edicionId: string) =>

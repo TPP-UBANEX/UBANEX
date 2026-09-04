@@ -549,12 +549,14 @@ classDiagram
 
 ## Rendición
 
-> **Estado: no implementado.** Hoy `Rendicion` es una tabla mínima de solo lectura
-> (`estado: string` con default `'pendiente'`); `rendiciones.service.ts` solo expone un
-> `findAll`. La entidad `Comprobante`, la carga por rubro y el flujo de revisión
-> (`EnRevision → Aceptado | Rechazado` con comentario y reemplazo) todavía no existen.
-> El enum `EstadoComprobante` está definido pero sin uso. El diagrama de abajo es el
-> diseño objetivo.
+> **Estado: implementado (diseño simplificado).** Cada fila de `Rendicion` *es* un
+> comprobante: apunta a una `Edicion` (`edicionId`, no a `Proyecto`), con `rubro`,
+> `monto`, `fecha`, `comprobanteUrl`, `descripcion`, `estado`, `motivoRechazo` y
+> `creadoPorId`. El enum `EstadoComprobante` (`EnRevision → Aceptado | Rechazado`) está
+> en uso. No existe la entidad separada `Comprobante` ni historial de reemplazos: un
+> comprobante rechazado se re-edita en su misma fila. El diagrama de abajo es el diseño
+> objetivo; en el código actual la relación `Edicion`→`Rendicion` es 1 a N sobre la misma
+> tabla.
 
 ```mermaid
 classDiagram
@@ -589,10 +591,11 @@ classDiagram
 
 ### Notas
 
-- Una única `Rendicion` por `Edicion`. Activa durante la etapa `Ejecucion` de la convocatoria.
-- El director y/o codirector suben `Comprobante`s (archivos PDF o imagen), cada uno asociado a un rubro del presupuesto.
+- La tabla `Rendicion` contiene un comprobante por fila, asociado a una `Edicion`, activa durante la etapa `Ejecucion` de la convocatoria.
+- El director/codirector (o creador con permisos de ejecución) carga comprobantes durante `Ejecucion`, cada uno asociado a un rubro del presupuesto, y puede editarlos o eliminarlos mientras estén `EnRevision`.
 - Cada comprobante tiene un estado individual: `EnRevision → Aceptado | Rechazado`.
-- Cuando un usuario de rectorado rechaza un comprobante, puede dejar un `comentarioRechazo` explicativo. El director puede subir un nuevo comprobante que reemplace al rechazado (relación `reemplaza a`).
+- **Aceptar y rechazar es exclusivo de Rectorado** (`AutoridadDeRectorado` o `AsistenteDeRectorado`). Al rechazar es obligatorio dejar un `motivoRechazo` explicativo.
+- `Edicion.uaPuedeVerComprobantes` (default `false`) habilita a la **Secretaría de la misma unidad académica** a **ver** la sección de comprobantes en modo lectura. Si es `false`, esa Secretaría no tiene acceso de lectura (la API responde 403) y el frontend le muestra un aviso al abrir la pestaña de que el director no la habilitó. El toggle lo controla el director mientras la edición está en ejecución. Rectorado siempre ve la sección.
 - `Rendicion` no tiene estado global — se considera "en curso" mientras la convocatoria esté en `Ejecucion`.
 
 ---

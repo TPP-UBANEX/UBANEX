@@ -12,6 +12,7 @@ import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { ActualizarAvalDto } from './dto/actualizar-aval.dto';
+import { ActualizarVisibilidadComprobantesDto } from './dto/actualizar-visibilidad-comprobantes.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
@@ -799,6 +800,25 @@ export class ProyectosService {
     await this.edicionRepo.save(edicion);
 
     return this.obtenerProyecto(proyectoId);
+  }
+
+  /**
+   * El director decide si la Unidad Académica puede ver (solo lectura) los
+   * comprobantes de rendición de la edición. Solo creador/director lo puede
+   * togglear; la gestión de estados sigue siendo exclusiva de Rectorado.
+   */
+  async actualizarVisibilidadComprobantes(
+    proyectoId: string,
+    edicionId: string,
+    dto: ActualizarVisibilidadComprobantesDto,
+    usuario: Usuario,
+  ) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+    if (!(await this.esCreadorODirector(edicion, usuario))) {
+      throw new ForbiddenException('Solo el director del proyecto puede configurar esta visualización');
+    }
+    edicion.uaPuedeVerComprobantes = dto.uaPuedeVerComprobantes;
+    return this.edicionRepo.save(edicion);
   }
 
   async cerrarEdicion(proyectoId: string, edicionId: string, usuario: Usuario) {

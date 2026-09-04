@@ -314,6 +314,9 @@ export interface Edicion {
   anioEdicion?: number;
   datosFormulario?: Record<string, unknown>;
   avalUrl?: string | null;
+  // El director decide si la Unidad Académica puede ver (solo lectura) los
+  // comprobantes de rendición de esta edición.
+  uaPuedeVerComprobantes?: boolean;
   ordenMerito?: number | null;
   adjudicacionPropuesta?: boolean | null;
   mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
@@ -414,6 +417,10 @@ export interface ActualizarEdicionDto {
   unidadAcademicaAdicionalId?: string | null;
   presupuestoSolicitado?: Presupuesto;
   datosFormulario?: Record<string, unknown>;
+}
+
+export interface ActualizarVisibilidadComprobantesDto {
+  uaPuedeVerComprobantes: boolean;
 }
 
 export interface Evaluacion {

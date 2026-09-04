@@ -902,13 +902,19 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
 * Desempate por tercera evaluación: umbral de inconsistencia cruzada y designación de un
   evaluador de una tercera unidad académica.
 * Hitos de ejecución.
+* Comprobantes de rendición: carga por rubro con consumo del presupuesto y estados
+  `EnRevision → Aceptado | Rechazado`; **aceptar/rechazar es solo de Rectorado** (con
+  motivo de rechazo) y el director controla si la Secretaría de la UA puede ver la
+  sección en modo lectura (`Edicion.uaPuedeVerComprobantes`, default `false`); si no la
+  habilita, la Secretaría ve un aviso al abrir la pestaña.
 * Autoevaluación de impacto (plantillas configurables) e informe final (autogenerado
   desde hitos), cada uno con su confirmación.
 
 ## Falta / incompleto
 
-* **Rendición de comprobantes** (Módulo 3): hoy es una tabla mínima de solo lectura, sin
-  entidad `Comprobante` ni flujo de revisión.
+* **Rendición de comprobantes**: está implementado el circuito básico (carga por rubro,
+  revisión por Rectorado), pero faltan el historial/reemplazo de comprobantes rechazados
+  y la subida de archivos reales (hoy el comprobante es un link).
 * **Cierre de la Edición a `Cerrado`**: existen las confirmaciones individuales de
   informe y autoevaluación, pero no la transición que valida los 3 requisitos (informe
   confirmado + autoevaluación completada + rendición aceptada).

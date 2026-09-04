@@ -4097,6 +4097,13 @@ export class SeedService {
       await this.seedParticipacion({ usuarioId: esc.director.id, convocatoriaId: conv.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: ed.id, esDirectorPrincipal: true, asignadoPorId: this.admin.id });
       await this.seedParticipacion({ usuarioId: esc.codirector.id, convocatoriaId: conv.id, rol: RolEjecucion.DirectorDeProyecto, edicionId: ed.id, esDirectorPrincipal: false, asignadoPorId: this.admin.id });
 
+      // Habilitar la vista de comprobantes para la UA en una edición con
+      // comprobantes cargados, para poder probar el acceso de solo lectura.
+      if (esc.nombre === 'Proyecto Cierre 04 · listo para cerrar') {
+        ed.uaPuedeVerComprobantes = true;
+        await this.edicionRepo.save(ed);
+      }
+
       const hitos = await asegurarHitos(ed, esc.director);
       await asegurarRendiciones(ed, esc.director, esc.rendiciones);
       await asegurarAutoevaluacion(ed, esc.director, esc.autoeval);

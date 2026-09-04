@@ -98,10 +98,16 @@ export class RendicionesService {
     }
   }
 
-  /** Lectura: director/creador, Secretaría de la misma UA o Rectorado. */
+  /** Lectura: director/creador, Secretaría de la misma UA (solo si el director la habilitó) o Rectorado. */
   private async validarAccesoLectura(edicion: Edicion, usuario: Usuario): Promise<void> {
     if (this.esRectorado(usuario)) return;
-    if (this.esSecretaria(usuario) && usuario.unidadAcademicaId === edicion.unidadAcademicaId) return;
+    if (
+      this.esSecretaria(usuario) &&
+      usuario.unidadAcademicaId === edicion.unidadAcademicaId &&
+      edicion.uaPuedeVerComprobantes
+    ) {
+      return;
+    }
     if (edicion.creadoPorId === usuario.id) return;
     const esDirector = await this.participacionRepo.findOneBy({
       edicionId: edicion.id,
@@ -113,21 +119,14 @@ export class RendicionesService {
   }
 
   /**
-   * Destinatarios de gestión de comprobantes: Rectorado (todas las UAs) y
-   * Secretaría de la misma unidad académica de la edición. Excluye al autor.
+   * Destinatarios de gestión de comprobantes: solo Rectorado (todas las UAs).
+   * La Unidad Académica no participa de la gestión de comprobantes. Excluye al autor.
    */
   private async resolverDestinatariosGestion(edicion: Edicion, excluirId: string): Promise<Usuario[]> {
     const usuarios = await this.usuarioRepo
       .createQueryBuilder('u')
       .where('u.habilitado = :habilitado', { habilitado: true })
-      .andWhere(
-        "(u.roles LIKE :rectorado OR (u.roles LIKE :secretaria AND u.unidadAcademicaId = :uaId))",
-        {
-          rectorado: '%Rectorado%',
-          secretaria: '%Secretaria%',
-          uaId: edicion.unidadAcademicaId,
-        },
-      )
+      .andWhere('u.roles LIKE :rectorado', { rectorado: '%Rectorado%' })
       .getMany();
     return usuarios.filter(u => u.id !== excluirId);
   }
@@ -339,12 +338,11 @@ export class RendicionesService {
     if (!rendicion) throw new NotFoundException('Comprobante no encontrado');
     const edicion = await this.obtenerEdicion(rendicion.edicionId);
 
-    // Cambio de estado (aceptar/rechazar): solo Secretaría de la misma UA o Rectorado.
+    // Cambio de estado (aceptar/rechazar): solo Rectorado.
     if (dto.estado !== undefined) {
-      const esGestion = this.esRectorado(usuario) ||
-        (this.esSecretaria(usuario) && usuario.unidadAcademicaId === edicion.unidadAcademicaId);
+      const esGestion = this.esRectorado(usuario);
       if (!esGestion) {
-        throw new ForbiddenException('Solo la Secretaría o el Rectorado pueden cambiar el estado del comprobante');
+        throw new ForbiddenException('Solo el Rectorado puede aceptar o rechazar comprobantes');
       }
       if (dto.estado === EstadoComprobante.Aceptado) {
         // Si venía en revisión o aprobado ya cuenta en la suma; si estaba rechazado, aceptarlo lo agrega.

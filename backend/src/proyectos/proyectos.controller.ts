@@ -7,6 +7,7 @@ import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { ActualizarAvalDto } from './dto/actualizar-aval.dto';
+import { ActualizarVisibilidadComprobantesDto } from './dto/actualizar-visibilidad-comprobantes.dto';
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -90,6 +91,17 @@ export class ProyectosController {
     @CurrentUser() usuario: Usuario,
   ) {
     return this.service.actualizarAval(id, edicionId, dto, usuario);
+  }
+
+  @Patch(':id/ediciones/:edicionId/visibilidad-comprobantes')
+  @Roles(RolUsuario.Estudiante, RolUsuario.Docente)
+  actualizarVisibilidadComprobantes(
+    @Param('id') id: string,
+    @Param('edicionId') edicionId: string,
+    @Body() dto: ActualizarVisibilidadComprobantesDto,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.actualizarVisibilidadComprobantes(id, edicionId, dto, usuario);
   }
 
   @Post(':id/ediciones/:edicionId/iniciar-evaluacion')
