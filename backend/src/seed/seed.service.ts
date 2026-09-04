@@ -83,6 +83,7 @@ const UA_SOCIALES = 'Facultad de Ciencias Sociales';
 const UA_FILOSOFIA = 'Facultad de Filosofía y Letras';
 
 type UsuariosUa = {
+  clave: string; // 'ING' | 'MED' | 'SOC' | 'FIL'
   ua: UnidadAcademica;
   autoridad: Usuario;
   asistente: Usuario;
@@ -91,6 +92,9 @@ type UsuariosUa = {
   pendiente: Usuario; // docente pendiente de validación
   estudiantes: Usuario[]; // 2 estudiantes
 };
+
+/** Pares de UAs activas (mismos que EMPAREJAMIENTO_DEFAULT): usado para resolver el evaluador Ajena. */
+const PAR_UA: Record<string, string> = { ING: 'MED', MED: 'ING', SOC: 'FIL', FIL: 'SOC' };
 
 const GENEROS = [Genero.Masculino, Genero.Femenino, Genero.Otro, Genero.PrefieroNoResponder];
 const CARGOS_DOCENTE = [
@@ -427,7 +431,7 @@ export class SeedService {
       );
     }
 
-    this.uaUsuarios.set(opts.clave, { ua, autoridad, asistente, docentes, incompleto, pendiente, estudiantes });
+    this.uaUsuarios.set(opts.clave, { clave: opts.clave, ua, autoridad, asistente, docentes, incompleto, pendiente, estudiantes });
   }
 
   private async seedUsuarios(): Promise<void> {
@@ -683,17 +687,24 @@ export class SeedService {
       anio: number;
       estado: EstadoConvocatoria;
       fechas: [string, string, string, string, string, string]; // presentInicio, presentFin, evalInicio, evalFin, ejecInicio, ejecFin
+      // Deliberadamente ajustado (no "sin límite"): en 2025 hace que al generar el orden de
+      // mérito en vivo no entren las 8 ediciones — hay una decisión real que mostrar, no un
+      // trámite. En 2023/2024 es consistente con lo ya adjudicado a mano (ver más abajo).
+      presupuestoTotal: number;
     }> = [
-      // 2023 — Cierre: ciclo completo, todo en el pasado.
-      { anio: 2023, estado: EstadoConvocatoria.Cierre, fechas: ['2023-03-01', '2023-04-30', '2023-05-15', '2023-07-15', '2023-08-01', '2024-02-28'] },
+      // 2023 — Cierre: ciclo completo, todo en el pasado. 4 ediciones × $350.000 adjudicado = $1.400.000.
+      { anio: 2023, estado: EstadoConvocatoria.Cierre, fechas: ['2023-03-01', '2023-04-30', '2023-05-15', '2023-07-15', '2023-08-01', '2024-02-28'], presupuestoTotal: 1_600_000 },
       // 2024 — Ejecución: ya adjudicada, ejecución en curso (el rango incluye "hoy" 2026-09-04).
-      { anio: 2024, estado: EstadoConvocatoria.Ejecucion, fechas: ['2024-03-01', '2024-04-30', '2024-05-15', '2024-07-15', '2025-09-01', '2027-02-28'] },
+      // 8 ediciones × $320.000 = $2.560.000; no alcanza para la 9na (NoAdjudicado, que además evaluó bajo).
+      { anio: 2024, estado: EstadoConvocatoria.Ejecucion, fechas: ['2024-03-01', '2024-04-30', '2024-05-15', '2024-07-15', '2025-09-01', '2027-02-28'], presupuestoTotal: 2_700_000 },
       // 2025 — Evaluación: presentación cerrada, evaluación en curso (incluye "hoy").
-      { anio: 2025, estado: EstadoConvocatoria.Evaluacion, fechas: ['2025-03-01', '2025-04-30', '2026-06-01', '2026-11-30', '2026-12-01', '2027-06-30'] },
+      // Las 8 ediciones piden ~$2.811.750 en total (con el extra PSE de "Salud en Territorio")
+      // — con este tope no entran todas.
+      { anio: 2025, estado: EstadoConvocatoria.Evaluacion, fechas: ['2025-03-01', '2025-04-30', '2026-06-01', '2026-11-30', '2026-12-01', '2027-06-30'], presupuestoTotal: 2_300_000 },
       // 2026 — Presentación: ventana de presentación abierta ahora (incluye "hoy").
-      { anio: 2026, estado: EstadoConvocatoria.Presentacion, fechas: ['2026-08-01', '2026-10-15', '2026-10-20', '2026-12-15', '2027-01-01', '2027-07-31'] },
+      { anio: 2026, estado: EstadoConvocatoria.Presentacion, fechas: ['2026-08-01', '2026-10-15', '2026-10-20', '2026-12-15', '2027-01-01', '2027-07-31'], presupuestoTotal: 2_500_000 },
       // 2028 — Configuración: recién creada, todo a futuro.
-      { anio: 2028, estado: EstadoConvocatoria.Configuracion, fechas: ['2028-03-01', '2028-04-30', '2028-05-15', '2028-07-15', '2028-08-01', '2029-02-28'] },
+      { anio: 2028, estado: EstadoConvocatoria.Configuracion, fechas: ['2028-03-01', '2028-04-30', '2028-05-15', '2028-07-15', '2028-08-01', '2029-02-28'], presupuestoTotal: 2_500_000 },
     ];
 
     for (const spec of especificaciones) {
@@ -713,6 +724,7 @@ export class SeedService {
         fechaFinEjecucion: ejecFin,
         formularioId,
         cuotaFederativa: 1,
+        presupuestoTotal: spec.presupuestoTotal,
         umbralInconsistenciaCruzada: 40,
         // Holgados respecto de lo que generan los presupuestos de demo (~$350.000 en el peor caso).
         topePresupuestoNoConsolidado: 1_200_000,
@@ -771,6 +783,8 @@ export class SeedService {
     esConsolidado?: boolean | null;
     avalUrl?: string;
     uaPuedeVerComprobantes?: boolean;
+    esInterfacultad?: boolean;
+    unidadAcademicaAdicionalId?: string;
   }): Promise<Edicion> {
     let proyecto = await this.proyectoRepo.findOne({ where: { nombre: opts.nombreProyecto } });
     if (proyecto) {
@@ -788,6 +802,8 @@ export class SeedService {
           nombre: opts.nombreProyecto,
           creadoPorId: opts.creadoPor.id,
           esConsolidado: opts.esConsolidado ?? null,
+          esInterfacultad: opts.esInterfacultad ?? false,
+          unidadAcademicaAdicionalId: opts.unidadAcademicaAdicionalId ?? null,
         }),
       );
     }
@@ -824,6 +840,28 @@ export class SeedService {
     edicion.mecanismoAdjudicacion = opts.mecanismoAdjudicacion;
     edicion.montoAdjudicado = opts.montoAdjudicado;
     await this.edicionRepo.save(edicion);
+  }
+
+  /**
+   * Notificación que en la app real dispara `confirmarOrdenMerito` para cada director.
+   * Acá se genera a mano porque el resultado de 2023/2024 se escribe directo por columna
+   * (ya están decididos), sin pasar por ese endpoint.
+   */
+  private async notificarAdjudicacion(edicion: Edicion, convocatoria: Convocatoria, adjudicada: boolean): Promise<void> {
+    const mensaje = adjudicada
+      ? `Tu proyecto fue adjudicado en la convocatoria "${convocatoria.nombre}"`
+      : `Tu proyecto no fue adjudicado en la convocatoria "${convocatoria.nombre}"`;
+    const existe = await this.notificacionRepo.count({
+      where: { usuarioId: edicion.creadoPorId, tipo: TipoNotificacion.RESULTADO_ADJUDICACION, mensaje },
+    });
+    if (existe > 0) return;
+    await this.notificacionRepo.save(
+      this.notificacionRepo.create({
+        usuarioId: edicion.creadoPorId,
+        tipo: TipoNotificacion.RESULTADO_ADJUDICACION,
+        mensaje,
+      }),
+    );
   }
 
   /** Campos de un formulario dinámico, buscados por nombre (no por posición). */
@@ -1025,6 +1063,31 @@ export class SeedService {
     };
   }
 
+  /**
+   * Puntajes de evaluación cruzada como fracción del máximo de cada ítem (según
+   * TEMPLATE_CRUZADA_DEFAULT). Se usa para variar el nivel de los proyectos de una
+   * convocatoria sin escribir los 12 ítems a mano en cada llamado.
+   */
+  private itemsCruzadaPorNivel(factor: number): Record<string, number> {
+    const items: Record<string, number> = {};
+    for (const categoria of TEMPLATE_CRUZADA_DEFAULT.categorias) {
+      for (const item of categoria.items) {
+        items[item.id] = Math.round(item.puntajeMaximo * factor);
+      }
+    }
+    return items;
+  }
+
+  /** El evaluador "Propia" y "Ajena" de un proyecto según el emparejamiento de su UA. */
+  private evaluadorPropio(pool: UsuariosUa): Usuario {
+    return pool.docentes[3];
+  }
+
+  private evaluadorAjeno(pool: UsuariosUa): Usuario {
+    const par = this.uaUsuarios.get(PAR_UA[pool.clave])!;
+    return par.docentes[3];
+  }
+
   private async guardarInstitucional(opts: {
     convocatoria: Convocatoria;
     edicionId: string;
@@ -1080,13 +1143,21 @@ export class SeedService {
   // ─────────────────── Ejecución (hitos, rendiciones, autoevaluación, informe) ───────────────────
 
   private static readonly TITULOS_HITOS: Array<{
-    categoria: CategoriaHito; titulo: string; descripcion: string; integrantes: string;
+    categoria: CategoriaHito; titulo: string; descripcion: string; integrantes: string; links?: string[];
   }> = [
     { categoria: CategoriaHito.Organizacion, titulo: 'Constitución del equipo y plan de trabajo', descripcion: 'Reuniones iniciales y definición del cronograma.', integrantes: 'Dirección y docentes' },
-    { categoria: CategoriaHito.ActividadConLaComunidad, titulo: 'Actividad con la comunidad destinataria', descripcion: 'Jornadas de trabajo en el territorio.', integrantes: 'Equipo completo y estudiantes' },
+    {
+      categoria: CategoriaHito.ActividadConLaComunidad, titulo: 'Actividad con la comunidad destinataria',
+      descripcion: 'Jornadas de trabajo en el territorio.', integrantes: 'Equipo completo y estudiantes',
+      links: ['https://drive.google.com/drive/folders/fotos-actividad-seed', 'https://docs.google.com/document/d/planilla-asistencia-seed'],
+    },
     { categoria: CategoriaHito.Capacitacion, titulo: 'Taller de capacitación para participantes', descripcion: 'Formación práctica para el equipo y beneficiarios.', integrantes: 'Docentes y estudiantes' },
     { categoria: CategoriaHito.Articulacion, titulo: 'Jornada de articulación institucional', descripcion: 'Acuerdos con organizaciones del territorio.', integrantes: 'Dirección' },
-    { categoria: CategoriaHito.Difusion, titulo: 'Difusión de resultados parciales', descripcion: 'Presentación de avances a la comunidad.', integrantes: 'Dirección y equipo' },
+    {
+      categoria: CategoriaHito.Difusion, titulo: 'Difusión de resultados parciales',
+      descripcion: 'Presentación de avances a la comunidad.', integrantes: 'Dirección y equipo',
+      links: ['https://drive.google.com/file/d/gacetilla-difusion-seed/view'],
+    },
   ];
 
   private async seedHitos(edicion: Edicion, fechas: string[]): Promise<Hito[]> {
@@ -1102,6 +1173,7 @@ export class SeedService {
         fechaFin: this.sumarDias(fechaInicio, 30),
         integrantes: plantilla.integrantes,
         categoria: plantilla.categoria,
+        links: plantilla.links ?? null,
         creadoPorId: edicion.creadoPorId,
       });
     });
@@ -1244,10 +1316,16 @@ export class SeedService {
         observaciones: 'Proyecto bien articulado con el territorio y con un equipo comprometido.',
       });
       await this.guardarCruzada({
-        convocatoria: conv, edicionId: edicion.id, evaluador: p.ua.docentes[3], tipo: TipoEvaluacionCruzada.Propia,
+        convocatoria: conv, edicionId: edicion.id, evaluador: this.evaluadorPropio(p.ua), tipo: TipoEvaluacionCruzada.Propia,
         items: this.itemsCruzada({ problema: 9, objetivos: 7, metodologia: 6, participacionDiseno: 7, formacionAlumnos: 6, rolesAlumnos: 4, viabilidad: 4, presupuesto: 4, comunidad: 5, articulacion: 5, impactoEsperado: 7, sostenibilidad: 6 }),
         observaciones: 'Metodología adecuada y viable dentro del cronograma propuesto.',
       });
+      await this.guardarCruzada({
+        convocatoria: conv, edicionId: edicion.id, evaluador: this.evaluadorAjeno(p.ua), tipo: TipoEvaluacionCruzada.Ajena,
+        items: this.itemsCruzada({ problema: 9, objetivos: 7, metodologia: 6, participacionDiseno: 6, formacionAlumnos: 6, rolesAlumnos: 5, viabilidad: 4, presupuesto: 4, comunidad: 5, articulacion: 5, impactoEsperado: 6, sostenibilidad: 5 }),
+        observaciones: 'Evaluación desde la Unidad Académica emparejada: buena viabilidad y articulación comunitaria.',
+      });
+      await this.notificarAdjudicacion(edicion, conv, true);
 
       const hitos = await this.seedHitos(edicion, ['2023-09-01', '2023-10-15', '2023-11-20']);
       await this.seedRendicion(edicion, {
@@ -1348,10 +1426,16 @@ export class SeedService {
         observaciones: 'La trayectoria del equipo y la coherencia interna avalan la propuesta.',
       });
       await this.guardarCruzada({
-        convocatoria: conv, edicionId: edicion.id, evaluador: p.ua.docentes[3], tipo: TipoEvaluacionCruzada.Propia,
+        convocatoria: conv, edicionId: edicion.id, evaluador: this.evaluadorPropio(p.ua), tipo: TipoEvaluacionCruzada.Propia,
         items: this.itemsCruzada({ problema: 8, objetivos: 7, metodologia: 6, participacionDiseno: 6, formacionAlumnos: 6, rolesAlumnos: 4, viabilidad: 4, presupuesto: 4, comunidad: 5, articulacion: 5, impactoEsperado: 6, sostenibilidad: 6 }),
         observaciones: 'Buena participación estudiantil y articulación con el medio.',
       });
+      await this.guardarCruzada({
+        convocatoria: conv, edicionId: edicion.id, evaluador: this.evaluadorAjeno(p.ua), tipo: TipoEvaluacionCruzada.Ajena,
+        items: this.itemsCruzada({ problema: 8, objetivos: 7, metodologia: 6, participacionDiseno: 6, formacionAlumnos: 5, rolesAlumnos: 5, viabilidad: 4, presupuesto: 4, comunidad: 5, articulacion: 5, impactoEsperado: 5, sostenibilidad: 5 }),
+        observaciones: 'Evaluación desde la Unidad Académica emparejada: propuesta sólida y viable.',
+      });
+      await this.notificarAdjudicacion(edicion, conv, true);
 
       const hitos = await this.seedHitos(edicion, ['2025-10-01', '2025-12-05', '2026-02-10']);
       for (const r of p.rendiciones) {
@@ -1361,8 +1445,8 @@ export class SeedService {
       await this.seedInformeFinal(edicion, conv, p.informe, hitos);
     }
 
-    // Un proyecto que se presentó pero no llegó a financiarse: NoAdjudicado es terminal,
-    // no tiene hitos, rendiciones ni informe.
+    // Un proyecto que se presentó, compitió por presupuesto y perdió (nota final baja):
+    // NoAdjudicado es terminal, no tiene hitos, rendiciones ni informe.
     // Nota: el director tiene que ser alguien sin otra participación ya asignada en esta
     // convocatoria (ParticipacionConvocatoria admite una sola fila por usuario y convocatoria).
     const noAdjudicada = await this.seedProyectoConEdicion({
@@ -1391,6 +1475,17 @@ export class SeedService {
       }),
       observaciones: 'Propuesta con potencial, pero el equipo no cuenta con trayectoria previa en extensión.',
     });
+    await this.guardarCruzada({
+      convocatoria: conv, edicionId: noAdjudicada.id, evaluador: this.evaluadorPropio(med), tipo: TipoEvaluacionCruzada.Propia,
+      items: this.itemsCruzada({ problema: 4, objetivos: 3, metodologia: 3, participacionDiseno: 3, formacionAlumnos: 3, rolesAlumnos: 2, viabilidad: 2, presupuesto: 2, comunidad: 3, articulacion: 2, impactoEsperado: 3, sostenibilidad: 3 }),
+      observaciones: 'Idea con potencial, pero la formulación todavía es incipiente.',
+    });
+    await this.guardarCruzada({
+      convocatoria: conv, edicionId: noAdjudicada.id, evaluador: this.evaluadorAjeno(med), tipo: TipoEvaluacionCruzada.Ajena,
+      items: this.itemsCruzada({ problema: 4, objetivos: 3, metodologia: 3, participacionDiseno: 2, formacionAlumnos: 3, rolesAlumnos: 2, viabilidad: 2, presupuesto: 2, comunidad: 3, articulacion: 2, impactoEsperado: 3, sostenibilidad: 2 }),
+      observaciones: 'Evaluación desde la Unidad Académica emparejada: falta desarrollar la propuesta metodológica.',
+    });
+    await this.notificarAdjudicacion(noAdjudicada, conv, false);
   }
 
   // ─────────────────── Convocatoria 2025 (Evaluación) ───────────────────
@@ -1408,18 +1503,35 @@ export class SeedService {
       await this.seedEvaluadorAprobado(pool.docentes[3], conv);
     }
 
+    // institucional = {trayectoria, antecedentes, vinculacion, coherencia} (0-10 c/u, solo suman
+    // las subcategorías numéricas). nivelCruzada = fracción del puntaje máximo de cada ítem
+    // cruzado (ver itemsCruzadaPorNivel). Variados a propósito: si todos los proyectos empatan
+    // en nota final, el orden de mérito de la demo no muestra nada — acá hay una distribución
+    // real, de mejor a peor: Puente Comunitario > Salud en Territorio > Voces del Barrio >
+    // Letras en la Comunidad > Taller de Robótica Educativa ≈ Cooperativas > Patrimonio Oral >
+    // Acompañamiento a Adultos Mayores (el "hueco", además el más bajo una vez completado).
     type SpecProyecto = {
       ua: UsuariosUa; nombre: string; director: Usuario; resumen: string; area: string; esPse?: boolean;
+      institucional: { trayectoria: number; antecedentes: number; vinculacion: number; coherencia: number };
+      nivelCruzada: number;
     };
     const proyectos: SpecProyecto[] = [
-      { ua: ing, nombre: 'Puente Comunitario UBANEX', director: ing.docentes[0], resumen: 'Tercera edición de los talleres de oficios digitales, ahora con salida laboral asistida.', area: 'Tecnología' },
-      { ua: ing, nombre: 'Taller de Robótica Educativa', director: ing.docentes[2], resumen: 'Robótica educativa en escuelas técnicas de la zona sur.', area: 'Tecnología' },
-      { ua: med, nombre: 'Salud en Territorio', director: med.docentes[0], resumen: 'Tercera edición de las jornadas de salud comunitaria, con foco en salud mental.', area: 'Salud', esPse: true },
-      { ua: med, nombre: 'Acompañamiento a Adultos Mayores', director: med.docentes[1], resumen: 'Visitas domiciliarias y acompañamiento a adultos mayores en situación de aislamiento.', area: 'Salud' },
-      { ua: soc, nombre: 'Voces del Barrio', director: soc.docentes[0], resumen: 'Tercera edición de la radio comunitaria, con formación en producción audiovisual.', area: 'Cultura' },
-      { ua: soc, nombre: 'Cooperativas y Trabajo Digno', director: soc.docentes[2], resumen: 'Acompañamiento técnico a cooperativas de trabajo de la economía popular.', area: 'Educación' },
-      { ua: fil, nombre: 'Letras en la Comunidad', director: fil.docentes[0], resumen: 'Tercera edición de los talleres de lectura y escritura, ahora en escuelas rurales.', area: 'Educación' },
-      { ua: fil, nombre: 'Patrimonio Oral de la Ciudad', director: fil.docentes[2], resumen: 'Relevamiento de historias orales de vecinos y vecinas de barrios históricos.', area: 'Cultura' },
+      { ua: ing, nombre: 'Puente Comunitario UBANEX', director: ing.docentes[0], resumen: 'Tercera edición de los talleres de oficios digitales, ahora con salida laboral asistida.', area: 'Tecnología',
+        institucional: { trayectoria: 9, antecedentes: 9, vinculacion: 9, coherencia: 9 }, nivelCruzada: 0.85 },
+      { ua: ing, nombre: 'Taller de Robótica Educativa', director: ing.docentes[2], resumen: 'Robótica educativa en escuelas técnicas de la zona sur.', area: 'Tecnología',
+        institucional: { trayectoria: 7, antecedentes: 6, vinculacion: 7, coherencia: 6 }, nivelCruzada: 0.65 },
+      { ua: med, nombre: 'Salud en Territorio', director: med.docentes[0], resumen: 'Tercera edición de las jornadas de salud comunitaria, con foco en salud mental.', area: 'Salud', esPse: true,
+        institucional: { trayectoria: 9, antecedentes: 8, vinculacion: 9, coherencia: 8 }, nivelCruzada: 0.80 },
+      { ua: med, nombre: 'Acompañamiento a Adultos Mayores', director: med.docentes[1], resumen: 'Visitas domiciliarias y acompañamiento a adultos mayores en situación de aislamiento.', area: 'Salud',
+        institucional: { trayectoria: 6, antecedentes: 5, vinculacion: 6, coherencia: 5 }, nivelCruzada: 0.55 },
+      { ua: soc, nombre: 'Voces del Barrio', director: soc.docentes[0], resumen: 'Tercera edición de la radio comunitaria, con formación en producción audiovisual.', area: 'Cultura',
+        institucional: { trayectoria: 8, antecedentes: 8, vinculacion: 8, coherencia: 8 }, nivelCruzada: 0.78 },
+      { ua: soc, nombre: 'Cooperativas y Trabajo Digno', director: soc.docentes[2], resumen: 'Acompañamiento técnico a cooperativas de trabajo de la economía popular.', area: 'Educación',
+        institucional: { trayectoria: 7, antecedentes: 6, vinculacion: 6, coherencia: 7 }, nivelCruzada: 0.62 },
+      { ua: fil, nombre: 'Letras en la Comunidad', director: fil.docentes[0], resumen: 'Tercera edición de los talleres de lectura y escritura, ahora en escuelas rurales.', area: 'Educación',
+        institucional: { trayectoria: 8, antecedentes: 7, vinculacion: 8, coherencia: 7 }, nivelCruzada: 0.75 },
+      { ua: fil, nombre: 'Patrimonio Oral de la Ciudad', director: fil.docentes[2], resumen: 'Relevamiento de historias orales de vecinos y vecinas de barrios históricos.', area: 'Cultura',
+        institucional: { trayectoria: 6, antecedentes: 5, vinculacion: 6, coherencia: 6 }, nivelCruzada: 0.58 },
     ];
 
     for (const p of proyectos) {
@@ -1446,20 +1558,17 @@ export class SeedService {
       await this.guardarInstitucional({
         convocatoria: conv, edicionId: edicion.id, autoridad: p.ua.autoridad,
         categorias: this.categoriasInstitucional({
-          trayectoria: 9, antecedentes: 8, vinculacion: 8, coherencia: 8,
+          ...p.institucional,
           fundamentacionTrayectoria: 'El equipo acumula tres ediciones consecutivas en la convocatoria.',
-          fundamentacionVinculacion: 'Fuerte articulación con instituciones y organizaciones del territorio.',
+          fundamentacionVinculacion: 'Articulación con instituciones y organizaciones del territorio.',
         }),
-        observaciones: 'El proyecto está muy bien articulado con el territorio y su equipo tiene una trayectoria sólida.',
+        observaciones: 'El proyecto está bien articulado con el territorio.',
         esPse: p.esPse,
       });
 
-      const evaluadorPropio = p.ua === ing ? ing.docentes[3] : p.ua === med ? med.docentes[3] : p.ua === soc ? soc.docentes[3] : fil.docentes[3];
-      const evaluadorAjeno = p.ua === ing ? med.docentes[3] : p.ua === med ? ing.docentes[3] : p.ua === soc ? fil.docentes[3] : soc.docentes[3];
-
       await this.guardarCruzada({
-        convocatoria: conv, edicionId: edicion.id, evaluador: evaluadorPropio, tipo: TipoEvaluacionCruzada.Propia,
-        items: this.itemsCruzada({ problema: 9, objetivos: 7, metodologia: 6, participacionDiseno: 7, formacionAlumnos: 6, rolesAlumnos: 4, viabilidad: 4, presupuesto: 4, comunidad: 5, articulacion: 5, impactoEsperado: 7, sostenibilidad: 6 }),
+        convocatoria: conv, edicionId: edicion.id, evaluador: this.evaluadorPropio(p.ua), tipo: TipoEvaluacionCruzada.Propia,
+        items: this.itemsCruzadaPorNivel(p.nivelCruzada),
         observaciones: 'Problema claramente relevante y metodología adecuada al territorio.',
       });
 
@@ -1467,10 +1576,8 @@ export class SeedService {
       // completarla en vivo y mostrar el cierre de la etapa de Evaluación.
       const esHueco = p.nombre === 'Acompañamiento a Adultos Mayores';
       await this.guardarCruzada({
-        convocatoria: conv, edicionId: edicion.id, evaluador: evaluadorAjeno, tipo: TipoEvaluacionCruzada.Ajena,
-        items: esHueco
-          ? this.itemsCruzada({ problema: 8, objetivos: 0, metodologia: 0, participacionDiseno: 0, formacionAlumnos: 0, rolesAlumnos: 0, viabilidad: 0, presupuesto: 0, comunidad: 0, articulacion: 0, impactoEsperado: 0, sostenibilidad: 0 })
-          : this.itemsCruzada({ problema: 9, objetivos: 7, metodologia: 6, participacionDiseno: 7, formacionAlumnos: 6, rolesAlumnos: 5, viabilidad: 4, presupuesto: 4, comunidad: 5, articulacion: 5, impactoEsperado: 5, sostenibilidad: 5 }),
+        convocatoria: conv, edicionId: edicion.id, evaluador: this.evaluadorAjeno(p.ua), tipo: TipoEvaluacionCruzada.Ajena,
+        items: esHueco ? this.itemsCruzadaPorNivel(0) : this.itemsCruzadaPorNivel(p.nivelCruzada),
         observaciones: esHueco ? 'Evaluación en curso: falta completar la mayoría de los ítems.' : 'Evaluación desde la Unidad Académica emparejada: buena viabilidad y fuerte articulación comunitaria.',
         confirmada: !esHueco,
       });
@@ -1488,7 +1595,9 @@ export class SeedService {
     const fil = this.uaUsuarios.get('FIL')!;
 
     // Puente Comunitario UBANEX: cuarta participación consecutiva. Rectorado ya lo marcó
-    // como consolidado a mano (override manual, independiente del cálculo automático).
+    // como consolidado a mano (override manual, independiente del cálculo automático), y esta
+    // edición además se declara interfacultad con Medicina — por eso el referente institucional
+    // del formulario (más abajo) es la autoridad de esa UA, no de la propia.
     const puente = await this.seedProyectoConEdicion({
       nombreProyecto: 'Puente Comunitario UBANEX',
       creadoPor: ing.docentes[0],
@@ -1508,6 +1617,9 @@ export class SeedService {
         anio: 2026,
       }),
       esConsolidado: true,
+      esInterfacultad: true,
+      unidadAcademicaAdicionalId: med.ua.id,
+      avalUrl: 'https://drive.google.com/file/d/aval-seed/view',
     });
     await this.seedDirector(ing.docentes[0], puente, conv, ing.autoridad.id);
 
@@ -1544,6 +1656,7 @@ export class SeedService {
         antecedentes: true,
         anio: 2026,
       }),
+      avalUrl: 'https://drive.google.com/file/d/aval-seed/view',
     });
     await this.seedDirector(med.docentes[0], medPresentado, conv, med.autoridad.id);
 
@@ -1579,8 +1692,18 @@ export class SeedService {
         antecedentes: true,
         anio: 2026,
       }),
+      avalUrl: 'https://drive.google.com/file/d/aval-seed/view',
     });
     await this.seedDirector(soc.docentes[0], socPresentado, conv, soc.autoridad.id);
+    // Sugerencia ya resuelta (Aceptada): el sistema real aplica el cambio automáticamente al
+    // aceptar, así que acá se actualiza a mano el datosFormulario para reflejar ese resultado.
+    await this.seedSugerenciaAceptada(socPresentado, soc.autoridad, {
+      campoNombre: CAMPOS_ESTANDAR.fundamentacion,
+      valorNuevo: 'Existe una red de vínculos previa con instituciones de la zona, incluida la articulación con dos escuelas técnicas para la producción audiovisual.',
+      comentario: 'Ampliar la fundamentación mencionando con qué instituciones se articula.',
+      respuestaDirector: 'De acuerdo, amplío la fundamentación con el detalle de las escuelas técnicas.',
+      respondidoPor: soc.docentes[0],
+    }, campos);
 
     const socPendiente = await this.seedProyectoConEdicion({
       nombreProyecto: 'Economía Popular en Red',
@@ -1620,8 +1743,22 @@ export class SeedService {
         antecedentes: true,
         anio: 2026,
       }),
+      avalUrl: 'https://drive.google.com/file/d/aval-seed/view',
     });
     await this.seedDirector(fil.docentes[0], filPresentado, conv, fil.autoridad.id);
+    // Sugerencia ya resuelta como MasInformacion: no aplica ningún cambio, solo cierra pidiendo
+    // precisiones (para retomar la conversación hay que crear una sugerencia nueva).
+    await this.seedSugerencia(filPresentado, fil.autoridad, {
+      campo: 'nombre',
+      valorActual: 'Letras en la Comunidad',
+      valorSugerido: null,
+      comentario: '¿La cuarta edición sigue en las mismas escuelas rurales o se suman otras?',
+      respuesta: {
+        estado: EstadoSugerencia.MasInformacion,
+        respuestaDirector: 'Se suman dos escuelas rurales nuevas, además de las tres de la edición anterior.',
+        respondidoPor: fil.docentes[0],
+      },
+    });
 
     const filPendiente = await this.seedProyectoConEdicion({
       nombreProyecto: 'Memoria y Patrimonio Barrial',
@@ -1650,10 +1787,17 @@ export class SeedService {
   private async seedSugerencia(
     edicion: Edicion,
     sugeridoPor: Usuario,
-    datos: { campo: string; valorActual: string | null; valorSugerido: string | null; comentario: string },
+    datos: {
+      campo: string; valorActual: string | null; valorSugerido: string | null; comentario: string;
+      // Si se pasa, la sugerencia nace ya respondida (Aceptada/Rechazada/MasInformacion) en vez de
+      // Pendiente. Si es Aceptada, quien llama es responsable de aplicar el cambio a mano sobre la
+      // Edicion/Proyecto correspondiente — acá se bypasean los servicios reales, que lo harían solos.
+      respuesta?: { estado: EstadoSugerencia; respuestaDirector: string; respondidoPor: Usuario };
+    },
   ): Promise<void> {
     const existe = await this.sugerenciaRepo.count({ where: { edicionId: edicion.id } });
     if (existe > 0) return;
+    const respondida = datos.respuesta;
     const sugerencia = await this.sugerenciaRepo.save(
       this.sugerenciaRepo.create({
         edicionId: edicion.id,
@@ -1662,7 +1806,9 @@ export class SeedService {
         valorActual: datos.valorActual,
         valorSugerido: datos.valorSugerido,
         comentario: datos.comentario,
-        estado: EstadoSugerencia.Pendiente,
+        estado: respondida?.estado ?? EstadoSugerencia.Pendiente,
+        respuestaDirector: respondida?.respuestaDirector ?? null,
+        respondidoEn: respondida ? new Date() : null,
       }),
     );
     await this.notificacionRepo.save(
@@ -1671,8 +1817,49 @@ export class SeedService {
         tipo: TipoNotificacion.NUEVA_SUGERENCIA,
         sugerenciaId: sugerencia.id,
         mensaje: `${sugeridoPor.nombreCompleto} sugirió un cambio en el proyecto`,
+        leida: !!respondida,
       }),
     );
+    if (respondida) {
+      await this.notificacionRepo.save(
+        this.notificacionRepo.create({
+          usuarioId: sugeridoPor.id,
+          tipo: TipoNotificacion.RESPUESTA_SUGERENCIA,
+          sugerenciaId: sugerencia.id,
+          mensaje: `${respondida.respondidoPor.nombreCompleto} respondió tu sugerencia (${respondida.estado})`,
+        }),
+      );
+    }
+  }
+
+  /**
+   * Sugerencia sobre un campo del formulario que nace ya Aceptada, con el cambio aplicado
+   * a `datosFormulario` — igual que hace `sugerencias.service.ts` en la app real al aceptar.
+   */
+  private async seedSugerenciaAceptada(
+    edicion: Edicion,
+    sugeridoPor: Usuario,
+    datos: { campoNombre: string; valorNuevo: string; comentario: string; respuestaDirector: string; respondidoPor: Usuario },
+    campos: CampoFormulario[],
+  ): Promise<void> {
+    const yaExiste = await this.sugerenciaRepo.count({ where: { edicionId: edicion.id } });
+    if (yaExiste > 0) return;
+    const campoId = this.campo(campos, datos.campoNombre).id;
+    const datosActuales = (edicion.datosFormulario as Record<string, unknown> | null) ?? {};
+    const valorActual = typeof datosActuales[campoId] === 'string' ? (datosActuales[campoId] as string) : null;
+
+    await this.seedSugerencia(edicion, sugeridoPor, {
+      campo: `datosFormulario.${campoId}`,
+      valorActual,
+      valorSugerido: datos.valorNuevo,
+      comentario: datos.comentario,
+      respuesta: { estado: EstadoSugerencia.Aceptada, respuestaDirector: datos.respuestaDirector, respondidoPor: datos.respondidoPor },
+    });
+
+    await this.edicionRepo.update(edicion.id, {
+      datosFormulario: { ...datosActuales, [campoId]: datos.valorNuevo },
+    });
+    edicion.datosFormulario = { ...datosActuales, [campoId]: datos.valorNuevo };
   }
 
   // ─────────────────── Resumen ───────────────────
