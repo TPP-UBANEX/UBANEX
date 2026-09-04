@@ -993,6 +993,7 @@ export interface Hito {
   fechaInicio: string | null
   fechaFin: string | null
   integrantes: string | null
+  links: string[] | null
   categoria: CategoriaHito
   creadoPorId: string
   creadoEn: string
@@ -1061,6 +1062,7 @@ export interface CrearHitoDto {
   fechaInicio?: string
   fechaFin?: string
   integrantes?: string
+  links?: string[]
   categoria: CategoriaHito
 }
 
@@ -1070,6 +1072,7 @@ export interface ActualizarHitoDto {
   fechaInicio?: string
   fechaFin?: string
   integrantes?: string
+  links?: string[]
   categoria?: CategoriaHito
 }
 

@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
+import { conProtocolo } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Convocatoria, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
@@ -56,11 +57,6 @@ const OPCIONES_ES_INSUMO = [
 
 const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'comprobantes', 'autoevaluacion', 'informe-final', 'sugerencias']
 
-/** Antepone https:// si el link no trae protocolo, para que no se resuelva como ruta relativa. */
-const conProtocolo = (url: string) => {
-  const u = url.trim()
-  return /^https?:\/\//i.test(u) ? u : `https://${u}`
-}
 
 interface ModalConfigSugerencia {
   multilinea?: boolean

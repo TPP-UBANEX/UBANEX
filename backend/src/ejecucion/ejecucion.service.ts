@@ -26,6 +26,18 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { validarEstructuraAutoevaluacion } from '../common/dto/validador-estructura-autoevaluacion';
 import { validarRespuestasAutoevaluacion, preguntasObligatoriasFaltantes } from '../evaluaciones/validar-respuestas-autoevaluacion';
 
+/**
+ * Normaliza los links de un hito: descarta los vacíos y antepone `https://` a los
+ * que no traen protocolo, para que siempre queden como URLs absolutas.
+ */
+export function normalizarLinksHito(links?: string[] | null): string[] {
+  if (!links) return [];
+  return links
+    .map(l => l.trim())
+    .filter(l => l.length > 0)
+    .map(l => (/^https?:\/\//i.test(l) ? l : `https://${l}`));
+}
+
 @Injectable()
 export class EjecucionService {
   constructor(
@@ -125,6 +137,7 @@ export class EjecucionService {
         fechaInicio: dto.fechaInicio ?? null,
         fechaFin: dto.fechaFin ?? null,
         integrantes: dto.integrantes ?? null,
+        links: normalizarLinksHito(dto.links),
         categoria: dto.categoria,
         creadoPorId: usuario.id,
       }),
@@ -158,6 +171,7 @@ export class EjecucionService {
     if (dto.fechaInicio !== undefined) hito.fechaInicio = dto.fechaInicio;
     if (dto.fechaFin !== undefined) hito.fechaFin = dto.fechaFin;
     if (dto.integrantes !== undefined) hito.integrantes = dto.integrantes;
+    if (dto.links !== undefined) hito.links = normalizarLinksHito(dto.links);
     if (dto.categoria !== undefined) hito.categoria = dto.categoria;
 
     const guardado = await this.hitoRepo.save(hito);
