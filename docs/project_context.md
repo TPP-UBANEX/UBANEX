@@ -884,6 +884,8 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
 * CRUD de usuarios con paginación, filtros y perfil académico/docente; auditoría de
   acciones; catálogos de unidades académicas, carreras y geo.
 * CRUD de convocatorias con estados y fechas por etapa.
+* Reglas de cierre de convocatoria: solo se cierra cuando la fecha actual es igual o
+  posterior a la fecha de fin de ejecución y no quedan comprobantes en revisión.
 * Formularios dinámicos con 12 tipos de campo, tablas, y plantillas reutilizables;
   se congelan al pasar a `Presentacion`.
 * Proyectos y ediciones con presupuesto de 3 rubros (recálculo en backend), tope de

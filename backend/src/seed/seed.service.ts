@@ -3770,11 +3770,12 @@ export class SeedService {
       fechaFinPresentacion: this.crearFecha(ANIO, 4, 30),
       fechaInicioEvaluacion: this.crearFecha(ANIO, 5, 15),
       fechaFinEvaluacion: this.crearFecha(ANIO, 7, 15),
-      // Execución en el FUTURO (hoy es 2026): así cerrar la convocatoria desde la
-      // UI no falla por la regla "fecha no puede ser anterior a hoy" y se prueba
-      // el condicionante real (comprobantes en revisión).
-      fechaInicioEjecucion: this.crearFecha(ANIO + 1, 8, 1),
-      fechaFinEjecucion: this.crearFecha(ANIO + 2, 2, 28),
+      // Ejecución en el PASADO: para cerrar la convocatoria desde la UI debe
+      // cumplirse que la fecha actual sea igual o posterior a la fecha de fin
+      // de ejecución, así se prueba el condicionante real (comprobantes en
+      // revisión y fecha de fin de ejecución ya transcurrida).
+      fechaInicioEjecucion: this.crearFecha(ANIO, 8, 1),
+      fechaFinEjecucion: this.crearFecha(ANIO, 9, 1),
       umbralInconsistenciaCruzada: 40,
       formularioId,
       cuotaFederativa: 1,

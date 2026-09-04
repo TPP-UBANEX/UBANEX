@@ -127,3 +127,6 @@ afectada muestra los datos bien.
 - No instalar librerías sin verificar que no exista ya una alternativa en el proyecto.
 - No generar archivos fuera de `backend/` o `frontend/` a menos que sea necesario.
 - **No hacer commit ni push sin autorización explícita del usuario.**
+
+## Documentacion
+- SIEMPRE que se realize un cambio identificar si se debe modificar algo de la documentacion tecnica, funcional o manual de usuario para reflejar el presente del proyecto

@@ -511,6 +511,17 @@ export function ConvocatoriaDetail() {
       return;
     }
 
+    if (editForm.estado === EstadoConvocatoria.Cierre) {
+      const hoy = new Date().toISOString().split('T')[0];
+      if (editForm.fechaFinEjecucion && editForm.fechaFinEjecucion > hoy) {
+        toast.error(
+          'No se puede cerrar la convocatoria: la fecha actual debe ser igual o posterior a la fecha de fin de ejecución',
+          { duration: 8000 },
+        );
+        return;
+      }
+    }
+
     setConfirmEditOpen(true);
   };
 

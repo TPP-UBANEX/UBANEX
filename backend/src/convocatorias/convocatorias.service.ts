@@ -168,6 +168,7 @@ export class ConvocatoriasService {
 
     if (dto.estado === EstadoConvocatoria.Cierre && estadoAnterior !== EstadoConvocatoria.Cierre) {
       await this.validarCierreSinComprobantesPendientes(convocatoria.id);
+      this.validarFechaFinEjecucionParaCierre(dto.fechaFinEjecucion ?? convocatoria.fechaFinEjecucion);
     }
 
     Object.assign(convocatoria, dto);
@@ -611,8 +612,11 @@ export class ConvocatoriasService {
   }
 
   /**
-   * Único condicionante para cerrar una convocatoria: no puede quedar ningún
-   * comprobante en revisión en ninguna de las ediciones de esa convocatoria.
+   * Condicionantes para cerrar una convocatoria:
+   * 1. No puede quedar ningún comprobante en revisión en ninguna de las
+   *    ediciones de esa convocatoria.
+   * 2. La fecha actual debe ser igual o posterior a la fecha de fin de
+   *    ejecución de la convocatoria.
    */
   private async validarCierreSinComprobantesPendientes(convocatoriaId: string): Promise<void> {
     const pendientes = await this.rendicionRepo
@@ -625,6 +629,24 @@ export class ConvocatoriasService {
     if (pendientes > 0) {
       throw new BadRequestException(
         `No se puede cerrar la convocatoria: hay ${pendientes} comprobante(s) en revisión`,
+      );
+    }
+  }
+
+  /**
+   * Para cerrar una convocatoria la fecha actual debe ser igual o posterior a
+   * su fecha de fin de ejecución. Si la convocatoria no tiene fecha de fin de
+   * ejecución definida se permite el cierre.
+   */
+  private validarFechaFinEjecucionParaCierre(fechaFinEjecucion?: string | null): void {
+    if (!fechaFinEjecucion) return;
+
+    const hoy = new Date(new Date().toISOString().split('T')[0]);
+    const finEjecucion = new Date(fechaFinEjecucion);
+
+    if (hoy < finEjecucion) {
+      throw new BadRequestException(
+        'No se puede cerrar la convocatoria: la fecha actual debe ser igual o posterior a la fecha de fin de ejecución',
       );
     }
   }
