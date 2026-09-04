@@ -23,7 +23,7 @@ async function bootstrap() {
   // relee tablas completas y materializa miles de entidades en memoria, lo que
   // agota el heap del proceso durante el arranque.
   const seedHabilitado =
-    (process.env.UBANEX_SEED ?? 'true') === 'true'
+    (process.env.UBANEX_SEED ?? 'false') === 'true'
     && process.env.RENDER !== 'true';
   if (seedHabilitado) {
     const seedService = app.get(SeedService);
