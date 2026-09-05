@@ -49,6 +49,7 @@ describe('SugerenciasService', () => {
   const findOneSugerencia = jest.fn<() => Promise<SugerenciaCambio | null>>();
   const saveSugerencia = jest.fn<(s: unknown) => Promise<unknown>>();
   const createSugerencia = jest.fn((data: unknown) => data as SugerenciaCambio);
+  const countSugerencia = jest.fn<() => Promise<number>>();
   const saveNotificacion = jest.fn<(n: unknown) => Promise<unknown>>();
   const createNotificacion = jest.fn((data: unknown) => data);
   const findOneEdicion = jest.fn<() => Promise<Edicion | null>>();
@@ -63,6 +64,7 @@ describe('SugerenciasService', () => {
     findOne: findOneSugerencia,
     save: saveSugerencia,
     create: createSugerencia,
+    count: countSugerencia,
   } as unknown as Repository<SugerenciaCambio>;
 
   const notificacionRepo = {
@@ -118,6 +120,7 @@ describe('SugerenciasService', () => {
     findOneByProyecto.mockResolvedValue({ id: 'proyecto-1', nombre: 'Proyecto de prueba' } as unknown as Proyecto);
     findOneSugerencia.mockResolvedValue(null);
     saveSugerencia.mockImplementation(async (s) => s);
+    countSugerencia.mockResolvedValue(0);
   });
 
   describe('crear — validación de rutas de presupuesto', () => {

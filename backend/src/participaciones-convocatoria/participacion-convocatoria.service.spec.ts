@@ -36,6 +36,9 @@ describe('ParticipacionConvocatoriaService', () => {
   const findOneEdicion = jest.fn<() => Promise<Edicion | null>>();
 
   const registrarAuditoria = jest.fn<(params: unknown) => Promise<unknown>>();
+  const createNotificacion = jest.fn();
+  const saveNotificacion = jest.fn();
+  const deleteNotificacion = jest.fn();
 
   const participacionRepo = {
     find: findParticipaciones,
@@ -64,7 +67,11 @@ describe('ParticipacionConvocatoriaService', () => {
     registrar: registrarAuditoria,
   } as unknown as AuditoriaService;
 
-  const notificacionRepo = {} as unknown as Repository<Notificacion>;
+  const notificacionRepo = {
+    create: createNotificacion,
+    save: saveNotificacion,
+    delete: deleteNotificacion,
+  } as unknown as Repository<Notificacion>;
   const mail = {} as unknown as MailService;
 
   const service = new ParticipacionConvocatoriaService(
@@ -313,6 +320,7 @@ describe('ParticipacionConvocatoriaService', () => {
         edicionId: 'edicion-1',
         esDirectorPrincipal: true,
         asignadoPorId: 'u-creador',
+        estado: null,
       });
       expect(saveParticipacion).toHaveBeenCalledWith(entity);
     });

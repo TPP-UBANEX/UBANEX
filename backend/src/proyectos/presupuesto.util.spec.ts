@@ -193,6 +193,8 @@ describe('presupuestoIncompletoParaEnvio', () => {
   const convocatoriaConEjecucion = {
     fechaInicioEjecucion: '2027-08-01',
     fechaFinEjecucion: '2028-02-28',
+    topePresupuestoConsolidado: null as number | null,
+    topePresupuestoNoConsolidado: null as number | null,
   };
 
   it('reporta presupuesto vacio cuando es null', () => {
@@ -267,7 +269,7 @@ describe('presupuestoIncompletoParaEnvio', () => {
     const viatico = p.rubros[0].partidas[0] as { periodoInicio: string; periodoFin: string };
     viatico.periodoInicio = '2000-01-01';
     viatico.periodoFin = '2000-02-01';
-    const motivos = presupuestoIncompletoParaEnvio(p, { fechaInicioEjecucion: null, fechaFinEjecucion: null });
+    const motivos = presupuestoIncompletoParaEnvio(p, { fechaInicioEjecucion: null, fechaFinEjecucion: null, topePresupuestoConsolidado: null, topePresupuestoNoConsolidado: null });
     expect(motivos).toContain(
       '"Viáticos y Seguros": el período de la partida 1 no puede comenzar antes de hoy',
     );
