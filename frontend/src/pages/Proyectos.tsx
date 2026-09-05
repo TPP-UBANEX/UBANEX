@@ -173,6 +173,7 @@ export function Proyectos() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Proyecto</TableHead>
+                      <TableHead>Convocatoria</TableHead>
                       <TableHead>Creado por</TableHead>
                       <TableHead>Facultad</TableHead>
                       <TableHead>Etapa</TableHead>
@@ -184,6 +185,7 @@ export function Proyectos() {
                     {ediciones.map(e => (
                       <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`)}>
                         <TableCell className="font-medium">{e.proyecto?.nombre || 'Sin nombre'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{e.convocatoria?.nombre || '-'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {e.proyecto?.esInterfacultad && e.proyecto.unidadAcademicaAdicionalId !== e.unidadAcademicaId && e.proyecto.unidadAcademicaAdicional
@@ -262,6 +264,7 @@ export function Proyectos() {
                     <Card key={e.id} className="cursor-pointer hover:bg-accent" onClick={() => navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`)}>
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
+                        <p className="text-xs text-muted-foreground">{e.convocatoria?.nombre || '-'}</p>
                         <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
                         {e.presupuesto && <Badge variant="outline" className="text-xs">{formatearMoneda(e.presupuesto.montoTotal)}</Badge>}
                       </CardContent>
