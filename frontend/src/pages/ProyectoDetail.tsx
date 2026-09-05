@@ -26,6 +26,7 @@ import { SugerenciasTab } from '@/components/SugerenciasTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import { HitosEjecucionTab } from '@/components/HitosEjecucionTab'
+import { ComprobantesTab } from '@/components/ComprobantesTab'
 import { AutoevaluacionTab } from '@/components/AutoevaluacionTab'
 import { InformeFinalTab } from '@/components/InformeFinalTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
@@ -41,7 +42,7 @@ import {
   formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, motivoTopeExcedido,
   normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
-import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X } from 'lucide-react'
+import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 const OPCIONES_TIPO_PERSONA = [
@@ -54,7 +55,7 @@ const OPCIONES_ES_INSUMO = [
   { value: 'false', label: 'No' },
 ]
 
-const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'autoevaluacion', 'informe-final', 'sugerencias']
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'comprobantes', 'autoevaluacion', 'informe-final', 'sugerencias']
 
 
 interface ModalConfigSugerencia {
@@ -81,6 +82,8 @@ export function ProyectoDetail() {
   const [enviando, setEnviando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
+  const [cerrando, setCerrando] = useState(false)
+  const [confirmarCerrar, setConfirmarCerrar] = useState(false)
 
   const [editando, setEditando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
@@ -205,8 +208,41 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
+  const uaSinAccesoComprobantes = esSecretariaMismaUA && !edicion?.uaPuedeVerComprobantes
   const esDirector = directores.some(d => d.usuarioId === user?.id)
   const puedeEditarEjecucion = esPropietario || esDirector
+  const puedeGestionarComprobantes = Boolean(
+    esRectoradoAmplio &&
+      [EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado].includes(edicion?.estado as EstadoEdicion),
+  )
+  // La UA solo ve los comprobantes si el director lo habilitó; y en ese
+  // caso es solo lectura (aceptar/rechazar es exclusivo de Rectorado).
+  const toggleVisibilidadComprobantes = async () => {
+    if (!id || !edicion) return
+    try {
+      const actualizada = await api.proyectos.actualizarVisibilidadComprobantes(id, edicion.id, {
+        uaPuedeVerComprobantes: !edicion.uaPuedeVerComprobantes,
+      })
+      setEdicion(actualizada)
+      toast.success(
+        actualizada.uaPuedeVerComprobantes
+          ? 'La Unidad Académica ahora puede ver los comprobantes'
+          : 'La Unidad Académica ya no puede ver los comprobantes',
+      )
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'No se pudo cambiar la visibilidad de los comprobantes',
+        { duration: 8000 },
+      )
+    }
+  }
+  const convocatoriaEnEjecucionOCierre =
+    edicion?.convocatoria?.estado === EstadoConvocatoria.Ejecucion ||
+    edicion?.convocatoria?.estado === EstadoConvocatoria.Cierre
+  const puedeCerrarEdicion =
+    (esPropietario || esDirector) &&
+    edicion?.estado === EstadoEdicion.EnEjecucion &&
+    convocatoriaEnEjecucionOCierre
 
   const nombreUnidadesAcademicas = () => {
     const principal = edicion?.unidadAcademica?.nombre
@@ -394,6 +430,21 @@ export function ProyectoDetail() {
     }
   }
 
+  const handleCerrar = async () => {
+    if (!id || !edicion) return
+    setCerrando(true)
+    try {
+      await api.proyectos.cerrarEdicion(id, edicion.id)
+      toast.success('Edición cerrada')
+      setConfirmarCerrar(false)
+      await cargarDatos()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cerrar la edición')
+    } finally {
+      setCerrando(false)
+    }
+  }
+
   const handleSugerirClick = (campo: string, valorActual: string, label: string) => {
     const previa = sugerenciasPropias.find(s => s.campo === campo)
     setSugerenciaModal({
@@ -557,6 +608,11 @@ export function ProyectoDetail() {
               </Button>
             </>
           )}
+          {!editando && puedeCerrarEdicion && (
+            <Button variant="outline" onClick={() => setConfirmarCerrar(true)}>
+              <Lock className="h-4 w-4 mr-2" />Cerrar edición
+            </Button>
+          )}
           {editando && (
             <>
               <Button variant="outline" onClick={cancelarEdicion}>Cancelar</Button>
@@ -673,6 +729,7 @@ export function ProyectoDetail() {
           <TabsTrigger value="presupuesto">Presupuesto solicitado</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
+          <TabsTrigger value="comprobantes">Comprobantes</TabsTrigger>
           <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
           <TabsTrigger value="informe-final">Informe final</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
@@ -902,6 +959,60 @@ export function ProyectoDetail() {
           )}
         </TabsContent>
 
+        <TabsContent value="comprobantes" className="mt-4">
+          {puedeEditarEjecucion && (
+            <Card className="mb-4">
+              <CardContent className="flex items-center justify-between gap-4 py-4">
+                <div>
+                  <p className="text-sm font-medium">Comprobantes visibles para la Unidad Académica</p>
+                  <p className="text-sm text-muted-foreground">
+                    La Unidad Académica podrá ver la sección en modo lectura. Aceptar y rechazar es solo de Rectorado.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!edicion?.uaPuedeVerComprobantes}
+                  onClick={toggleVisibilidadComprobantes}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    edicion?.uaPuedeVerComprobantes ? 'bg-primary' : 'bg-input'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      edicion?.uaPuedeVerComprobantes ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </CardContent>
+            </Card>
+          )}
+          {uaSinAccesoComprobantes ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+                <Lock className="h-6 w-6 text-muted-foreground" />
+                <p className="text-sm font-medium">Comprobantes no habilitados</p>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  El director del proyecto no habilitó la visualización de comprobantes para esta
+                  Unidad Académica. Contactalo para que la active si necesitás consultarlos.
+                </p>
+              </CardContent>
+            </Card>
+          ) : edicion ? (
+            <ComprobantesTab
+              edicionId={edicion.id}
+              estado={edicion.estado}
+              puedeEditar={puedeEditarEjecucion}
+              puedeGestionarEstado={puedeGestionarComprobantes}
+              presupuesto={edicion.presupuestoSolicitado}
+              fechaInicioEjecucion={edicion.convocatoria?.fechaInicioEjecucion ?? undefined}
+              fechaFinEjecucion={edicion.convocatoria?.fechaFinEjecucion ?? undefined}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
+          )}
+        </TabsContent>
+
         <TabsContent value="autoevaluacion" className="mt-4">
           {edicion?.estado === EstadoEdicion.EnEjecucion || edicion?.estado === EstadoEdicion.Cerrado ? (
             <AutoevaluacionTab edicionId={edicion?.id} estado={edicion?.estado} puedeEditar={puedeEditarEjecucion} />
@@ -992,6 +1103,26 @@ export function ProyectoDetail() {
             <Button variant="destructive" onClick={handleEliminar} disabled={eliminando}>
               {eliminando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmarCerrar} onOpenChange={setConfirmarCerrar}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cerrar edición?</DialogTitle>
+            <DialogDescription>
+              Se requiere tener el informe final confirmado, la autoevaluación completada y
+              ningún comprobante en revisión. Una vez cerrada, la edición queda bloqueada para
+              nuevas modificaciones.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarCerrar(false)}>Cancelar</Button>
+            <Button onClick={handleCerrar} disabled={cerrando}>
+              {cerrando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Cerrar edición
             </Button>
           </DialogFooter>
         </DialogContent>

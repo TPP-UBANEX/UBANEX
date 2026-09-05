@@ -5,4 +5,5 @@ export enum TipoEntidadAuditoria {
   AUTOEVALUACION_IMPACTO = 'autoevaluacion-impacto',
   INFORME_FINAL = 'informe-final',
   ADJUDICACION = 'adjudicacion',
+  RENDICION = 'rendicion',
 }

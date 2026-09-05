@@ -314,8 +314,22 @@ export const api = {
       ),
     actualizarAval: (id: string, edicionId: string, data: { avalUrl: string | null }) =>
       patch<import('@/data/types').Proyecto>(`/proyectos/${id}/ediciones/${edicionId}/aval`, data),
+    actualizarVisibilidadComprobantes: (
+      id: string,
+      edicionId: string,
+      data: import('@/data/types').ActualizarVisibilidadComprobantesDto,
+    ) =>
+      patch<import('@/data/types').Edicion>(
+        `/proyectos/${id}/ediciones/${edicionId}/visibilidad-comprobantes`,
+        data,
+      ),
     eliminarEdicion: (id: string, edicionId: string) =>
       del(`/proyectos/${id}/ediciones/${edicionId}`),
+    cerrarEdicion: (id: string, edicionId: string) =>
+      post<import('@/data/types').Proyecto>(
+        `/proyectos/${id}/ediciones/${edicionId}/cerrar`,
+        {},
+      ),
     resubir: (id: string, data: { convocatoriaId: string; anioEdicion?: number }) =>
       post<import('@/data/types').Proyecto>(`/proyectos/${id}/resubir`, data),
     disponiblesParaResubir: (convocatoriaId: string, search?: string) => {
@@ -574,10 +588,14 @@ export const api = {
     eliminar: (id: string) => del(`/notificaciones/${id}`),
   },
   rendiciones: {
-    list: (proyectoId?: string) => {
-      const qs = proyectoId ? `?proyectoId=${proyectoId}` : '';
-      return get<import('@/data/types').Rendicion[]>(`/rendiciones${qs}`);
-    },
+    listar: (edicionId: string) =>
+      get<import('@/data/types').Rendicion[]>(`/rendiciones?edicionId=${encodeURIComponent(edicionId)}`),
+    crear: (data: import('@/data/types').CrearRendicionDto) =>
+      post<import('@/data/types').Rendicion>('/rendiciones', data),
+    actualizar: (id: string, data: import('@/data/types').ActualizarRendicionDto) =>
+      patch<import('@/data/types').Rendicion>(`/rendiciones/${id}`, data),
+    eliminar: (id: string) =>
+      del(`/rendiciones/${id}`),
   },
   ejecucion: {
     hitos: {

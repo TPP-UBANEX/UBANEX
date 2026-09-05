@@ -168,8 +168,10 @@ export function ConvocatoriaDetail() {
       await api.proyectos.iniciarEvaluacion(e.proyectoId, e.id);
       toast.success('Edición pasada a evaluación');
       setRefreshKey((k) => k + 1);
-    } catch {
-      toast.error('No se pudo pasar la edición a evaluación');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo pasar la edición a evaluación', {
+        duration: 8000,
+      });
     } finally {
       setPasandoEvaluacionId(null);
     }
@@ -509,6 +511,17 @@ export function ConvocatoriaDetail() {
       return;
     }
 
+    if (editForm.estado === EstadoConvocatoria.Cierre) {
+      const hoy = new Date().toISOString().split('T')[0];
+      if (editForm.fechaFinEjecucion && editForm.fechaFinEjecucion > hoy) {
+        toast.error(
+          'No se puede cerrar la convocatoria: la fecha actual debe ser igual o posterior a la fecha de fin de ejecución',
+          { duration: 8000 },
+        );
+        return;
+      }
+    }
+
     setConfirmEditOpen(true);
   };
 
@@ -529,8 +542,10 @@ export function ConvocatoriaDetail() {
       setConv(actualizada);
       toast.success('Convocatoria actualizada correctamente');
       setEditOpen(false);
-    } catch {
-      toast.error('Error al actualizar la convocatoria');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar la convocatoria', {
+        duration: 8000,
+      });
     } finally {
       setGuardando(false);
     }
@@ -547,8 +562,10 @@ export function ConvocatoriaDetail() {
       await api.convocatorias.eliminar(id!);
       toast.success('Convocatoria eliminada correctamente');
       navigate('/convocatorias');
-    } catch {
-      toast.error('Error al eliminar la convocatoria');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar la convocatoria', {
+        duration: 8000,
+      });
     }
   };
 

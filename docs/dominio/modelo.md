@@ -109,6 +109,7 @@ classDiagram
 - Las etapas de la convocatoria son siempre las mismas 5 (`Configuracion`, `Presentacion`, `Evaluacion`, `Ejecucion`, `Cierre`) y se corresponden 1 a 1 con el estado actual.
 - Solo `Presentacion`, `Evaluacion` y `Ejecucion` tienen fechas de inicio y fin predefinidas (value object `RangoFechas`).
 - `Configuracion` y `Cierre` no tienen fechas asociadas.
+- Para pasar la convocatoria a `Cierre` se exige que la fecha actual sea igual o posterior a `fechaFinEjecucion` **y** que no quede ningún comprobante de rendición en estado `EnRevision` en ninguna de sus ediciones.
 - `Formulario` es la definición de los campos dinámicos del formulario de presentación (no se llama `TemplateFormulario` como el resto de los templates del dominio porque, a diferencia de ellos, no tiene una entidad hermana que guarde las respuestas — las respuestas de cada proyecto se guardan directamente en `Edicion.datosFormulario`). `esPlantilla: true` marca los formularios de biblioteca, reutilizables, que se pueden usar como punto de partida; `esPlantilla: false` es el formulario privado de una convocatoria. `esDefault` indica, entre las plantillas, cuál se sugiere primero — hay a lo sumo una.
 - Aunque `CampoFormulario` es un value object, lleva un `id` estable: es la clave con la que se guardan las respuestas en `Edicion.datosFormulario`, y debe sobrevivir a que se renombre la etiqueta (`nombre`) del campo más adelante. Por eso, al copiar los campos de una plantilla a una convocatoria, cada `CampoFormulario.id` se regenera: así las respuestas de una convocatoria nunca se confunden con las de otra que partió de la misma plantilla.
 - `Edicion.datosFormulario` es un objeto cuyas claves son los `CampoFormulario.id` del `Formulario` de la convocatoria correspondiente.
@@ -548,12 +549,14 @@ classDiagram
 
 ## Rendición
 
-> **Estado: no implementado.** Hoy `Rendicion` es una tabla mínima de solo lectura
-> (`estado: string` con default `'pendiente'`); `rendiciones.service.ts` solo expone un
-> `findAll`. La entidad `Comprobante`, la carga por rubro y el flujo de revisión
-> (`EnRevision → Aceptado | Rechazado` con comentario y reemplazo) todavía no existen.
-> El enum `EstadoComprobante` está definido pero sin uso. El diagrama de abajo es el
-> diseño objetivo.
+> **Estado: implementado (diseño simplificado).** Cada fila de `Rendicion` *es* un
+> comprobante: apunta a una `Edicion` (`edicionId`, no a `Proyecto`), con `rubro`,
+> `monto`, `fecha`, `comprobanteUrl`, `descripcion`, `estado`, `motivoRechazo` y
+> `creadoPorId`. El enum `EstadoComprobante` (`EnRevision → Aceptado | Rechazado`) está
+> en uso. No existe la entidad separada `Comprobante` ni historial de reemplazos: un
+> comprobante rechazado se re-edita en su misma fila. El diagrama de abajo es el diseño
+> objetivo; en el código actual la relación `Edicion`→`Rendicion` es 1 a N sobre la misma
+> tabla.
 
 ```mermaid
 classDiagram
@@ -588,10 +591,11 @@ classDiagram
 
 ### Notas
 
-- Una única `Rendicion` por `Edicion`. Activa durante la etapa `Ejecucion` de la convocatoria.
-- El director y/o codirector suben `Comprobante`s (archivos PDF o imagen), cada uno asociado a un rubro del presupuesto.
+- La tabla `Rendicion` contiene un comprobante por fila, asociado a una `Edicion`, activa durante la etapa `Ejecucion` de la convocatoria.
+- El director/codirector (o creador con permisos de ejecución) carga comprobantes durante `Ejecucion`, cada uno asociado a un rubro del presupuesto, y puede editarlos o eliminarlos mientras estén `EnRevision`.
 - Cada comprobante tiene un estado individual: `EnRevision → Aceptado | Rechazado`.
-- Cuando un usuario de rectorado rechaza un comprobante, puede dejar un `comentarioRechazo` explicativo. El director puede subir un nuevo comprobante que reemplace al rechazado (relación `reemplaza a`).
+- **Aceptar y rechazar es exclusivo de Rectorado** (`AutoridadDeRectorado` o `AsistenteDeRectorado`). Al rechazar es obligatorio dejar un `motivoRechazo` explicativo.
+- `Edicion.uaPuedeVerComprobantes` (default `false`) habilita a la **Secretaría de la misma unidad académica** a **ver** la sección de comprobantes en modo lectura. Si es `false`, esa Secretaría no tiene acceso de lectura (la API responde 403) y el frontend le muestra un aviso al abrir la pestaña de que el director no la habilitó. El toggle lo controla el director mientras la edición está en ejecución. Rectorado siempre ve la sección.
 - `Rendicion` no tiene estado global — se considera "en curso" mientras la convocatoria esté en `Ejecucion`.
 
 ---

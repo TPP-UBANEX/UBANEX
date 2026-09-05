@@ -60,6 +60,12 @@ export class Edicion {
   @Column({ type: 'text', nullable: true })
   avalUrl: string | null;
 
+  // El director decide si la Unidad Académica puede VER (solo lectura) los
+  // comprobantes de rendición de esta edición. La gestión (aceptar/rechazar) es
+  // siempre de Rectorado.
+  @Column({ type: 'boolean', default: false })
+  uaPuedeVerComprobantes: boolean;
+
   @Column({ type: 'int', nullable: true })
   ordenMerito: number | null;
 

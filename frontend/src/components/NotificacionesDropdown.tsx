@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, MessageSquare, CheckCheck, Loader2, UserCheck, CheckCircle2, Trash2 } from 'lucide-react'
+import { Bell, MessageSquare, CheckCheck, Loader2, UserCheck, CheckCircle2, Trash2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { Notificacion } from '@/data/types'
@@ -149,22 +149,29 @@ export function NotificacionesDropdown() {
             >
               <div className="flex items-start gap-2 w-full">
                 {(() => {
-                  const Icono = notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR
-                    ? UserCheck
-                    : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
-                      ? CheckCircle2
-                      : notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+                  const Icono =
+                    notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR ||
+                    notif.tipo === TipoNotificacion.NUEVO_COMPROBANTE
+                      ? UserCheck
+                      : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR ||
+                        notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION ||
+                        notif.tipo === TipoNotificacion.COMPROBANTE_ACEPTADO
                         ? CheckCircle2
-                        : MessageSquare
-                  const color = notif.tipo === TipoNotificacion.NUEVA_SUGERENCIA
-                    ? 'text-blue-500'
-                    : notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR
-                      ? 'text-amber-500'
-                      : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR
-                        ? 'text-green-500'
-                        : notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION
+                        : notif.tipo === TipoNotificacion.COMPROBANTE_RECHAZADO
+                          ? XCircle
+                          : MessageSquare
+                  const color =
+                    notif.tipo === TipoNotificacion.NUEVA_SUGERENCIA
+                      ? 'text-blue-500'
+                      : notif.tipo === TipoNotificacion.PROPUESTA_EVALUADOR
+                        ? 'text-amber-500'
+                        : notif.tipo === TipoNotificacion.RESULTADO_EVALUADOR ||
+                          notif.tipo === TipoNotificacion.RESULTADO_ADJUDICACION ||
+                          notif.tipo === TipoNotificacion.COMPROBANTE_ACEPTADO
                           ? 'text-green-500'
-                          : 'text-green-500'
+                          : notif.tipo === TipoNotificacion.COMPROBANTE_RECHAZADO
+                            ? 'text-red-500'
+                            : 'text-green-500'
                   return <Icono className={cn('h-4 w-4 mt-0.5 shrink-0', color)} />
                 })()}
                 <div className="flex-1 min-w-0">

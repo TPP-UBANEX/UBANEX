@@ -356,11 +356,28 @@ el texto libremente y, si querés, adjuntá un PDF (como link). Cuando esté lis
 
 ![Pestaña de informe final](assets/manual/informe-final.png)
 
-### 8.4 Rendición
+### 8.4 Comprobantes de rendición
 
-> **En construcción.** El circuito de comprobantes de rendición todavía no está
-> disponible en la aplicación; por ahora la rendición se sigue gestionando por fuera del
-> sistema.
+Mientras el proyecto está en ejecución, en la pestaña **Comprobantes** del detalle del
+proyecto el director/codirector carga los comprobantes de gastos por rubro
+(**Cargar comprobante**), indicando rubro, monto, fecha y un link al comprobante. La
+pestaña muestra el **consumo del presupuesto** por rubro contra lo adjudicado.
+
+Cada comprobante pasa por estados:
+
+- **En revisión** — recién cargado; el director puede editarlo o eliminarlo.
+- **Aceptado** — valida el gasto.
+- **Rechazado** — incluye el **motivo** del rechazo; el director puede corregirlo y
+  volver a presentarlo en esa misma fila.
+
+**Aceptar y rechazar es solo de Rectorado.** Ni la Secretaría de la UA ni el director
+pueden cambiar el estado de un comprobante.
+
+El director decide si la Secretaría de su Unidad Académica puede **ver** la sección en
+modo lectura mediante el interruptor *"Comprobantes visibles para la Unidad Académica"*.
+Si está apagado, al abrir la pestaña la Secretaría ve un aviso de que el director no
+habilitó la visualización (no accede a los comprobantes); Rectorado siempre la ve. Al
+cerrar la convocatoria, solo se permite hacerlo si no quedan comprobantes en revisión.
 
 ---
 

@@ -314,6 +314,9 @@ export interface Edicion {
   anioEdicion?: number;
   datosFormulario?: Record<string, unknown>;
   avalUrl?: string | null;
+  // El director decide si la Unidad Académica puede ver (solo lectura) los
+  // comprobantes de rendición de esta edición.
+  uaPuedeVerComprobantes?: boolean;
   ordenMerito?: number | null;
   adjudicacionPropuesta?: boolean | null;
   mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
@@ -414,6 +417,10 @@ export interface ActualizarEdicionDto {
   unidadAcademicaAdicionalId?: string | null;
   presupuestoSolicitado?: Presupuesto;
   datosFormulario?: Record<string, unknown>;
+}
+
+export interface ActualizarVisibilidadComprobantesDto {
+  uaPuedeVerComprobantes: boolean;
 }
 
 export interface Evaluacion {
@@ -664,15 +671,43 @@ export interface GuardarEvaluacionCruzadaDto {
   observaciones?: string;
 }
 
+export enum EstadoComprobante {
+  EnRevision = 'EnRevision',
+  Aceptado = 'Aceptado',
+  Rechazado = 'Rechazado',
+}
+
 export interface Rendicion {
   id: string;
-  proyectoId: string;
-  proyectoTitulo?: string;
-  rubro: string;
+  edicionId: string;
+  rubro: TipoRubro;
   monto: number;
-  estado: string;
+  descripcion?: string;
   fecha: string;
+  comprobanteUrl: string;
+  motivoRechazo?: string | null;
+  estado: EstadoComprobante;
+  creadoPor?: Usuario;
+  creadoEn: string;
+}
+
+export interface CrearRendicionDto {
+  edicionId: string;
+  rubro: TipoRubro;
+  monto: number;
+  descripcion?: string;
+  fecha: string;
+  comprobanteUrl: string;
+}
+
+export interface ActualizarRendicionDto {
+  rubro?: TipoRubro;
+  monto?: number;
+  descripcion?: string;
+  fecha?: string;
   comprobanteUrl?: string;
+  motivoRechazo?: string;
+  estado?: EstadoComprobante;
 }
 
 export enum TipoCampo {
@@ -821,6 +856,9 @@ export enum TipoNotificacion {
   PROPUESTA_EVALUADOR = 'PROPUESTA_EVALUADOR',
   RESULTADO_EVALUADOR = 'RESULTADO_EVALUADOR',
   RESULTADO_ADJUDICACION = 'RESULTADO_ADJUDICACION',
+  NUEVO_COMPROBANTE = 'NUEVO_COMPROBANTE',
+  COMPROBANTE_ACEPTADO = 'COMPROBANTE_ACEPTADO',
+  COMPROBANTE_RECHAZADO = 'COMPROBANTE_RECHAZADO',
 }
 
 export interface SugerenciaCambio {
@@ -856,6 +894,8 @@ export interface Notificacion {
   sugerencia?: (SugerenciaCambio & { edicion: Edicion }) | null;
   participacionId?: string | null;
   participacion?: ParticipacionConvocatoria & { convocatoria: Convocatoria };
+  rendicionId?: string | null;
+  rendicion?: { id: string; edicionId: string; rubro: string; monto: number; estado: string; creadoPor?: Usuario } | null;
   mensaje: string;
   leida: boolean;
   creadoEn: string;

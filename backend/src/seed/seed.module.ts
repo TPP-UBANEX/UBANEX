@@ -20,6 +20,7 @@ import { Hito } from '../ejecucion/hito.entity';
 import { AutoevaluacionImpacto } from '../ejecucion/autoevaluacion-impacto.entity';
 import { InformeFinal } from '../ejecucion/informe-final.entity';
 import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
+import { Rendicion } from '../rendiciones/rendicion.entity';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluac
       AutoevaluacionImpacto,
       InformeFinal,
       TemplateAutoevaluacionImpacto,
+      Rendicion,
     ]),
   ],
   providers: [SeedService],
