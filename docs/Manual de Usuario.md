@@ -149,7 +149,12 @@ Rectorado):
    visual). El tipo *archivo* está deshabilitado por ahora.
 3. Marcá cada campo como **obligatorio** u opcional. Para *tabla*, definí sus columnas y
    los mínimos/máximos de filas.
-4. Guardá.
+4. El botón **Vista previa** (arriba a la derecha del builder) muestra el formulario tal
+   como lo verá quien presente un proyecto: las tabs "Resumen" + una por cada campo de tipo
+   **sección**, más las tabs fijas "Dirección" y "Presupuesto solicitado" a modo de
+   referencia. Es solo lectura y no guarda nada; **Volver al editor** regresa a la lista de
+   campos. El mismo botón está en la edición de plantillas (*Plantillas de presentación*).
+5. Guardá.
 
 ![Builder de formulario dinámico](assets/manual/formulario-builder.png)
 

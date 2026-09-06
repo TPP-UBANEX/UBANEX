@@ -891,8 +891,11 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
 * Proyectos y ediciones con presupuesto de 3 rubros (recálculo en backend; el período de
   Viáticos y Seguros es texto libre), tope de presupuesto solicitado por convocatoria,
   aval de edición y reenvío ("resubir").
-* Vista previa del formulario de presentación (interruptor Editar / Vista previa sobre las
-  tabs del proyecto) y descarga del proyecto en PDF (detalle + formulario + presupuesto).
+* Vista previa del formulario de presentación: para quien presenta (interruptor Editar /
+  Vista previa sobre las tabs del proyecto con los datos sin guardar) y para Rectorado en
+  el constructor de formulario y en las plantillas (tabs por sección en solo lectura +
+  mocks de Dirección y Presupuesto). Descarga del proyecto en PDF (detalle + formulario +
+  presupuesto).
 * Sugerencias de cambio sobre ediciones presentadas + notificaciones in-app / mail.
 * Emparejamiento de unidades académicas por convocatoria.
 * Evaluación institucional y cruzada con estado `Borrador | Confirmada` y plantillas
