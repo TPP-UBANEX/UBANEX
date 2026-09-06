@@ -144,7 +144,7 @@ function presupuestoCompleto() {
     rubros: [
       {
         tipo: 'ViaticosYSeguros', subtotal: 1000,
-        partidas: [{ tipoPersona: 'Docente', descripcion: 'Viáticos', periodoInicio: '2029-10-15', periodoFin: '2029-11-15', monto: 1000 }],
+        partidas: [{ tipoPersona: 'Docente', descripcion: 'Viáticos', periodo: '2do cuatrimestre 2029', monto: 1000 }],
       },
       {
         tipo: 'BienesDeConsumo', subtotal: 1000,

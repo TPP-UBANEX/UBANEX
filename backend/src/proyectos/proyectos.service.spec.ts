@@ -286,8 +286,7 @@ describe('ProyectosService', () => {
             partidas: [{
               tipoPersona: TipoPersona.Docente,
               descripcion: 'Viáticos',
-              periodoInicio: '2027-08-01',
-              periodoFin: '2027-09-01',
+              periodo: '2do cuatrimestre 2027',
               monto: 1000,
             }],
           },
@@ -328,8 +327,7 @@ describe('ProyectosService', () => {
             partidas: [{
               tipoPersona: TipoPersona.Docente,
               descripcion: 'Viáticos',
-              periodoInicio: '2027-08-01',
-              periodoFin: '2027-09-01',
+              periodo: '2do cuatrimestre 2027',
               monto: 1000,
             }],
           },

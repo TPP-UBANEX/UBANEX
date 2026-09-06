@@ -1559,8 +1559,7 @@ export class SeedService {
   }
 
   private async seedProyectosCanonicos(): Promise<void> {
-    // Periodos dentro de la ejecucion de la convocatoria (anio-08-01 a (anio+1)-02-28, ver
-    // seedConvocatoria mas abajo): AAAA-MM-DD, igual formato que produce la UI.
+    // El período de los viáticos es texto libre (ver presupuesto.util.ts).
     const presupuestoEjecucion = (anio: number): Presupuesto => ({
       montoTotal: 500000,
       rubros: [
@@ -1570,11 +1569,11 @@ export class SeedService {
           partidas: [
             {
               tipoPersona: TipoPersona.Docente, descripcion: 'Viáticos para docentes',
-              periodoInicio: `${anio}-08-01`, periodoFin: `${anio}-12-15`, monto: 100000,
+              periodo: `Agosto a diciembre ${anio}`, monto: 100000,
             },
             {
               tipoPersona: TipoPersona.Estudiante, descripcion: 'Viáticos para estudiantes',
-              periodoInicio: `${anio}-08-01`, periodoFin: `${anio}-12-15`, monto: 100000,
+              periodo: `Agosto a diciembre ${anio}`, monto: 100000,
             },
           ],
         },
@@ -1591,11 +1590,11 @@ export class SeedService {
           partidas: [
             {
               tipoPersona: TipoPersona.Docente, descripcion: 'Viáticos',
-              periodoInicio: `${anio}-11-01`, periodoFin: `${anio + 1}-02-15`, monto: 150000,
+              periodo: `Noviembre ${anio} a febrero ${anio + 1}`, monto: 150000,
             },
             {
               tipoPersona: TipoPersona.Estudiante, descripcion: 'Viáticos',
-              periodoInicio: `${anio}-11-01`, periodoFin: `${anio + 1}-02-15`, monto: 100000,
+              periodo: `Noviembre ${anio} a febrero ${anio + 1}`, monto: 100000,
             },
           ],
         },
@@ -3808,11 +3807,11 @@ export class SeedService {
           partidas: [
             {
               tipoPersona: TipoPersona.Docente, descripcion: 'Viáticos para docentes',
-              periodoInicio: `${ANIO + 1}-08-01`, periodoFin: `${ANIO + 1}-12-15`, monto: 80000,
+              periodo: `Agosto a diciembre ${ANIO + 1}`, monto: 80000,
             },
             {
               tipoPersona: TipoPersona.Estudiante, descripcion: 'Viáticos para estudiantes',
-              periodoInicio: `${ANIO + 1}-08-01`, periodoFin: `${ANIO + 1}-12-15`, monto: 70000,
+              periodo: `Agosto a diciembre ${ANIO + 1}`, monto: 70000,
             },
           ],
         },

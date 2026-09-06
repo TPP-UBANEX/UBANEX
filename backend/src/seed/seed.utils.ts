@@ -88,15 +88,13 @@ export function generarPresupuesto(rng: Rng, anioInicio: number): Presupuesto {
           {
             tipoPersona: TipoPersona.Docente,
             descripcion: 'Viáticos para docentes',
-            periodoInicio: `${anioInicio}-08-01`,
-            periodoFin: `${anioInicio + 1}-02-28`,
+            periodo: `Agosto ${anioInicio} a febrero ${anioInicio + 1}`,
             monto: Math.round((rng.entero(20_000, 60_000) * escala) / 1000) * 1000,
           },
           {
             tipoPersona: TipoPersona.Estudiante,
             descripcion: 'Viáticos para estudiantes',
-            periodoInicio: `${anioInicio}-08-01`,
-            periodoFin: `${anioInicio + 1}-02-28`,
+            periodo: `Agosto ${anioInicio} a febrero ${anioInicio + 1}`,
             monto: Math.round((rng.entero(15_000, 45_000) * escala) / 1000) * 1000,
           },
         ],
