@@ -20,10 +20,11 @@ export const LABELS_RUBRO: Record<TipoRubro, string> = {
 }
 
 export const MAX_LONGITUD_DESCRIPCION_PARTIDA = 500
+export const MAX_LONGITUD_PERIODO_PARTIDA = 200
 
 /** Campos de una partida sobre los que se puede sugerir un cambio (espejo del backend). */
 export const CAMPOS_PARTIDA_PERMITIDOS = [
-  'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+  'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodo', 'tipoPersona',
   'esInsumo',
 ] as const
 
@@ -32,8 +33,7 @@ export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
   monto: 'Monto',
   cantidad: 'Cantidad',
   precioUnitario: 'Precio unitario',
-  periodoInicio: 'Inicio del período',
-  periodoFin: 'Fin del período',
+  periodo: 'Período',
   tipoPersona: 'Tipo de persona',
   esInsumo: 'Es insumo',
 }
@@ -126,8 +126,6 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
 export function presupuestoIncompletoParaEnvio(
   presupuesto: Presupuesto | null | undefined,
   convocatoria?: {
-    fechaInicioEjecucion: string | null
-    fechaFinEjecucion: string | null
     topePresupuestoConsolidado?: number | null
     topePresupuestoNoConsolidado?: number | null
   } | null,
@@ -138,9 +136,6 @@ export function presupuestoIncompletoParaEnvio(
   }
 
   const motivos: string[] = []
-  const fechaInicioEjecucion = convocatoria?.fechaInicioEjecucion ?? null
-  const fechaFinEjecucion = convocatoria?.fechaFinEjecucion ?? null
-  const hoy = new Date().toISOString().slice(0, 10)
 
   for (const rubro of presupuesto.rubros) {
     const label = LABELS_RUBRO[rubro.tipo]
@@ -158,17 +153,8 @@ export function presupuestoIncompletoParaEnvio(
       }
       if (rubro.tipo === TipoRubro.ViaticosYSeguros) {
         const v = partida as ViaticoPresupuesto
-        if (!v.periodoInicio || !v.periodoFin) {
+        if (!v.periodo || v.periodo.trim() === '') {
           motivos.push(`"${label}": a la partida ${indice + 1} le falta el período`)
-        } else if (fechaInicioEjecucion && fechaFinEjecucion) {
-          if (v.periodoInicio < fechaInicioEjecucion || v.periodoFin > fechaFinEjecucion) {
-            motivos.push(
-              `"${label}": el período de la partida ${indice + 1} está fuera del período de `
-              + 'ejecución de la convocatoria',
-            )
-          }
-        } else if (v.periodoInicio < hoy) {
-          motivos.push(`"${label}": el período de la partida ${indice + 1} no puede comenzar antes de hoy`)
         }
       }
     })
