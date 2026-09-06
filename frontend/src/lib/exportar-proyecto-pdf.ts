@@ -67,18 +67,23 @@ export function exportarProyectoPdf({
     y += 4
   }
 
+  // Ancho fijo de la columna de etiquetas para que todos los valores queden alineados.
+  const anchoColumnaLabel = 108
+
   const lineaInfo = (label: string, valor: string) => {
-    addPageIfNeeded(18)
+    addPageIfNeeded(16)
     doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(60, 60, 60)
     doc.text(label, margin, y)
+    // Se mide con la fuente en negrita (la que se usó para dibujar la etiqueta), y se deja al
+    // menos un espacio: así el valor nunca queda pegado a una etiqueta larga.
+    const xValor = margin + Math.max(anchoColumnaLabel, doc.getTextWidth(label) + 8)
     doc.setFont('helvetica', 'normal').setTextColor(30, 30, 30)
-    const anchoLabel = doc.getTextWidth(label + ' ')
-    const lineas = doc.splitTextToSize(valor, contentWidth - anchoLabel) as string[]
-    doc.text(lineas[0] ?? '-', margin + anchoLabel, y)
-    y += 18
+    const lineas = doc.splitTextToSize(String(valor || '-'), pageWidth - margin - xValor) as string[]
+    doc.text(lineas[0] ?? '-', xValor, y)
+    y += 15
     for (const linea of lineas.slice(1)) {
       addPageIfNeeded(14)
-      doc.text(linea, margin + anchoLabel, y)
+      doc.text(linea, xValor, y)
       y += 14
     }
   }
