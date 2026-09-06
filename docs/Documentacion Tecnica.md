@@ -177,7 +177,7 @@ frontend/src/
 ### 3.4 Componentes destacados
 
 - **Builders de configuración**: `FormularioBuilderTab`, `TemplateInstitucionalBuilder`, `TemplateCruzadaBuilder`, `TemplateAutoevaluacionBuilder`, `ColumnasTablaEditor`, `ConfigTipoCampoEditor`.
-- **Flujo de edición/proyecto**: `NuevoProyectoDialog`, `ResubirProyectoDialog`, `TablaPartidasPresupuesto`, `CampoFormularioInput` / `CampoFormularioLectura`, `TablaCampoFormulario` (campos tipo tabla), `SeleccionarPlantillaDialog`, `ListaCamposFaltantes`, `CampoSugerible`, `SugerirCambioModal`, `SugerenciasTab`.
+- **Flujo de edición/proyecto**: `NuevoProyectoDialog`, `ResubirProyectoDialog`, `TablaPartidasPresupuesto`, `CampoFormularioInput` / `CampoFormularioLectura`, `TablaCampoFormulario` (campos tipo tabla), `SeleccionarPlantillaDialog`, `ListaCamposFaltantes`, `CampoSugerible`, `SugerirCambioModal`, `SugerenciasTab`. En `ProyectoDetail`, el modo edición tiene un interruptor **Editar / Vista previa** que renderiza las tabs de presentación en modo lectura con los datos sin guardar, y `lib/exportar-proyecto-pdf.ts` genera el PDF del proyecto (detalle + formulario + presupuesto) con `jsPDF`.
 - **Evaluación y adjudicación**: `ProyectoEvaluablePanel`, `EvaluacionesProyectoTab`, `EvaluacionConfigTab`, `EmparejamientoTab`, `AdjudicacionResolucionTab`, `AsignacionEvaluadores`, `EvaluadorPerfilDialog`.
 - **Ejecución y cierre**: `HitosEjecucionTab`, `InformeFinalTab`, `AutoevaluacionTab`.
 - **Usuarios**: `EditarUsuarioDialog`, `UsuarioAutocomplete`, `UsuarioHistorial`, `GestionarDireccionModal`, `DireccionEditor`, `LocalidadAutocomplete`.
@@ -234,7 +234,7 @@ frontend/src/
   - `sugerencias/sugerencias.service.spec.ts` — creación de sugerencias y validación de rutas de presupuesto, respuesta/aceptación.
   - `formularios/campo-formulario.util.spec.ts` — validación de valores y campos incompletos de formularios dinámicos (incluye geolocalización y campos tipo usuario).
   - `common/dto/validador-campos-formulario.spec.ts` — validación de campos de formulario a nivel DTO (tabla y usuario).
-  - `proyectos/presupuesto.util.spec.ts` — validación de presupuestos (rubros faltantes/duplicados, montos negativos o NaN, cantidades, fechas y períodos de viáticos).
+  - `proyectos/presupuesto.util.spec.ts` — validación de presupuestos (rubros faltantes/duplicados, montos negativos o NaN, cantidades y período de viáticos como texto libre).
   - `proyectos/proyectos.service.spec.ts` — eliminación de ediciones y permisos, y normalización/tope de presupuesto al actualizar y enviar una edición.
   - `usuarios/usuarios.service.spec.ts` — reglas de grupos de roles excluyentes, cupos de autoridades por UA y búsqueda de usuarios para formularios.
 - Comandos: `npm run test`, `npm run test:watch` (backend). El frontend no tiene suite de tests configurada actualmente.

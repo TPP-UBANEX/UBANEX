@@ -296,7 +296,7 @@ En el detalle de la edición:
 - **Dirección:** ubicación del proyecto (si el formulario lo pide).
 - **Presupuesto solicitado:** cargá las partidas de los 3 rubros:
   - **Viáticos y Seguros** — por tipo de persona (Docente / Estudiante): descripción,
-    período (dentro de las fechas de ejecución) y monto.
+    período (texto libre, ej. "2do cuatrimestre 2026") y monto.
   - **Bienes de Consumo** y **Bienes de Uso** — descripción, cantidad, precio unitario;
     marcá **insumo** cuando corresponda.
   - El sistema **recalcula** subtotales y total automáticamente. Respetá el **tope** de
@@ -304,13 +304,23 @@ En el detalle de la edición:
 
 ![Pestaña de presupuesto solicitado con las partidas por rubro](assets/manual/presupuesto.png)
 
-### 7.3 Enviar (presentar)
+Mientras editás, el botón **Vista previa** muestra las pestañas del proyecto (Resumen,
+secciones, Dirección, Presupuesto) tal como se verían presentadas, con los datos que
+tenés sin guardar; **Volver a editar** regresa a los campos.
+
+### 7.3 Descargar el proyecto
+
+El botón **Descargar proyecto** (arriba a la derecha del detalle) genera un PDF con el
+detalle del proyecto, el formulario de presentación por secciones y el presupuesto
+solicitado. Está disponible para cualquier usuario que pueda ver el proyecto.
+
+### 7.4 Enviar (presentar)
 
 Botón **Enviar** / **Presentar**. La edición pasa de **Borrador** a **Presentado**.
 Validaciones al enviar: campos obligatorios completos, presupuesto dentro del tope y bien
 formado, fechas coherentes.
 
-### 7.4 Responder observaciones y reenviar
+### 7.5 Responder observaciones y reenviar
 
 Si la Secretaría te devuelve la edición con cambios, pasa a **Pendiente de cambios**.
 
@@ -373,11 +383,11 @@ Cada comprobante pasa por estados:
 **Aceptar y rechazar es solo de Rectorado.** Ni la Secretaría de la UA ni el director
 pueden cambiar el estado de un comprobante.
 
-El director decide si la Secretaría de su Unidad Académica puede **ver** la sección en
-modo lectura mediante el interruptor *"Comprobantes visibles para la Unidad Académica"*.
-Si está apagado, al abrir la pestaña la Secretaría ve un aviso de que el director no
-habilitó la visualización (no accede a los comprobantes); Rectorado siempre la ve. Al
-cerrar la convocatoria, solo se permite hacerlo si no quedan comprobantes en revisión.
+La sección de comprobantes la ven el **Rectorado** y quienes están relacionados al
+proyecto: su creador, la dirección/codirección y la **Secretaría de una Unidad Académica
+del proyecto** (la de la edición y, en interfacultad, la adicional). Cualquier otro
+usuario no accede. Al cerrar la convocatoria, solo se permite hacerlo si no quedan
+comprobantes en revisión.
 
 ---
 
