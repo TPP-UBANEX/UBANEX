@@ -1,14 +1,9 @@
 import * as crypto from 'crypto';
-import {
-  EstructuraTemplateCruzada,
-  EstructuraTemplateInstitucional,
-} from '../templates-evaluacion/estructura-template';
 import { CampoFormulario, ColumnaTabla } from '../formularios/campo-formulario.interface';
-import { Presupuesto } from '../proyectos/presupuesto.interface';
+import { BienPresupuesto, Presupuesto, ViaticoPresupuesto } from '../proyectos/presupuesto.interface';
 import { normalizarPresupuesto } from '../proyectos/presupuesto.util';
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { TipoPersona } from '../common/enums/tipo-persona.enum';
-import { FUNDAMENTACIONES, OBSERVACIONES_CRUZADA, OBSERVACIONES_INST } from './seed.data';
 
 /**
  * Copia los campos de una plantilla a una convocatoria regenerando los ids de
@@ -25,192 +20,67 @@ export function clonarCamposConIdsNuevos(campos: CampoFormulario[]): CampoFormul
   }));
 }
 
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export class Rng {
-  private readonly siguienteFloat: () => number;
-
-  constructor(semilla: number) {
-    this.siguienteFloat = mulberry32(semilla);
-  }
-
-  float(): number {
-    return this.siguienteFloat();
-  }
-
-  entero(min: number, max: number): number {
-    return min + Math.floor(this.siguienteFloat() * (max - min + 1));
-  }
-
-  pick<T>(opciones: readonly T[]): T {
-    if (opciones.length === 0) {
-      throw new Error('pick sobre un array vacío');
-    }
-    return opciones[Math.min(opciones.length - 1, Math.floor(this.siguienteFloat() * opciones.length))];
-  }
-
-  bool(probabilidad = 0.5): boolean {
-    return this.siguienteFloat() < probabilidad;
-  }
-
-  proyectosPorUa(): number {
-    return 10 + Math.floor(Math.pow(this.siguienteFloat(), 0.5) * 40);
-  }
-}
-
 /**
- * Genera solo las partidas (con períodos AAAA-MM-DD dentro de la ejecución de la convocatoria,
- * que arranca el 1 de agosto de anioInicio) y deja que normalizarPresupuesto derive montos de
- * bienes, subtotales y monto total: un presupuesto de seed nunca puede quedar con sumas que no
+ * Arma un presupuesto a partir de montos fijos (elegidos a mano por el llamador, no
+ * generados al azar) y deja que normalizarPresupuesto derive el monto de los bienes,
+ * los subtotales y el total: un presupuesto de seed nunca puede quedar con sumas que no
  * cierran, porque pasa por el mismo cálculo que usa la API.
  */
-export function generarPresupuesto(rng: Rng, anioInicio: number): Presupuesto {
-  const escala = 1 + 0.1 * (anioInicio - 2023);
-  const precioUnitarioConsumo = Math.round((2000 * escala) / 100) * 100;
-  const precioUnitarioUso = Math.round((rng.entero(15_000, 60_000) * escala) / 100) * 100;
+export function crearPresupuesto(opts: {
+  periodoInicio: string;
+  periodoFin: string;
+  viaticoDocente: number;
+  viaticoEstudiante: number;
+  consumoCantidad: number;
+  consumoPrecioUnitario: number;
+  consumoEsInsumo?: boolean;
+  usoCantidad: number;
+  usoPrecioUnitario: number;
+}): Presupuesto {
+  const viaticos: ViaticoPresupuesto[] = [
+    {
+      tipoPersona: TipoPersona.Docente,
+      descripcion: 'Viáticos para docentes',
+      periodoInicio: opts.periodoInicio,
+      periodoFin: opts.periodoFin,
+      monto: opts.viaticoDocente,
+    },
+    {
+      tipoPersona: TipoPersona.Estudiante,
+      descripcion: 'Viáticos para estudiantes',
+      periodoInicio: opts.periodoInicio,
+      periodoFin: opts.periodoFin,
+      monto: opts.viaticoEstudiante,
+    },
+  ];
+  const consumo: BienPresupuesto[] = [
+    {
+      descripcion: 'Materiales e insumos',
+      cantidad: opts.consumoCantidad,
+      precioUnitario: opts.consumoPrecioUnitario,
+      monto: 0,
+      esInsumo: opts.consumoEsInsumo ?? true,
+    },
+  ];
+  const uso: BienPresupuesto[] = [
+    {
+      descripcion: 'Equipamiento',
+      cantidad: opts.usoCantidad,
+      precioUnitario: opts.usoPrecioUnitario,
+      monto: 0,
+      esInsumo: false,
+    },
+  ];
 
   const crudo: Presupuesto = {
     montoTotal: 0,
     rubros: [
-      {
-        tipo: TipoRubro.ViaticosYSeguros,
-        subtotal: 0,
-        partidas: [
-          {
-            tipoPersona: TipoPersona.Docente,
-            descripcion: 'Viáticos para docentes',
-            periodoInicio: `${anioInicio}-08-01`,
-            periodoFin: `${anioInicio + 1}-02-28`,
-            monto: Math.round((rng.entero(20_000, 60_000) * escala) / 1000) * 1000,
-          },
-          {
-            tipoPersona: TipoPersona.Estudiante,
-            descripcion: 'Viáticos para estudiantes',
-            periodoInicio: `${anioInicio}-08-01`,
-            periodoFin: `${anioInicio + 1}-02-28`,
-            monto: Math.round((rng.entero(15_000, 45_000) * escala) / 1000) * 1000,
-          },
-        ],
-      },
-      {
-        tipo: TipoRubro.BienesDeConsumo,
-        subtotal: 0,
-        partidas: [
-          {
-            descripcion: 'Materiales e insumos',
-            cantidad: rng.entero(20, 120),
-            precioUnitario: precioUnitarioConsumo,
-            monto: 0,
-            esInsumo: true,
-          },
-        ],
-      },
-      {
-        tipo: TipoRubro.BienesDeUso,
-        subtotal: 0,
-        partidas: [
-          {
-            descripcion: 'Equipamiento',
-            cantidad: rng.entero(1, 5),
-            precioUnitario: precioUnitarioUso,
-            monto: 0,
-            esInsumo: false,
-          },
-        ],
-      },
+      { tipo: TipoRubro.ViaticosYSeguros, subtotal: 0, partidas: viaticos },
+      { tipo: TipoRubro.BienesDeConsumo, subtotal: 0, partidas: consumo },
+      { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: uso },
     ],
   };
-
   return normalizarPresupuesto(crudo);
-}
-
-export function generarEvaluacionInstitucional(
-  estructura: EstructuraTemplateInstitucional,
-  rng: Rng,
-  completo: boolean,
-): {
-  categorias: Record<string, unknown>;
-  checklist: Record<string, unknown>;
-  observaciones: string;
-  esPse: boolean | null;
-} {
-  const categorias: Record<string, unknown> = {};
-  for (const categoria of estructura.categorias ?? []) {
-    for (const subcategoria of categoria.subcategorias ?? []) {
-      if (subcategoria.tipoValor === 'numerico') {
-        const minimo = Math.max(subcategoria.minimo ?? 0, 4);
-        const maximo = subcategoria.maximo ?? 10;
-        categorias[subcategoria.id] = {
-          valor: rng.entero(Math.min(minimo, maximo), maximo),
-          fundamentacion: rng.pick(FUNDAMENTACIONES),
-        };
-      } else {
-        categorias[subcategoria.id] = { valor: rng.bool(0.85), fundamentacion: '' };
-      }
-    }
-  }
-  const checklist: Record<string, unknown> = {};
-  for (const item of estructura.checklist ?? []) {
-    checklist[item.id] = completo ? true : rng.bool(0.6);
-  }
-  // Fijo y obligatorio para confirmar (ver evaluaciones.service.ts), independiente del template:
-  // un borrador puede quedar sin responder para ejercitar el bloqueo de confirmación.
-  const esPse = completo ? rng.bool(0.25) : (rng.bool(0.5) ? rng.bool(0.25) : null);
-  return { categorias, checklist, observaciones: rng.pick(OBSERVACIONES_INST), esPse };
-}
-
-export function generarEvaluacionCruzada(
-  estructura: EstructuraTemplateCruzada,
-  rng: Rng,
-  modo?: 'alta' | 'baja' | 'alta90' | 'media',
-): { items: Record<string, number>; observaciones: string } {
-  const items: Record<string, number> = {};
-  for (const categoria of estructura.categorias ?? []) {
-    for (const item of categoria.items ?? []) {
-      const maximo = item.puntajeMaximo;
-      let minimo = Math.max(0, maximo - 4);
-      let tope = maximo;
-      if (modo === 'alta') {
-        minimo = Math.ceil(maximo * 0.6);
-      } else if (modo === 'alta90') {
-        minimo = Math.ceil(maximo * 0.82);
-      } else if (modo === 'media') {
-        minimo = Math.ceil(maximo * 0.6);
-        tope = Math.floor(maximo * 0.98);
-      } else if (modo === 'baja') {
-        minimo = 0;
-        tope = Math.floor(maximo * 0.4);
-      }
-      items[item.id] = rng.entero(Math.min(minimo, tope), tope);
-    }
-  }
-  return { items, observaciones: rng.pick(OBSERVACIONES_CRUZADA) };
-}
-
-// Items deterministas como fracción del puntaje máximo de cada ítem. Se usa
-// para los casos demo de inconsistencia, donde la diferencia entre Propia y
-// Ajena tiene que ser reproducible (el modo aleatorio de generarEvaluacionCruzada
-// nunca llega al umbral de inconsistencia).
-export function itemsCruzadaFactor(
-  estructura: EstructuraTemplateCruzada,
-  factor: number,
-): Record<string, number> {
-  const items: Record<string, number> = {};
-  for (const categoria of estructura.categorias ?? []) {
-    for (const item of categoria.items ?? []) {
-      items[item.id] = Math.round(item.puntajeMaximo * factor);
-    }
-  }
-  return items;
 }
 
 export function slugUa(nombre: string): string {
@@ -219,8 +89,4 @@ export function slugUa(nombre: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 24);
-}
-
-export function capitalizar(texto: string): string {
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }

@@ -114,9 +114,9 @@ de la derecha:
 
 | Si tocaste… | Revisá en el seed |
 |---|---|
-| `Formulario.campos` (o el formulario estándar) | `seedDatosFormulario()` |
-| `Edicion.presupuesto` | `generarPresupuesto()` en `seed.utils.ts` |
-| `templates-default.ts` (ids de categorías/checklist/items) | `categorias`, `checklist` e `items` en `seed.service.ts` |
+| `Formulario.campos` (o el formulario estándar) | `datosFormulario()` |
+| `Edicion.presupuesto` | `crearPresupuesto()` en `seed.utils.ts` |
+| `templates-default.ts` (ids de categorías/checklist/items) | `categoriasInstitucional()` e `itemsCruzada()` en `seed.service.ts` |
 | cualquier `*.entity.ts` | columnas nuevas no-nulas y relaciones obligatorias |
 
 Después de tocarlo: `make reset-seed` y confirmar que arranca sin errores y que la pantalla
