@@ -897,10 +897,9 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   mocks de Dirección y Presupuesto). Descarga del proyecto en PDF (detalle + formulario +
   presupuesto).
 * Sugerencias de cambio sobre ediciones presentadas + notificaciones in-app / mail.
-* Visibilidad de proyectos para Rectorado: ve los `Presentado` (con o sin aval) para poder
-  pasarlos a evaluación, y todo lo que ya está en evaluación en adelante. Los `Borrador` y
-  `PendienteDeCambios` solo aparecen si la Secretaría de la UA cargó el aval. El aval no bloquea
-  el pase a evaluación.
+* Visibilidad de proyectos para Rectorado: ve todas las ediciones de la convocatoria excepto
+  los `Borrador` (aún no presentados). Los `Presentado` y `PendienteDeCambios` se ven con o sin
+  aval; el aval no gatea la visibilidad ni bloquea el pase a evaluación.
 * Emparejamiento de unidades académicas por convocatoria.
 * Evaluación institucional y cruzada con estado `Borrador | Confirmada` y plantillas
   configurables por convocatoria.

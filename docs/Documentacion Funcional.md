@@ -145,7 +145,7 @@ stateDiagram-v2
 - Un usuario puede dirigir como máximo **2 proyectos por convocatoria**.
 - El presupuesto solicitado se compone de 3 rubros fijos (Viáticos y Seguros, Bienes de Consumo, Bienes de Uso); el sistema recalcula siempre los subtotales y el total a partir de las partidas cargadas, ignorando lo que envíe el frontend.
 - Existe un flujo de **reenvío ("resubir")**: una edición `PendienteDeCambios` puede corregirse y volver a `Presentado`.
-- **Visibilidad para Rectorado**: Rectorado ve los proyectos `Presentado` (con o sin aval) —para poder pasarlos a evaluación— y todo lo que ya está en evaluación en adelante. Los `Borrador` y `PendienteDeCambios` solo aparecen si la Secretaría de su UA cargó el **aval** firmado. El aval no bloquea el pase a evaluación.
+- **Visibilidad para Rectorado**: Rectorado ve todas las ediciones de la convocatoria excepto los `Borrador` (aún no presentados). Los `Presentado` y `PendienteDeCambios` se ven con o sin aval, para poder pasarlos a evaluación. El aval no gatea la visibilidad ni bloquea el pase a evaluación.
 
 ## 6. Módulo 2 — Evaluación y Adjudicación
 

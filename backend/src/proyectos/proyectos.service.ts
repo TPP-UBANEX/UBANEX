@@ -263,19 +263,10 @@ export class ProyectosService {
       .orderBy('edicion.actualizadoEn', 'DESC');
 
     if (esRectorado) {
-      // Rectorado ve los proyectos presentados (con o sin aval) para poder pasarlos a
-      // evaluación, y todo lo que ya está en evaluación en adelante. En cambio, los
-      // borradores y los pendientes de cambios solo aparecen si la Secretaría de la UA
-      // cargó el aval.
-      query.andWhere(
-        '(edicion.avalUrl IS NOT NULL OR edicion.estado NOT IN (:...estadosPrevioAval))',
-        {
-          estadosPrevioAval: [
-            EstadoEdicion.Borrador,
-            EstadoEdicion.PendienteDeCambios,
-          ],
-        },
-      );
+      // Rectorado ve todas las ediciones de una convocatoria excepto los borradores
+      // (que todavía no fueron presentados). Presentado y PendienteDeCambios se ven con
+      // o sin aval; el aval no gatea la visibilidad.
+      query.andWhere('edicion.estado != :borrador', { borrador: EstadoEdicion.Borrador });
     } else if (esSecretaria) {
       query.andWhere('edicion.unidadAcademicaId = :uaId', { uaId: usuario.unidadAcademicaId });
     } else {

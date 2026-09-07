@@ -250,10 +250,9 @@ Para cada uno: **Validar** o **Rechazar**. Solo la **Autoridad** de Secretaría 
 ### 6.2 Cargar el aval de una edición
 
 En el detalle de un proyecto de tu UA, pestaña **Resumen**: **cargar el aval** (link al
-PDF firmado por el decano). Es requisito para adjudicar. Para los estados **Borrador** y
-**Pendiente de cambios**, el aval además **habilita a Rectorado a ver el proyecto** (sin
-aval no los ve); los **Presentado**, en cambio, Rectorado los ve con o sin aval, para poder
-pasarlos a evaluación.
+PDF firmado por el decano). Es requisito para adjudicar. No afecta la visibilidad: Rectorado
+ve los proyectos **Presentado** y **Pendiente de cambios** con o sin aval (solo los
+**Borrador**, aún no presentados, no los ve).
 
 ### 6.3 Evaluación institucional
 
