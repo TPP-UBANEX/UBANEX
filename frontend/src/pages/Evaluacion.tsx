@@ -1135,7 +1135,7 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
       </div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">Estado de evaluación por edición</CardTitle>
+          <CardTitle className="text-sm font-medium">Estado de evaluación por edición de proyecto</CardTitle>
           {data?.meta && (
             <span className="text-xs text-muted-foreground">
               {data.meta.total} edicion{data.meta.total !== 1 ? 'es' : ''} &middot; p&aacute;gina {data.meta.page} de {data.meta.totalPages || 1}
@@ -1153,7 +1153,7 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
               <TableHead>Proyecto</TableHead>
               <TableHead>Unidad Académica</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead>Institucional</TableHead>
+              <TableHead>Evaluación institucional</TableHead>
               <TableHead>Evaluaciones cruzadas</TableHead>
               <TableHead>Tercera UA</TableHead>
             </TableRow>
