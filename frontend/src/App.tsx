@@ -13,6 +13,7 @@ import { ConvocatoriaDetail } from '@/pages/ConvocatoriaDetail'
 import { Proyectos } from '@/pages/Proyectos'
 import { ProyectoDetail } from '@/pages/ProyectoDetail'
 import { Evaluacion } from '@/pages/Evaluacion'
+import { Plantillas } from '@/pages/Plantillas'
 import { PlantillasEvaluacion } from '@/pages/PlantillasEvaluacion'
 import { PlantillasAutoevaluacion } from '@/pages/PlantillasAutoevaluacion'
 import { Usuarios } from '@/pages/Usuarios'
@@ -71,13 +72,14 @@ function App() {
                   <Route path="/proyectos" element={<Proyectos />} />
                   <Route path="/proyectos/:id" element={<ProyectoDetail />} />
                   <Route path="/evaluacion" element={<Evaluacion />} />
-                  <Route path="/plantillas-evaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasEvaluacion /></ProtectedRoute>} />
-                  <Route path="/plantillas-autoevaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasAutoevaluacion /></ProtectedRoute>} />
+                  <Route path="/plantillas" element={<ProtectedRoute roles={ROLES_RECTORADO}><Plantillas /></ProtectedRoute>} />
+                  <Route path="/plantillas/presentacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasFormulario /></ProtectedRoute>} />
+                  <Route path="/plantillas/presentacion/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaFormularioDetail /></ProtectedRoute>} />
+                  <Route path="/plantillas/evaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasEvaluacion /></ProtectedRoute>} />
+                  <Route path="/plantillas/impacto" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasAutoevaluacion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<ProtectedRoute roles={ROLES_GESTION}><Usuarios /></ProtectedRoute>} />
                   <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION} allowOwnId><UsuarioDetail /></ProtectedRoute>} />
                   <Route path="/validacion-docente" element={<ValidacionDocente />} />
-                <Route path="/plantillas-formulario" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasFormulario /></ProtectedRoute>} />
-                <Route path="/plantillas-formulario/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaFormularioDetail /></ProtectedRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

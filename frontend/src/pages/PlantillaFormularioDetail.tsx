@@ -74,7 +74,7 @@ export function PlantillaFormularioDetail() {
     try {
       await api.formularios.eliminar(id)
       toast.success('Plantilla eliminada correctamente')
-      navigate('/plantillas-formulario')
+      navigate('/plantillas/presentacion')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar la plantilla')
       setEliminando(false)
@@ -86,7 +86,7 @@ export function PlantillaFormularioDetail() {
   if (!plantilla) {
     return (
       <div className="p-6 space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/plantillas-formulario')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/plantillas/presentacion')}>
           <ArrowLeft className="h-4 w-4 mr-2" />Volver
         </Button>
         <p className="text-muted-foreground">Plantilla no encontrada</p>
@@ -98,7 +98,7 @@ export function PlantillaFormularioDetail() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas-formulario')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas/presentacion')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>

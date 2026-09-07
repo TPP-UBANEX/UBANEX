@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +18,7 @@ import type {
   TemplateAutoevaluacionImpacto,
 } from '@/data/types'
 import { TemplateAutoevaluacionBuilder } from '@/components/TemplateAutoevaluacionBuilder'
-import { ClipboardCheck, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ClipboardCheck, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface DialogAutoState {
@@ -36,6 +37,7 @@ const dialogAutoVacio: DialogAutoState = {
 }
 
 export function PlantillasAutoevaluacion() {
+  const navigate = useNavigate()
   const [templates, setTemplates] = useState<TemplateAutoevaluacionImpacto[]>([])
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -101,6 +103,10 @@ export function PlantillasAutoevaluacion() {
 
   return (
     <div className="p-6 space-y-6">
+      <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas')}>
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
