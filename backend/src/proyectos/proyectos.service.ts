@@ -947,7 +947,7 @@ export class ProyectosService {
         eventos.push({
           fecha: s.respondidoEn,
           tipo: 'sugerencia',
-          descripcion: `Respuesta a la observación (${s.estado})${
+          descripcion: `Respuesta a la observación${
             s.respuestaDirector ? `: ${s.respuestaDirector}` : ''
           }`,
           responsableNombre: edicion.creadoPor?.nombreCompleto ?? null,
