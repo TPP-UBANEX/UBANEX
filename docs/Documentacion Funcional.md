@@ -145,6 +145,7 @@ stateDiagram-v2
 - Un usuario puede dirigir como máximo **2 proyectos por convocatoria**.
 - El presupuesto solicitado se compone de 3 rubros fijos (Viáticos y Seguros, Bienes de Consumo, Bienes de Uso); el sistema recalcula siempre los subtotales y el total a partir de las partidas cargadas, ignorando lo que envíe el frontend.
 - Existe un flujo de **reenvío ("resubir")**: una edición `PendienteDeCambios` puede corregirse y volver a `Presentado`.
+- **Visibilidad para Rectorado**: Rectorado ve los proyectos `Presentado` (con o sin aval) —para poder pasarlos a evaluación— y todo lo que ya está en evaluación en adelante. Los `Borrador` y `PendienteDeCambios` solo aparecen si la Secretaría de su UA cargó el **aval** firmado. El aval no bloquea el pase a evaluación.
 
 ## 6. Módulo 2 — Evaluación y Adjudicación
 
@@ -180,6 +181,7 @@ stateDiagram-v2
 - Rectorado puede ajustar la propuesta mientras no esté confirmada. `confirmarOrdenMerito` fija el resultado y notifica a cada director si su proyecto quedó adjudicado o no.
 - **Emisión formal**: confirmar el orden de mérito no es lo mismo que emitir la adjudicación. La **emisión de la resolución formal de adjudicación** es una acción separada y posterior, exclusiva de **Autoridad de Rectorado** (el Asistente puede generar el orden de mérito y ajustar la propuesta borrador, pero no confirmarla ni emitirla).
 - No hay umbral mínimo de nota: el corte lo determinan presupuesto y cuota federativa.
+- **Descarga de la resolución**: una vez emitida, los usuarios relacionados con la convocatoria (Rectorado, Secretaría de la UA y la dirección de cada proyecto) pueden descargar la **resolución de adjudicación en PDF** (documento formal con todos los proyectos, su resultado y monto).
 
 ## 7. Módulo 3 — Ejecución, Rendición y Seguimiento
 
@@ -234,6 +236,8 @@ Diseño objetivo (no operativo hoy):
 ## 10. Auditoría
 
 - El sistema registra acciones relevantes (alta/baja/modificación de usuarios y entidades clave) con actor, tipo de acción, tipo de entidad y fecha, para trazabilidad institucional.
+- Los **cambios de estado de una edición** (presentación, pase a evaluación, resultado de adjudicación, cierre) se auditan con responsable y fecha.
+- **Historial de trazabilidad del proyecto**: en el detalle de un proyecto, una pestaña de línea de tiempo consolida los cambios de estado auditados, las observaciones (sugerencias de cambio) y la actividad de las evaluaciones. La ven la dirección del proyecto, la Secretaría de su UA y el Rectorado.
 
 ## 11. Matriz de permisos por rol
 

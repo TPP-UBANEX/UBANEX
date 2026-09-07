@@ -121,6 +121,7 @@ Más allá del CRUD estándar (`GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DEL
 | `proyectos` | `DELETE /proyectos/:id/ediciones/:edicionId` | Elimina una edición (solo aplicable en estados tempranos, ej. `Borrador`) |
 | `proyectos` | `PATCH /proyectos/:id/ediciones/:edicionId/aval` | Carga la URL del aval firmado |
 | `proyectos` | `POST /proyectos/:id/ediciones/:edicionId/iniciar-evaluacion` | Pasa la edición a `EnEvaluacion` |
+| `proyectos` | `GET /proyectos/:id/ediciones/:edicionId/historial` | Timeline de trazabilidad (cambios de estado + sugerencias + evaluaciones) para dirección/Secretaría de la UA/Rectorado |
 | `evaluaciones` | `GET /evaluaciones` | Monitoreo agregado de evaluaciones por convocatoria (rectorado) |
 | `evaluaciones` | `GET /evaluaciones/convocatoria/:id/orden-merito/ua` \| `/docente` | Orden de mérito agrupado por UA o por docente |
 | `evaluaciones` | `POST /evaluaciones/convocatoria/:id/orden-merito` | Genera/recalcula el orden de mérito (on demand) |
@@ -128,6 +129,7 @@ Más allá del CRUD estándar (`GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DEL
 | `evaluaciones` | `GET/PUT /evaluaciones/convocatoria/:id/adjudicacion` | Consultar/ajustar la propuesta de adjudicación |
 | `evaluaciones` | `POST /evaluaciones/convocatoria/:id/confirmar-orden-merito` | Fija el resultado y dispara notificaciones |
 | `evaluaciones` | `POST /evaluaciones/convocatoria/:id/adjudicacion/emitir` | Emite la resolución formal de adjudicación |
+| `evaluaciones` | `GET /evaluaciones/convocatoria/:id/resolucion` | Resumen de la resolución emitida para los relacionados (Rectorado, Secretaría de la UA, dirección) — insumo del PDF de la resolución |
 | `evaluaciones` | `GET /evaluaciones/institucionales` \| `/cruzadas/disponibles` | Listados de evaluaciones institucionales/cruzadas pendientes para el evaluador actual |
 | `evaluaciones` | `PUT/POST /evaluaciones/institucionales/:edicionId` \| `/confirmar` | Cargar y confirmar evaluación institucional |
 | `evaluaciones` | `PUT/POST /evaluaciones/cruzadas/:edicionId` \| `/confirmar` | Cargar y confirmar evaluación cruzada |

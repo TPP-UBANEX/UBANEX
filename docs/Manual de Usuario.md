@@ -217,7 +217,10 @@ Se trabaja desde la barra lateral → **Evaluación**, eligiendo la convocatoria
 4. **Confirmar el orden de mérito.** Fija el resultado (ya no se regenera ni ajusta) y
    **notifica a cada director** si su proyecto quedó adjudicado o no.
 5. **Emitir la resolución de adjudicación** (Autoridad de Rectorado). Es el acto formal
-   posterior a la confirmación.
+   posterior a la confirmación. Una vez emitida, aparece el botón **Descargar resolución**
+   en la convocatoria: genera el PDF con el resultado de todos los proyectos (orden de
+   mérito, adjudicado/no y monto). Lo pueden descargar Rectorado, la Secretaría de la UA y
+   la dirección de cada proyecto.
 
 ![Orden de mérito con la propuesta de adjudicación](assets/manual/orden-merito.png)
 
@@ -247,8 +250,10 @@ Para cada uno: **Validar** o **Rechazar**. Solo la **Autoridad** de Secretaría 
 ### 6.2 Cargar el aval de una edición
 
 En el detalle de un proyecto de tu UA, pestaña **Resumen**: **cargar el aval** (link al
-PDF firmado por el decano). Es requisito para adjudicar, pero no bloquea el pase a
-evaluación.
+PDF firmado por el decano). Es requisito para adjudicar. Para los estados **Borrador** y
+**Pendiente de cambios**, el aval además **habilita a Rectorado a ver el proyecto** (sin
+aval no los ve); los **Presentado**, en cambio, Rectorado los ve con o sin aval, para poder
+pasarlos a evaluación.
 
 ### 6.3 Evaluación institucional
 
@@ -318,6 +323,14 @@ tenés sin guardar; **Volver a editar** regresa a los campos.
 El botón **Descargar proyecto** (arriba a la derecha del detalle) genera un PDF con el
 detalle del proyecto, el formulario de presentación por secciones y el presupuesto
 solicitado. Está disponible para cualquier usuario que pueda ver el proyecto.
+
+### 7.5 Historial de trazabilidad
+
+En el detalle del proyecto, la pestaña **Historial** muestra una línea de tiempo con los
+cambios de estado (presentación, pase a evaluación, adjudicación, cierre), las
+observaciones (sugerencias de cambio) y la actividad de las evaluaciones, cada evento con
+su fecha y responsable. La ven la dirección del proyecto, la Secretaría de su UA y el
+Rectorado.
 
 ### 7.4 Enviar (presentar)
 
@@ -481,6 +494,11 @@ congelado.
 **Generé el orden de mérito pero una edición no aparece.**
 Le falta alguna evaluación confirmada (institucional, propia o ajena), o hay una
 inconsistencia sin resolver.
+
+**Como Rectorado no veo un proyecto en borrador o pendiente de cambios.**
+Rectorado ve esos estados solo cuando la Secretaría de su UA carga el **aval**. Los
+proyectos **Presentado**, en cambio, aparecen con o sin aval, para que Rectorado pueda
+pasarlos a evaluación.
 
 **La aplicación tardó mucho en abrir.**
 El entorno de producción "se duerme" por inactividad; la primera carga puede demorar hasta
