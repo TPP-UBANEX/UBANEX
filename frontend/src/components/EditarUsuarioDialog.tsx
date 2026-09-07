@@ -29,18 +29,10 @@ import {
   cargoDocenteLabel,
   tipoDesignacionDocenteLabel,
   personaConDiscapacidadLabel,
+  rolUsuarioLabels,
 } from '@/data/perfil'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-
-const rolLabels: Record<string, string> = {
-  [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
-  [RolUsuario.AsistenteDeRectorado]: 'Asistente Rectorado',
-  [RolUsuario.AutoridadDeSecretaria]: 'Autoridad Secretaría',
-  [RolUsuario.AsistenteDeSecretaria]: 'Asistente Secretaría',
-  [RolUsuario.Estudiante]: 'Estudiante',
-  [RolUsuario.Docente]: 'Docente',
-}
 
 export function EditarUsuarioDialog({
   usuario,
@@ -93,7 +85,7 @@ export function EditarUsuarioDialog({
   const puedeEditarRoles = esRectorado || (esSecretariaMismaUA && esTargetEjecucion)
   const puedeEditarUA = esRectorado
   const rolesDisponibles: RolUsuario[] = esRectorado
-    ? Object.keys(rolLabels) as RolUsuario[]
+    ? Object.keys(rolUsuarioLabels) as RolUsuario[]
     : [RolUsuario.Docente, RolUsuario.Estudiante]
   const puedeEditar = esAutoEdicion || esRectorado || esSecretariaMismaUA
   const esDocente = usuario.roles.includes(RolUsuario.Docente)
@@ -434,7 +426,7 @@ export function EditarUsuarioDialog({
                             setRoles(selected ? [] : [rol])
                           }}
                         >
-                          {rolLabels[rol]}
+                          {rolUsuarioLabels[rol]}
                         </Button>
                       )
                     })}

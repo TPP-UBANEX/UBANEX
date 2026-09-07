@@ -1,4 +1,4 @@
-import { Genero, CargoDocente, TipoDesignacionDocente } from './types'
+import { Genero, CargoDocente, TipoDesignacionDocente, RolUsuario } from './types'
 import type { Usuario } from './types'
 
 export type CampoPerfilDocente =
@@ -78,4 +78,38 @@ export function tipoDesignacionDocenteLabel(t?: TipoDesignacionDocente | null): 
 export function personaConDiscapacidadLabel(v?: boolean | null): string {
   if (v === undefined || v === null) return '—'
   return v ? 'Sí' : 'No'
+}
+
+export const rolUsuarioLabels: Record<RolUsuario, string> = {
+  [RolUsuario.AutoridadDeRectorado]: 'Autoridad de rectorado',
+  [RolUsuario.AsistenteDeRectorado]: 'Asistente de rectorado',
+  [RolUsuario.AutoridadDeSecretaria]: 'Autoridad de secretaría',
+  [RolUsuario.AsistenteDeSecretaria]: 'Asistente de secretaría',
+  [RolUsuario.Estudiante]: 'Estudiante',
+  [RolUsuario.Docente]: 'Docente',
+}
+
+export function rolUsuarioLabel(rol: string): string {
+  return rolUsuarioLabels[rol as RolUsuario] || rol
+}
+
+export function rolUsuarioColor(rol: string): string {
+  if (rol.includes('Rectorado')) return 'text-blue-600 bg-blue-50 dark:bg-blue-950'
+  if (rol.includes('Secretaria')) return 'text-green-600 bg-green-50 dark:bg-green-950'
+  if (rol === RolUsuario.Docente) return 'text-purple-600 bg-purple-50 dark:bg-purple-950'
+  return 'text-amber-600 bg-amber-50 dark:bg-amber-950'
+}
+
+/** Orden de jerarquía de roles, de mayor a menor, usado para elegir el "rol principal" a mostrar. */
+export const JERARQUIA_ROLES_USUARIO: RolUsuario[] = [
+  RolUsuario.AutoridadDeRectorado,
+  RolUsuario.AsistenteDeRectorado,
+  RolUsuario.AutoridadDeSecretaria,
+  RolUsuario.AsistenteDeSecretaria,
+  RolUsuario.Docente,
+  RolUsuario.Estudiante,
+]
+
+export function rolUsuarioPrincipal(roles: RolUsuario[]): RolUsuario | undefined {
+  return JERARQUIA_ROLES_USUARIO.find(r => roles.includes(r)) ?? roles[0]
 }

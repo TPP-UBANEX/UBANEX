@@ -19,6 +19,8 @@ import {
   cargoDocenteLabel,
   tipoDesignacionDocenteLabel,
   personaConDiscapacidadLabel,
+  rolUsuarioLabel,
+  rolUsuarioColor,
 } from '@/data/perfil'
 import {
   Shield,
@@ -36,22 +38,6 @@ import {
   MapPin,
   ExternalLink,
 } from 'lucide-react'
-
-const rolLabels: Record<string, string> = {
-  [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
-  [RolUsuario.AsistenteDeRectorado]: 'Asistente Rectorado',
-  [RolUsuario.AutoridadDeSecretaria]: 'Autoridad Secretaría',
-  [RolUsuario.AsistenteDeSecretaria]: 'Asistente Secretaría',
-  [RolUsuario.Estudiante]: 'Estudiante',
-  [RolUsuario.Docente]: 'Docente',
-}
-
-function rolColor(rol: string): string {
-  if (rol.includes('Rectorado')) return 'text-blue-600 bg-blue-50 dark:bg-blue-950'
-  if (rol.includes('Secretaria')) return 'text-green-600 bg-green-50 dark:bg-green-950'
-  if (rol === RolUsuario.Docente) return 'text-purple-600 bg-purple-50 dark:bg-purple-950'
-  return 'text-amber-600 bg-amber-50 dark:bg-amber-950'
-}
 
 function estadoValidacionDocenteColor(estado: EstadoValidacionDocente | null | undefined): string {
   switch (estado) {
@@ -118,8 +104,8 @@ export function EvaluadorPerfilDialog({
                 <p className="text-lg font-semibold">{usuario.nombreCompleto}</p>
                 <div className="flex gap-1 flex-wrap mt-1">
                   {usuario.roles.map(r => (
-                    <Badge key={r} variant="outline" className={rolColor(r)}>
-                      {rolLabels[r] || r}
+                    <Badge key={r} variant="outline" className={rolUsuarioColor(r)}>
+                      {rolUsuarioLabel(r)}
                     </Badge>
                   ))}
                 </div>
