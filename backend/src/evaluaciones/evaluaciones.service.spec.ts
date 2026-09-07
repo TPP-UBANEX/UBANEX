@@ -51,6 +51,7 @@ function construirEscenario(ordenCreacion: number[]): Fixture {
 
   const convocatoria = {
     id: 'conv1',
+    estado: EstadoConvocatoria.Evaluacion,
     ordenMeritoConfirmado: false,
     presupuestoTotal: 200,
     cuotaFederativa: 1,
@@ -172,6 +173,7 @@ function construirEscenarioFlex(
   };
   const convocatoria = {
     id: 'conv1',
+    estado: EstadoConvocatoria.Evaluacion,
     ordenMeritoConfirmado: false,
     presupuestoTotal,
     cuotaFederativa: cuota,
@@ -638,6 +640,7 @@ describe('EvaluacionesService.generarOrdenMerito - subcategorías booleanas', ()
     };
     const convocatoria = {
       id: 'conv1',
+      estado: EstadoConvocatoria.Evaluacion,
       ordenMeritoConfirmado: false,
       presupuestoTotal: null,
       cuotaFederativa: 0,
@@ -977,6 +980,7 @@ describe('EvaluacionesService.generarOrdenMerito - Fase 3 swap por presupuesto r
     };
     const convocatoria = {
       id: 'conv1',
+      estado: EstadoConvocatoria.Evaluacion,
       ordenMeritoConfirmado: false,
       presupuestoTotal,
       cuotaFederativa: 1,

@@ -158,6 +158,15 @@ export function ConvocatoriaDetail() {
     (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   );
   const esAutoridadRectorado = user?.roles.includes(RolUsuario.AutoridadDeRectorado);
+  // El orden de mérito recién tiene sentido a partir de la evaluación; se
+  // mantiene visible en ejecución y cierre para consultar el resultado confirmado.
+  const etapasConOrdenMerito = [
+    EstadoConvocatoria.Evaluacion,
+    EstadoConvocatoria.Ejecucion,
+    EstadoConvocatoria.Cierre,
+  ];
+  const puedeVerOrdenMerito =
+    !!esRectorado && !!conv && etapasConOrdenMerito.includes(conv.estado);
   const errores = erroresFechas(editForm);
 
   const [pasandoEvaluacionId, setPasandoEvaluacionId] = useState<string | null>(null);
@@ -178,6 +187,10 @@ export function ConvocatoriaDetail() {
   };
 
   const esEvaluadorActivo = invitacionEvaluador !== null;
+
+  useEffect(() => {
+    if (tab === 'merito' && !puedeVerOrdenMerito) setTab('proyectos');
+  }, [tab, puedeVerOrdenMerito]);
 
   const cargarDatos = () => {
     if (!id) return;
@@ -1098,7 +1111,7 @@ export function ConvocatoriaDetail() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
-          {esRectorado && <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>}
+          {puedeVerOrdenMerito && <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>}
           {esRectorado && conv?.ordenMeritoConfirmado && (
             <TabsTrigger value="adjudicacion">Adjudicación</TabsTrigger>
           )}
@@ -1327,7 +1340,7 @@ export function ConvocatoriaDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        {esRectorado && (
+        {puedeVerOrdenMerito && (
           <TabsContent value="merito" className="mt-4">
             <Card>
               <CardHeader className="flex flex-col gap-3 space-y-0">

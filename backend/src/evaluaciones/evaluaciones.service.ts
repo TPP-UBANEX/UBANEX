@@ -688,6 +688,9 @@ export class EvaluacionesService {
       },
     });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (convocatoria.estado !== EstadoConvocatoria.Evaluacion) {
+      throw new BadRequestException('La convocatoria no está en etapa de evaluación');
+    }
     if (convocatoria.ordenMeritoConfirmado) {
       throw new BadRequestException(
         'El orden de mérito ya está confirmado y no puede volver a generarse',
