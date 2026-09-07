@@ -14,11 +14,12 @@ export function OpcionesCampoEditor({ opciones, editable, onChange }: OpcionesCa
   const lista = opciones ?? []
 
   return (
-    <div className="space-y-2 pl-2 border-l-2">
+    <div className="space-y-2 pl-3 border-l border-muted-foreground/20">
       <span className="text-xs text-muted-foreground">Opciones</span>
       {lista.map((opcion, idx) => (
         <div key={idx} className="flex items-center gap-2">
           <Input
+            className="bg-muted/40"
             value={opcion}
             disabled={!editable}
             onChange={e => onChange(lista.map((o, i) => i === idx ? e.target.value : o))}
@@ -51,12 +52,13 @@ interface RangoNumericoEditorProps {
 /** Editor del rango (mínimo/máximo/decimales) de un campo numérico. Reutilizado por campos de nivel superior y por columnas de tabla. */
 export function RangoNumericoEditor({ minimo, maximo, admiteDecimales, editable, onChange }: RangoNumericoEditorProps) {
   return (
-    <div className="space-y-2 pl-2 border-l-2">
+    <div className="space-y-2 pl-3 border-l border-muted-foreground/20">
       <span className="text-xs text-muted-foreground">Rango (opcional)</span>
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1">
           <span className="text-xs text-muted-foreground">Mínimo</span>
           <Input
+            className="bg-muted/40"
             type="number"
             value={minimo ?? ''}
             disabled={!editable}
@@ -66,6 +68,7 @@ export function RangoNumericoEditor({ minimo, maximo, admiteDecimales, editable,
         <div className="flex-1 space-y-1">
           <span className="text-xs text-muted-foreground">Máximo</span>
           <Input
+            className="bg-muted/40"
             type="number"
             value={maximo ?? ''}
             disabled={!editable}
@@ -124,7 +127,7 @@ export function RolesUsuarioEditor({ rolesUsuario, editable, onChange }: RolesUs
   }
 
   return (
-    <div className="space-y-2 pl-2 border-l-2">
+    <div className="space-y-2 pl-3 border-l border-muted-foreground/20">
       <span className="text-xs text-muted-foreground">¿A quién busca?</span>
       <div className="flex gap-2">
         {(Object.keys(ETIQUETA_ROL_USUARIO) as RolUsuario[]).map(rol => (

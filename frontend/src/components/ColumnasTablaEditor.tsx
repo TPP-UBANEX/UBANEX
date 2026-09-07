@@ -73,15 +73,16 @@ export function ColumnasTablaEditor({ campo, editable, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-3 pl-2 border-l-2">
+    <div className="space-y-3 pl-3 border-l border-muted-foreground/20">
       <span className="text-xs text-muted-foreground">Columnas</span>
-      <div className="space-y-3">
+      <div className="rounded-md border divide-y bg-muted/30">
         {columnas.map((columna, index) => (
-          <div key={columna.id} className="border rounded-lg p-3 space-y-2 bg-background">
+          <div key={columna.id} className="p-3 space-y-2">
             <div className="flex items-start gap-2">
               <div className="flex-[2] space-y-1">
                 <span className="text-xs text-muted-foreground">Etiqueta</span>
                 <Input
+                  className="bg-background"
                   value={columna.nombre}
                   disabled={!editable}
                   onChange={e => actualizarColumna(columna.id, { nombre: e.target.value })}
@@ -95,7 +96,7 @@ export function ColumnasTablaEditor({ campo, editable, onChange }: Props) {
                   disabled={!editable}
                   onValueChange={v => actualizarColumna(columna.id, { tipo: v as TipoCampo })}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {TIPOS_COLUMNA_TABLA.map(t => {
                       const Icono = tipoCampoIconos[t]
@@ -190,6 +191,7 @@ export function ColumnasTablaEditor({ campo, editable, onChange }: Props) {
           <div className="flex-1 space-y-1">
             <span className="text-xs text-muted-foreground">Mínimo</span>
             <Input
+              className="bg-muted/40"
               type="number"
               min={0}
               value={campo.filasMinimas ?? ''}
@@ -200,6 +202,7 @@ export function ColumnasTablaEditor({ campo, editable, onChange }: Props) {
           <div className="flex-1 space-y-1">
             <span className="text-xs text-muted-foreground">Máximo</span>
             <Input
+              className="bg-muted/40"
               type="number"
               min={1}
               value={campo.filasMaximas ?? ''}
