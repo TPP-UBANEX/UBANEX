@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
+import { EnlaceUsuario } from '@/components/EnlaceUsuario'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { TipoRubro, estadoBadge, estadoEdicionLabel } from '@/data/types'
 import type { CampoFormulario, Convocatoria, Edicion } from '@/data/types'
@@ -55,7 +56,7 @@ export function ProyectoEvaluablePanel({
             </div>
             <div>
               <span className="text-muted-foreground">Creado por:</span>{' '}
-              {edicion.creadoPor?.nombreCompleto || '-'}
+              <EnlaceUsuario usuarioId={edicion.creadoPorId} nombre={edicion.creadoPor?.nombreCompleto} />
             </div>
             <div>
               <span className="text-muted-foreground">Edición:</span> {edicion.anioEdicion ?? '-'}

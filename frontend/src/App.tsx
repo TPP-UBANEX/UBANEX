@@ -21,13 +21,7 @@ import { ValidacionDocente } from '@/pages/ValidacionDocente'
 import { PlantillasFormulario } from '@/pages/PlantillasFormulario'
 import { PlantillaFormularioDetail } from '@/pages/PlantillaFormularioDetail'
 import { RolUsuario } from '@/data/types'
-
-const ROLES_GESTION = [
-  RolUsuario.AutoridadDeRectorado,
-  RolUsuario.AsistenteDeRectorado,
-  RolUsuario.AutoridadDeSecretaria,
-  RolUsuario.AsistenteDeSecretaria,
-]
+import { ROLES_GESTION } from '@/data/perfil'
 
 const ROLES_RECTORADO = [
   RolUsuario.AutoridadDeRectorado,

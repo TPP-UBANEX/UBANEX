@@ -32,6 +32,7 @@ import { InformeFinalTab } from '@/components/InformeFinalTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
 import { useDireccionEdicion, DireccionEditor } from '@/components/DireccionEditor'
 import { GestionarDireccionModal } from '@/components/GestionarDireccionModal'
+import { EnlaceUsuario } from '@/components/EnlaceUsuario'
 import {
   CampoFormularioInput,
   camposIncompletosParaEnvio,
@@ -248,6 +249,17 @@ export function ProyectoDetail() {
     if (!d?.usuario) return '-'
     const ua = d.usuario.unidadAcademica?.nombre
     return ua ? `${d.usuario.nombreCompleto} (${ua})` : d.usuario.nombreCompleto
+  }
+
+  const enlaceDirector = (d: ParticipacionConvocatoria | undefined) => {
+    if (!d?.usuario) return '-'
+    const ua = d.usuario.unidadAcademica?.nombre
+    return (
+      <>
+        <EnlaceUsuario usuarioId={d.usuarioId} nombre={d.usuario.nombreCompleto} />
+        {ua ? ` (${ua})` : ''}
+      </>
+    )
   }
 
   const descargarProyecto = () => {
@@ -700,7 +712,7 @@ export function ProyectoDetail() {
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Creado por</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.creadoPor?.nombreCompleto || '-'}</p></CardContent>
+          <CardContent><p className="text-sm"><EnlaceUsuario usuarioId={edicion?.creadoPorId} nombre={edicion?.creadoPor?.nombreCompleto} /></p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
@@ -712,11 +724,11 @@ export function ProyectoDetail() {
             <div className="space-y-1 text-sm">
               <div>
                 <span className="text-muted-foreground">Dirección:</span>{' '}
-                {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
+                {enlaceDirector(directores.find(d => d.esDirectorPrincipal))}
               </div>
               <div>
                 <span className="text-muted-foreground">Codirección:</span>{' '}
-                {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
+                {enlaceDirector(directores.find(d => !d.esDirectorPrincipal))}
               </div>
             </div>
           </CardContent>
@@ -801,7 +813,7 @@ export function ProyectoDetail() {
                         {previsualizando ? editNombre : proyecto.nombre}
                       </CampoSugerible>
                     </div>
-                    <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
+                    <div><span className="text-muted-foreground">Creado por:</span> <EnlaceUsuario usuarioId={edicion?.creadoPorId} nombre={edicion?.creadoPor?.nombreCompleto} /></div>
                     <div><span className="text-muted-foreground">Unidad Académica:</span> {nombreUnidadesAcademicas()}</div>
                     <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
                     <div>
@@ -925,11 +937,11 @@ export function ProyectoDetail() {
                   )}
                   <div>
                     <span className="text-muted-foreground">Dirección:</span>{' '}
-                    {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
+                    {enlaceDirector(directores.find(d => d.esDirectorPrincipal))}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Codirección:</span>{' '}
-                    {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
+                    {enlaceDirector(directores.find(d => !d.esDirectorPrincipal))}
                   </div>
                   {!esEditable && (
                     <p className="text-muted-foreground text-xs col-span-2">

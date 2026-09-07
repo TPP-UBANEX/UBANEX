@@ -113,3 +113,15 @@ export const JERARQUIA_ROLES_USUARIO: RolUsuario[] = [
 export function rolUsuarioPrincipal(roles: RolUsuario[]): RolUsuario | undefined {
   return JERARQUIA_ROLES_USUARIO.find(r => roles.includes(r)) ?? roles[0]
 }
+
+/** Roles con acceso a la sección de Usuarios y a la ficha de cualquier usuario. */
+export const ROLES_GESTION: RolUsuario[] = [
+  RolUsuario.AutoridadDeRectorado,
+  RolUsuario.AsistenteDeRectorado,
+  RolUsuario.AutoridadDeSecretaria,
+  RolUsuario.AsistenteDeSecretaria,
+]
+
+export function esRolDeGestion(roles?: RolUsuario[]): boolean {
+  return !!roles?.some(r => ROLES_GESTION.includes(r))
+}
