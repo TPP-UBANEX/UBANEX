@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import type { EventoHistorialEdicion } from '@/data/types'
+import type { CampoFormulario, EventoHistorialEdicion, Presupuesto } from '@/data/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loader2 } from 'lucide-react'
+import { nombreCampoSugerencia } from '@/lib/nombre-campo'
 
 interface Props {
   proyectoId?: string
   edicionId?: string
+  camposFormulario?: CampoFormulario[]
+  presupuesto?: Presupuesto | null
 }
 
 const etiquetaTipo: Record<EventoHistorialEdicion['tipo'], string> = {
@@ -34,9 +37,17 @@ function formatearFechaHora(fecha: string): string {
  * Línea de tiempo de trazabilidad de la edición: cambios de estado, observaciones y actividad de
  * las evaluaciones, con fecha y responsable. Alimentada por GET /proyectos/:id/ediciones/:id/historial.
  */
-export function HistorialTab({ proyectoId, edicionId }: Props) {
+export function HistorialTab({ proyectoId, edicionId, camposFormulario = [], presupuesto = null }: Props) {
   const [eventos, setEventos] = useState<EventoHistorialEdicion[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Para las observaciones, antepone el campo observado con una etiqueta legible.
+  const textoEvento = (evento: EventoHistorialEdicion): string => {
+    if (evento.campo) {
+      return `Observación sobre "${nombreCampoSugerencia(evento.campo, camposFormulario, presupuesto)}": ${evento.descripcion}`
+    }
+    return evento.descripcion
+  }
 
   useEffect(() => {
     if (!proyectoId || !edicionId) return
@@ -74,7 +85,7 @@ export function HistorialTab({ proyectoId, edicionId }: Props) {
                     {formatearFechaHora(evento.fecha)}
                   </span>
                 </div>
-                <p className="text-sm mt-1">{evento.descripcion}</p>
+                <p className="text-sm mt-1">{textoEvento(evento)}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {evento.responsableNombre ? `Por ${evento.responsableNombre}` : 'Responsable no registrado'}
                 </p>

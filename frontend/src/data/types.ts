@@ -355,6 +355,9 @@ export interface EventoHistorialEdicion {
   tipo: 'estado' | 'sugerencia' | 'evaluacion';
   descripcion: string;
   responsableNombre: string | null;
+  // Presente solo en la creación de una observación: clave del campo observado (se traduce a
+  // etiqueta legible con nombreCampoSugerencia).
+  campo?: string;
 }
 
 export interface AdjudicacionResumen {

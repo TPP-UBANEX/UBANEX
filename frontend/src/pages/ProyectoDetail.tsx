@@ -1049,7 +1049,12 @@ export function ProyectoDetail() {
 
         {(esSecretariaMismaUA || esRectoradoAmplio || esPropietario || esDirector) && (
           <TabsContent value="historial" className="mt-4">
-            <HistorialTab proyectoId={id} edicionId={edicion?.id} />
+            <HistorialTab
+              proyectoId={id}
+              edicionId={edicion?.id}
+              camposFormulario={camposFormulario}
+              presupuesto={edicion?.presupuestoSolicitado}
+            />
           </TabsContent>
         )}
       </Tabs>

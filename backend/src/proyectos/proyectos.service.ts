@@ -915,6 +915,9 @@ export class ProyectosService {
       tipo: 'estado' | 'sugerencia' | 'evaluacion';
       descripcion: string;
       responsableNombre: string | null;
+      // Solo en la creación de una observación: la clave del campo observado. El frontend la
+      // traduce a una etiqueta legible (ver lib/nombre-campo.ts).
+      campo?: string;
     }[] = [];
 
     // 1. Cambios de estado de la edición.
@@ -940,8 +943,9 @@ export class ProyectosService {
       eventos.push({
         fecha: s.creadoEn,
         tipo: 'sugerencia',
-        descripcion: `Observación sobre "${s.campo}": ${s.comentario}`,
+        descripcion: s.comentario,
         responsableNombre: s.sugeridoPor?.nombreCompleto ?? null,
+        campo: s.campo,
       });
       if (s.respondidoEn) {
         eventos.push({
