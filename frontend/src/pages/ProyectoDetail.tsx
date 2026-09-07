@@ -58,7 +58,7 @@ const OPCIONES_ES_INSUMO = [
   { value: 'false', label: 'No' },
 ]
 
-const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'comprobantes', 'autoevaluacion', 'informe-final', 'sugerencias']
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'rendicion', 'autoevaluacion', 'informe-final', 'sugerencias']
 
 
 interface ModalConfigSugerencia {
@@ -764,7 +764,7 @@ export function ProyectoDetail() {
           <TabsTrigger value="presupuesto">Presupuesto solicitado</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
-          <TabsTrigger value="comprobantes">Comprobantes</TabsTrigger>
+          <TabsTrigger value="rendicion">Rendición de fondos</TabsTrigger>
           <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
           <TabsTrigger value="informe-final">Informe final</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
@@ -996,7 +996,7 @@ export function ProyectoDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="comprobantes" className="mt-4">
+        <TabsContent value="rendicion" className="mt-4">
           {edicion ? (
             <ComprobantesTab
               edicionId={edicion.id}
