@@ -55,7 +55,14 @@ import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores';
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab';
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab';
 import { AdjudicacionResolucionTab } from '@/components/AdjudicacionResolucionTab';
-import { calcularPresupuestoAAdjudicar, formatearMoneda } from '@/lib/presupuesto';
+import {
+  calcularPresupuestoAAdjudicar,
+  formatearMoneda,
+  PORCENTAJE_EXTRA_INSUMOS_DEFAULT,
+  UMBRAL_INSUMOS_DEFAULT,
+  PORCENTAJE_EXTRA_PSE_DEFAULT,
+} from '@/lib/presupuesto';
+import { formatearFechaISO } from '@/lib/utils';
 import {
   ArrowLeft,
   Pencil,
@@ -68,6 +75,18 @@ import {
   Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Default aplicado en backend/src/evaluaciones/evaluaciones.service.ts cuando el campo
+// umbralInconsistenciaCruzada de la convocatoria queda vacío.
+const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
+
+// Etapa del cronograma que corresponde a cada estado de la convocatoria, para resaltar
+// cuál de los tres rangos de fechas está vigente.
+const ETAPA_VIGENTE_POR_ESTADO: Partial<Record<EstadoConvocatoria, 'presentacion' | 'evaluacion' | 'ejecucion'>> = {
+  [EstadoConvocatoria.Presentacion]: 'presentacion',
+  [EstadoConvocatoria.Evaluacion]: 'evaluacion',
+  [EstadoConvocatoria.Ejecucion]: 'ejecucion',
+};
 
 function erroresFechas(f: {
   fechaInicioPresentacion: string;
@@ -619,9 +638,6 @@ export function ConvocatoriaDetail() {
               {estadoConvocatoriaLabel[conv.estado] || conv.estado}
             </Badge>
           </div>
-          {conv.descripcion && (
-            <p className="text-sm text-muted-foreground truncate">{conv.descripcion}</p>
-          )}
         </div>
         {user?.roles.includes(RolUsuario.AutoridadDeRectorado) && (
           <div className="flex gap-2">
@@ -887,13 +903,14 @@ export function ConvocatoriaDetail() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Umbral de inconsistencia (3ra UA) · vacío = default 40 pts
+                        Umbral de inconsistencia (3ra UA) · vacío = default{' '}
+                        {UMBRAL_INCONSISTENCIA_DEFAULT} pts
                       </p>
                       <Input
                         type="number"
                         min={0}
                         className="mt-1"
-                        placeholder="40"
+                        placeholder={String(UMBRAL_INCONSISTENCIA_DEFAULT)}
                         value={editForm.umbralInconsistenciaCruzada}
                         onChange={e => setEditForm(f => ({ ...f, umbralInconsistenciaCruzada: e.target.value }))}
                       />
@@ -1597,12 +1614,18 @@ export function ConvocatoriaDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="detalle" className="mt-4">
+        <TabsContent value="detalle" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium">Información</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">Descripción:</span>{' '}
+                <span className="whitespace-pre-wrap break-words">
+                  {conv.descripcion || '-'}
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-muted-foreground">Año:</span> {conv.anio}
@@ -1613,54 +1636,130 @@ export function ConvocatoriaDetail() {
                 </div>
               </div>
               <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Presentación</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm font-medium">Etapa de presentación</p>
+                  {ETAPA_VIGENTE_POR_ESTADO[conv.estado] === 'presentacion' && (
+                    <Badge variant="secondary">Etapa actual</Badge>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioPresentacion || '-'}
+                    {conv.fechaInicioPresentacion ? formatearFechaISO(conv.fechaInicioPresentacion) : '-'}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinPresentacion || '-'}
+                    {conv.fechaFinPresentacion ? formatearFechaISO(conv.fechaFinPresentacion) : '-'}
                   </div>
                 </div>
               </div>
               <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Evaluación</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm font-medium">Etapa de evaluación</p>
+                  {ETAPA_VIGENTE_POR_ESTADO[conv.estado] === 'evaluacion' && (
+                    <Badge variant="secondary">Etapa actual</Badge>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioEvaluacion || '-'}
+                    {conv.fechaInicioEvaluacion ? formatearFechaISO(conv.fechaInicioEvaluacion) : '-'}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinEvaluacion || '-'}
+                    {conv.fechaFinEvaluacion ? formatearFechaISO(conv.fechaFinEvaluacion) : '-'}
                   </div>
                 </div>
               </div>
               <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Ejecución</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm font-medium">Etapa de ejecución</p>
+                  {ETAPA_VIGENTE_POR_ESTADO[conv.estado] === 'ejecucion' && (
+                    <Badge variant="secondary">Etapa actual</Badge>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioEjecucion || '-'}
+                    {conv.fechaInicioEjecucion ? formatearFechaISO(conv.fechaInicioEjecucion) : '-'}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinEjecucion || '-'}
+                    {conv.fechaFinEjecucion ? formatearFechaISO(conv.fechaFinEjecucion) : '-'}
                   </div>
                 </div>
-              </div>
-              <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Formulario</p>
-                <p>
-                  {conv.formulario?.campos?.length
-                    ? `${conv.formulario.campos.length} campos definidos`
-                    : 'Sin campos definidos'}
-                </p>
               </div>
             </CardContent>
           </Card>
+          {esRectorado && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Configuración</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <p className="text-sm font-medium mb-2">Presupuesto</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Presupuesto total máximo:</span>{' '}
+                      {conv.presupuestoTotal ? formatearMoneda(conv.presupuestoTotal) : 'Sin tope'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Tope por proyecto (no consolidado):
+                      </span>{' '}
+                      {conv.topePresupuestoNoConsolidado
+                        ? formatearMoneda(conv.topePresupuestoNoConsolidado)
+                        : 'Sin tope'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Tope por proyecto (consolidado):
+                      </span>{' '}
+                      {conv.topePresupuestoConsolidado
+                        ? formatearMoneda(conv.topePresupuestoConsolidado)
+                        : 'Sin tope'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Extra por insumos:</span>{' '}
+                      {(() => {
+                        const porcentaje = conv.porcentajeExtraInsumos ?? PORCENTAJE_EXTRA_INSUMOS_DEFAULT;
+                        const umbral = conv.umbralInsumos ?? UMBRAL_INSUMOS_DEFAULT;
+                        return porcentaje
+                          ? `${porcentaje}% si los insumos representan al menos el ${umbral}% del solicitado`
+                          : 'Desactivado';
+                      })()}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Extra por PSE:</span>{' '}
+                      {(() => {
+                        const porcentaje = conv.porcentajeExtraPse ?? PORCENTAJE_EXTRA_PSE_DEFAULT;
+                        return porcentaje ? `${porcentaje}%` : 'Desactivado';
+                      })()}
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <p className="text-sm font-medium mb-2">Reglas de adjudicación</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Cuota federativa:</span>{' '}
+                      {conv.cuotaFederativa
+                        ? `${conv.cuotaFederativa} proyecto(s) adjudicado(s) como mínimo por unidad académica`
+                        : 'Sin mínimo'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Umbral de inconsistencia cruzada:
+                      </span>{' '}
+                      {conv.umbralInconsistenciaCruzada ?? UMBRAL_INCONSISTENCIA_DEFAULT} pts
+                      {conv.umbralInconsistenciaCruzada == null && ' (por defecto)'}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
