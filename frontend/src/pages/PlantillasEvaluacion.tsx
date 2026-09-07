@@ -21,7 +21,9 @@ import type {
 } from '@/data/types'
 import { TemplateInstitucionalBuilder } from '@/components/TemplateInstitucionalBuilder'
 import { TemplateCruzadaBuilder } from '@/components/TemplateCruzadaBuilder'
-import { ClipboardCheck, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { VistaPreviaEvaluacionInstitucional } from '@/components/VistaPreviaEvaluacionInstitucional'
+import { VistaPreviaEvaluacionCruzada } from '@/components/VistaPreviaEvaluacionCruzada'
+import { ClipboardCheck, Eye, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface DialogInstState {
@@ -30,6 +32,7 @@ interface DialogInstState {
   nombre: string
   esDefault: boolean
   estructura: EstructuraTemplateInstitucional | null
+  preview: boolean
 }
 
 interface DialogCruzadaState {
@@ -38,10 +41,11 @@ interface DialogCruzadaState {
   nombre: string
   esDefault: boolean
   estructura: EstructuraTemplateCruzada | null
+  preview: boolean
 }
 
-const dialogInstVacio: DialogInstState = { open: false, nombre: '', esDefault: false, estructura: null }
-const dialogCruzadaVacio: DialogCruzadaState = { open: false, nombre: '', esDefault: false, estructura: null }
+const dialogInstVacio: DialogInstState = { open: false, nombre: '', esDefault: false, estructura: null, preview: false }
+const dialogCruzadaVacio: DialogCruzadaState = { open: false, nombre: '', esDefault: false, estructura: null, preview: false }
 
 export function PlantillasEvaluacion() {
   const [institucionales, setInstitucionales] = useState<TemplateEvaluacionInstitucional[]>([])
@@ -66,11 +70,11 @@ export function PlantillasEvaluacion() {
 
   const abrirNuevaInst = () => setDialogInst({ ...dialogInstVacio, open: true })
   const abrirEditarInst = (t: TemplateEvaluacionInstitucional) =>
-    setDialogInst({ open: true, id: t.id, nombre: t.nombre, esDefault: t.esDefault, estructura: t.estructura })
+    setDialogInst({ open: true, id: t.id, nombre: t.nombre, esDefault: t.esDefault, estructura: t.estructura, preview: false })
 
   const abrirNuevaCruzada = () => setDialogCruzada({ ...dialogCruzadaVacio, open: true })
   const abrirEditarCruzada = (t: TemplateEvaluacionCruzada) =>
-    setDialogCruzada({ open: true, id: t.id, nombre: t.nombre, esDefault: t.esDefault, estructura: t.estructura })
+    setDialogCruzada({ open: true, id: t.id, nombre: t.nombre, esDefault: t.esDefault, estructura: t.estructura, preview: false })
 
   const guardarInstitucional = async () => {
     if (!dialogInst.nombre.trim()) {
@@ -248,35 +252,56 @@ export function PlantillasEvaluacion() {
       <Dialog open={dialogInst.open} onOpenChange={v => setDialogInst(d => ({ ...d, open: v }))}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              <ClipboardCheck className="h-4 w-4 mr-2 inline" />
-              {dialogInst.id ? 'Editar plantilla institucional' : 'Nueva plantilla institucional'}
+            <DialogTitle className="flex items-center justify-between gap-2">
+              <span>
+                <ClipboardCheck className="h-4 w-4 mr-2 inline" />
+                {dialogInst.id ? 'Editar plantilla institucional' : 'Nueva plantilla institucional'}
+              </span>
+              {(dialogInst.estructura?.categorias.length ?? 0) > 0 ||
+              (dialogInst.estructura?.checklist.length ?? 0) > 0 ? (
+                <Button
+                  type="button"
+                  variant={dialogInst.preview ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDialogInst(d => ({ ...d, preview: !d.preview }))}
+                >
+                  {dialogInst.preview
+                    ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                    : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+                </Button>
+              ) : null}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Nombre</span>
-              <Input
-                value={dialogInst.nombre}
-                onChange={e => setDialogInst(d => ({ ...d, nombre: e.target.value }))}
-                placeholder="Ej: Plantilla institucional estándar"
-              />
-            </div>
-            <TemplateInstitucionalBuilder
-              estructura={dialogInst.estructura}
-              onChange={estructura => setDialogInst(d => ({ ...d, estructura }))}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Establecer como plantilla por defecto</span>
-              <Button
-                type="button"
-                variant={dialogInst.esDefault ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setDialogInst(d => ({ ...d, esDefault: !d.esDefault }))}
-              >
-                {dialogInst.esDefault ? 'Sí' : 'No'}
-              </Button>
-            </div>
+            {dialogInst.preview ? (
+              <VistaPreviaEvaluacionInstitucional estructura={dialogInst.estructura} />
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Nombre</span>
+                  <Input
+                    value={dialogInst.nombre}
+                    onChange={e => setDialogInst(d => ({ ...d, nombre: e.target.value }))}
+                    placeholder="Ej: Plantilla institucional estándar"
+                  />
+                </div>
+                <TemplateInstitucionalBuilder
+                  estructura={dialogInst.estructura}
+                  onChange={estructura => setDialogInst(d => ({ ...d, estructura }))}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Establecer como plantilla por defecto</span>
+                  <Button
+                    type="button"
+                    variant={dialogInst.esDefault ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDialogInst(d => ({ ...d, esDefault: !d.esDefault }))}
+                  >
+                    {dialogInst.esDefault ? 'Sí' : 'No'}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogInst(dialogInstVacio)}>Cancelar</Button>
@@ -291,35 +316,55 @@ export function PlantillasEvaluacion() {
       <Dialog open={dialogCruzada.open} onOpenChange={v => setDialogCruzada(d => ({ ...d, open: v }))}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              <ClipboardCheck className="h-4 w-4 mr-2 inline" />
-              {dialogCruzada.id ? 'Editar plantilla de evaluación cruzada' : 'Nueva plantilla de evaluación cruzada'}
+            <DialogTitle className="flex items-center justify-between gap-2">
+              <span>
+                <ClipboardCheck className="h-4 w-4 mr-2 inline" />
+                {dialogCruzada.id ? 'Editar plantilla de evaluación cruzada' : 'Nueva plantilla de evaluación cruzada'}
+              </span>
+              {(dialogCruzada.estructura?.categorias.length ?? 0) > 0 && (
+                <Button
+                  type="button"
+                  variant={dialogCruzada.preview ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDialogCruzada(d => ({ ...d, preview: !d.preview }))}
+                >
+                  {dialogCruzada.preview
+                    ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                    : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Nombre</span>
-              <Input
-                value={dialogCruzada.nombre}
-                onChange={e => setDialogCruzada(d => ({ ...d, nombre: e.target.value }))}
-                placeholder="Ej: Plantilla cruzada estándar"
-              />
-            </div>
-            <TemplateCruzadaBuilder
-              estructura={dialogCruzada.estructura}
-              onChange={estructura => setDialogCruzada(d => ({ ...d, estructura }))}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Establecer como plantilla por defecto</span>
-              <Button
-                type="button"
-                variant={dialogCruzada.esDefault ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setDialogCruzada(d => ({ ...d, esDefault: !d.esDefault }))}
-              >
-                {dialogCruzada.esDefault ? 'Sí' : 'No'}
-              </Button>
-            </div>
+            {dialogCruzada.preview ? (
+              <VistaPreviaEvaluacionCruzada estructura={dialogCruzada.estructura} />
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Nombre</span>
+                  <Input
+                    value={dialogCruzada.nombre}
+                    onChange={e => setDialogCruzada(d => ({ ...d, nombre: e.target.value }))}
+                    placeholder="Ej: Plantilla cruzada estándar"
+                  />
+                </div>
+                <TemplateCruzadaBuilder
+                  estructura={dialogCruzada.estructura}
+                  onChange={estructura => setDialogCruzada(d => ({ ...d, estructura }))}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Establecer como plantilla por defecto</span>
+                  <Button
+                    type="button"
+                    variant={dialogCruzada.esDefault ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDialogCruzada(d => ({ ...d, esDefault: !d.esDefault }))}
+                  >
+                    {dialogCruzada.esDefault ? 'Sí' : 'No'}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogCruzada(dialogCruzadaVacio)}>Cancelar</Button>

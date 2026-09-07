@@ -896,6 +896,9 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   el constructor de formulario y en las plantillas (tabs por sección en solo lectura +
   mocks de Dirección y Presupuesto). Descarga del proyecto en PDF (detalle + formulario +
   presupuesto).
+* Vista previa de los formularios de evaluación institucional y cruzada: mismo interruptor
+  Editor/Vista previa, disponible en la pestaña Evaluación de la convocatoria y en las
+  plantillas de biblioteca (*Plantillas de evaluación*), en solo lectura y sin guardar nada.
 * Sugerencias de cambio sobre ediciones presentadas + notificaciones in-app / mail.
 * Emparejamiento de unidades académicas por convocatoria.
 * Evaluación institucional y cruzada con estado `Borrador | Confirmada` y plantillas

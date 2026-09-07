@@ -19,7 +19,9 @@ import type {
 } from '@/data/types'
 import { TemplateInstitucionalBuilder } from '@/components/TemplateInstitucionalBuilder'
 import { TemplateCruzadaBuilder } from '@/components/TemplateCruzadaBuilder'
-import { Loader2, Copy } from 'lucide-react'
+import { VistaPreviaEvaluacionInstitucional } from '@/components/VistaPreviaEvaluacionInstitucional'
+import { VistaPreviaEvaluacionCruzada } from '@/components/VistaPreviaEvaluacionCruzada'
+import { Loader2, Copy, Eye, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -48,6 +50,14 @@ function clonarCruzada(s: EstructuraTemplateCruzada): EstructuraTemplateCruzada 
   }
 }
 
+function tieneContenidoInst(estructura: EstructuraTemplateInstitucional | null): boolean {
+  return !!estructura && (estructura.categorias.length > 0 || estructura.checklist.length > 0)
+}
+
+function tieneContenidoCruzada(estructura: EstructuraTemplateCruzada | null): boolean {
+  return !!estructura && estructura.categorias.length > 0
+}
+
 export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Props) {
   const editable = estadoConvocatoria === EstadoConvocatoria.Configuracion
 
@@ -58,6 +68,8 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
   const [loading, setLoading] = useState(true)
   const [guardandoInst, setGuardandoInst] = useState(false)
   const [guardandoCruzada, setGuardandoCruzada] = useState(false)
+  const [previewInst, setPreviewInst] = useState(false)
+  const [previewCruzada, setPreviewCruzada] = useState(false)
 
   const cargar = useCallback(async () => {
     const [inst, cruzada, plantillasInst, plantillasCruzada] = await Promise.all([
@@ -140,69 +152,105 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium">Formulario de evaluación institucional</CardTitle>
+            {tieneContenidoInst(instEstructura) && (
+              <Button
+                type="button"
+                variant={previewInst ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPreviewInst(v => !v)}
+              >
+                {previewInst
+                  ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                  : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+              </Button>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
-            {plantillasInst.length > 0 && editable && (
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Cargar desde plantilla de biblioteca</span>
-                <Select onValueChange={importarInst}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar plantilla..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plantillasInst.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <TemplateInstitucionalBuilder
-              estructura={instEstructura}
-              onChange={setInstEstructura}
-              editable={editable}
-            />
-            {editable && (
-              <Button onClick={guardarInst} disabled={guardandoInst}>
-                {guardandoInst && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Guardar formulario de evaluación institucional
-              </Button>
+            {previewInst ? (
+              <VistaPreviaEvaluacionInstitucional estructura={instEstructura} />
+            ) : (
+              <>
+                {plantillasInst.length > 0 && editable && (
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Cargar desde plantilla de biblioteca</span>
+                    <Select onValueChange={importarInst}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar plantilla..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plantillasInst.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <TemplateInstitucionalBuilder
+                  estructura={instEstructura}
+                  onChange={setInstEstructura}
+                  editable={editable}
+                />
+                {editable && (
+                  <Button onClick={guardarInst} disabled={guardandoInst}>
+                    {guardandoInst && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Guardar formulario de evaluación institucional
+                  </Button>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium">Formulario de evaluación cruzada</CardTitle>
+            {tieneContenidoCruzada(cruzadaEstructura) && (
+              <Button
+                type="button"
+                variant={previewCruzada ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPreviewCruzada(v => !v)}
+              >
+                {previewCruzada
+                  ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                  : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+              </Button>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
-            {plantillasCruzada.length > 0 && editable && (
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Cargar desde plantilla de biblioteca</span>
-                <Select onValueChange={importarCruzada}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar plantilla..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plantillasCruzada.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <TemplateCruzadaBuilder
-              estructura={cruzadaEstructura}
-              onChange={setCruzadaEstructura}
-              editable={editable}
-            />
-            {editable && (
-              <Button onClick={guardarCruzada} disabled={guardandoCruzada}>
-                {guardandoCruzada && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Guardar formulario de evaluación cruzada
-              </Button>
+            {previewCruzada ? (
+              <VistaPreviaEvaluacionCruzada estructura={cruzadaEstructura} />
+            ) : (
+              <>
+                {plantillasCruzada.length > 0 && editable && (
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Cargar desde plantilla de biblioteca</span>
+                    <Select onValueChange={importarCruzada}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar plantilla..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plantillasCruzada.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <TemplateCruzadaBuilder
+                  estructura={cruzadaEstructura}
+                  onChange={setCruzadaEstructura}
+                  editable={editable}
+                />
+                {editable && (
+                  <Button onClick={guardarCruzada} disabled={guardandoCruzada}>
+                    {guardandoCruzada && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Guardar formulario de evaluación cruzada
+                  </Button>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

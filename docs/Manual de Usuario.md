@@ -175,6 +175,11 @@ convocatoria desde su detalle:
 
 Podés marcar una plantilla como **default** para reutilizarla en la próxima convocatoria.
 
+Tanto en la pestaña **Evaluación** de la convocatoria como en la edición de plantillas de
+biblioteca, el botón **Vista previa** de cada formulario (institucional y cruzada, por
+separado) muestra cómo lo verá quien evalúe: categorías, subcategorías/ítems y checklist
+en solo lectura y sin valores. **Volver al editor** regresa al builder sin guardar nada.
+
 ![Builder de plantilla de evaluación cruzada](assets/manual/plantilla-evaluacion.png)
 
 ### 4.4 Emparejamiento de Unidades Académicas
