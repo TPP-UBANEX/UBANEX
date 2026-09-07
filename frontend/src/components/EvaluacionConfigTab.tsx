@@ -2,13 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api } from '@/lib/api'
 import { EstadoConvocatoria } from '@/data/types'
 import type {
@@ -17,11 +11,12 @@ import type {
   TemplateEvaluacionInstitucional,
   TemplateEvaluacionCruzada,
 } from '@/data/types'
-import { TemplateInstitucionalBuilder } from '@/components/TemplateInstitucionalBuilder'
-import { TemplateCruzadaBuilder } from '@/components/TemplateCruzadaBuilder'
+import { TemplateInstitucionalBuilder, nuevaCategoriaInstitucional } from '@/components/TemplateInstitucionalBuilder'
+import { TemplateCruzadaBuilder, nuevaCategoriaCruzada } from '@/components/TemplateCruzadaBuilder'
 import { VistaPreviaEvaluacionInstitucional } from '@/components/VistaPreviaEvaluacionInstitucional'
 import { VistaPreviaEvaluacionCruzada } from '@/components/VistaPreviaEvaluacionCruzada'
-import { Loader2, Copy, Eye, Pencil } from 'lucide-react'
+import { SeleccionarPlantillaDialog } from '@/components/SeleccionarPlantillaDialog'
+import { Eye, FileText, Loader2, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -58,54 +53,63 @@ function tieneContenidoCruzada(estructura: EstructuraTemplateCruzada | null): bo
   return !!estructura && estructura.categorias.length > 0
 }
 
+/** Punto que marca una pestaña con cambios sin guardar, igual convención que las notificaciones no leídas. */
+function PuntoSinGuardar() {
+  return <span className="ml-1.5 h-2 w-2 rounded-full bg-blue-500" title="Cambios sin guardar" />
+}
+
 export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Props) {
   const editable = estadoConvocatoria === EstadoConvocatoria.Configuracion
 
+  const [formulario, setFormulario] = useState<'institucional' | 'cruzada'>('institucional')
+
   const [instEstructura, setInstEstructura] = useState<EstructuraTemplateInstitucional | null>(null)
   const [cruzadaEstructura, setCruzadaEstructura] = useState<EstructuraTemplateCruzada | null>(null)
-  const [plantillasInst, setPlantillasInst] = useState<TemplateEvaluacionInstitucional[]>([])
-  const [plantillasCruzada, setPlantillasCruzada] = useState<TemplateEvaluacionCruzada[]>([])
+  const [instOriginal, setInstOriginal] = useState('')
+  const [cruzadaOriginal, setCruzadaOriginal] = useState('')
   const [loading, setLoading] = useState(true)
   const [guardandoInst, setGuardandoInst] = useState(false)
   const [guardandoCruzada, setGuardandoCruzada] = useState(false)
   const [previewInst, setPreviewInst] = useState(false)
   const [previewCruzada, setPreviewCruzada] = useState(false)
+  const [plantillaDialogOpen, setPlantillaDialogOpen] = useState(false)
 
   const cargar = useCallback(async () => {
-    const [inst, cruzada, plantillasInst, plantillasCruzada] = await Promise.all([
+    const [inst, cruzada] = await Promise.all([
       api.convocatorias.templateInstitucional.get(convocatoriaId),
       api.convocatorias.templateCruzada.get(convocatoriaId),
-      api.templatesEvaluacion.institucionales.list().catch(() => []),
-      api.templatesEvaluacion.cruzadas.list().catch(() => []),
     ])
     setInstEstructura(inst.estructura)
     setCruzadaEstructura(cruzada.estructura)
-    setPlantillasInst(plantillasInst)
-    setPlantillasCruzada(plantillasCruzada)
+    setInstOriginal(JSON.stringify(inst.estructura))
+    setCruzadaOriginal(JSON.stringify(cruzada.estructura))
   }, [convocatoriaId])
 
   useEffect(() => {
     cargar().finally(() => setLoading(false))
   }, [cargar])
 
-  const importarInst = (templateId: string) => {
-    const plantilla = plantillasInst.find(p => p.id === templateId)
-    if (!plantilla?.estructura) return
+  const instSucio = JSON.stringify(instEstructura) !== instOriginal
+  const cruzadaSucio = JSON.stringify(cruzadaEstructura) !== cruzadaOriginal
+
+  const importarInst = (plantilla: TemplateEvaluacionInstitucional) => {
+    if (!plantilla.estructura) return
     setInstEstructura(clonarInstitucional(plantilla.estructura))
     toast.success('Plantilla cargada. Guardá para aplicarla a la convocatoria.')
   }
 
-  const importarCruzada = (templateId: string) => {
-    const plantilla = plantillasCruzada.find(p => p.id === templateId)
-    if (!plantilla?.estructura) return
+  const importarCruzada = (plantilla: TemplateEvaluacionCruzada) => {
+    if (!plantilla.estructura) return
     setCruzadaEstructura(clonarCruzada(plantilla.estructura))
     toast.success('Plantilla cargada. Guardá para aplicarla a la convocatoria.')
   }
 
   const guardarInst = async () => {
+    const snapshot = JSON.stringify(instEstructura)
     setGuardandoInst(true)
     try {
       await api.convocatorias.templateInstitucional.guardar(convocatoriaId, instEstructura)
+      setInstOriginal(snapshot)
       toast.success('Formulario de evaluación institucional guardado')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar el formulario de evaluación')
@@ -115,9 +119,11 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
   }
 
   const guardarCruzada = async () => {
+    const snapshot = JSON.stringify(cruzadaEstructura)
     setGuardandoCruzada(true)
     try {
       await api.convocatorias.templateCruzada.guardar(convocatoriaId, cruzadaEstructura)
+      setCruzadaOriginal(snapshot)
       toast.success('Formulario de evaluación cruzada guardado')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar el formulario de evaluación')
@@ -128,19 +134,41 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
 
   if (loading) {
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
-        {[...Array(2)].map((_, i) => (
-          <Card key={i}>
-            <CardContent className="pt-6 space-y-4">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
     )
   }
+
+  const preview = formulario === 'institucional' ? previewInst : previewCruzada
+  const setPreview = formulario === 'institucional' ? setPreviewInst : setPreviewCruzada
+  const hayContenido = formulario === 'institucional'
+    ? tieneContenidoInst(instEstructura)
+    : tieneContenidoCruzada(cruzadaEstructura)
+
+  const slotVacio = (nombreFormulario: string, onEmpezarDeCero: () => void) => editable ? (
+    <div className="text-center py-8 space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Todavía no hay categorías definidas. ¿Cómo querés empezar?
+      </p>
+      <div className="flex items-center justify-center gap-3">
+        <Button type="button" variant="outline" onClick={() => setPlantillaDialogOpen(true)}>
+          <FileText className="h-4 w-4 mr-2" />Empezar desde una plantilla
+        </Button>
+        <Button type="button" variant="outline" onClick={onEmpezarDeCero}>
+          <Plus className="h-4 w-4 mr-2" />Empezar de cero
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <p className="text-sm text-muted-foreground text-center py-4">
+      Este formulario de evaluación {nombreFormulario} no tiene categorías definidas.
+    </p>
+  )
 
   return (
     <div className="space-y-6">
@@ -150,116 +178,120 @@ export function EvaluacionConfigTab({ convocatoriaId, estadoConvocatoria }: Prop
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <Tabs value={formulario} onValueChange={v => setFormulario(v as 'institucional' | 'cruzada')}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Formulario de evaluación institucional</CardTitle>
-            {tieneContenidoInst(instEstructura) && (
-              <Button
-                type="button"
-                variant={previewInst ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setPreviewInst(v => !v)}
-              >
-                {previewInst
-                  ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
-                  : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              <CardTitle className="text-sm font-medium">Formulario de evaluación</CardTitle>
+              <TabsList>
+                <TabsTrigger value="institucional">
+                  Institucional
+                  {instSucio && <PuntoSinGuardar />}
+                </TabsTrigger>
+                <TabsTrigger value="cruzada">
+                  Cruzada
+                  {cruzadaSucio && <PuntoSinGuardar />}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <div className="flex items-center gap-2">
+              {editable && !preview && hayContenido && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setPlantillaDialogOpen(true)}>
+                  <FileText className="h-4 w-4 mr-2" />Reemplazar por plantilla
+                </Button>
+              )}
+              {hayContenido && (
+                <Button
+                  type="button"
+                  variant={preview ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPreview(v => !v)}
+                >
+                  {preview
+                    ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                    : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+                </Button>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {previewInst ? (
-              <VistaPreviaEvaluacionInstitucional estructura={instEstructura} />
-            ) : (
-              <>
-                {plantillasInst.length > 0 && editable && (
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Cargar desde plantilla de biblioteca</span>
-                    <Select onValueChange={importarInst}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar plantilla..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plantillasInst.map(p => (
-                          <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+          <CardContent>
+            <TabsContent value="institucional" className="mt-0 space-y-4">
+              {previewInst ? (
+                <VistaPreviaEvaluacionInstitucional estructura={instEstructura} />
+              ) : !tieneContenidoInst(instEstructura) ? (
+                slotVacio('institucional', () =>
+                  setInstEstructura({
+                    categorias: [nuevaCategoriaInstitucional()],
+                    checklist: instEstructura?.checklist ?? [],
+                  }),
+                )
+              ) : (
                 <TemplateInstitucionalBuilder
                   estructura={instEstructura}
                   onChange={setInstEstructura}
                   editable={editable}
                 />
-                {editable && (
+              )}
+              {editable && !previewInst && (
+                <div className="flex justify-end">
                   <Button onClick={guardarInst} disabled={guardandoInst}>
                     {guardandoInst && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Guardar formulario de evaluación institucional
+                    Guardar formulario
                   </Button>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </TabsContent>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Formulario de evaluación cruzada</CardTitle>
-            {tieneContenidoCruzada(cruzadaEstructura) && (
-              <Button
-                type="button"
-                variant={previewCruzada ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setPreviewCruzada(v => !v)}
-              >
-                {previewCruzada
-                  ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
-                  : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {previewCruzada ? (
-              <VistaPreviaEvaluacionCruzada estructura={cruzadaEstructura} />
-            ) : (
-              <>
-                {plantillasCruzada.length > 0 && editable && (
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Cargar desde plantilla de biblioteca</span>
-                    <Select onValueChange={importarCruzada}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar plantilla..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plantillasCruzada.map(p => (
-                          <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+            <TabsContent value="cruzada" className="mt-0 space-y-4">
+              {previewCruzada ? (
+                <VistaPreviaEvaluacionCruzada estructura={cruzadaEstructura} />
+              ) : !tieneContenidoCruzada(cruzadaEstructura) ? (
+                slotVacio('cruzada', () =>
+                  setCruzadaEstructura({ categorias: [nuevaCategoriaCruzada()] }),
+                )
+              ) : (
                 <TemplateCruzadaBuilder
                   estructura={cruzadaEstructura}
                   onChange={setCruzadaEstructura}
                   editable={editable}
                 />
-                {editable && (
+              )}
+              {editable && !previewCruzada && (
+                <div className="flex justify-end">
                   <Button onClick={guardarCruzada} disabled={guardandoCruzada}>
                     {guardandoCruzada && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Guardar formulario de evaluación cruzada
+                    Guardar formulario
                   </Button>
-                )}
-              </>
-            )}
+                </div>
+              )}
+            </TabsContent>
           </CardContent>
         </Card>
-      </div>
+      </Tabs>
 
-      <p className="text-xs text-muted-foreground flex items-center gap-1">
-        <Copy className="h-3 w-3" />
-        Importar una plantilla copia su estructura con ids regenerados; los cambios se aplican recién al guardar.
-      </p>
+      {formulario === 'institucional' ? (
+        <SeleccionarPlantillaDialog
+          open={plantillaDialogOpen}
+          onOpenChange={setPlantillaDialogOpen}
+          cargarPlantillas={api.templatesEvaluacion.institucionales.list}
+          detalle={p => `${p.estructura?.categorias.length ?? 0} categorías`}
+          onSeleccionar={importarInst}
+          advertencia={tieneContenidoInst(instEstructura)
+            ? 'Las categorías que tenés cargadas se reemplazan por las de la plantilla. El cambio no se aplica hasta que guardes.'
+            : undefined}
+        />
+      ) : (
+        <SeleccionarPlantillaDialog
+          open={plantillaDialogOpen}
+          onOpenChange={setPlantillaDialogOpen}
+          cargarPlantillas={api.templatesEvaluacion.cruzadas.list}
+          detalle={p => `${p.estructura?.categorias.length ?? 0} categorías`}
+          onSeleccionar={importarCruzada}
+          advertencia={tieneContenidoCruzada(cruzadaEstructura)
+            ? 'Las categorías que tenés cargadas se reemplazan por las de la plantilla. El cambio no se aplica hasta que guardes.'
+            : undefined}
+        />
+      )}
     </div>
   )
 }
