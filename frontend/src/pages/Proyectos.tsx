@@ -24,7 +24,6 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria, PaginatedResponse, Hito } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario, categoriaHitoLabel } from '@/data/types'
-import { formatearMoneda } from '@/lib/presupuesto'
 import { toast } from 'sonner'
 import { Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 
@@ -209,7 +208,7 @@ export function Proyectos() {
               <div className="space-y-3">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="flex gap-4">
-                    {[...Array(5)].map((_, j) => (
+                    {[...Array(4)].map((_, j) => (
                       <Skeleton key={j} className="h-4 flex-1" />
                     ))}
                   </div>
@@ -227,7 +226,6 @@ export function Proyectos() {
                       <TableHead>Creado por</TableHead>
                       <TableHead>Facultad</TableHead>
                       <TableHead>Etapa</TableHead>
-                      <TableHead>Presupuesto solicitado</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -262,7 +260,6 @@ export function Proyectos() {
                               : e.unidadAcademica?.nombre || '-'}
                           </TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                          <TableCell className="text-sm">{formatearMoneda(e.presupuestoSolicitado?.montoTotal)}</TableCell>
                           <TableCell>
                             <div className="flex gap-1 justify-end">
                               {esRectorado && e.estado === EstadoEdicion.Presentado && e.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
@@ -275,13 +272,12 @@ export function Proyectos() {
                                   Pasar a evaluación
                                 </Button>
                               )}
-                              <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
                             </div>
                           </TableCell>
                         </TableRow>
                         {expandidaId === e.id && (
                           <TableRow key={`${e.id}-detalle`}>
-                            <TableCell colSpan={esAdmin ? 7 : 6}>
+                            <TableCell colSpan={esAdmin ? 6 : 5}>
                               <div className="py-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                                   Hitos de ejecución
@@ -363,11 +359,6 @@ export function Proyectos() {
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
                         <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
-                        {e.presupuestoSolicitado && (
-                          <Badge variant="outline" className="text-xs">
-                            {formatearMoneda(e.presupuestoSolicitado.montoTotal)}
-                          </Badge>
-                        )}
                       </CardContent>
                     </Card>
                   ))}

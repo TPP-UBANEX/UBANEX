@@ -1222,7 +1222,7 @@ export function ConvocatoriaDetail() {
                 <div className="space-y-3">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="flex gap-4">
-                      {[...Array(5)].map((_, j) => (
+                      {[...Array(4)].map((_, j) => (
                         <Skeleton key={j} className="h-4 flex-1" />
                       ))}
                     </div>
@@ -1243,7 +1243,6 @@ export function ConvocatoriaDetail() {
                         <TableHead>Facultad</TableHead>
                         <TableHead>Estado</TableHead>
                         {conv?.ordenMeritoConfirmado && <TableHead>Adjudicación</TableHead>}
-                        <TableHead>Presupuesto solicitado</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1284,9 +1283,6 @@ export function ConvocatoriaDetail() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-sm">
-                            {formatearMoneda(e.presupuestoSolicitado?.montoTotal)}
-                          </TableCell>
                           <TableCell>
                             <div className="flex gap-1 justify-end">
                               {esRectorado &&
@@ -1304,18 +1300,6 @@ export function ConvocatoriaDetail() {
                                     Pasar a evaluación
                                   </Button>
                                 )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e2) => {
-                                  e2.stopPropagation();
-                                  navigate(
-                                    `/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`,
-                                  );
-                                }}
-                              >
-                                Ver
-                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
