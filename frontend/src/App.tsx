@@ -21,6 +21,8 @@ import { UsuarioDetail } from '@/pages/UsuarioDetail'
 import { ValidacionDocente } from '@/pages/ValidacionDocente'
 import { PlantillasFormulario } from '@/pages/PlantillasFormulario'
 import { PlantillaFormularioDetail } from '@/pages/PlantillaFormularioDetail'
+import { PlantillaEvaluacionDetail } from '@/pages/PlantillaEvaluacionDetail'
+import { PlantillaAutoevaluacionDetail } from '@/pages/PlantillaAutoevaluacionDetail'
 import { RolUsuario } from '@/data/types'
 import { ROLES_GESTION } from '@/data/perfil'
 
@@ -76,7 +78,9 @@ function App() {
                   <Route path="/plantillas/presentacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasFormulario /></ProtectedRoute>} />
                   <Route path="/plantillas/presentacion/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaFormularioDetail /></ProtectedRoute>} />
                   <Route path="/plantillas/evaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasEvaluacion /></ProtectedRoute>} />
+                  <Route path="/plantillas/evaluacion/:tipo/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaEvaluacionDetail /></ProtectedRoute>} />
                   <Route path="/plantillas/impacto" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasAutoevaluacion /></ProtectedRoute>} />
+                  <Route path="/plantillas/impacto/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaAutoevaluacionDetail /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<ProtectedRoute roles={ROLES_GESTION}><Usuarios /></ProtectedRoute>} />
                   <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION} allowOwnId><UsuarioDetail /></ProtectedRoute>} />
                   <Route path="/validacion-docente" element={<ValidacionDocente />} />

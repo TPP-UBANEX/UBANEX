@@ -1,61 +1,50 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
+  DialogTrigger,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TableSkeleton } from '@/components/TableSkeleton'
 import { api } from '@/lib/api'
-import type {
-  EstructuraTemplateInstitucional,
-  EstructuraTemplateCruzada,
-  TemplateEvaluacionInstitucional,
-  TemplateEvaluacionCruzada,
-} from '@/data/types'
-import { TemplateInstitucionalBuilder } from '@/components/TemplateInstitucionalBuilder'
-import { TemplateCruzadaBuilder } from '@/components/TemplateCruzadaBuilder'
-import { VistaPreviaEvaluacionInstitucional } from '@/components/VistaPreviaEvaluacionInstitucional'
-import { VistaPreviaEvaluacionCruzada } from '@/components/VistaPreviaEvaluacionCruzada'
-import { ArrowLeft, ClipboardCheck, Eye, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import type { TemplateEvaluacionInstitucional, TemplateEvaluacionCruzada } from '@/data/types'
+import { ArrowLeft, Loader2, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface DialogInstState {
-  open: boolean
-  id?: string
-  nombre: string
-  esDefault: boolean
-  estructura: EstructuraTemplateInstitucional | null
-  preview: boolean
-}
-
-interface DialogCruzadaState {
-  open: boolean
-  id?: string
-  nombre: string
-  esDefault: boolean
-  estructura: EstructuraTemplateCruzada | null
-  preview: boolean
-}
-
-const dialogInstVacio: DialogInstState = { open: false, nombre: '', esDefault: false, estructura: null, preview: false }
-const dialogCruzadaVacio: DialogCruzadaState = { open: false, nombre: '', esDefault: false, estructura: null, preview: false }
+type Tipo = 'institucional' | 'cruzada'
+type Plantilla = TemplateEvaluacionInstitucional | TemplateEvaluacionCruzada
 
 export function PlantillasEvaluacion() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tipo: Tipo = searchParams.get('tipo') === 'cruzada' ? 'cruzada' : 'institucional'
+
   const [institucionales, setInstitucionales] = useState<TemplateEvaluacionInstitucional[]>([])
   const [cruzadas, setCruzadas] = useState<TemplateEvaluacionCruzada[]>([])
   const [loading, setLoading] = useState(true)
-  const [guardando, setGuardando] = useState(false)
-  const [dialogInst, setDialogInst] = useState<DialogInstState>(dialogInstVacio)
-  const [dialogCruzada, setDialogCruzada] = useState<DialogCruzadaState>(dialogCruzadaVacio)
+  const [nuevaOpen, setNuevaOpen] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const [esDefault, setEsDefault] = useState(false)
+  const [creando, setCreando] = useState(false)
+  const [aEliminar, setAEliminar] = useState<{ tipo: Tipo; plantilla: Plantilla } | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
   const cargar = useCallback(async () => {
     const [institucionales, cruzadas] = await Promise.all([
@@ -67,316 +56,303 @@ export function PlantillasEvaluacion() {
   }, [])
 
   useEffect(() => {
-    cargar().finally(() => setLoading(false))
+    cargar()
+      .catch(err => toast.error(err instanceof Error ? err.message : 'Error al cargar las plantillas'))
+      .finally(() => setLoading(false))
   }, [cargar])
 
-  const abrirNuevaInst = () => setDialogInst({ ...dialogInstVacio, open: true })
-  const abrirEditarInst = (t: TemplateEvaluacionInstitucional) =>
-    setDialogInst({ open: true, id: t.id, nombre: t.nombre, esDefault: t.esDefault, estructura: t.estructura, preview: false })
+  const cambiarTipo = (nuevo: string) => {
+    setSearchParams(nuevo === 'cruzada' ? { tipo: 'cruzada' } : {})
+  }
 
-  const abrirNuevaCruzada = () => setDialogCruzada({ ...dialogCruzadaVacio, open: true })
-  const abrirEditarCruzada = (t: TemplateEvaluacionCruzada) =>
-    setDialogCruzada({ open: true, id: t.id, nombre: t.nombre, esDefault: t.esDefault, estructura: t.estructura, preview: false })
-
-  const guardarInstitucional = async () => {
-    if (!dialogInst.nombre.trim()) {
-      toast.error('La plantilla debe tener un nombre')
+  const handleCrear = async () => {
+    if (!nombre.trim()) {
+      toast.error('La plantilla necesita un nombre')
       return
     }
-    setGuardando(true)
+    setCreando(true)
     try {
-      const dto = {
-        nombre: dialogInst.nombre.trim(),
-        esDefault: dialogInst.esDefault,
-        estructura: dialogInst.estructura,
-      }
-      if (dialogInst.id) {
-        await api.templatesEvaluacion.institucionales.actualizar(dialogInst.id, dto)
-        toast.success('Plantilla institucional actualizada')
+      if (tipo === 'institucional') {
+        const creada = await api.templatesEvaluacion.institucionales.crear({ nombre: nombre.trim(), esDefault })
+        toast.success('Plantilla creada correctamente')
+        setNuevaOpen(false)
+        setNombre('')
+        setEsDefault(false)
+        navigate(`/plantillas/evaluacion/institucional/${creada.id}`)
       } else {
-        await api.templatesEvaluacion.institucionales.crear(dto)
-        toast.success('Plantilla institucional creada')
+        const creada = await api.templatesEvaluacion.cruzadas.crear({ nombre: nombre.trim(), esDefault })
+        toast.success('Plantilla creada correctamente')
+        setNuevaOpen(false)
+        setNombre('')
+        setEsDefault(false)
+        navigate(`/plantillas/evaluacion/cruzada/${creada.id}`)
       }
-      setDialogInst(dialogInstVacio)
-      await cargar()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar la plantilla')
+      toast.error(err instanceof Error ? err.message : 'Error al crear la plantilla')
     } finally {
-      setGuardando(false)
+      setCreando(false)
     }
   }
 
-  const guardarCruzada = async () => {
-    if (!dialogCruzada.nombre.trim()) {
-      toast.error('La plantilla debe tener un nombre')
-      return
-    }
-    setGuardando(true)
+  const marcarDefaultInstitucional = async (plantilla: TemplateEvaluacionInstitucional) => {
     try {
-      const dto = {
-        nombre: dialogCruzada.nombre.trim(),
-        esDefault: dialogCruzada.esDefault,
-        estructura: dialogCruzada.estructura,
-      }
-      if (dialogCruzada.id) {
-        await api.templatesEvaluacion.cruzadas.actualizar(dialogCruzada.id, dto)
-        toast.success('Plantilla cruzada actualizada')
-      } else {
-        await api.templatesEvaluacion.cruzadas.crear(dto)
-        toast.success('Plantilla cruzada creada')
-      }
-      setDialogCruzada(dialogCruzadaVacio)
+      await api.templatesEvaluacion.institucionales.actualizar(plantilla.id, {
+        nombre: plantilla.nombre,
+        esDefault: true,
+        estructura: plantilla.estructura,
+      })
+      toast.success(`"${plantilla.nombre}" es la nueva plantilla por defecto`)
       await cargar()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar la plantilla')
-    } finally {
-      setGuardando(false)
+      toast.error(err instanceof Error ? err.message : 'Error al marcar la plantilla')
     }
   }
 
-  const eliminarInstitucional = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar la plantilla "${nombre}"?`)) return
+  const marcarDefaultCruzada = async (plantilla: TemplateEvaluacionCruzada) => {
     try {
-      await api.templatesEvaluacion.institucionales.eliminar(id)
-      toast.success('Plantilla eliminada')
+      await api.templatesEvaluacion.cruzadas.actualizar(plantilla.id, {
+        nombre: plantilla.nombre,
+        esDefault: true,
+        estructura: plantilla.estructura,
+      })
+      toast.success(`"${plantilla.nombre}" es la nueva plantilla por defecto`)
+      await cargar()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al marcar la plantilla')
+    }
+  }
+
+  const ejecutarEliminar = async () => {
+    if (!aEliminar) return
+    setEliminando(true)
+    try {
+      if (aEliminar.tipo === 'institucional') {
+        await api.templatesEvaluacion.institucionales.eliminar(aEliminar.plantilla.id)
+      } else {
+        await api.templatesEvaluacion.cruzadas.eliminar(aEliminar.plantilla.id)
+      }
+      toast.success('Plantilla eliminada correctamente')
+      setAEliminar(null)
       await cargar()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar la plantilla')
-    }
-  }
-
-  const eliminarCruzada = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar la plantilla "${nombre}"?`)) return
-    try {
-      await api.templatesEvaluacion.cruzadas.eliminar(id)
-      toast.success('Plantilla eliminada')
-      await cargar()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar la plantilla')
+    } finally {
+      setEliminando(false)
     }
   }
 
   return (
     <div className="p-6 space-y-6">
-      <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas')}>
-        <ArrowLeft className="h-4 w-4" />
-      </Button>
-
-      {loading ? (
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            Acá podés crear las plantillas de evaluación institucional y cruzada que después se
+            configuran en cada convocatoria.
+          </p>
         </div>
-      ) : (
-        <Tabs defaultValue="institucional">
-          <TabsList>
-            <TabsTrigger value="institucional">Institucional ({institucionales.length})</TabsTrigger>
-            <TabsTrigger value="cruzada">Cruzada ({cruzadas.length})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="institucional" className="mt-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Plantillas de evaluación institucional</CardTitle>
-                <Button size="sm" onClick={abrirNuevaInst}>
-                  <Plus className="h-4 w-4 mr-2" />Nueva plantilla
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {institucionales.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    Todavía no hay plantillas institucionales.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {institucionales.map(t => (
-                      <div key={t.id} className="flex items-center justify-between border rounded-lg p-3">
-                        <div>
-                          <p className="text-sm font-medium">{t.nombre}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {t.estructura?.categorias.length ?? 0} categorías · {t.estructura?.checklist.length ?? 0} ítems de checklist
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {t.esDefault && <Badge variant="default">Por defecto</Badge>}
-                          <Button variant="outline" size="icon" onClick={() => abrirEditarInst(t)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => eliminarInstitucional(t.id, t.nombre)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="cruzada" className="mt-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Plantillas de evaluación cruzada</CardTitle>
-                <Button size="sm" onClick={abrirNuevaCruzada}>
-                  <Plus className="h-4 w-4 mr-2" />Nueva plantilla
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {cruzadas.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    Todavía no hay plantillas de evaluación cruzada.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {cruzadas.map(t => (
-                      <div key={t.id} className="flex items-center justify-between border rounded-lg p-3">
-                        <div>
-                          <p className="text-sm font-medium">{t.nombre}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {t.estructura?.categorias.length ?? 0} categorías
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {t.esDefault && <Badge variant="default">Por defecto</Badge>}
-                          <Button variant="outline" size="icon" onClick={() => abrirEditarCruzada(t)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => eliminarCruzada(t.id, t.nombre)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
-
-      <Dialog open={dialogInst.open} onOpenChange={v => setDialogInst(d => ({ ...d, open: v }))}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between gap-2">
-              <span>
-                <ClipboardCheck className="h-4 w-4 mr-2 inline" />
-                {dialogInst.id ? 'Editar plantilla institucional' : 'Nueva plantilla institucional'}
-              </span>
-              {(dialogInst.estructura?.categorias.length ?? 0) > 0 ||
-              (dialogInst.estructura?.checklist.length ?? 0) > 0 ? (
-                <Button
-                  type="button"
-                  variant={dialogInst.preview ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setDialogInst(d => ({ ...d, preview: !d.preview }))}
-                >
-                  {dialogInst.preview
-                    ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
-                    : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
-                </Button>
-              ) : null}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {dialogInst.preview ? (
-              <VistaPreviaEvaluacionInstitucional estructura={dialogInst.estructura} />
-            ) : (
-              <>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Nombre</span>
-                  <Input
-                    value={dialogInst.nombre}
-                    onChange={e => setDialogInst(d => ({ ...d, nombre: e.target.value }))}
-                    placeholder="Ej: Plantilla institucional estándar"
-                  />
-                </div>
-                <TemplateInstitucionalBuilder
-                  estructura={dialogInst.estructura}
-                  onChange={estructura => setDialogInst(d => ({ ...d, estructura }))}
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Establecer como plantilla por defecto</span>
-                  <Button
-                    type="button"
-                    variant={dialogInst.esDefault ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setDialogInst(d => ({ ...d, esDefault: !d.esDefault }))}
-                  >
-                    {dialogInst.esDefault ? 'Sí' : 'No'}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogInst(dialogInstVacio)}>Cancelar</Button>
-            <Button onClick={guardarInstitucional} disabled={guardando}>
-              {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Guardar
+        <Dialog open={nuevaOpen} onOpenChange={setNuevaOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />Nueva plantilla
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={dialogCruzada.open} onOpenChange={v => setDialogCruzada(d => ({ ...d, open: v }))}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between gap-2">
-              <span>
-                <ClipboardCheck className="h-4 w-4 mr-2 inline" />
-                {dialogCruzada.id ? 'Editar plantilla de evaluación cruzada' : 'Nueva plantilla de evaluación cruzada'}
-              </span>
-              {(dialogCruzada.estructura?.categorias.length ?? 0) > 0 && (
-                <Button
-                  type="button"
-                  variant={dialogCruzada.preview ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setDialogCruzada(d => ({ ...d, preview: !d.preview }))}
-                >
-                  {dialogCruzada.preview
-                    ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
-                    : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
-                </Button>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {dialogCruzada.preview ? (
-              <VistaPreviaEvaluacionCruzada estructura={dialogCruzada.estructura} />
-            ) : (
-              <>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Nombre</span>
-                  <Input
-                    value={dialogCruzada.nombre}
-                    onChange={e => setDialogCruzada(d => ({ ...d, nombre: e.target.value }))}
-                    placeholder="Ej: Plantilla cruzada estándar"
-                  />
-                </div>
-                <TemplateCruzadaBuilder
-                  estructura={dialogCruzada.estructura}
-                  onChange={estructura => setDialogCruzada(d => ({ ...d, estructura }))}
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Nueva plantilla {tipo === 'institucional' ? 'institucional' : 'de evaluación cruzada'}</DialogTitle>
+              <DialogDescription>
+                Después de crearla vas a poder cargarle la estructura.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Nombre</p>
+                <Input
+                  value={nombre}
+                  onChange={e => setNombre(e.target.value)}
+                  placeholder={tipo === 'institucional' ? 'Ej: Plantilla institucional estándar' : 'Ej: Plantilla cruzada estándar'}
                 />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Establecer como plantilla por defecto</span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">¿Es la plantilla por defecto?</p>
+                <div className="flex gap-2">
                   <Button
                     type="button"
-                    variant={dialogCruzada.esDefault ? 'default' : 'outline'}
+                    variant={esDefault ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setDialogCruzada(d => ({ ...d, esDefault: !d.esDefault }))}
+                    onClick={() => setEsDefault(true)}
                   >
-                    {dialogCruzada.esDefault ? 'Sí' : 'No'}
+                    Sí
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!esDefault ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEsDefault(false)}
+                  >
+                    No
                   </Button>
                 </div>
-              </>
-            )}
-          </div>
+                <p className="text-xs text-muted-foreground">
+                  Solo puede haber una por defecto: si marcás esta, se desmarca la anterior.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNuevaOpen(false)}>Cancelar</Button>
+              <Button onClick={handleCrear} disabled={creando}>
+                {creando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {creando ? 'Creando...' : 'Crear'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Tabs value={tipo} onValueChange={cambiarTipo}>
+        <TabsList>
+          <TabsTrigger value="institucional">Institucional ({institucionales.length})</TabsTrigger>
+          <TabsTrigger value="cruzada">Cruzada ({cruzadas.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="institucional" className="mt-4">
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <TableSkeleton columns={4} />
+              ) : institucionales.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No hay plantillas institucionales cargadas.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Categorías</TableHead>
+                      <TableHead>Checklist</TableHead>
+                      <TableHead>Por defecto</TableHead>
+                      <TableHead className="w-32 text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {institucionales.map(t => (
+                      <TableRow
+                        key={t.id}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/plantillas/evaluacion/institucional/${t.id}`)}
+                      >
+                        <TableCell className="font-medium">{t.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{t.estructura?.categorias.length ?? 0}</TableCell>
+                        <TableCell className="text-muted-foreground">{t.estructura?.checklist.length ?? 0}</TableCell>
+                        <TableCell>
+                          {t.esDefault && <Badge variant="secondary">Por defecto</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                          {!t.esDefault && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Marcar como por defecto"
+                              onClick={() => marcarDefaultInstitucional(t)}
+                            >
+                              <Star className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Eliminar plantilla"
+                            onClick={() => setAEliminar({ tipo: 'institucional', plantilla: t })}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cruzada" className="mt-4">
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <TableSkeleton columns={3} />
+              ) : cruzadas.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No hay plantillas de evaluación cruzada cargadas.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Categorías</TableHead>
+                      <TableHead>Por defecto</TableHead>
+                      <TableHead className="w-32 text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cruzadas.map(t => (
+                      <TableRow
+                        key={t.id}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/plantillas/evaluacion/cruzada/${t.id}`)}
+                      >
+                        <TableCell className="font-medium">{t.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{t.estructura?.categorias.length ?? 0}</TableCell>
+                        <TableCell>
+                          {t.esDefault && <Badge variant="secondary">Por defecto</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                          {!t.esDefault && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Marcar como por defecto"
+                              onClick={() => marcarDefaultCruzada(t)}
+                            >
+                              <Star className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Eliminar plantilla"
+                            onClick={() => setAEliminar({ tipo: 'cruzada', plantilla: t })}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={aEliminar !== null} onOpenChange={open => !open && setAEliminar(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar plantilla</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de eliminar "{aEliminar?.plantilla.nombre}"? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogCruzada(dialogCruzadaVacio)}>Cancelar</Button>
-            <Button onClick={guardarCruzada} disabled={guardando}>
-              {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Guardar
+            <Button variant="outline" onClick={() => setAEliminar(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={ejecutarEliminar} disabled={eliminando}>
+              {eliminando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

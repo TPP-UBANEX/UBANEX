@@ -70,7 +70,7 @@ export function PlantillasFormulario() {
   const marcarDefault = async (plantilla: Formulario) => {
     try {
       await api.formularios.actualizar(plantilla.id, { esDefault: true })
-      toast.success(`"${plantilla.nombre}" es la nueva plantilla default`)
+      toast.success(`"${plantilla.nombre}" es la nueva plantilla por defecto`)
       await cargar()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al marcar la plantilla')
@@ -175,7 +175,7 @@ export function PlantillasFormulario() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Campos</TableHead>
-                  <TableHead>Default</TableHead>
+                  <TableHead>Por defecto</TableHead>
                   <TableHead className="w-32 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -189,7 +189,7 @@ export function PlantillasFormulario() {
                     <TableCell className="font-medium">{p.nombre}</TableCell>
                     <TableCell className="text-muted-foreground">{p.campos?.length ?? 0}</TableCell>
                     <TableCell>
-                      {p.esDefault && <Badge variant="secondary">Default</Badge>}
+                      {p.esDefault && <Badge variant="secondary">Por defecto</Badge>}
                     </TableCell>
                     <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       {!p.esDefault && (

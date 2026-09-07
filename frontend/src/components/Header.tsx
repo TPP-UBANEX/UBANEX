@@ -28,7 +28,9 @@ function tituloSeccion(pathname: string, search: string, userId?: string): strin
   if (pathname === '/plantillas/presentacion') return 'Plantillas de presentación'
   if (pathname.startsWith('/plantillas/presentacion/')) return 'Plantilla de presentación'
   if (pathname === '/plantillas/evaluacion') return 'Plantillas de evaluación'
+  if (pathname.startsWith('/plantillas/evaluacion/')) return 'Plantilla de evaluación'
   if (pathname === '/plantillas/impacto') return 'Plantillas de autoevaluación de impacto'
+  if (pathname.startsWith('/plantillas/impacto/')) return 'Plantilla de autoevaluación de impacto'
   if (pathname === '/usuarios') return 'Usuarios'
   if (pathname.startsWith('/usuarios/')) {
     const id = pathname.split('/')[2]

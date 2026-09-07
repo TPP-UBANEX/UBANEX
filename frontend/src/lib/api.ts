@@ -520,7 +520,8 @@ export const api = {
         id: string,
         data: Partial<import('@/data/types').GuardarTemplateInstitucionalDto>,
       ) =>
-        patch<import('@/data/types').TemplateEvaluacionInstitucional>(
+        request<import('@/data/types').TemplateEvaluacionInstitucional>(
+          'PUT',
           `/templates-evaluacion-institucional/${id}`,
           data,
         ),
@@ -539,7 +540,8 @@ export const api = {
           data,
         ),
       actualizar: (id: string, data: Partial<import('@/data/types').GuardarTemplateCruzadaDto>) =>
-        patch<import('@/data/types').TemplateEvaluacionCruzada>(
+        request<import('@/data/types').TemplateEvaluacionCruzada>(
+          'PUT',
           `/templates-evaluacion-cruzada/${id}`,
           data,
         ),
