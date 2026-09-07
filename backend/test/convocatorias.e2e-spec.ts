@@ -141,8 +141,7 @@ describe('Ciclo de convocatoria y presentación de proyectos (e2e)', () => {
                 {
                   tipoPersona: 'Docente',
                   descripcion: 'Viáticos',
-                  periodoInicio: '2027-10-15',
-                  periodoFin: '2027-11-15',
+                  periodo: '2do cuatrimestre 2027',
                   monto: 1000,
                 },
               ],
@@ -208,8 +207,7 @@ describe('Ciclo de convocatoria y presentación de proyectos (e2e)', () => {
                 {
                   tipoPersona: 'Docente',
                   descripcion: 'Viáticos',
-                  periodoInicio: '2027-10-15',
-                  periodoFin: '2027-11-15',
+                  periodo: '2do cuatrimestre 2027',
                   monto: 1000,
                 },
               ],

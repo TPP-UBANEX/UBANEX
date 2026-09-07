@@ -188,8 +188,9 @@ Comienza cuando se firma la resolución de adjudicación (edición pasa a `EnEje
 ### 7.1 Presupuesto
 
 - Cada edición tiene presupuesto desde su creación (puede estar vacío en `Borrador`).
-- 3 rubros fijos: Viáticos y Seguros (por tipo de persona: Docente/Estudiante), Bienes de Consumo, Bienes de Uso.
+- 3 rubros fijos: Viáticos y Seguros (por tipo de persona: Docente/Estudiante; cada partida lleva un período de **texto libre**), Bienes de Consumo, Bienes de Uso.
 - Los bienes marcados `esInsumo` que superan el umbral configurado disparan un extra en el presupuesto a adjudicar.
+- Mientras edita, quien presenta puede alternar **Editar / Vista previa** para ver las tabs del proyecto como quedarían presentadas, y **Descargar proyecto** genera un PDF con el detalle, el formulario y el presupuesto.
 
 ### 7.2 Rendición — **no implementada aún**
 

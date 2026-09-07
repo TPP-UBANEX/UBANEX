@@ -98,17 +98,11 @@ export class RendicionesService {
     }
   }
 
-  /** Lectura: director/creador, Secretaría de la misma UA (solo si el director la habilitó) o Rectorado. */
+  /** Lectura: Rectorado, o quien esté relacionado al proyecto (creador, director/codirector, o Secretaría de una UA del proyecto). */
   private async validarAccesoLectura(edicion: Edicion, usuario: Usuario): Promise<void> {
     if (this.esRectorado(usuario)) return;
-    if (
-      this.esSecretaria(usuario) &&
-      usuario.unidadAcademicaId === edicion.unidadAcademicaId &&
-      edicion.uaPuedeVerComprobantes
-    ) {
-      return;
-    }
     if (edicion.creadoPorId === usuario.id) return;
+    if (this.esSecretaria(usuario) && this.esSecretariaDeUnaUaDelProyecto(edicion, usuario)) return;
     const esDirector = await this.participacionRepo.findOneBy({
       edicionId: edicion.id,
       usuarioId: usuario.id,
@@ -116,6 +110,19 @@ export class RendicionesService {
     });
     if (esDirector) return;
     throw new ForbiddenException('No tenés acceso a los comprobantes de esta edición');
+  }
+
+  /**
+   * La Secretaría ve los comprobantes de los proyectos de su Unidad Académica; en proyectos
+   * interfacultad también los de la UA adicional.
+   */
+  private esSecretariaDeUnaUaDelProyecto(edicion: Edicion, usuario: Usuario): boolean {
+    if (!usuario.unidadAcademicaId) return false;
+    if (usuario.unidadAcademicaId === edicion.unidadAcademicaId) return true;
+    return (
+      edicion.proyecto?.esInterfacultad === true &&
+      edicion.proyecto.unidadAcademicaAdicionalId === usuario.unidadAcademicaId
+    );
   }
 
   /**

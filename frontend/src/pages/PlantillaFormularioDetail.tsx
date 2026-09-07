@@ -13,9 +13,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { DetailSkeleton } from '@/components/TableSkeleton'
 import { CamposFormularioEditor, campoVacio, validarCampos } from '@/components/CamposFormularioEditor'
+import { VistaPreviaFormulario } from '@/components/VistaPreviaFormulario'
 import { api } from '@/lib/api'
 import type { CampoFormulario, Formulario } from '@/data/types'
-import { ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function PlantillaFormularioDetail() {
@@ -30,6 +31,7 @@ export function PlantillaFormularioDetail() {
   const [guardando, setGuardando] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [eliminando, setEliminando] = useState(false)
+  const [preview, setPreview] = useState(false)
 
   const cargarDatos = useCallback(async () => {
     if (!id) return
@@ -148,31 +150,47 @@ export function PlantillaFormularioDetail() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium">Campos</CardTitle>
+          {campos.length > 0 && (
+            <Button
+              type="button"
+              variant={preview ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPreview(v => !v)}
+            >
+              {preview
+                ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          <CamposFormularioEditor
-            campos={campos}
-            onChange={setCampos}
-            editable
-            slotVacio={
-              <div className="text-center py-8 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Esta plantilla todavía no tiene campos.
-                </p>
-                <Button type="button" variant="outline" onClick={() => setCampos([campoVacio()])}>
-                  <Plus className="h-4 w-4 mr-2" />Agregar el primer campo
+          {preview ? (
+            <VistaPreviaFormulario campos={campos} />
+          ) : (
+            <CamposFormularioEditor
+              campos={campos}
+              onChange={setCampos}
+              editable
+              slotVacio={
+                <div className="text-center py-8 space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Esta plantilla todavía no tiene campos.
+                  </p>
+                  <Button type="button" variant="outline" onClick={() => setCampos([campoVacio()])}>
+                    <Plus className="h-4 w-4 mr-2" />Agregar el primer campo
+                  </Button>
+                </div>
+              }
+              slotAcciones={
+                <Button onClick={handleGuardar} disabled={guardando}>
+                  {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {guardando ? 'Guardando...' : 'Guardar plantilla'}
                 </Button>
-              </div>
-            }
-            slotAcciones={
-              <Button onClick={handleGuardar} disabled={guardando}>
-                {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {guardando ? 'Guardando...' : 'Guardar plantilla'}
-              </Button>
-            }
-          />
+              }
+            />
+          )}
         </CardContent>
       </Card>
 

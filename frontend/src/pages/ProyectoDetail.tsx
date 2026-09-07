@@ -18,7 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { api } from '@/lib/api'
 import { conProtocolo } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Convocatoria, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
@@ -38,11 +38,13 @@ import {
 } from '@/components/CampoFormularioInput'
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
+import { exportarProyectoPdf } from '@/lib/exportar-proyecto-pdf'
 import {
-  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, motivoTopeExcedido,
-  normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO, presupuestoIncompletoParaEnvio,
+  formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, MAX_LONGITUD_PERIODO_PARTIDA,
+  motivoTopeExcedido, normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO,
+  presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
-import { ArrowLeft, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 const OPCIONES_TIPO_PERSONA = [
@@ -86,6 +88,9 @@ export function ProyectoDetail() {
   const [confirmarCerrar, setConfirmarCerrar] = useState(false)
 
   const [editando, setEditando] = useState(false)
+  // Mientras se edita, permite ver las tabs de presentación como quedarían presentadas, con los
+  // datos sin guardar (no persiste nada).
+  const [previsualizando, setPrevisualizando] = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
@@ -149,7 +154,7 @@ export function ProyectoDetail() {
       if (ruta.campo === 'esInsumo') return { opciones: OPCIONES_ES_INSUMO }
       if (ruta.campo === 'monto' || ruta.campo === 'precioUnitario') return { tipoInput: 'number', min: 0, step: 'any' }
       if (ruta.campo === 'cantidad') return { tipoInput: 'number', min: 1, step: 1 }
-      if (ruta.campo === 'periodoInicio' || ruta.campo === 'periodoFin') return { tipoInput: 'date' }
+      if (ruta.campo === 'periodo') return { maxLongitud: MAX_LONGITUD_PERIODO_PARTIDA }
       if (ruta.campo === 'descripcion') return { maxLongitud: MAX_LONGITUD_DESCRIPCION_PARTIDA }
       return {}
     }
@@ -170,6 +175,9 @@ export function ProyectoDetail() {
 
   const esPropietario = edicion?.creadoPorId === user?.id
   const esEditable = esPropietario && edicion?.estado === EstadoEdicion.Borrador
+  // Durante la previsualización se sigue "editando" (los datos sin guardar viven en el estado de
+  // edición), pero las tabs de presentación se muestran en modo lectura.
+  const editandoEfectivo = editando && !previsualizando
   const esSecretaria = user?.roles.some(
     r => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
   )
@@ -192,10 +200,12 @@ export function ProyectoDetail() {
   ).length >= 2
   const directoresCompletos = tieneDirectorPrincipal && tieneSegundoDirector
   const camposObligatoriosFaltantes = camposIncompletosParaEnvio(
-    camposFormulario, (edicion?.datosFormulario ?? {}) as Record<string, unknown>,
+    camposFormulario,
+    (previsualizando ? editDatosFormulario : edicion?.datosFormulario ?? {}) as Record<string, unknown>,
   )
   const presupuestoFaltante = presupuestoIncompletoParaEnvio(
-    edicion?.presupuestoSolicitado, edicion?.convocatoria, edicion?.esConsolidadoParaTope,
+    previsualizando ? editPresupuesto : edicion?.presupuestoSolicitado,
+    edicion?.convocatoria, edicion?.esConsolidadoParaTope,
   )
   const puedeEnviar = esPropietario && esDocenteValidado && directoresCompletos
     && camposObligatoriosFaltantes.length === 0 && presupuestoFaltante.length === 0
@@ -208,34 +218,14 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
-  const uaSinAccesoComprobantes = esSecretariaMismaUA && !edicion?.uaPuedeVerComprobantes
   const esDirector = directores.some(d => d.usuarioId === user?.id)
   const puedeEditarEjecucion = esPropietario || esDirector
+  // Aceptar/rechazar comprobantes es exclusivo de Rectorado; la lectura la resuelve el backend
+  // (Rectorado + relacionados al proyecto: creador, dirección y Secretaría de una UA del proyecto).
   const puedeGestionarComprobantes = Boolean(
     esRectoradoAmplio &&
       [EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado].includes(edicion?.estado as EstadoEdicion),
   )
-  // La UA solo ve los comprobantes si el director lo habilitó; y en ese
-  // caso es solo lectura (aceptar/rechazar es exclusivo de Rectorado).
-  const toggleVisibilidadComprobantes = async () => {
-    if (!id || !edicion) return
-    try {
-      const actualizada = await api.proyectos.actualizarVisibilidadComprobantes(id, edicion.id, {
-        uaPuedeVerComprobantes: !edicion.uaPuedeVerComprobantes,
-      })
-      setEdicion(actualizada)
-      toast.success(
-        actualizada.uaPuedeVerComprobantes
-          ? 'La Unidad Académica ahora puede ver los comprobantes'
-          : 'La Unidad Académica ya no puede ver los comprobantes',
-      )
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'No se pudo cambiar la visibilidad de los comprobantes',
-        { duration: 8000 },
-      )
-    }
-  }
   const convocatoriaEnEjecucionOCierre =
     edicion?.convocatoria?.estado === EstadoConvocatoria.Ejecucion ||
     edicion?.convocatoria?.estado === EstadoConvocatoria.Cierre
@@ -258,6 +248,23 @@ export function ProyectoDetail() {
     if (!d?.usuario) return '-'
     const ua = d.usuario.unidadAcademica?.nombre
     return ua ? `${d.usuario.nombreCompleto} (${ua})` : d.usuario.nombreCompleto
+  }
+
+  const descargarProyecto = () => {
+    if (!proyecto || !edicion) return
+    try {
+      exportarProyectoPdf({
+        proyecto,
+        edicion,
+        campos: camposFormulario,
+        unidadAcademica: nombreUnidadesAcademicas(),
+        directores: directores
+          .filter(d => d.rol === RolEjecucion.DirectorDeProyecto)
+          .map(d => ({ nombre: nombreConUA(d), esPrincipal: !!d.esDirectorPrincipal })),
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo generar el PDF del proyecto')
+    }
   }
 
   const motivoEnvio: ReactNode = !esDocenteValidado
@@ -339,11 +346,13 @@ export function ProyectoDetail() {
       edicion.presupuestoSolicitado ? JSON.parse(JSON.stringify(edicion.presupuestoSolicitado)) : null,
     )
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
+    setPrevisualizando(false)
     setEditando(true)
     direccion.reset()
   }
 
   const cancelarEdicion = () => {
+    setPrevisualizando(false)
     setEditando(false)
   }
 
@@ -392,6 +401,7 @@ export function ProyectoDetail() {
       })
       await direccion.sincronizar()
       toast.success('Proyecto actualizado')
+      setPrevisualizando(false)
       setEditando(false)
       cargarDatos()
     } catch (err) {
@@ -472,7 +482,7 @@ export function ProyectoDetail() {
     const rubro = { ...rubros[rubroIdx] }
     if (tipo === TipoRubro.ViaticosYSeguros) {
       const partidas = [...(rubro.partidas as ViaticoPresupuesto[])]
-      partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodoInicio: '', periodoFin: '', monto: 0 })
+      partidas.push({ tipoPersona: TipoPersona.Docente, descripcion: '', periodo: '', monto: 0 })
       rubro.partidas = partidas
     } else {
       const partidas = [...(rubro.partidas as BienPresupuesto[])]
@@ -538,7 +548,7 @@ export function ProyectoDetail() {
         <CampoFormularioLectura
           key={campo.id}
           campo={campo}
-          valor={edicion?.datosFormulario?.[campo.id]}
+          valor={(previsualizando ? editDatosFormulario : edicion?.datosFormulario)?.[campo.id]}
           envolverValor={(contenido, { valorFormateado, anchoCompleto }) => (
             <CampoSugerible
               campo={`datosFormulario.${campo.id}`}
@@ -578,6 +588,11 @@ export function ProyectoDetail() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {!editando && (
+            <Button variant="outline" onClick={descargarProyecto}>
+              <Download className="h-4 w-4 mr-2" />Descargar proyecto
+            </Button>
+          )}
           {esEditable && !editando && (
             <>
               <Button variant="outline" onClick={iniciarEdicion}>
@@ -615,6 +630,14 @@ export function ProyectoDetail() {
           )}
           {editando && (
             <>
+              <Button
+                variant={previsualizando ? 'default' : 'outline'}
+                onClick={() => setPrevisualizando(v => !v)}
+              >
+                {previsualizando
+                  ? <><Pencil className="h-4 w-4 mr-2" />Volver a editar</>
+                  : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+              </Button>
               <Button variant="outline" onClick={cancelarEdicion}>Cancelar</Button>
               <TooltipProvider>
                 <Tooltip>
@@ -736,7 +759,7 @@ export function ProyectoDetail() {
         </TabsList>
 
         <TabsContent value="info" className="mt-4">
-          {editando ? (
+          {editandoEfectivo ? (
             <div className="space-y-4">
               <Card>
                 <CardHeader><CardTitle className="text-sm font-medium">Editar proyecto</CardTitle></CardHeader>
@@ -774,8 +797,8 @@ export function ProyectoDetail() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <span className="text-muted-foreground">Nombre:</span>{' '}
-                      <CampoSugerible campo="nombre" valorActual={proyecto.nombre} label="Nombre" activo={modoSugerencia} onClick={handleSugerirClick}>
-                        {proyecto.nombre}
+                      <CampoSugerible campo="nombre" valorActual={previsualizando ? editNombre : proyecto.nombre} label="Nombre" activo={modoSugerencia} onClick={handleSugerirClick}>
+                        {previsualizando ? editNombre : proyecto.nombre}
                       </CampoSugerible>
                     </div>
                     <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
@@ -783,8 +806,8 @@ export function ProyectoDetail() {
                     <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
                     <div>
                       <span className="text-muted-foreground">Edición:</span>{' '}
-                      <CampoSugerible campo="anioEdicion" valorActual={String(edicion?.anioEdicion ?? '')} label="Año de edición" activo={modoSugerencia} onClick={handleSugerirClick}>
-                        {edicion?.anioEdicion || '-'}
+                      <CampoSugerible campo="anioEdicion" valorActual={String((previsualizando ? editAnioEdicion : edicion?.anioEdicion) ?? '')} label="Año de edición" activo={modoSugerencia} onClick={handleSugerirClick}>
+                        {(previsualizando ? editAnioEdicion : edicion?.anioEdicion) || '-'}
                       </CampoSugerible>
                     </div>
                     <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
@@ -837,8 +860,8 @@ export function ProyectoDetail() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Interfacultad:</span>{' '}
-                      <CampoSugerible campo="esInterfacultad" valorActual={String(proyecto.esInterfacultad)} label="Es interfacultad" activo={modoSugerencia} onClick={handleSugerirClick}>
-                        {proyecto.esInterfacultad ? 'Sí' : 'No'}
+                      <CampoSugerible campo="esInterfacultad" valorActual={String(previsualizando ? direccion.esInterfacultad : proyecto.esInterfacultad)} label="Es interfacultad" activo={modoSugerencia} onClick={handleSugerirClick}>
+                        {(previsualizando ? direccion.esInterfacultad : proyecto.esInterfacultad) ? 'Sí' : 'No'}
                       </CampoSugerible>
                     </div>
                     {renderCamposLectura(seccionResumen.campos)}
@@ -866,7 +889,7 @@ export function ProyectoDetail() {
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Esta sección no cuenta con ningún campo.
                   </p>
-                ) : editando ? (
+                ) : editandoEfectivo ? (
                   <div className="space-y-4">
                     {renderCamposEdicion(seccion.campos)}
                   </div>
@@ -884,18 +907,20 @@ export function ProyectoDetail() {
           <Card>
             <CardHeader><CardTitle className="text-sm font-medium">Dirección y codirección</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {editando ? (
+              {editandoEfectivo ? (
                 <DireccionEditor direccion={direccion} edicionUnidadAcademicaId={edicion?.unidadAcademicaId} />
               ) : (
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Interfacultad:</span>{' '}
-                    {proyecto?.esInterfacultad ? 'Sí' : 'No'}
+                    {(previsualizando ? direccion.esInterfacultad : proyecto?.esInterfacultad) ? 'Sí' : 'No'}
                   </div>
-                  {proyecto?.esInterfacultad && (
+                  {(previsualizando ? direccion.esInterfacultad : proyecto?.esInterfacultad) && (
                     <div>
                       <span className="text-muted-foreground">Unidad académica adicional:</span>{' '}
-                      {proyecto?.unidadAcademicaAdicional?.nombre || '-'}
+                      {previsualizando
+                        ? (uas.find(u => u.id === direccion.unidadAcademicaAdicionalId)?.nombre || '-')
+                        : (proyecto?.unidadAcademicaAdicional?.nombre || '-')}
                     </div>
                   )}
                   <div>
@@ -934,7 +959,7 @@ export function ProyectoDetail() {
               {motivoTopePresupuesto && (
                 <p className="text-sm text-destructive">{motivoTopePresupuesto}</p>
               )}
-              {renderPresupuesto(editPresupuesto || edicion?.presupuestoSolicitado || null, editando, edicion?.convocatoria, {
+              {renderPresupuesto(editPresupuesto || edicion?.presupuestoSolicitado || null, editandoEfectivo, {
                 addPartida, removePartida, updateViatico, updateBien,
               }, { activo: modoSugerencia, onSugerir: handleSugerirClick })}
             </CardContent>
@@ -960,45 +985,7 @@ export function ProyectoDetail() {
         </TabsContent>
 
         <TabsContent value="comprobantes" className="mt-4">
-          {puedeEditarEjecucion && (
-            <Card className="mb-4">
-              <CardContent className="flex items-center justify-between gap-4 py-4">
-                <div>
-                  <p className="text-sm font-medium">Comprobantes visibles para la Unidad Académica</p>
-                  <p className="text-sm text-muted-foreground">
-                    La Unidad Académica podrá ver la sección en modo lectura. Aceptar y rechazar es solo de Rectorado.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={!!edicion?.uaPuedeVerComprobantes}
-                  onClick={toggleVisibilidadComprobantes}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                    edicion?.uaPuedeVerComprobantes ? 'bg-primary' : 'bg-input'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                      edicion?.uaPuedeVerComprobantes ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </CardContent>
-            </Card>
-          )}
-          {uaSinAccesoComprobantes ? (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
-                <Lock className="h-6 w-6 text-muted-foreground" />
-                <p className="text-sm font-medium">Comprobantes no habilitados</p>
-                <p className="max-w-md text-sm text-muted-foreground">
-                  El director del proyecto no habilitó la visualización de comprobantes para esta
-                  Unidad Académica. Contactalo para que la active si necesitás consultarlos.
-                </p>
-              </CardContent>
-            </Card>
-          ) : edicion ? (
+          {edicion ? (
             <ComprobantesTab
               edicionId={edicion.id}
               estado={edicion.estado}
@@ -1134,7 +1121,6 @@ export function ProyectoDetail() {
 function renderPresupuesto(
   presupuesto: Presupuesto | null,
   editando: boolean,
-  convocatoria: Convocatoria | undefined,
   handlers?: {
     addPartida: (rubroIdx: number, tipo: TipoRubro) => void
     removePartida: (rubroIdx: number, partidaIdx: number) => void
@@ -1186,7 +1172,6 @@ function renderPresupuesto(
             rubro={rubro}
             rubroIdx={rubroIdx}
             editando={editando}
-            convocatoria={convocatoria}
             handlers={handlers}
             sugerencia={sugerencia}
           />

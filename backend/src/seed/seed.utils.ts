@@ -27,8 +27,7 @@ export function clonarCamposConIdsNuevos(campos: CampoFormulario[]): CampoFormul
  * cierran, porque pasa por el mismo cálculo que usa la API.
  */
 export function crearPresupuesto(opts: {
-  periodoInicio: string;
-  periodoFin: string;
+  periodo: string;
   viaticoDocente: number;
   viaticoEstudiante: number;
   consumoCantidad: number;
@@ -41,15 +40,13 @@ export function crearPresupuesto(opts: {
     {
       tipoPersona: TipoPersona.Docente,
       descripcion: 'Viáticos para docentes',
-      periodoInicio: opts.periodoInicio,
-      periodoFin: opts.periodoFin,
+      periodo: opts.periodo,
       monto: opts.viaticoDocente,
     },
     {
       tipoPersona: TipoPersona.Estudiante,
       descripcion: 'Viáticos para estudiantes',
-      periodoInicio: opts.periodoInicio,
-      periodoFin: opts.periodoFin,
+      periodo: opts.periodo,
       monto: opts.viaticoEstudiante,
     },
   ];

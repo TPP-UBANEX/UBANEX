@@ -782,7 +782,6 @@ export class SeedService {
     datosFormulario?: object;
     esConsolidado?: boolean | null;
     avalUrl?: string;
-    uaPuedeVerComprobantes?: boolean;
     esInterfacultad?: boolean;
     unidadAcademicaAdicionalId?: string;
   }): Promise<Edicion> {
@@ -819,7 +818,6 @@ export class SeedService {
         presupuestoSolicitado: opts.presupuesto ?? null,
         datosFormulario: opts.datosFormulario ?? null,
         avalUrl: opts.avalUrl ?? null,
-        uaPuedeVerComprobantes: opts.uaPuedeVerComprobantes ?? false,
       }),
     );
     console.log(`  ${opts.nombreProyecto} (${opts.estado})`);
@@ -926,27 +924,28 @@ export class SeedService {
     return datos;
   }
 
-  private presupuestoPequeno(periodoInicio: string, periodoFin: string): Presupuesto {
+  // El período de los viáticos es texto libre; el seed lo arma como "desde a hasta".
+  private presupuestoPequeno(desde: string, hasta: string): Presupuesto {
     return crearPresupuesto({
-      periodoInicio, periodoFin,
+      periodo: `${desde} a ${hasta}`,
       viaticoDocente: 40_000, viaticoEstudiante: 30_000,
       consumoCantidad: 30, consumoPrecioUnitario: 1_500,
       usoCantidad: 2, usoPrecioUnitario: 20_000,
     });
   }
 
-  private presupuestoMediano(periodoInicio: string, periodoFin: string): Presupuesto {
+  private presupuestoMediano(desde: string, hasta: string): Presupuesto {
     return crearPresupuesto({
-      periodoInicio, periodoFin,
+      periodo: `${desde} a ${hasta}`,
       viaticoDocente: 70_000, viaticoEstudiante: 50_000,
       consumoCantidad: 60, consumoPrecioUnitario: 2_000,
       usoCantidad: 3, usoPrecioUnitario: 35_000,
     });
   }
 
-  private presupuestoGrande(periodoInicio: string, periodoFin: string): Presupuesto {
+  private presupuestoGrande(desde: string, hasta: string): Presupuesto {
     return crearPresupuesto({
-      periodoInicio, periodoFin,
+      periodo: `${desde} a ${hasta}`,
       viaticoDocente: 100_000, viaticoEstudiante: 70_000,
       consumoCantidad: 90, consumoPrecioUnitario: 2_500,
       usoCantidad: 4, usoPrecioUnitario: 50_000,
@@ -1356,13 +1355,13 @@ export class SeedService {
     type SpecProyecto = {
       ua: UsuariosUa; nombre: string; director: Usuario; codirector?: Usuario; resumen: string; area: string;
       rendiciones: Array<{ estado: EstadoComprobante; monto: number; motivoRechazo?: string }>;
-      informe: EstadoInforme; autoeval: EstadoAutoevaluacion; uaPuedeVer?: boolean;
+      informe: EstadoInforme; autoeval: EstadoAutoevaluacion;
     };
 
     const proyectos: SpecProyecto[] = [
       { ua: ing, nombre: 'Puente Comunitario UBANEX', director: ing.docentes[0], resumen: 'Segunda edición de los talleres de oficios digitales.', area: 'Tecnología',
         rendiciones: [{ estado: EstadoComprobante.Aceptado, monto: 40_000 }, { estado: EstadoComprobante.Aceptado, monto: 35_000 }],
-        informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada, uaPuedeVer: true },
+        informe: EstadoInforme.Confirmado, autoeval: EstadoAutoevaluacion.Completada },
       { ua: ing, nombre: 'Robótica para la Inclusión', director: ing.docentes[1], codirector: ing.docentes[4], resumen: 'Introducción a la robótica educativa en escuelas públicas.', area: 'Tecnología',
         rendiciones: [{ estado: EstadoComprobante.EnRevision, monto: 28_000 }, { estado: EstadoComprobante.Aceptado, monto: 18_000 }],
         informe: EstadoInforme.Borrador, autoeval: EstadoAutoevaluacion.Borrador },
@@ -1405,7 +1404,6 @@ export class SeedService {
         presupuesto: this.presupuestoMediano('2025-09-15', '2026-02-15'),
         datosFormulario: datos,
         avalUrl: 'https://drive.google.com/file/d/aval-seed/view',
-        uaPuedeVerComprobantes: p.uaPuedeVer ?? false,
       });
       await this.seedDirector(p.director, edicion, conv, p.ua.autoridad.id);
       if (p.codirector) await this.seedDirector(p.codirector, edicion, conv, p.ua.autoridad.id, false);
