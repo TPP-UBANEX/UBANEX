@@ -397,6 +397,12 @@ export const api = {
         get<import('@/data/types').AdjudicacionResumen>(
           `/evaluaciones/convocatoria/${convocatoriaId}/adjudicacion`,
         ),
+      // Resolución de adjudicación para los usuarios relacionados (incluidos directores),
+      // disponible una vez emitida. Devuelve el mismo resumen que `obtener`.
+      resolucion: (convocatoriaId: string) =>
+        get<import('@/data/types').AdjudicacionResumen>(
+          `/evaluaciones/convocatoria/${convocatoriaId}/resolucion`,
+        ),
       guardarBorrador: (
         convocatoriaId: string,
         data: import('@/data/types').GuardarAdjudicacionDto,
