@@ -327,6 +327,10 @@ export const api = {
       const qs = `?convocatoriaId=${encodeURIComponent(convocatoriaId)}${search ? `&search=${encodeURIComponent(search)}` : ''}`
       return get<{ proyectoId: string; proyectoNombre: string; esConsolidado: boolean | null }[]>(`/proyectos/disponibles-para-resubir${qs}`)
     },
+    historial: (id: string, edicionId: string) =>
+      get<import('@/data/types').EventoHistorialEdicion[]>(
+        `/proyectos/${id}/ediciones/${edicionId}/historial`,
+      ),
   },
   evaluaciones: {
     monitoreo: (

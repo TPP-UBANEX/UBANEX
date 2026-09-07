@@ -350,6 +350,13 @@ export interface AdjudicacionResumenItem {
   tieneAval: boolean;
 }
 
+export interface EventoHistorialEdicion {
+  fecha: string;
+  tipo: 'estado' | 'sugerencia' | 'evaluacion';
+  descripcion: string;
+  responsableNombre: string | null;
+}
+
 export interface AdjudicacionResumen {
   convocatoria: {
     id: string;

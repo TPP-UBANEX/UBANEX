@@ -32,6 +32,9 @@ import { Proyecto } from '../proyectos/proyecto.entity';
 import { Edicion } from '../proyectos/edicion.entity';
 import { Presupuesto } from '../proyectos/presupuesto.interface';
 import { Rendicion } from '../rendiciones/rendicion.entity';
+import { Auditoria } from '../auditoria/auditoria.entity';
+import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
+import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { Emparejamiento } from '../convocatorias/emparejamiento.entity';
 import { UnidadAcademica } from '../unidades-academicas/unidad-academica.entity';
@@ -141,6 +144,7 @@ export class SeedService {
   private readonly informeRepo: Repository<InformeFinal>;
   private readonly templateAutoevalRepo: Repository<TemplateAutoevaluacionImpacto>;
   private readonly rendicionRepo: Repository<Rendicion>;
+  private auditoriaRepo!: Repository<Auditoria>;
 
   private readonly uaMap = new Map<string, UnidadAcademica>();
   private readonly carrerasPorUa = new Map<string, string[]>(); // uaId -> [carreraId,...]
@@ -179,6 +183,7 @@ export class SeedService {
     this.informeRepo = dataSource.getRepository(InformeFinal);
     this.templateAutoevalRepo = dataSource.getRepository(TemplateAutoevaluacionImpacto);
     this.rendicionRepo = dataSource.getRepository(Rendicion);
+    this.auditoriaRepo = dataSource.getRepository(Auditoria);
   }
 
   // ─────────────────── Orquestador ───────────────────
@@ -821,7 +826,61 @@ export class SeedService {
       }),
     );
     console.log(`  ${opts.nombreProyecto} (${opts.estado})`);
+    await this.seedTrazaEstados(edicion, opts.creadoPor, opts.convocatoria.anio);
     return edicion;
+  }
+
+  /**
+   * Genera la traza de cambios de estado de la edición en la tabla de auditoría, para que la
+   * timeline de trazabilidad muestre actividad en la demo. Usa las mismas descripciones que la
+   * aplicación real (ver ProyectosService.registrarCambioEstado y emitirAdjudicacion).
+   */
+  private async seedTrazaEstados(
+    edicion: Edicion,
+    creadoPor: Usuario,
+    anio: number,
+  ): Promise<void> {
+    const pasos: { desc: string; responsable: Usuario }[] = [];
+    const estado = edicion.estado;
+    const yaPresentado = [
+      EstadoEdicion.Presentado,
+      EstadoEdicion.PendienteDeCambios,
+      EstadoEdicion.EnEvaluacion,
+      EstadoEdicion.Adjudicado,
+      EstadoEdicion.NoAdjudicado,
+      EstadoEdicion.EnEjecucion,
+      EstadoEdicion.Cerrado,
+    ].includes(estado);
+    const yaEvaluado = [
+      EstadoEdicion.EnEvaluacion,
+      EstadoEdicion.Adjudicado,
+      EstadoEdicion.NoAdjudicado,
+      EstadoEdicion.EnEjecucion,
+      EstadoEdicion.Cerrado,
+    ].includes(estado);
+    const adjudicado = [EstadoEdicion.Adjudicado, EstadoEdicion.EnEjecucion, EstadoEdicion.Cerrado].includes(estado);
+
+    if (yaPresentado) pasos.push({ desc: 'El proyecto fue presentado', responsable: creadoPor });
+    if (yaEvaluado) pasos.push({ desc: 'El proyecto pasó a evaluación', responsable: this.admin });
+    if (adjudicado) pasos.push({ desc: 'El proyecto fue adjudicado', responsable: this.admin });
+    if (estado === EstadoEdicion.NoAdjudicado) pasos.push({ desc: 'El proyecto no fue adjudicado', responsable: this.admin });
+    if (estado === EstadoEdicion.Cerrado) pasos.push({ desc: 'El proyecto fue cerrado', responsable: creadoPor });
+
+    if (pasos.length === 0) return;
+
+    const entradas = pasos.map((paso, indice) =>
+      this.auditoriaRepo.create({
+        usuarioId: creadoPor.id,
+        accion: TipoAccionAuditoria.CAMBIO_ESTADO,
+        descripcion: paso.desc,
+        responsableId: paso.responsable.id,
+        responsableNombre: paso.responsable.nombreCompleto,
+        entidad: TipoEntidadAuditoria.EDICION,
+        entidadId: edicion.id,
+        fecha: new Date(`${anio}-05-${String(1 + indice).padStart(2, '0')}T12:00:00`),
+      }),
+    );
+    await this.auditoriaRepo.save(entradas);
   }
 
   private async marcarAdjudicada(edicionId: string, opts: {

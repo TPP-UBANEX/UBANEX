@@ -1342,6 +1342,27 @@ export class EvaluacionesService {
       entidadId: convocatoriaId,
     });
 
+    // Traza por edición del resultado de adjudicación, para la timeline del proyecto.
+    for (const edicion of ediciones) {
+      if (
+        edicion.estado === EstadoEdicion.Adjudicado ||
+        edicion.estado === EstadoEdicion.NoAdjudicado
+      ) {
+        await this.auditoria.registrar({
+          usuarioId: edicion.creadoPorId,
+          accion: TipoAccionAuditoria.CAMBIO_ESTADO,
+          descripcion:
+            edicion.estado === EstadoEdicion.Adjudicado
+              ? 'El proyecto fue adjudicado'
+              : 'El proyecto no fue adjudicado',
+          responsableId: usuario.id,
+          responsableNombre: usuario.nombreCompleto,
+          entidad: TipoEntidadAuditoria.EDICION,
+          entidadId: edicion.id,
+        });
+      }
+    }
+
     return { convocatoria, ediciones };
   }
 
