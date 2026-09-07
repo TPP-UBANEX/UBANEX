@@ -149,7 +149,7 @@ export function ConvocatoriaDetail() {
   const [confirmarMeritoOpen, setConfirmarMeritoOpen] = useState(false);
   const [meritoIncompleto, setMeritoIncompleto] = useState<DetalleMeritoIncompleto | null>(null);
   const [ordenMeritoSort, setOrdenMeritoSort] = useState('puntaje-desc');
-  const [tab, setTab] = useState('proyectos');
+  const [tab, setTab] = useState('detalle');
 
   const esUsuarioEjecucion = user?.roles.some(
     (r) => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
@@ -167,6 +167,9 @@ export function ConvocatoriaDetail() {
   ];
   const puedeVerOrdenMerito =
     !!esRectorado && !!conv && etapasConOrdenMerito.includes(conv.estado);
+  // En configuración todavía no puede existir ningún proyecto presentado,
+  // así que la pestaña no aporta nada.
+  const puedeVerProyectos = !!conv && conv.estado !== EstadoConvocatoria.Configuracion;
   const errores = erroresFechas(editForm);
 
   const [pasandoEvaluacionId, setPasandoEvaluacionId] = useState<string | null>(null);
@@ -189,8 +192,9 @@ export function ConvocatoriaDetail() {
   const esEvaluadorActivo = invitacionEvaluador !== null;
 
   useEffect(() => {
-    if (tab === 'merito' && !puedeVerOrdenMerito) setTab('proyectos');
-  }, [tab, puedeVerOrdenMerito]);
+    if (tab === 'merito' && !puedeVerOrdenMerito) setTab('detalle');
+    if (tab === 'proyectos' && !puedeVerProyectos) setTab('detalle');
+  }, [tab, puedeVerOrdenMerito, puedeVerProyectos]);
 
   const cargarDatos = () => {
     if (!id) return;
@@ -1110,17 +1114,20 @@ export function ConvocatoriaDetail() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
+          <TabsTrigger value="detalle">Detalle</TabsTrigger>
+          {puedeVerProyectos && (
+            <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
+          )}
           {puedeVerOrdenMerito && <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>}
           {esRectorado && conv?.ordenMeritoConfirmado && (
             <TabsTrigger value="adjudicacion">Adjudicación</TabsTrigger>
           )}
-          {!esUsuarioEjecucion && <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>}
-          <TabsTrigger value="detalle">Detalle</TabsTrigger>
-          <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
-          {esRectorado && <TabsTrigger value="formulario">Formulario</TabsTrigger>}
+          {esRectorado && <TabsTrigger value="formulario">Presentación</TabsTrigger>}
           {esRectorado && <TabsTrigger value="evaluacion">Evaluación</TabsTrigger>}
+          <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
+          {!esUsuarioEjecucion && <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>}
         </TabsList>
+        {puedeVerProyectos && (
         <TabsContent value="proyectos" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -1340,6 +1347,7 @@ export function ConvocatoriaDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
         {puedeVerOrdenMerito && (
           <TabsContent value="merito" className="mt-4">
             <Card>
