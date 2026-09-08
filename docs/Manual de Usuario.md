@@ -139,7 +139,7 @@ Ejecución → Cierre**. Casi toda la configuración se hace en **Configuración
 
 ### 4.2 Formulario de presentación
 
-En el detalle de la convocatoria, pestaña **Formulario** (Autoridad **o** Asistente de
+En el detalle de la convocatoria, pestaña **Presentación** (Autoridad **o** Asistente de
 Rectorado):
 
 1. Podés partir de una **plantilla** (*Plantillas de presentación* en la barra lateral) o
@@ -222,7 +222,10 @@ Se trabaja desde la barra lateral → **Evaluación**, eligiendo la convocatoria
 4. **Confirmar el orden de mérito.** Fija el resultado (ya no se regenera ni ajusta) y
    **notifica a cada director** si su proyecto quedó adjudicado o no.
 5. **Emitir la resolución de adjudicación** (Autoridad de Rectorado). Es el acto formal
-   posterior a la confirmación.
+   posterior a la confirmación. Una vez emitida, aparece el botón **Descargar resolución**
+   en la convocatoria: genera el PDF con el resultado de todos los proyectos (orden de
+   mérito, adjudicado/no y monto). Lo pueden descargar Rectorado, la Secretaría de la UA y
+   la dirección de cada proyecto.
 
 ![Orden de mérito con la propuesta de adjudicación](assets/manual/orden-merito.png)
 
@@ -252,8 +255,9 @@ Para cada uno: **Validar** o **Rechazar**. Solo la **Autoridad** de Secretaría 
 ### 6.2 Cargar el aval de una edición
 
 En el detalle de un proyecto de tu UA, pestaña **Resumen**: **cargar el aval** (link al
-PDF firmado por el decano). Es requisito para adjudicar, pero no bloquea el pase a
-evaluación.
+PDF firmado por el decano). Es requisito para adjudicar. No afecta la visibilidad: Rectorado
+ve los proyectos **Presentado** y **Pendiente de cambios** con o sin aval (solo los
+**Borrador**, aún no presentados, no los ve).
 
 ### 6.3 Evaluación institucional
 
@@ -338,6 +342,14 @@ Si la Secretaría te devuelve la edición con cambios, pasa a **Pendiente de cam
 2. Corregí lo que haga falta.
 3. Botón **Resubir** para volver a **Presentado**.
 
+### 7.6 Historial de trazabilidad
+
+En el detalle del proyecto, la pestaña **Historial** muestra una línea de tiempo con los
+cambios de estado (presentación, pase a evaluación, adjudicación, cierre), las
+observaciones (sugerencias de cambio) y la actividad de las evaluaciones, cada evento con
+su fecha y responsable. La ven la dirección del proyecto, la Secretaría de su UA y el
+Rectorado.
+
 ---
 
 ## 8. Director de Proyecto — ejecución y cierre
@@ -363,7 +375,7 @@ solo los ven el director, la Secretaría de la UA y Rectorado.
 
 ### 8.2 Autoevaluación de impacto
 
-Pestaña **Autoevaluación**. Respondé el cuestionario de la convocatoria. Se puede guardar
+Pestaña **Impacto**. Respondé el cuestionario de la convocatoria. Se puede guardar
 como **Borrador** y retomar. Cuando esté lista, **Completar**.
 
 ![Pestaña de autoevaluación de impacto](assets/manual/autoevaluacion.png)
@@ -378,7 +390,7 @@ el texto libremente y, si querés, adjuntá un PDF (como link). Cuando esté lis
 
 ### 8.4 Comprobantes de rendición
 
-Mientras el proyecto está en ejecución, en la pestaña **Comprobantes** del detalle del
+Mientras el proyecto está en ejecución, en la pestaña **Rendición de fondos** del detalle del
 proyecto el director/codirector carga los comprobantes de gastos por rubro
 (**Cargar comprobante**), indicando rubro, monto, fecha y un link al comprobante. La
 pestaña muestra el **consumo del presupuesto** por rubro contra lo adjudicado.
@@ -486,6 +498,11 @@ congelado.
 **Generé el orden de mérito pero una edición no aparece.**
 Le falta alguna evaluación confirmada (institucional, propia o ajena), o hay una
 inconsistencia sin resolver.
+
+**Como Rectorado no veo un proyecto en borrador.**
+Rectorado no ve los proyectos en **Borrador** porque todavía no fueron presentados. Los
+proyectos **Presentado** y **Pendiente de cambios** sí aparecen, con o sin aval — el aval
+no afecta la visibilidad, solo es requisito para adjudicar.
 
 **La aplicación tardó mucho en abrir.**
 El entorno de producción "se duerme" por inactividad; la primera carga puede demorar hasta

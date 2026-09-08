@@ -1133,6 +1133,64 @@ export class EvaluacionesService {
     });
     if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
 
+    return this.construirResumenAdjudicacion(convocatoria);
+  }
+
+  /**
+   * Resolución de adjudicación como documento formal público: accesible a los usuarios
+   * relacionados con la convocatoria (Rectorado, Secretaría de una UA con proyectos, y los
+   * directores/docentes que participan) una vez que la adjudicación fue emitida.
+   */
+  async obtenerResolucion(convocatoriaId: string, usuario: Usuario) {
+    const convocatoria = await this.convocatoriaRepo.findOne({
+      where: { id: convocatoriaId },
+    });
+    if (!convocatoria) throw new NotFoundException('Convocatoria no encontrada');
+    if (!convocatoria.adjudicacionEmitida) {
+      throw new NotFoundException(
+        'La resolución de adjudicación todavía no fue emitida para esta convocatoria',
+      );
+    }
+
+    await this.validarAccesoResolucion(convocatoriaId, usuario);
+
+    return this.construirResumenAdjudicacion(convocatoria);
+  }
+
+  private async validarAccesoResolucion(
+    convocatoriaId: string,
+    usuario: Usuario,
+  ): Promise<void> {
+    const roles = usuario.roles ?? [];
+    const esRectorado = roles.some(
+      (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+    );
+    if (esRectorado) return;
+
+    const esSecretaria = roles.some(
+      (r) => r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+    );
+    if (esSecretaria && usuario.unidadAcademicaId) {
+      const tieneProyectoEnUA = await this.edicionRepo.findOne({
+        where: { convocatoriaId, unidadAcademicaId: usuario.unidadAcademicaId },
+        select: { id: true },
+      });
+      if (tieneProyectoEnUA) return;
+    }
+
+    const participa = await this.participacionRepo.findOne({
+      where: { usuarioId: usuario.id, convocatoriaId },
+      select: { id: true },
+    });
+    if (participa) return;
+
+    throw new ForbiddenException(
+      'No tiene acceso a la resolución de adjudicación de esta convocatoria',
+    );
+  }
+
+  private async construirResumenAdjudicacion(convocatoria: Convocatoria) {
+    const convocatoriaId = convocatoria.id;
     const ediciones = await this.edicionRepo.find({
       where: { convocatoriaId },
       relations: { proyecto: true, unidadAcademica: true },
@@ -1286,6 +1344,27 @@ export class EvaluacionesService {
       entidad: TipoEntidadAuditoria.ADJUDICACION,
       entidadId: convocatoriaId,
     });
+
+    // Traza por edición del resultado de adjudicación, para la timeline del proyecto.
+    for (const edicion of ediciones) {
+      if (
+        edicion.estado === EstadoEdicion.Adjudicado ||
+        edicion.estado === EstadoEdicion.NoAdjudicado
+      ) {
+        await this.auditoria.registrar({
+          usuarioId: edicion.creadoPorId,
+          accion: TipoAccionAuditoria.CAMBIO_ESTADO,
+          descripcion:
+            edicion.estado === EstadoEdicion.Adjudicado
+              ? 'El proyecto fue adjudicado'
+              : 'El proyecto no fue adjudicado',
+          responsableId: usuario.id,
+          responsableNombre: usuario.nombreCompleto,
+          entidad: TipoEntidadAuditoria.EDICION,
+          entidadId: edicion.id,
+        });
+      }
+    }
 
     return { convocatoria, ediciones };
   }

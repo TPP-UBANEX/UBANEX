@@ -64,6 +64,7 @@ import {
   PORCENTAJE_EXTRA_PSE_DEFAULT,
 } from '@/lib/presupuesto';
 import { formatearFechaISO } from '@/lib/utils';
+import { exportarResolucionPdf } from '@/lib/exportar-resolucion-pdf';
 import {
   ArrowLeft,
   Pencil,
@@ -191,6 +192,10 @@ export function ConvocatoriaDetail() {
   // En configuración todavía no puede existir ningún proyecto presentado,
   // así que la pestaña no aporta nada.
   const puedeVerProyectos = !!conv && conv.estado !== EstadoConvocatoria.Configuracion;
+  // Espeja validarAccesoResolucion del backend: Rectorado siempre; el resto (Secretaría con
+  // proyectos en su UA, director o evaluador) queda reflejado en que `todasEdiciones` -ya
+  // filtrado por rol al cargar la convocatoria- no venga vacío.
+  const puedeDescargarResolucion = !!esRectorado || todasEdiciones.length > 0;
   const errores = erroresFechas(editForm);
 
   const [pasandoEvaluacionId, setPasandoEvaluacionId] = useState<string | null>(null);
@@ -216,6 +221,22 @@ export function ConvocatoriaDetail() {
     if (tab === 'merito' && !puedeVerOrdenMerito) setTab('detalle');
     if (tab === 'proyectos' && !puedeVerProyectos) setTab('detalle');
   }, [tab, puedeVerOrdenMerito, puedeVerProyectos]);
+
+  const [descargandoResolucion, setDescargandoResolucion] = useState(false);
+  const descargarResolucion = async () => {
+    if (!id || !conv) return;
+    setDescargandoResolucion(true);
+    try {
+      const resumen = await api.evaluaciones.adjudicacion.resolucion(id);
+      exportarResolucionPdf({ resumen, convocatoriaNombre: conv.nombre });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'No se pudo descargar la resolución de adjudicación',
+      );
+    } finally {
+      setDescargandoResolucion(false);
+    }
+  };
 
   const cargarDatos = () => {
     if (!id) return;
@@ -648,6 +669,21 @@ export function ConvocatoriaDetail() {
             </Badge>
           </div>
         </div>
+        {conv.adjudicacionEmitida && puedeDescargarResolucion && (
+          <Button
+            variant="outline"
+            className="shrink-0"
+            disabled={descargandoResolucion}
+            onClick={descargarResolucion}
+          >
+            {descargandoResolucion ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1" />
+            )}
+            Descargar resolución
+          </Button>
+        )}
         {user?.roles.includes(RolUsuario.AutoridadDeRectorado) && (
           <div className="flex gap-2">
             <Dialog open={editOpen} onOpenChange={setEditOpen}>

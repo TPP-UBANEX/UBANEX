@@ -23,6 +23,7 @@ import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, Tip
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
+import { HistorialTab } from '@/components/HistorialTab'
 import { ListaCamposFaltantes } from '@/components/ListaCamposFaltantes'
 import { EvaluacionesProyectoTab } from '@/components/EvaluacionesProyectoTab'
 import { HitosEjecucionTab } from '@/components/HitosEjecucionTab'
@@ -58,7 +59,7 @@ const OPCIONES_ES_INSUMO = [
   { value: 'false', label: 'No' },
 ]
 
-const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'rendicion', 'autoevaluacion', 'informe-final', 'sugerencias']
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'rendicion', 'autoevaluacion', 'informe-final', 'sugerencias', 'historial']
 
 
 interface ModalConfigSugerencia {
@@ -795,6 +796,9 @@ export function ProyectoDetail() {
           <TabsTrigger value="autoevaluacion">Impacto</TabsTrigger>
           <TabsTrigger value="informe-final">Informe final</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
+          {(esSecretariaMismaUA || esRectoradoAmplio || esPropietario || esDirector) && (
+            <TabsTrigger value="historial">Historial</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="info" className="mt-4">
@@ -1050,6 +1054,17 @@ export function ProyectoDetail() {
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           )}
         </TabsContent>
+
+        {(esSecretariaMismaUA || esRectoradoAmplio || esPropietario || esDirector) && (
+          <TabsContent value="historial" className="mt-4">
+            <HistorialTab
+              proyectoId={id}
+              edicionId={edicion?.id}
+              camposFormulario={camposFormulario}
+              presupuesto={edicion?.presupuestoSolicitado}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       <SugerirCambioModal

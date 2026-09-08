@@ -84,6 +84,21 @@ export class EvaluacionesController {
     return this.service.obtenerAdjudicacion(convocatoriaId, usuario);
   }
 
+  @Get('convocatoria/:convocatoriaId/resolucion')
+  @Roles(
+    RolUsuario.AutoridadDeRectorado,
+    RolUsuario.AsistenteDeRectorado,
+    RolUsuario.AutoridadDeSecretaria,
+    RolUsuario.AsistenteDeSecretaria,
+    RolUsuario.Docente,
+  )
+  obtenerResolucion(
+    @Param('convocatoriaId') convocatoriaId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.obtenerResolucion(convocatoriaId, usuario);
+  }
+
   @Put('convocatoria/:convocatoriaId/adjudicacion')
   @Roles(RolUsuario.AutoridadDeRectorado, RolUsuario.AsistenteDeRectorado)
   guardarBorradorAdjudicacion(
