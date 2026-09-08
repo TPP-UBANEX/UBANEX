@@ -41,7 +41,6 @@ import type {
 } from '@/data/types';
 import {
   estadoBadge,
-  estadoConvocatoriaLabel,
   estadoEdicionLabel,
   EstadoEdicion,
   EstadoConvocatoria,
@@ -49,6 +48,7 @@ import {
   RolEjecucion,
 } from '@/data/types';
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog';
+import { LineaTiempoConvocatoria } from '@/components/LineaTiempoConvocatoria';
 import { ResubirProyectoDialog } from '@/components/ResubirProyectoDialog';
 import { AvalBadge } from '@/components/AvalBadge';
 import { EmparejamientoTab } from '@/components/EmparejamientoTab';
@@ -63,7 +63,6 @@ import {
   UMBRAL_INSUMOS_DEFAULT,
   PORCENTAJE_EXTRA_PSE_DEFAULT,
 } from '@/lib/presupuesto';
-import { formatearFechaISO } from '@/lib/utils';
 import { exportarResolucionPdf } from '@/lib/exportar-resolucion-pdf';
 import {
   ArrowLeft,
@@ -81,14 +80,6 @@ import { toast } from 'sonner';
 // Default aplicado en backend/src/evaluaciones/evaluaciones.service.ts cuando el campo
 // umbralInconsistenciaCruzada de la convocatoria queda vacío.
 const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
-
-// Etapa del cronograma que corresponde a cada estado de la convocatoria, para resaltar
-// cuál de los tres rangos de fechas está vigente.
-const ETAPA_VIGENTE_POR_ESTADO: Partial<Record<EstadoConvocatoria, 'presentacion' | 'evaluacion' | 'ejecucion'>> = {
-  [EstadoConvocatoria.Presentacion]: 'presentacion',
-  [EstadoConvocatoria.Evaluacion]: 'evaluacion',
-  [EstadoConvocatoria.Ejecucion]: 'ejecucion',
-};
 
 function erroresFechas(f: {
   fechaInicioPresentacion: string;
@@ -638,11 +629,6 @@ export function ConvocatoriaDetail() {
       </div>
     );
 
-  const conteo: Record<string, number> = {};
-  Object.values(EstadoEdicion).forEach((estado) => {
-    conteo[estado] = todasEdiciones.filter((e) => e.estado === estado).length;
-  });
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
@@ -650,14 +636,9 @@ export function ConvocatoriaDetail() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-foreground truncate" title={conv.nombre}>
-              {conv.nombre}
-            </h2>
-            <Badge variant={estadoBadge[conv.estado]} className="shrink-0">
-              {estadoConvocatoriaLabel[conv.estado] || conv.estado}
-            </Badge>
-          </div>
+          <h2 className="text-xl font-semibold text-foreground truncate" title={conv.nombre}>
+            {conv.nombre}
+          </h2>
         </div>
         {conv.adjudicacionEmitida && puedeDescargarResolucion && (
           <Button
@@ -1149,20 +1130,7 @@ export function ConvocatoriaDetail() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        {Object.entries(conteo).map(([etapa, count]) => (
-          <Card key={etapa}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium">
-                {estadoEdicionLabel[etapa] || etapa}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{count}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <LineaTiempoConvocatoria convocatoria={conv} />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -1650,68 +1618,8 @@ export function ConvocatoriaDetail() {
                   {conv.descripcion || '-'}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-muted-foreground">Año:</span> {conv.anio}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Estado:</span>{' '}
-                  {estadoConvocatoriaLabel[conv.estado] || conv.estado}
-                </div>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm font-medium">Etapa de presentación</p>
-                  {ETAPA_VIGENTE_POR_ESTADO[conv.estado] === 'presentacion' && (
-                    <Badge variant="secondary">Etapa actual</Badge>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioPresentacion ? formatearFechaISO(conv.fechaInicioPresentacion) : '-'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinPresentacion ? formatearFechaISO(conv.fechaFinPresentacion) : '-'}
-                  </div>
-                </div>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm font-medium">Etapa de evaluación</p>
-                  {ETAPA_VIGENTE_POR_ESTADO[conv.estado] === 'evaluacion' && (
-                    <Badge variant="secondary">Etapa actual</Badge>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioEvaluacion ? formatearFechaISO(conv.fechaInicioEvaluacion) : '-'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinEvaluacion ? formatearFechaISO(conv.fechaFinEvaluacion) : '-'}
-                  </div>
-                </div>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm font-medium">Etapa de ejecución</p>
-                  {ETAPA_VIGENTE_POR_ESTADO[conv.estado] === 'ejecucion' && (
-                    <Badge variant="secondary">Etapa actual</Badge>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioEjecucion ? formatearFechaISO(conv.fechaInicioEjecucion) : '-'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinEjecucion ? formatearFechaISO(conv.fechaFinEjecucion) : '-'}
-                  </div>
-                </div>
+              <div>
+                <span className="text-muted-foreground">Año:</span> {conv.anio}
               </div>
             </CardContent>
           </Card>
