@@ -20,6 +20,7 @@ import { conProtocolo } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
+import { cargoDocenteLabel, tipoDesignacionDocenteLabel } from '@/data/perfil'
 import { CampoSugerible } from '@/components/CampoSugerible'
 import { SugerirCambioModal } from '@/components/SugerirCambioModal'
 import { SugerenciasTab } from '@/components/SugerenciasTab'
@@ -301,7 +302,18 @@ export function ProyectoDetail() {
         unidadAcademica: nombreUnidadesAcademicas(),
         directores: directores
           .filter(d => d.rol === RolEjecucion.DirectorDeProyecto)
-          .map(d => ({ nombre: nombreConUA(d), esPrincipal: !!d.esDirectorPrincipal })),
+          .map(d => ({
+            nombreCompleto: d.usuario?.nombreCompleto ?? '-',
+            esPrincipal: !!d.esDirectorPrincipal,
+            unidadAcademica: d.usuario?.unidadAcademica?.nombre,
+            cargo: d.usuario?.cargoDocente ? cargoDocenteLabel(d.usuario.cargoDocente) : undefined,
+            designacion: d.usuario?.tipoDesignacionDocente
+              ? tipoDesignacionDocenteLabel(d.usuario.tipoDesignacionDocente)
+              : undefined,
+            area: d.usuario?.areaDocente,
+            telefono: d.usuario?.telefono,
+            email: d.usuario?.email,
+          })),
       })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo generar el PDF del proyecto')

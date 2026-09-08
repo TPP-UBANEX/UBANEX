@@ -1,9 +1,21 @@
-import { jsPDF } from 'jspdf'
-import type { CampoFormulario, Edicion, Proyecto } from '@/data/types'
-import { TipoRubro, estadoEdicionLabel } from '@/data/types'
+import type { CampoFormulario, ColumnaTabla, Edicion, Proyecto } from '@/data/types'
+import { TipoCampo, TipoRubro, estadoEdicionLabel } from '@/data/types'
 import { formatearValorCampoFormulario } from '@/components/CampoFormularioInput'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { formatearMoneda, LABELS_RUBRO } from '@/lib/presupuesto'
+import { crearDocPdf, slugArchivo } from '@/lib/pdf/pdf-helpers'
+
+/** Datos de un director/co-director para la tabla "Datos del Director" del formulario oficial. */
+export interface DirectorProyectoPdf {
+  nombreCompleto: string
+  esPrincipal: boolean
+  unidadAcademica?: string
+  cargo?: string
+  designacion?: string
+  area?: string
+  telefono?: string
+  email?: string
+}
 
 interface OpcionesExportar {
   proyecto: Proyecto
@@ -11,12 +23,14 @@ interface OpcionesExportar {
   campos: CampoFormulario[]
   /** Nombre(s) de la(s) unidad(es) académica(s), tal como se muestran en el detalle del proyecto. */
   unidadAcademica: string
-  directores?: { nombre: string; esPrincipal: boolean }[]
+  directores?: DirectorProyectoPdf[]
 }
 
 /**
- * Descarga el proyecto (una edición) como PDF: detalle + formulario de presentación + presupuesto
- * solicitado. Se arma en el cliente con jsPDF, mismo enfoque que InformeFinalTab#descargarPdf.
+ * Descarga el proyecto (una edición) como PDF con el aspecto del formulario oficial de
+ * presentación UBANEX: encabezado con sello, datos generales y de dirección, el formulario
+ * dinámico (campos cortos en recuadros, texto largo y tablas fluidos) y el presupuesto.
+ * Se arma en el cliente con jsPDF (ver `@/lib/pdf/pdf-helpers`).
  */
 export function exportarProyectoPdf({
   proyecto,
@@ -25,157 +39,149 @@ export function exportarProyectoPdf({
   unidadAcademica,
   directores = [],
 }: OpcionesExportar): void {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const margin = 48
-  const contentWidth = pageWidth - margin * 2
-  let y = margin
-
-  const addPageIfNeeded = (heightNeeded: number) => {
-    const maxY = doc.internal.pageSize.getHeight() - margin
-    if (y + heightNeeded > maxY) {
-      doc.addPage()
-      y = margin
-    }
-  }
-
-  const titulo = (texto: string, size = 16) => {
-    addPageIfNeeded(28)
-    doc.setFont('helvetica', 'bold').setFontSize(size).setTextColor(13, 13, 13)
-    doc.text(texto, margin, y)
-    y += size + 6
-  }
-
-  const subtitulo = (texto: string) => {
-    addPageIfNeeded(24)
-    y += 6
-    doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(60, 60, 60)
-    doc.text(texto.toUpperCase(), margin, y)
-    y += 18
-  }
-
-  const parrafo = (texto: string, sangria = 0) => {
-    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(30, 30, 30)
-    for (const bloque of texto.split('\n')) {
-      const lineas = doc.splitTextToSize(bloque || ' ', contentWidth - sangria) as string[]
-      for (const linea of lineas) {
-        addPageIfNeeded(14)
-        doc.text(linea, margin + sangria, y)
-        y += 14
-      }
-    }
-    y += 4
-  }
-
-  // Ancho fijo de la columna de etiquetas para que todos los valores queden alineados.
-  const anchoColumnaLabel = 108
-
-  const lineaInfo = (label: string, valor: string) => {
-    addPageIfNeeded(16)
-    doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(60, 60, 60)
-    doc.text(label, margin, y)
-    // Se mide con la fuente en negrita (la que se usó para dibujar la etiqueta), y se deja al
-    // menos un espacio: así el valor nunca queda pegado a una etiqueta larga.
-    const xValor = margin + Math.max(anchoColumnaLabel, doc.getTextWidth(label) + 8)
-    doc.setFont('helvetica', 'normal').setTextColor(30, 30, 30)
-    const lineas = doc.splitTextToSize(String(valor || '-'), pageWidth - margin - xValor) as string[]
-    doc.text(lineas[0] ?? '-', xValor, y)
-    y += 15
-    for (const linea of lineas.slice(1)) {
-      addPageIfNeeded(14)
-      doc.text(linea, xValor, y)
-      y += 14
-    }
-  }
-
-  const regla = () => {
-    y += 6
-    doc.setDrawColor(200, 200, 200)
-    doc.line(margin, y, pageWidth - margin, y)
-    y += 14
-  }
+  const h = crearDocPdf()
 
   // ── Encabezado ──
-  titulo('Proyecto de extensión', 18)
-  lineaInfo('Nombre:', proyecto.nombre || '-')
-  lineaInfo('Convocatoria:', edicion.convocatoria?.nombre ?? '-')
-  lineaInfo('Unidad Académica:', unidadAcademica || '-')
-  lineaInfo('Edición:', String(edicion.anioEdicion ?? '-'))
-  lineaInfo('Estado:', estadoEdicionLabel[edicion.estado] ?? edicion.estado)
-  lineaInfo('Creado por:', edicion.creadoPor?.nombreCompleto ?? '-')
-  lineaInfo('Interfacultad:', proyecto.esInterfacultad ? 'Sí' : 'No')
-  const principal = directores.find(d => d.esPrincipal)
-  const codirector = directores.find(d => !d.esPrincipal)
-  lineaInfo('Dirección:', principal?.nombre ?? '-')
-  lineaInfo('Codirección:', codirector?.nombre ?? '-')
-  regla()
+  const convocatoria = edicion.convocatoria?.nombre
+  h.encabezadoSello({
+    titulo: convocatoria ? `${convocatoria} — «${proyecto.nombre}»` : proyecto.nombre,
+    subtitulo: 'Formulario para la presentación de proyectos',
+  })
+
+  // ── Datos generales ──
+  h.subtitulo('Información general')
+  h.campoRecuadro('Nombre del Proyecto', proyecto.nombre || '-')
+  h.campoRecuadro('Convocatoria', convocatoria ?? '-')
+  h.campoRecuadro('Unidad Académica', unidadAcademica || '-')
+  h.campoRecuadro('Edición', String(edicion.anioEdicion ?? '-'))
+  h.campoRecuadro('Estado', estadoEdicionLabel[edicion.estado] ?? edicion.estado)
+  h.campoRecuadro('Interfacultad', proyecto.esInterfacultad ? 'Sí' : 'No')
+
+  // ── Datos del Director / Co-director ──
+  const ordenados = [...directores].sort((a, b) => Number(b.esPrincipal) - Number(a.esPrincipal))
+  if (ordenados.length > 0) {
+    h.subtitulo('Datos del Director y Co-director')
+    for (const d of ordenados) {
+      h.subtitulo(d.esPrincipal ? 'Director' : 'Co-director')
+      const uaYCargo = [d.unidadAcademica, d.cargo, d.designacion].filter(Boolean).join(' — ')
+      h.tabla(
+        ['Campo', 'Valor'],
+        [
+          ['Apellido y Nombres', d.nombreCompleto || '-'],
+          ['CUIT/CUIL', ''],
+          ['Unidad Académica y Cargo', uaYCargo || '-'],
+          ['Área', d.area || '-'],
+          ['Teléfono', d.telefono || '-'],
+          ['Correo electrónico', d.email || '-'],
+        ],
+        { anchosRelativos: [1, 2] },
+      )
+    }
+  }
 
   // ── Formulario de presentación ──
-  subtitulo('Formulario de presentación')
+  h.subtitulo('Formulario de presentación')
   const datos = edicion.datosFormulario ?? {}
   const secciones = agruparCamposEnSecciones(campos).filter(s => s.campos.length > 0)
   if (secciones.length === 0) {
-    parrafo('La convocatoria no tiene formulario de presentación configurado.')
+    h.parrafo('La convocatoria no tiene formulario de presentación configurado.')
   } else {
     for (const seccion of secciones) {
       if (seccion.id !== 'resumen') {
-        addPageIfNeeded(22)
-        doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(45, 45, 45)
-        doc.text(seccion.nombre, margin, y)
-        y += 16
+        h.espacio(8)
+        h.doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(45, 45, 45)
+        h.addPageIfNeeded(20)
+        h.doc.text(seccion.nombre, h.margin, h.getY())
+        h.setY(h.getY() + 16)
       }
       for (const campo of seccion.campos) {
         const etiqueta = campo.nombre + (campo.esObligatorio ? ' *' : '')
-        const valor = formatearValorCampoFormulario(campo, datos[campo.id])
-        addPageIfNeeded(16)
-        doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(60, 60, 60)
-        doc.text(etiqueta, margin, y)
-        y += 13
-        parrafo(valor, 8)
+        if (campo.tipo === TipoCampo.TextoLargo) {
+          h.espacio(6)
+          h.addPageIfNeeded(20)
+          h.doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(60, 60, 60)
+          h.doc.text(etiqueta, h.margin, h.getY())
+          h.setY(h.getY() + 14)
+          h.parrafo(formatearValorCampoFormulario(campo, datos[campo.id]), 8)
+        } else if (campo.tipo === TipoCampo.Tabla) {
+          h.espacio(6)
+          h.addPageIfNeeded(20)
+          h.doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(60, 60, 60)
+          h.doc.text(etiqueta, h.margin, h.getY())
+          h.setY(h.getY() + 16)
+          renderarCampoTabla(h, campo, datos[campo.id])
+        } else {
+          h.campoRecuadro(etiqueta, formatearValorCampoFormulario(campo, datos[campo.id]))
+        }
       }
     }
   }
 
   // ── Presupuesto solicitado ──
   const presupuesto = edicion.presupuestoSolicitado
-  subtitulo('Presupuesto solicitado')
+  h.subtitulo('Presupuesto solicitado')
   if (!presupuesto || !presupuesto.rubros?.some(r => r.partidas.length > 0)) {
-    parrafo('El proyecto no tiene presupuesto cargado.')
+    h.parrafo('El proyecto no tiene presupuesto cargado.')
   } else {
     for (const rubro of presupuesto.rubros) {
-      addPageIfNeeded(22)
-      doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(45, 45, 45)
-      doc.text(`${LABELS_RUBRO[rubro.tipo]} — subtotal ${formatearMoneda(rubro.subtotal)}`, margin, y)
-      y += 15
+      h.espacio(8)
+      h.addPageIfNeeded(20)
+      h.doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(45, 45, 45)
+      h.doc.text(`${LABELS_RUBRO[rubro.tipo]} — subtotal ${formatearMoneda(rubro.subtotal)}`, h.margin, h.getY())
+      h.setY(h.getY() + 16)
       if (rubro.partidas.length === 0) {
-        parrafo('Sin partidas.', 8)
+        h.parrafo('Sin partidas.', 8)
         continue
       }
-      rubro.partidas.forEach((partida, indice) => {
-        const detalle = rubro.tipo === TipoRubro.ViaticosYSeguros
-          ? [
-              `${indice + 1}. ${partida.descripcion || 'Sin descripción'}`,
-              `Tipo de persona: ${(partida as { tipoPersona?: string }).tipoPersona ?? '-'}`,
-              `Período: ${(partida as { periodo?: string }).periodo || '-'}`,
-              `Monto: ${formatearMoneda(partida.monto)}`,
-            ].join('\n')
-          : [
-              `${indice + 1}. ${partida.descripcion || 'Sin descripción'}`,
-              `Cantidad: ${(partida as { cantidad?: number }).cantidad ?? '-'}`,
-              `Precio unitario: ${formatearMoneda((partida as { precioUnitario?: number }).precioUnitario ?? 0)}`,
-              `Monto: ${formatearMoneda(partida.monto)}`,
-              `Insumo: ${(partida as { esInsumo?: boolean }).esInsumo ? 'Sí' : 'No'}`,
-            ].join('\n')
-        parrafo(detalle, 8)
-      })
+      if (rubro.tipo === TipoRubro.ViaticosYSeguros) {
+        h.tabla(
+          ['Tipo de persona', 'Descripción', 'Período', 'Monto'],
+          rubro.partidas.map(p => {
+            const v = p as { tipoPersona?: string; descripcion?: string; periodo?: string; monto?: number }
+            return [v.tipoPersona ?? '-', v.descripcion || '-', v.periodo || '-', formatearMoneda(v.monto ?? 0)]
+          }),
+          { anchosRelativos: [1.2, 2.4, 1.4, 1], alineaciones: ['left', 'left', 'left', 'center'] },
+        )
+      } else {
+        h.tabla(
+          ['Descripción', 'Cantidad', 'P. unitario', 'Monto', 'Insumo'],
+          rubro.partidas.map(p => {
+            const v = p as { descripcion?: string; cantidad?: number; precioUnitario?: number; monto?: number; esInsumo?: boolean }
+            return [
+              v.descripcion || '-',
+              String(v.cantidad ?? '-'),
+              formatearMoneda(v.precioUnitario ?? 0),
+              formatearMoneda(v.monto ?? 0),
+              v.esInsumo ? 'Sí' : 'No',
+            ]
+          }),
+          { anchosRelativos: [2.6, 0.9, 1.1, 1.1, 0.8], alineaciones: ['left', 'center', 'center', 'center', 'center'] },
+        )
+      }
     }
-    addPageIfNeeded(18)
-    doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 30, 30)
-    doc.text(`Total solicitado: ${formatearMoneda(presupuesto.montoTotal)}`, margin, y)
-    y += 16
+    h.addPageIfNeeded(18)
+    h.doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 30, 30)
+    h.doc.text(`Total solicitado: ${formatearMoneda(presupuesto.montoTotal)}`, h.margin, h.getY())
+    h.setY(h.getY() + 16)
   }
 
-  const slug = (proyecto.nombre || 'proyecto')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  doc.save(`proyecto-${slug || 'proyecto'}.pdf`)
+  h.guardar(`proyecto-${slugArchivo(proyecto.nombre ?? '', 'proyecto')}.pdf`)
+}
+
+/** Renderiza un campo de tipo tabla como una tabla real, usando sus columnas y filas. */
+function renderarCampoTabla(
+  h: ReturnType<typeof crearDocPdf>,
+  campo: CampoFormulario,
+  valor: unknown,
+): void {
+  const columnas = (campo.columnas ?? []) as ColumnaTabla[]
+  const filas = Array.isArray(valor) ? (valor as Record<string, unknown>[]) : []
+  if (columnas.length === 0 || filas.length === 0) {
+    h.parrafo('-', 8)
+    return
+  }
+  h.tabla(
+    columnas.map(c => c.nombre),
+    filas.map(fila => columnas.map(c => formatearValorCampoFormulario(c, fila[c.id]))),
+  )
 }
