@@ -278,6 +278,7 @@ export const api = {
       estado?: string;
       convocatoriaId?: string;
       anio?: number;
+      tieneAval?: boolean;
     }) => {
       const qs = params
         ? '?' +

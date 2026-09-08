@@ -234,6 +234,7 @@ export class ProyectosService {
       estado?: EstadoEdicion;
       anio?: number;
       search?: string;
+      tieneAval?: boolean;
     },
   ) {
     const esRectorado = usuario.roles.some(r =>
@@ -291,6 +292,11 @@ export class ProyectosService {
     }
     if (filtros.search) {
       query.andWhere('proyecto.nombre ILIKE :search', { search: `%${filtros.search}%` });
+    }
+    if (filtros.tieneAval !== undefined) {
+      query.andWhere(
+        filtros.tieneAval ? 'edicion.avalUrl IS NOT NULL' : 'edicion.avalUrl IS NULL',
+      );
     }
 
     return query;

@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { api } from '@/lib/api'
+import { AvalBadge } from '@/components/AvalBadge'
 import { useAuth } from '@/lib/auth-context'
 import { esRectorado, esSecretaria } from '@/lib/evaluacion-roles'
 import {
@@ -241,6 +242,7 @@ function InstitucionalView({
                     <Badge variant={estadoBadge[edicion.estado]}>
                       {estadoEdicionLabel[edicion.estado]}
                     </Badge>
+                    <AvalBadge avalUrl={edicion.avalUrl} />
                     {evaluacion && (
                       <Badge
                         variant={
@@ -365,6 +367,7 @@ function CruzadaView({
                     <Badge variant={estadoBadge[edicion.estado]}>
                       {estadoEdicionLabel[edicion.estado]}
                     </Badge>
+                    <AvalBadge avalUrl={edicion.avalUrl} />
                     {evaluacion && (
                       <Badge
                         variant={
@@ -528,6 +531,7 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
               <TableHead>Proyecto</TableHead>
               <TableHead>Unidad Académica</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Aval</TableHead>
               <TableHead>Evaluación institucional</TableHead>
               <TableHead>Evaluaciones cruzadas</TableHead>
               <TableHead>Tercera UA</TableHead>
@@ -546,6 +550,9 @@ function MonitoreoView({ convocatoriaId }: { convocatoriaId: string }) {
                   <Badge variant={estadoBadge[edicion.estado]}>
                     {estadoEdicionLabel[edicion.estado]}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  <AvalBadge avalUrl={edicion.avalUrl} />
                 </TableCell>
                 <TableCell>
                   {institucional ? (

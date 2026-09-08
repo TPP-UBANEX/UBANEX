@@ -50,6 +50,7 @@ import {
 } from '@/data/types';
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog';
 import { ResubirProyectoDialog } from '@/components/ResubirProyectoDialog';
+import { AvalBadge } from '@/components/AvalBadge';
 import { EmparejamientoTab } from '@/components/EmparejamientoTab';
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores';
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab';
@@ -132,6 +133,7 @@ export function ConvocatoriaDetail() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filtroEtapa, setFiltroEtapa] = useState('todas');
   const [filtroAnio, setFiltroAnio] = useState('todas');
+  const [filtroAval, setFiltroAval] = useState('todas');
   const [filtroUA, setFiltroUA] = useState('todas');
   const [invitacionEvaluador, setInvitacionEvaluador] = useState<ParticipacionConvocatoria | null>(
     null,
@@ -251,6 +253,7 @@ export function ConvocatoriaDetail() {
         search: debouncedSearch || undefined,
         estado: filtroEtapa !== 'todas' ? filtroEtapa : undefined,
         anio: filtroAnio !== 'todas' ? Number(filtroAnio) : undefined,
+        tieneAval: filtroAval !== 'todas' ? filtroAval === 'si' : undefined,
       })
       .then((res) => {
         setEdiciones(res.data);
@@ -258,7 +261,7 @@ export function ConvocatoriaDetail() {
       })
       .catch(() => {})
       .finally(() => setLoadingTabla(false));
-  }, [id, page, debouncedSearch, filtroEtapa, filtroAnio, refreshKey]);
+  }, [id, page, debouncedSearch, filtroEtapa, filtroAnio, filtroAval, refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -274,6 +277,10 @@ export function ConvocatoriaDetail() {
   };
   const cambiarAnio = (v: string) => {
     setFiltroAnio(v);
+    setPage(1);
+  };
+  const cambiarAval = (v: string) => {
+    setFiltroAval(v);
     setPage(1);
   };
   const cambiarUA = (v: string) => {
@@ -432,6 +439,7 @@ export function ConvocatoriaDetail() {
           String(e.ordenMerito ?? ''),
           e.proyecto?.nombre || 'Sin nombre',
           e.unidadAcademica?.nombre || '-',
+          e.avalUrl ? 'Sí' : 'No',
           e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1).replace('.', ',') : '-',
           aAdjudicar.solicitado.toFixed(2).replace('.', ','),
           aAdjudicar.porcentajeInsumos.toFixed(1).replace('.', ','),
@@ -454,6 +462,7 @@ export function ConvocatoriaDetail() {
       'Orden',
       'Proyecto',
       'Unidad Académica',
+      'Aval',
       'Puntaje',
       'Presupuesto solicitado',
       '% insumos',
@@ -1216,6 +1225,16 @@ export function ConvocatoriaDetail() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={filtroAval} onValueChange={cambiarAval}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Aval" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Aval: todos</SelectItem>
+                  <SelectItem value="si">Con aval</SelectItem>
+                  <SelectItem value="no">Sin aval</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <CardContent>
               {loadingTabla ? (
@@ -1242,6 +1261,7 @@ export function ConvocatoriaDetail() {
                         <TableHead>Creado por</TableHead>
                         <TableHead>Facultad</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Aval</TableHead>
                         {conv?.ordenMeritoConfirmado && <TableHead>Adjudicación</TableHead>}
                         <TableHead></TableHead>
                       </TableRow>
@@ -1271,6 +1291,9 @@ export function ConvocatoriaDetail() {
                             <Badge variant={estadoBadge[e.estado]}>
                               {estadoEdicionLabel[e.estado] || e.estado}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <AvalBadge avalUrl={e.avalUrl} />
                           </TableCell>
                           {conv?.ordenMeritoConfirmado && (
                             <TableCell>
@@ -1453,6 +1476,7 @@ export function ConvocatoriaDetail() {
                       <TableHead>Orden</TableHead>
                       <TableHead>Proyecto</TableHead>
                       <TableHead>Unidad académica</TableHead>
+                      <TableHead>Aval</TableHead>
                       <TableHead className="text-right">Puntaje</TableHead>
                       <TableHead className="text-right">Solicitado</TableHead>
                       <TableHead className="text-right">A adjudicar</TableHead>
@@ -1479,6 +1503,9 @@ export function ConvocatoriaDetail() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {e.unidadAcademica?.nombre || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <AvalBadge avalUrl={e.avalUrl} />
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1) : '-'}

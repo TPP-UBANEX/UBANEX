@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AvalBadge } from '@/components/AvalBadge'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria, PaginatedResponse, Hito } from '@/data/types'
@@ -48,6 +49,7 @@ export function Proyectos() {
   const [filtroEtapa, setFiltroEtapa] = useState<EstadoEdicion | 'todas'>('todas')
   const [filtroConv, setFiltroConv] = useState('todas')
   const [filtroAnio, setFiltroAnio] = useState('todas')
+  const [filtroAval, setFiltroAval] = useState('todas')
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PaginatedResponse<Edicion>['meta'] | null>(null)
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
@@ -122,6 +124,7 @@ export function Proyectos() {
       estado: filtroEtapa !== 'todas' ? filtroEtapa : undefined,
       convocatoriaId: filtroConv !== 'todas' ? filtroConv : undefined,
       anio: filtroAnio !== 'todas' ? Number(filtroAnio) : undefined,
+      tieneAval: filtroAval !== 'todas' ? filtroAval === 'si' : undefined,
     })
       .then(res => {
         setEdiciones(res.data)
@@ -129,7 +132,7 @@ export function Proyectos() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [page, debouncedSearch, filtroEtapa, filtroConv, filtroAnio, vista, refreshKey])
+  }, [page, debouncedSearch, filtroEtapa, filtroConv, filtroAnio, filtroAval, vista, refreshKey])
 
   useEffect(() => {
     if (vista !== 'kanban') return
@@ -142,6 +145,7 @@ export function Proyectos() {
   const cambiarEtapa = (v: string) => { setFiltroEtapa(v as EstadoEdicion | 'todas'); setPage(1) }
   const cambiarConv = (v: string) => { setFiltroConv(v); setPage(1) }
   const cambiarAnio = (v: string) => { setFiltroAnio(v); setPage(1) }
+  const cambiarAval = (v: string) => { setFiltroAval(v); setPage(1) }
 
   return (
     <div className="p-6 space-y-6">
@@ -187,6 +191,14 @@ export function Proyectos() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={filtroAval} onValueChange={cambiarAval}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Aval" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Aval: todos</SelectItem>
+            <SelectItem value="si">Con aval</SelectItem>
+            <SelectItem value="no">Sin aval</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {vista === 'tabla' ? (
@@ -215,6 +227,7 @@ export function Proyectos() {
                       <TableHead>Creado por</TableHead>
                       <TableHead>Facultad</TableHead>
                       <TableHead>Etapa</TableHead>
+                      <TableHead>Aval</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -249,6 +262,7 @@ export function Proyectos() {
                               : e.unidadAcademica?.nombre || '-'}
                           </TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
+                          <TableCell><AvalBadge avalUrl={e.avalUrl} /></TableCell>
                           <TableCell>
                             <div className="flex gap-1 justify-end">
                               {esRectorado && e.estado === EstadoEdicion.Presentado && e.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
@@ -266,7 +280,7 @@ export function Proyectos() {
                         </TableRow>
                         {expandidaId === e.id && (
                           <TableRow key={`${e.id}-detalle`}>
-                            <TableCell colSpan={esAdmin ? 6 : 5}>
+                            <TableCell colSpan={esAdmin ? 7 : 6}>
                               <div className="py-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                                   Hitos de ejecución
