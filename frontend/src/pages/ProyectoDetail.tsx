@@ -44,14 +44,14 @@ import { exportarProyectoPdf } from '@/lib/exportar-proyecto-pdf'
 import { exportarAvalPdf } from '@/lib/pdf/exportar-aval-pdf'
 import { exportarCartaCompromisoPdf } from '@/lib/pdf/exportar-carta-compromiso-pdf'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,
+} from '@/components/ui/sheet'
 import {
   formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, MAX_LONGITUD_PERIODO_PARTIDA,
   motivoTopeExcedido, normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO,
   presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
-import { ArrowLeft, ChevronDown, Download, Eye, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 const OPCIONES_TIPO_PERSONA = [
@@ -78,6 +78,25 @@ interface ModalConfigSugerencia {
   rolesUsuario?: RolUsuario[]
   soloComentario?: boolean
   opciones?: { value: string; label: string }[]
+}
+
+/** Fila cliqueable del panel de descargas; cierra el panel al hacer clic. */
+function OpcionDescarga({ titulo, descripcion, onClick }: { titulo: string; descripcion: string; onClick: () => void }) {
+  return (
+    <SheetClose asChild>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full items-start gap-3 rounded-md border p-3 text-left transition-colors hover:bg-muted"
+      >
+        <Download className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <span>
+          <span className="block text-sm font-medium">{titulo}</span>
+          <span className="block text-xs text-muted-foreground">{descripcion}</span>
+        </span>
+      </button>
+    </SheetClose>
+  )
 }
 
 export function ProyectoDetail() {
@@ -643,24 +662,67 @@ export function ProyectoDetail() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {!editando && (esSecretariaMismaUA || esRectoradoAmplio) && !modoSugerencia && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios].includes(edicion?.estado as EstadoEdicion) && (
+            <Button variant="outline" onClick={() => setModoSugerencia(true)}>
+              <MessageSquare className="h-4 w-4 mr-2" />Sugerir
+            </Button>
+          )}
           {!editando && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <Sheet>
+              <SheetTrigger asChild>
                 <Button variant="outline">
-                  <Download className="h-4 w-4 mr-2" />Descargar
-                  <ChevronDown className="h-4 w-4 ml-2" />
+                  <Download className="h-4 w-4 mr-2" />Descargas
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={descargarProyecto}>Proyecto</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => descargarAval(false)}>Aval</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => descargarAval(true)}>Aval (en blanco)</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => descargarCartaCompromiso(false)}>Carta compromiso</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => descargarCartaCompromiso(true)}>Carta compromiso (en blanco)</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Descargar documentos</SheetTitle>
+                  <SheetDescription>
+                    Descargá el proyecto o los documentos para presentar y firmar. Todos los archivos
+                    se descargan en formato ".pdf" 
+                    <br />
+                    Las versiones pre-llenadas usan los datos de este proyecto,
+                    las «en blanco» son la plantilla oficial para completar a mano.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-6 space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Proyecto</p>
+                    <OpcionDescarga
+                      titulo="Detalle del Proyecto"
+                      descripcion="Detalle, formulario de presentación y presupuesto."
+                      onClick={descargarProyecto}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Aval de la Unidad Académica</p>
+                    <OpcionDescarga
+                      titulo="Aval"
+                      descripcion="Conformidad de la UA, pre-llenado con los datos del proyecto."
+                      onClick={() => descargarAval(false)}
+                    />
+                    <OpcionDescarga
+                      titulo="Aval (en blanco)"
+                      descripcion="Planilla vacía para completar a mano."
+                      onClick={() => descargarAval(true)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Carta compromiso</p>
+                    <OpcionDescarga
+                      titulo="Carta compromiso"
+                      descripcion="Acuerdo con la organización, pre-llenado con el proyecto y la dirección."
+                      onClick={() => descargarCartaCompromiso(false)}
+                    />
+                    <OpcionDescarga
+                      titulo="Carta compromiso (en blanco)"
+                      descripcion="Modelo vacío para completar a mano."
+                      onClick={() => descargarCartaCompromiso(true)}
+                    />
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           )}
           {esEditable && !editando && (
             <>
@@ -729,11 +791,6 @@ export function ProyectoDetail() {
                 </Tooltip>
               </TooltipProvider>
             </>
-          )}
-          {!editando && (esSecretariaMismaUA || esRectoradoAmplio) && !modoSugerencia && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios].includes(edicion?.estado as EstadoEdicion) && (
-            <Button variant="outline" onClick={() => setModoSugerencia(true)}>
-              <MessageSquare className="h-4 w-4 mr-2" />Sugerir
-            </Button>
           )}
           {modoSugerencia && (
             <Button variant="ghost" onClick={() => setModoSugerencia(false)}>
