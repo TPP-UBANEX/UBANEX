@@ -103,7 +103,7 @@ export function AutoevaluacionTab({
     try {
       await api.ejecucion.autoevaluacion.guardar(edicionId, { respuestas })
       await api.ejecucion.autoevaluacion.completar(edicionId)
-      toast.success('Autoevaluación completada')
+      toast.success('Autoevaluación de impacto completada')
       await cargar()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al completar la autoevaluación')

@@ -765,7 +765,7 @@ export function ProyectoDetail() {
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
           <TabsTrigger value="rendicion">Rendición de fondos</TabsTrigger>
-          <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
+          <TabsTrigger value="autoevaluacion">Impacto</TabsTrigger>
           <TabsTrigger value="informe-final">Informe final</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
         </TabsList>
