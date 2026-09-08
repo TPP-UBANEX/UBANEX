@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -58,6 +58,9 @@ import type {
 import { Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { ProyectoEvaluablePanel } from '@/components/ProyectoEvaluablePanel'
+import { EvaluacionSplit } from '@/components/EvaluacionSplit'
+import { IndiceCategoriasEvaluacion } from '@/components/IndiceCategoriasEvaluacion'
+import type { ItemIndiceCategoria } from '@/components/IndiceCategoriasEvaluacion'
 import type { CampoFormulario } from '@/data/types'
 
 const tipoCruzadaLabel: Record<TipoEvaluacionCruzada, string> = {
@@ -131,8 +134,8 @@ export function Evaluacion() {
       : 'cruzada'
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="space-y-1 max-w-sm">
+    <div className="p-6 flex-1 min-h-0 flex flex-col gap-6">
+      <div className="space-y-1 max-w-sm shrink-0">
         <span className="text-xs text-muted-foreground">Convocatoria en evaluación</span>
         {loadingConv ? (
           <Skeleton className="h-10 w-full" />
@@ -157,18 +160,20 @@ export function Evaluacion() {
       </div>
 
       {convocatoriaId ? (
-        vista === 'monitoreo' ? (
-          <MonitoreoView key={convocatoriaId} convocatoriaId={convocatoriaId} />
-        ) : vista === 'institucional' ? (
-          <InstitucionalView
-            key={convocatoriaId}
-            convocatoriaId={convocatoriaId}
-            convocatoria={convocatorias.find((c) => c.id === convocatoriaId) ?? null}
-            user={user}
-          />
-        ) : (
-          <CruzadaView key={convocatoriaId} convocatoriaId={convocatoriaId} />
-        )
+        <div className="flex-1 min-h-0 flex flex-col">
+          {vista === 'monitoreo' ? (
+            <MonitoreoView key={convocatoriaId} convocatoriaId={convocatoriaId} />
+          ) : vista === 'institucional' ? (
+            <InstitucionalView
+              key={convocatoriaId}
+              convocatoriaId={convocatoriaId}
+              convocatoria={convocatorias.find((c) => c.id === convocatoriaId) ?? null}
+              user={user}
+            />
+          ) : (
+            <CruzadaView key={convocatoriaId} convocatoriaId={convocatoriaId} />
+          )}
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">
           No hay convocatorias en etapa de evaluación.
@@ -213,7 +218,6 @@ function InstitucionalView({
   const [guardando, setGuardando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
-  const panelRef = useRef<HTMLDivElement>(null)
 
   const cargarLista = () => {
     setLoading(true)
@@ -304,12 +308,6 @@ function InstitucionalView({
 
   const confirmada = evaluacion?.estado === EstadoEvaluacion.Confirmada
 
-  useEffect(() => {
-    if (edicionId) {
-      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [edicionId])
-
   const guardar = async () => {
     if (!edicionId) return
     setGuardando(true)
@@ -359,96 +357,122 @@ function InstitucionalView({
     }
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar..."
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Select value={filtroEstado} onValueChange={cambiarEstado}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todos los estados</SelectItem>
-            <SelectItem value="sin_evaluar">Sin evaluar</SelectItem>
-            <SelectItem value="borrador">Borrador</SelectItem>
-            <SelectItem value="confirmada">Confirmada</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">Proyectos de mi Unidad Académica</CardTitle>
-          {meta && (
-            <span className="text-xs text-muted-foreground">
-              {meta.total} proyecto{meta.total !== 1 ? 's' : ''} &middot; p&aacute;gina {meta.page} de {meta.totalPages || 1}
-            </span>
-          )}
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay ediciones en evaluación de tu Unidad Académica.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {items.map(({ edicion, evaluacion }) => (
-                <button
-                  key={edicion.id}
-                  onClick={() => seleccionar(edicion.id)}
-                  className={`text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
-                >
-                  <p className="text-sm font-medium">
-                    {edicion.proyecto?.nombre || edicion.proyectoId}
-                  </p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={estadoBadge[edicion.estado]}>
-                      {estadoEdicionLabel[edicion.estado]}
-                    </Badge>
-                    {evaluacion && (
-                      <Badge
-                        variant={
-                          evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
-                        }
-                      >
-                        {evaluacion.estado === EstadoEvaluacion.Confirmada
-                          ? 'Confirmada'
-                          : 'Borrador'}
-                      </Badge>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          <Paginador meta={meta} page={page} onPage={setPage} />
-        </CardContent>
-      </Card>
+  const indiceCategorias: ItemIndiceCategoria[] = useMemo(
+    () =>
+      (template?.estructura?.categorias ?? []).map((cat) => ({
+        id: cat.id,
+        nombre: cat.nombre,
+        total: cat.subcategorias.length,
+        completados: cat.subcategorias.filter((sub) => respuestas[sub.id]?.valor != null).length,
+      })),
+    [template, respuestas],
+  )
 
+  const irACategoria = (id: string) =>
+    document.getElementById(`cat-inst-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-4">
       {!edicionId ? (
-        <Card>
-          <CardContent className="pt-6 text-sm text-muted-foreground text-center py-10">
-            Seleccioná una edición para evaluarla.
-          </CardContent>
-        </Card>
+        <>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar..."
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={filtroEstado} onValueChange={cambiarEstado}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todos los estados</SelectItem>
+                <SelectItem value="sin_evaluar">Sin evaluar</SelectItem>
+                <SelectItem value="borrador">Borrador</SelectItem>
+                <SelectItem value="confirmada">Confirmada</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium">Proyectos de mi Unidad Académica</CardTitle>
+              {meta && (
+                <span className="text-xs text-muted-foreground">
+                  {meta.total} proyecto{meta.total !== 1 ? 's' : ''} &middot; p&aacute;gina {meta.page} de {meta.totalPages || 1}
+                </span>
+              )}
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay ediciones en evaluación de tu Unidad Académica.
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {items.map(({ edicion, evaluacion }) => (
+                    <button
+                      key={edicion.id}
+                      onClick={() => seleccionar(edicion.id)}
+                      className={`text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
+                    >
+                      <p className="text-sm font-medium">
+                        {edicion.proyecto?.nombre || edicion.proyectoId}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={estadoBadge[edicion.estado]}>
+                          {estadoEdicionLabel[edicion.estado]}
+                        </Badge>
+                        {evaluacion && (
+                          <Badge
+                            variant={
+                              evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
+                            }
+                          >
+                            {evaluacion.estado === EstadoEvaluacion.Confirmada
+                              ? 'Confirmada'
+                              : 'Borrador'}
+                          </Badge>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Paginador meta={meta} page={page} onPage={setPage} />
+            </CardContent>
+          </Card>
+        </>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2" ref={panelRef}>
-          <ProyectoEvaluablePanel
-            edicion={edicionSeleccionada}
-            campos={camposFormulario}
-            convocatoria={convocatoria}
-            esPse={esPse ?? evaluacion?.esPse ?? false}
-          />
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+        <>
+          <div className="flex items-center gap-3 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setEdicionId(null)}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Volver al listado
+            </Button>
+            <span className="text-sm font-medium truncate">
+              {edicionSeleccionada?.proyecto?.nombre || edicionSeleccionada?.proyectoId}
+            </span>
+            {edicionSeleccionada && (
+              <Badge variant={estadoBadge[edicionSeleccionada.estado]}>
+                {estadoEdicionLabel[edicionSeleccionada.estado]}
+              </Badge>
+            )}
+          </div>
+          <EvaluacionSplit
+            presentacion={
+              <ProyectoEvaluablePanel
+                edicion={edicionSeleccionada}
+                campos={camposFormulario}
+                convocatoria={convocatoria}
+                esPse={esPse ?? evaluacion?.esPse ?? false}
+              />
+            }
+          >
+            <Card className="lg:h-full lg:flex lg:flex-col">
+              <CardHeader className="flex flex-row items-center justify-between lg:shrink-0">
                 <CardTitle className="text-sm font-medium">Evaluación institucional</CardTitle>
                 {evaluacion && (
                   <Badge
@@ -460,7 +484,13 @@ function InstitucionalView({
                   </Badge>
                 )}
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden">
+                {template?.estructura && (
+                  <div className="lg:shrink-0">
+                    <IndiceCategoriasEvaluacion items={indiceCategorias} onSelect={irACategoria} />
+                  </div>
+                )}
+                <div className="space-y-6 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                 {evaluacion && (
                   <div className="text-xs text-muted-foreground space-y-0.5">
                     <p>Iniciada por {evaluacion.realizadoPor?.nombreCompleto ?? '-'}</p>
@@ -471,7 +501,7 @@ function InstitucionalView({
                 {template?.estructura ? (
                   <>
                     {template.estructura.categorias.map((cat) => (
-                      <div key={cat.id} className="space-y-3">
+                      <div key={cat.id} id={`cat-inst-${cat.id}`} className="space-y-3 scroll-mt-4">
                         <h3 className="text-sm font-semibold border-b pb-1">{cat.nombre}</h3>
                         {cat.subcategorias.map((sub) => {
                           const resp = respuestas[sub.id] ?? { valor: null, fundamentacion: '' }
@@ -630,31 +660,32 @@ function InstitucionalView({
                         placeholder="Observaciones generales de la evaluación..."
                       />
                     </div>
-
-                    {!confirmada && (
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={guardar} disabled={guardando}>
-                          {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Guardar borrador
-                        </Button>
-                        {esAutoridadSecretaria(user) && (
-                          <Button onClick={confirmar} disabled={confirmando}>
-                            {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Confirmar evaluación
-                          </Button>
-                        )}
-                      </div>
-                    )}
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     La convocatoria no tiene configurado el formulario de evaluación institucional.
                   </p>
                 )}
+                </div>
+
+                {template?.estructura && !confirmada && (
+                  <div className="flex justify-end gap-2 lg:shrink-0 lg:pt-3 lg:border-t">
+                    <Button variant="outline" onClick={guardar} disabled={guardando}>
+                      {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Guardar borrador
+                    </Button>
+                    {esAutoridadSecretaria(user) && (
+                      <Button onClick={confirmar} disabled={confirmando}>
+                        {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Confirmar evaluación
+                      </Button>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
-          </div>
-        </div>
+          </EvaluacionSplit>
+        </>
       )}
     </div>
   )
@@ -681,7 +712,6 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
   const [guardando, setGuardando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
-  const panelRef = useRef<HTMLDivElement>(null)
 
   const cargarDisponibles = () => {
     setLoading(true)
@@ -758,12 +788,6 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
 
   const confirmada = evaluacion?.estado === EstadoEvaluacion.Confirmada
 
-  useEffect(() => {
-    if (edicionId) {
-      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [edicionId])
-
   const guardar = async () => {
     if (!edicionId) return
     setGuardando(true)
@@ -810,95 +834,122 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
     ? sumaItems((template.estructura?.categorias ?? []).flatMap((c) => c.items.map((i) => i.id)))
     : 0
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar..."
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Select value={filtroEstado} onValueChange={cambiarEstado}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todos los estados</SelectItem>
-            <SelectItem value="sin_evaluar">Sin evaluar</SelectItem>
-            <SelectItem value="borrador">Borrador</SelectItem>
-            <SelectItem value="confirmada">Confirmada</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">Evaluaciones disponibles</CardTitle>
-          {meta && (
-            <span className="text-xs text-muted-foreground">
-              {meta.total} proyecto{meta.total !== 1 ? 's' : ''} &middot; p&aacute;gina {meta.page} de {meta.totalPages || 1}
-            </span>
-          )}
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay ediciones disponibles para evaluar.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {items.map(({ edicion, tipo, evaluacion }) => (
-                <button
-                  key={edicion.id}
-                  onClick={() => seleccionar(edicion.id)}
-                  className={`text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
-                >
-                  <p className="text-sm font-medium">
-                    {edicion.proyecto?.nombre || edicion.proyectoId}
-                  </p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">{tipoCruzadaLabel[tipo]}</Badge>
-                    <Badge variant={estadoBadge[edicion.estado]}>
-                      {estadoEdicionLabel[edicion.estado]}
-                    </Badge>
-                    {evaluacion && (
-                      <Badge
-                        variant={
-                          evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
-                        }
-                      >
-                        {evaluacion.estado === EstadoEvaluacion.Confirmada
-                          ? 'Confirmada'
-                          : 'Borrador'}
-                      </Badge>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          <Paginador meta={meta} page={page} onPage={setPage} />
-        </CardContent>
-      </Card>
+  const indiceCategorias: ItemIndiceCategoria[] = useMemo(
+    () =>
+      (template?.estructura?.categorias ?? []).map((cat) => {
+        const ids = cat.items.map((i) => i.id)
+        return {
+          id: cat.id,
+          nombre: cat.nombre,
+          total: ids.length,
+          completados: ids.filter((id) => puntajes[id] != null).length,
+          resumen: `${sumaItems(ids)}/${cat.puntajeMaximo}`,
+        }
+      }),
+    [template, puntajes],
+  )
 
+  const irACategoria = (id: string) =>
+    document.getElementById(`cat-cruz-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-4">
       {!edicionId ? (
-        <Card>
-          <CardContent className="pt-6 text-sm text-muted-foreground text-center py-10">
-            Seleccioná una edición para evaluarla.
-          </CardContent>
-        </Card>
+        <>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar..."
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={filtroEstado} onValueChange={cambiarEstado}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todos los estados</SelectItem>
+                <SelectItem value="sin_evaluar">Sin evaluar</SelectItem>
+                <SelectItem value="borrador">Borrador</SelectItem>
+                <SelectItem value="confirmada">Confirmada</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium">Evaluaciones disponibles</CardTitle>
+              {meta && (
+                <span className="text-xs text-muted-foreground">
+                  {meta.total} proyecto{meta.total !== 1 ? 's' : ''} &middot; p&aacute;gina {meta.page} de {meta.totalPages || 1}
+                </span>
+              )}
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay ediciones disponibles para evaluar.
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {items.map(({ edicion, tipo, evaluacion }) => (
+                    <button
+                      key={edicion.id}
+                      onClick={() => seleccionar(edicion.id)}
+                      className={`text-left border rounded-lg p-3 space-y-1 ${edicionId === edicion.id ? 'border-primary bg-primary/5' : ''}`}
+                    >
+                      <p className="text-sm font-medium">
+                        {edicion.proyecto?.nombre || edicion.proyectoId}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary">{tipoCruzadaLabel[tipo]}</Badge>
+                        <Badge variant={estadoBadge[edicion.estado]}>
+                          {estadoEdicionLabel[edicion.estado]}
+                        </Badge>
+                        {evaluacion && (
+                          <Badge
+                            variant={
+                              evaluacion.estado === EstadoEvaluacion.Confirmada ? 'default' : 'outline'
+                            }
+                          >
+                            {evaluacion.estado === EstadoEvaluacion.Confirmada
+                              ? 'Confirmada'
+                              : 'Borrador'}
+                          </Badge>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Paginador meta={meta} page={page} onPage={setPage} />
+            </CardContent>
+          </Card>
+        </>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2" ref={panelRef}>
-          <ProyectoEvaluablePanel
-            edicion={edicionSeleccionada}
-            campos={camposFormulario}
-          />
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+        <>
+          <div className="flex items-center gap-3 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setEdicionId(null)}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Volver al listado
+            </Button>
+            <span className="text-sm font-medium truncate">
+              {edicionSeleccionada?.proyecto?.nombre || edicionSeleccionada?.proyectoId}
+            </span>
+            {edicionSeleccionada && (
+              <Badge variant={estadoBadge[edicionSeleccionada.estado]}>
+                {estadoEdicionLabel[edicionSeleccionada.estado]}
+              </Badge>
+            )}
+          </div>
+          <EvaluacionSplit
+            presentacion={
+              <ProyectoEvaluablePanel edicion={edicionSeleccionada} campos={camposFormulario} />
+            }
+          >
+            <Card className="lg:h-full lg:flex lg:flex-col">
+              <CardHeader className="flex flex-row items-center justify-between lg:shrink-0">
                 <CardTitle className="text-sm font-medium">
                   Evaluación cruzada{' '}
                   {tipo ? (
@@ -917,7 +968,13 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
                   </Badge>
                 )}
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden">
+                {template?.estructura && (
+                  <div className="lg:shrink-0">
+                    <IndiceCategoriasEvaluacion items={indiceCategorias} onSelect={irACategoria} />
+                  </div>
+                )}
+                <div className="space-y-6 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                 {evaluacion && (
                   <div className="text-xs text-muted-foreground space-y-0.5">
                     <p>Iniciada por {evaluacion.evaluador?.nombreCompleto ?? '-'}</p>
@@ -930,7 +987,7 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
                     {template.estructura.categorias.map((cat) => {
                       const ids = cat.items.map((i) => i.id)
                       return (
-                        <div key={cat.id} className="space-y-2">
+                        <div key={cat.id} id={`cat-cruz-${cat.id}`} className="space-y-2 scroll-mt-4">
                           <h3 className="text-sm font-semibold border-b pb-1">
                             {cat.nombre}{' '}
                             <span className="text-muted-foreground font-normal">
@@ -985,29 +1042,30 @@ function CruzadaView({ convocatoriaId }: { convocatoriaId: string }) {
                         placeholder="Observaciones de la evaluación..."
                       />
                     </div>
-
-                    {!confirmada && (
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={guardar} disabled={guardando}>
-                          {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Guardar borrador
-                        </Button>
-                        <Button onClick={confirmar} disabled={confirmando}>
-                          {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Confirmar evaluación
-                        </Button>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     La convocatoria no tiene configurado el formulario de evaluación cruzada.
                   </p>
                 )}
+                </div>
+
+                {template?.estructura && !confirmada && (
+                  <div className="flex justify-end gap-2 lg:shrink-0 lg:pt-3 lg:border-t">
+                    <Button variant="outline" onClick={guardar} disabled={guardando}>
+                      {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Guardar borrador
+                    </Button>
+                    <Button onClick={confirmar} disabled={confirmando}>
+                      {confirmando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Confirmar evaluación
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          </div>
-        </div>
+          </EvaluacionSplit>
+        </>
       )}
     </div>
   )

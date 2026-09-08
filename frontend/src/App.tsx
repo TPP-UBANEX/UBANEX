@@ -42,7 +42,7 @@ function Layout({ children }: { children: React.ReactNode }) {
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto bg-muted/20">
+        <main className="flex-1 overflow-y-auto bg-muted/20 flex flex-col">
           {children}
         </main>
       </div>
