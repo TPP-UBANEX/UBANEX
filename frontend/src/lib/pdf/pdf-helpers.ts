@@ -37,6 +37,7 @@ export interface PdfHelpers {
   regla: () => void
   encabezadoSello: (opciones?: { titulo?: string; subtitulo?: string }) => void
   tabla: (headers: string[], filas: string[][], opciones?: OpcionesTabla) => void
+  campoRecuadro: (etiqueta: string, valor: string) => void
   lineaPunteada: (opciones?: { sangria?: number; alto?: number }) => void
   guardar: (nombreArchivo: string) => void
 }
@@ -65,8 +66,8 @@ export function crearDocPdf(): PdfHelpers {
   }
 
   const subtitulo = (texto: string) => {
-    addPageIfNeeded(24)
-    y += 6
+    addPageIfNeeded(30)
+    y += 12
     doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(60, 60, 60)
     doc.text(texto.toUpperCase(), margin, y)
     y += 18
@@ -159,7 +160,11 @@ export function crearDocPdf(): PdfHelpers {
     y += 8
   }
 
-  /** Grilla simple con encabezados y filas; alto de fila configurable para dejar lugar a firmas. */
+  /**
+   * Grilla con encabezados y filas. El alto de cada fila se calcula según su contenido
+   * (con `altoFila` como mínimo, útil para dejar lugar a firmas). Si una fila fuerza un salto
+   * de página, el encabezado se vuelve a dibujar arriba.
+   */
   const tabla = (headers: string[], filas: string[][], opciones: OpcionesTabla = {}) => {
     const cols = headers.length
     const relativos = opciones.anchosRelativos ?? Array(cols).fill(1)
@@ -168,11 +173,23 @@ export function crearDocPdf(): PdfHelpers {
     const xs: number[] = [margin]
     for (let i = 1; i < cols; i++) xs.push(xs[i - 1] + anchos[i - 1])
     const alineaciones = opciones.alineaciones ?? Array(cols).fill('left')
-    const altoHeader = 22
-    const altoFila = opciones.altoFila ?? 22
+    const altoHeaderMin = 22
+    const altoFilaMin = opciones.altoFila ?? 22
     const padX = 6
+    const interlinea = 12
 
-    const dibujarFila = (celdas: string[], alto: number, esHeader: boolean) => {
+    // Envuelve cada celda una vez y devuelve las líneas + el alto necesario de la fila.
+    const preparar = (celdas: string[], altoMin: number) => {
+      const lineasPorCelda = celdas.map((celda, i) =>
+        celda ? (doc.splitTextToSize(celda, anchos[i] - padX * 2) as string[]) : [],
+      )
+      const maxLineas = Math.max(1, ...lineasPorCelda.map(l => l.length))
+      const alto = Math.max(altoMin, maxLineas * interlinea + 10)
+      return { lineasPorCelda, alto }
+    }
+
+    const dibujarFila = (celdas: string[], esHeader: boolean) => {
+      const { lineasPorCelda, alto } = preparar(celdas, esHeader ? altoHeaderMin : altoFilaMin)
       addPageIfNeeded(alto)
       const yTop = y
       doc.setDrawColor(120, 120, 120).setLineWidth(0.6)
@@ -180,23 +197,49 @@ export function crearDocPdf(): PdfHelpers {
       for (let i = 1; i < cols; i++) doc.line(xs[i], yTop, xs[i], yTop + alto)
       doc.setFont('helvetica', esHeader ? 'bold' : 'normal').setFontSize(10)
       doc.setTextColor(esHeader ? 40 : 30, esHeader ? 40 : 30, esHeader ? 40 : 30)
-      celdas.forEach((celda, i) => {
-        if (!celda) return
+      lineasPorCelda.forEach((lineas, i) => {
         const alineado = alineaciones[i] === 'center'
-        const anchoTexto = anchos[i] - padX * 2
-        const lineas = doc.splitTextToSize(celda, anchoTexto) as string[]
         const xTexto = alineado ? xs[i] + anchos[i] / 2 : xs[i] + padX
         lineas.forEach((linea, j) => {
-          doc.text(linea, xTexto, yTop + 15 + j * 12, alineado ? { align: 'center' } : undefined)
+          doc.text(linea, xTexto, yTop + 15 + j * interlinea, alineado ? { align: 'center' } : undefined)
         })
       })
       y += alto
     }
 
-    dibujarFila(headers, altoHeader, true)
-    for (const fila of filas) dibujarFila(fila, altoFila, false)
+    dibujarFila(headers, true)
+    for (const fila of filas) {
+      // Si la fila no entra y salta de página, reponer el encabezado arriba.
+      const { alto } = preparar(fila, altoFilaMin)
+      if (y + alto > pageHeight - margin) {
+        doc.addPage()
+        y = margin
+        dibujarFila(headers, true)
+      }
+      dibujarFila(fila, false)
+    }
     doc.setLineWidth(1)
     y += 6
+  }
+
+  /** Recuadro con etiqueta en negrita y valor debajo; alto según contenido. Para campos cortos. */
+  const campoRecuadro = (etiqueta: string, valor: string) => {
+    const pad = 7
+    doc.setFont('helvetica', 'normal').setFontSize(10)
+    const lineasValor = doc.splitTextToSize(valor || '-', contentWidth - pad * 2) as string[]
+    const alto = pad + 12 + lineasValor.length * 13 + pad - 4
+    addPageIfNeeded(alto + 4)
+    const yTop = y
+    doc.setDrawColor(180, 180, 180).setLineWidth(0.5)
+    doc.rect(margin, yTop, contentWidth, alto)
+    doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(45, 45, 45)
+    doc.text(etiqueta, margin + pad, yTop + pad + 8)
+    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(30, 30, 30)
+    lineasValor.forEach((linea, j) => {
+      doc.text(linea, margin + pad, yTop + pad + 20 + j * 13)
+    })
+    doc.setLineWidth(1)
+    y = yTop + alto + 8
   }
 
   /** Línea punteada de ancho completo para completar a mano. */
@@ -229,6 +272,7 @@ export function crearDocPdf(): PdfHelpers {
     regla,
     encabezadoSello,
     tabla,
+    campoRecuadro,
     lineaPunteada,
     guardar: (nombreArchivo: string) => doc.save(nombreArchivo),
   }
