@@ -63,6 +63,15 @@ export class ProyectosController {
     return this.service.obtenerProyecto(id);
   }
 
+  @Get(':id/ediciones/:edicionId/historial')
+  historialEdicion(
+    @Param('id') id: string,
+    @Param('edicionId') edicionId: string,
+    @CurrentUser() usuario: Usuario,
+  ) {
+    return this.service.historialEdicion(id, edicionId, usuario);
+  }
+
   @Patch(':id/ediciones/:edicionId')
   actualizarEdicion(
     @Param('id') id: string,

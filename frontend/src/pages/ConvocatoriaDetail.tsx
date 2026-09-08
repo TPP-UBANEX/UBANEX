@@ -56,6 +56,7 @@ import { FormularioBuilderTab } from '@/components/FormularioBuilderTab';
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab';
 import { AdjudicacionResolucionTab } from '@/components/AdjudicacionResolucionTab';
 import { calcularPresupuestoAAdjudicar, formatearMoneda } from '@/lib/presupuesto';
+import { exportarResolucionPdf } from '@/lib/exportar-resolucion-pdf';
 import {
   ArrowLeft,
   Pencil,
@@ -178,6 +179,22 @@ export function ConvocatoriaDetail() {
   };
 
   const esEvaluadorActivo = invitacionEvaluador !== null;
+
+  const [descargandoResolucion, setDescargandoResolucion] = useState(false);
+  const descargarResolucion = async () => {
+    if (!id || !conv) return;
+    setDescargandoResolucion(true);
+    try {
+      const resumen = await api.evaluaciones.adjudicacion.resolucion(id);
+      exportarResolucionPdf({ resumen, convocatoriaNombre: conv.nombre });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'No se pudo descargar la resolución de adjudicación',
+      );
+    } finally {
+      setDescargandoResolucion(false);
+    }
+  };
 
   const cargarDatos = () => {
     if (!id) return;
@@ -606,6 +623,21 @@ export function ConvocatoriaDetail() {
             <p className="text-sm text-muted-foreground truncate">{conv.descripcion}</p>
           )}
         </div>
+        {conv.adjudicacionEmitida && (
+          <Button
+            variant="outline"
+            className="shrink-0"
+            disabled={descargandoResolucion}
+            onClick={descargarResolucion}
+          >
+            {descargandoResolucion ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1" />
+            )}
+            Descargar resolución
+          </Button>
+        )}
         {user?.roles.includes(RolUsuario.AutoridadDeRectorado) && (
           <div className="flex gap-2">
             <Dialog open={editOpen} onOpenChange={setEditOpen}>

@@ -897,6 +897,9 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   mocks de Dirección y Presupuesto). Descarga del proyecto en PDF (detalle + formulario +
   presupuesto).
 * Sugerencias de cambio sobre ediciones presentadas + notificaciones in-app / mail.
+* Visibilidad de proyectos para Rectorado: ve todas las ediciones de la convocatoria excepto
+  los `Borrador` (aún no presentados). Los `Presentado` y `PendienteDeCambios` se ven con o sin
+  aval; el aval no gatea la visibilidad ni bloquea el pase a evaluación.
 * Emparejamiento de unidades académicas por convocatoria.
 * Evaluación institucional y cruzada con estado `Borrador | Confirmada` y plantillas
   configurables por convocatoria.
@@ -904,7 +907,9 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   consolidados.
 * Orden de mérito y adjudicación propuesta (mérito / cuota federativa) con presupuesto a
   adjudicar (topes, extra por insumos, extra por PSE); confirmación que fija el resultado
-  y notifica a los directores.
+  y notifica a los directores. Una vez **emitida** la resolución, los usuarios relacionados
+  (Rectorado, Secretaría de la UA y la dirección de cada proyecto) pueden **descargar la
+  resolución de adjudicación en PDF** desde la convocatoria.
 * Desempate por tercera evaluación: umbral de inconsistencia cruzada y designación de un
   evaluador de una tercera unidad académica.
 * Hitos de ejecución.
@@ -914,6 +919,10 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   proyecto: creador, dirección/codirección y Secretaría de una UA del proyecto.
 * Autoevaluación de impacto (plantillas configurables) e informe final (autogenerado
   desde hitos), cada uno con su confirmación.
+* Historial de trazabilidad por proyecto: pestaña que consolida en una línea de tiempo los
+  cambios de estado de la edición (auditados con responsable y fecha), las observaciones
+  (sugerencias de cambio) y la actividad de las evaluaciones. Visible para la dirección del
+  proyecto, la Secretaría de la UA y el Rectorado.
 
 ## Falta / incompleto
 

@@ -17,8 +17,9 @@ import type { SugerenciaCambio, CampoFormulario, Presupuesto } from '@/data/type
 import { estadoBadge, EstadoSugerencia, RolUsuario } from '@/data/types'
 import { formatearValorSerializado } from '@/components/CampoFormularioInput'
 import {
-  etiquetaCampoPresupuesto, formatearMoneda, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO,
+  formatearMoneda, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO,
 } from '@/lib/presupuesto'
+import { nombreCampoSugerencia } from '@/lib/nombre-campo'
 import { Loader2, Check, X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -88,24 +89,8 @@ export function SugerenciasTab({ edicionId, creadoPorId, directorIds = [], campo
     }
   }
 
-  const nombreCampo = (campo: string) => {
-    const mapa: Record<string, string> = {
-      nombre: 'Nombre',
-      anioEdicion: 'Año de edición',
-      esConsolidado: 'Es consolidado',
-      esInterfacultad: 'Es interfacultad',
-    }
-    if (mapa[campo]) return mapa[campo]
-    if (campo.startsWith(PREFIJO_RUTA_PRESUPUESTO)) {
-      return etiquetaCampoPresupuesto(presupuesto, campo.slice(PREFIJO_RUTA_PRESUPUESTO.length))
-    }
-    if (campo.startsWith('datosFormulario.')) {
-      const campoId = campo.slice(16)
-      const campoFormulario = camposFormulario.find(c => c.id === campoId)
-      return `Formulario > ${campoFormulario?.nombre ?? campoId}`
-    }
-    return campo
-  }
+  const nombreCampo = (campo: string) =>
+    nombreCampoSugerencia(campo, camposFormulario, presupuesto)
 
   const campoFormularioDe = (campo: string): CampoFormulario | null => {
     if (!campo.startsWith('datosFormulario.')) return null
