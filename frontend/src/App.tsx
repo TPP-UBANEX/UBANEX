@@ -13,6 +13,7 @@ import { ConvocatoriaDetail } from '@/pages/ConvocatoriaDetail'
 import { Proyectos } from '@/pages/Proyectos'
 import { ProyectoDetail } from '@/pages/ProyectoDetail'
 import { Evaluacion } from '@/pages/Evaluacion'
+import { EvaluacionDetail } from '@/pages/EvaluacionDetail'
 import { Plantillas } from '@/pages/Plantillas'
 import { PlantillasEvaluacion } from '@/pages/PlantillasEvaluacion'
 import { PlantillasAutoevaluacion } from '@/pages/PlantillasAutoevaluacion'
@@ -74,6 +75,7 @@ function App() {
                   <Route path="/proyectos" element={<Proyectos />} />
                   <Route path="/proyectos/:id" element={<ProyectoDetail />} />
                   <Route path="/evaluacion" element={<Evaluacion />} />
+                  <Route path="/evaluacion/:edicionId" element={<EvaluacionDetail />} />
                   <Route path="/plantillas" element={<ProtectedRoute roles={ROLES_RECTORADO}><Plantillas /></ProtectedRoute>} />
                   <Route path="/plantillas/presentacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasFormulario /></ProtectedRoute>} />
                   <Route path="/plantillas/presentacion/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaFormularioDetail /></ProtectedRoute>} />

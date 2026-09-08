@@ -1398,7 +1398,7 @@ export class EvaluacionesService {
   }
 
   async obtenerInstitucional(convocatoriaId: string, edicionId: string, usuario: Usuario) {
-    const { convocatoria } = await this.validarEdicionParaInstitucional(
+    const { convocatoria, edicion } = await this.validarEdicionParaInstitucional(
       convocatoriaId,
       edicionId,
       usuario,
@@ -1412,6 +1412,7 @@ export class EvaluacionesService {
     return {
       evaluacion,
       template: convocatoria.templateEvaluacionInstitucional,
+      edicion,
     };
   }
 
@@ -1746,7 +1747,7 @@ export class EvaluacionesService {
   }
 
   async obtenerCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {
-    const { convocatoria } = await this.validarEdicionParaCruzada(
+    const { convocatoria, edicion, tipo } = await this.validarEdicionParaCruzada(
       convocatoriaId,
       edicionId,
       usuario,
@@ -1764,7 +1765,7 @@ export class EvaluacionesService {
       relations: { edicion: { proyecto: true }, evaluador: true, actualizadoPor: true },
     });
 
-    return { evaluacion, template };
+    return { evaluacion, template, edicion, tipo };
   }
 
   async historialCruzada(convocatoriaId: string, edicionId: string, usuario: Usuario) {

@@ -7,17 +7,11 @@ import { EnlaceUsuario } from '@/components/EnlaceUsuario';
 import {
   EstadoEdicion,
   EstadoEvaluacion,
-  TipoEvaluacionCruzada,
   estadoBadge,
   estadoConvocatoriaLabel,
+  tipoCruzadaLabel,
 } from '@/data/types';
 import type { EvaluacionEdicionDetalle } from '@/data/types';
-
-const tipoCruzadaLabel: Record<TipoEvaluacionCruzada, string> = {
-  [TipoEvaluacionCruzada.Propia]: 'Propia',
-  [TipoEvaluacionCruzada.Ajena]: 'Ajena',
-  [TipoEvaluacionCruzada.TerceraUa]: 'Tercera UA',
-};
 
 const estadosSinEvaluacion = [
   EstadoEdicion.Borrador,

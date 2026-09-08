@@ -50,7 +50,7 @@ export function ProyectoEvaluablePanel({
     <Card className="min-w-0 lg:h-full lg:flex lg:flex-col">
       <Tabs value={tab} onValueChange={setTab} className="lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
         <CardHeader className="lg:shrink-0">
-          <CardTitle className="text-sm font-medium">Proyecto evaluable</CardTitle>
+          <CardTitle className="text-sm font-medium">Información del proyecto</CardTitle>
           <div className="overflow-x-auto">
             <TabsList className="flex-nowrap w-max">
               <TabsTrigger value="detalle">Detalle</TabsTrigger>

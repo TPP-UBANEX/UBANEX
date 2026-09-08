@@ -433,6 +433,7 @@ export const api = {
         get<{
           evaluacion: import('@/data/types').EvaluacionInstitucional | null;
           template: import('@/data/types').TemplateEvaluacionInstitucional | null;
+          edicion: import('@/data/types').Edicion;
         }>(`/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`),
       guardar: (
         convocatoriaId: string,
@@ -471,6 +472,8 @@ export const api = {
         get<{
           evaluacion: import('@/data/types').EvaluacionCruzada | null;
           template: import('@/data/types').TemplateEvaluacionCruzada | null;
+          edicion: import('@/data/types').Edicion;
+          tipo: import('@/data/types').TipoEvaluacionCruzada;
         }>(`/evaluaciones/cruzadas/${edicionId}?convocatoriaId=${convocatoriaId}`),
       guardar: (
         convocatoriaId: string,
