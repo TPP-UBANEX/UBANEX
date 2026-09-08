@@ -41,12 +41,17 @@ import {
 import { CampoFormularioLectura } from '@/components/CampoFormularioLectura'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { exportarProyectoPdf } from '@/lib/exportar-proyecto-pdf'
+import { exportarAvalPdf } from '@/lib/pdf/exportar-aval-pdf'
+import { exportarCartaCompromisoPdf } from '@/lib/pdf/exportar-carta-compromiso-pdf'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   formatearMoneda, LABELS_RUBRO, MAX_LONGITUD_DESCRIPCION_PARTIDA, MAX_LONGITUD_PERIODO_PARTIDA,
   motivoTopeExcedido, normalizarPresupuesto, parsearRutaPartida, PREFIJO_RUTA_PRESUPUESTO,
   presupuestoIncompletoParaEnvio,
 } from '@/lib/presupuesto'
-import { ArrowLeft, Download, Eye, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Download, Eye, Loader2, Pencil, Send, Save, Plus, Trash2, MessageSquare, X, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 const OPCIONES_TIPO_PERSONA = [
@@ -281,6 +286,38 @@ export function ProyectoDetail() {
       })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo generar el PDF del proyecto')
+    }
+  }
+
+  const directoresParaPdf = () => directores
+    .filter(d => d.rol === RolEjecucion.DirectorDeProyecto)
+    .map(d => ({ nombre: nombreConUA(d), esPrincipal: !!d.esDirectorPrincipal }))
+
+  const descargarAval = (enBlanco = false) => {
+    try {
+      exportarAvalPdf({
+        proyecto: proyecto ?? undefined,
+        edicion: edicion ?? undefined,
+        unidadAcademica: nombreUnidadesAcademicas(),
+        directores: directoresParaPdf(),
+        enBlanco,
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo generar el aval')
+    }
+  }
+
+  const descargarCartaCompromiso = (enBlanco = false) => {
+    try {
+      exportarCartaCompromisoPdf({
+        proyecto: proyecto ?? undefined,
+        edicion: edicion ?? undefined,
+        unidadAcademica: nombreUnidadesAcademicas(),
+        directores: directoresParaPdf(),
+        enBlanco,
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo generar la carta compromiso')
     }
   }
 
@@ -607,9 +644,23 @@ export function ProyectoDetail() {
         </div>
         <div className="flex items-center gap-2">
           {!editando && (
-            <Button variant="outline" onClick={descargarProyecto}>
-              <Download className="h-4 w-4 mr-2" />Descargar proyecto
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="h-4 w-4 mr-2" />Descargar
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={descargarProyecto}>Proyecto</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => descargarAval(false)}>Aval</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => descargarAval(true)}>Aval (en blanco)</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => descargarCartaCompromiso(false)}>Carta compromiso</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => descargarCartaCompromiso(true)}>Carta compromiso (en blanco)</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {esEditable && !editando && (
             <>
