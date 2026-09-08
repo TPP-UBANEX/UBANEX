@@ -141,7 +141,7 @@ export function crearDocPdf(): PdfHelpers {
     const altoSello = anchoSello / SELLO_UBA_ASPECTO
     const x = (pageWidth - anchoSello) / 2
     doc.addImage(SELLO_UBA_PNG, 'PNG', x, y, anchoSello, altoSello)
-    y += altoSello + 12
+    y += altoSello + 28
     if (opciones?.titulo) {
       doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(13, 13, 13)
       for (const linea of doc.splitTextToSize(opciones.titulo, contentWidth) as string[]) {

@@ -33,14 +33,14 @@ export function exportarCartaCompromisoPdf({
 
   const ua = (!enBlanco && unidadAcademica) || ''
   const universidadSeg = enBlanco
-    ? `(Universidad) ${puntos(24)}`
+    ? `(Universidad) ${puntos(34)}`
     : `Universidad de Buenos Aires${ua ? ` — ${ua}` : ''}`
   const nombreProyecto = (!enBlanco && proyecto?.nombre) || ''
-  const proyectoSeg = enBlanco ? `(Nombre del proyecto) ${puntos(24)}` : `«${nombreProyecto}»`
+  const proyectoSeg = enBlanco ? `(Nombre del proyecto) ${puntos(34)}` : `«${nombreProyecto}»`
 
   const intro =
-    `En la Ciudad de ${puntos(16)} (Localidad, provincia), a los ${puntos(8)} días del mes de ` +
-    `${puntos(12)} de 20${puntos(4)}, la (Institución) ${puntos(26)} y la ${universidadSeg}, en el ` +
+    `En la Ciudad de ${puntos(22)} (Localidad, provincia), a los ${puntos(8)} días del mes de ` +
+    `${puntos(12)} de 20${puntos(4)}, la (Institución) ${puntos(36)} y la ${universidadSeg}, en el ` +
     `marco del Proyecto de Extensión UBANEX ${proyectoSeg}, se comprometen a trabajar asociadamente ` +
     'en su implementación.'
   h.parrafo(intro)
