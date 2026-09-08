@@ -13,10 +13,24 @@ import {
 import { Input } from '@/components/ui/input'
 import { DetailSkeleton } from '@/components/TableSkeleton'
 import { TemplateAutoevaluacionBuilder } from '@/components/TemplateAutoevaluacionBuilder'
+import { VistaPreviaAutoevaluacion } from '@/components/VistaPreviaAutoevaluacion'
 import { api } from '@/lib/api'
-import type { EstructuraTemplateAutoevaluacion, TemplateAutoevaluacionImpacto } from '@/data/types'
-import { ArrowLeft, Loader2, Trash2 } from 'lucide-react'
+import type { EstructuraTemplateAutoevaluacion, PreguntaAutoevaluacion, TemplateAutoevaluacionImpacto } from '@/data/types'
+import { ArrowLeft, Eye, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+
+function preguntaVacia(): PreguntaAutoevaluacion {
+  return {
+    id: crypto.randomUUID(),
+    tipo: 'texto',
+    texto: '',
+    esObligatorio: true,
+    orden: 0,
+    opciones: null,
+    escalaMin: null,
+    escalaMax: null,
+  }
+}
 
 export function PlantillaAutoevaluacionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -30,6 +44,7 @@ export function PlantillaAutoevaluacionDetail() {
   const [guardando, setGuardando] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [eliminando, setEliminando] = useState(false)
+  const [preview, setPreview] = useState(false)
 
   const cargarDatos = useCallback(async () => {
     if (!id) return
@@ -150,17 +165,47 @@ export function PlantillaAutoevaluacionDetail() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Preguntas</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium">Formulario de autoevaluación de impacto</CardTitle>
+          {(estructura?.preguntas.length ?? 0) > 0 && (
+            <Button
+              type="button"
+              variant={preview ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPreview(v => !v)}
+            >
+              {preview
+                ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
-          <TemplateAutoevaluacionBuilder estructura={estructura} onChange={setEstructura} />
-          <div className="flex justify-end">
-            <Button onClick={handleGuardar} disabled={guardando}>
-              {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {guardando ? 'Guardando...' : 'Guardar plantilla'}
-            </Button>
-          </div>
+          {preview ? (
+            <VistaPreviaAutoevaluacion estructura={estructura} />
+          ) : (
+            <TemplateAutoevaluacionBuilder
+              estructura={estructura}
+              onChange={setEstructura}
+              editable
+              slotVacio={
+                <div className="text-center py-8 space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Esta plantilla todavía no tiene preguntas.
+                  </p>
+                  <Button type="button" variant="outline" onClick={() => setEstructura({ preguntas: [preguntaVacia()] })}>
+                    <Plus className="h-4 w-4 mr-2" />Agregar la primera pregunta
+                  </Button>
+                </div>
+              }
+              slotAcciones={
+                <Button onClick={handleGuardar} disabled={guardando}>
+                  {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {guardando ? 'Guardando...' : 'Guardar plantilla'}
+                </Button>
+              }
+            />
+          )}
         </CardContent>
       </Card>
 

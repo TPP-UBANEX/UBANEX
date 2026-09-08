@@ -151,7 +151,7 @@ export function PlantillaFormularioDetail() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">Campos</CardTitle>
+          <CardTitle className="text-sm font-medium">Formulario de presentación</CardTitle>
           {campos.length > 0 && (
             <Button
               type="button"
@@ -165,7 +165,7 @@ export function PlantillaFormularioDetail() {
             </Button>
           )}
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {preview ? (
             <VistaPreviaFormulario campos={campos} />
           ) : (

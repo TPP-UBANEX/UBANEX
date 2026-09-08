@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -12,8 +13,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { DetailSkeleton } from '@/components/TableSkeleton'
-import { TemplateInstitucionalBuilder } from '@/components/TemplateInstitucionalBuilder'
-import { TemplateCruzadaBuilder } from '@/components/TemplateCruzadaBuilder'
+import { TemplateInstitucionalBuilder, nuevaCategoriaInstitucional } from '@/components/TemplateInstitucionalBuilder'
+import { TemplateCruzadaBuilder, nuevaCategoriaCruzada } from '@/components/TemplateCruzadaBuilder'
 import { VistaPreviaEvaluacionInstitucional } from '@/components/VistaPreviaEvaluacionInstitucional'
 import { VistaPreviaEvaluacionCruzada } from '@/components/VistaPreviaEvaluacionCruzada'
 import { api } from '@/lib/api'
@@ -23,7 +24,7 @@ import type {
   TemplateEvaluacionInstitucional,
   TemplateEvaluacionCruzada,
 } from '@/data/types'
-import { ArrowLeft, Eye, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Tipo = 'institucional' | 'cruzada'
@@ -192,7 +193,10 @@ export function PlantillaEvaluacionDetail() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">Estructura</CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-sm font-medium">Formulario de evaluación</CardTitle>
+            <Badge variant="outline">{esInstitucional ? 'Institucional' : 'Cruzada'}</Badge>
+          </div>
           {hayContenidoPreview && (
             <Button
               type="button"
@@ -211,6 +215,21 @@ export function PlantillaEvaluacionDetail() {
             esInstitucional
               ? <VistaPreviaEvaluacionInstitucional estructura={estructuraInst} />
               : <VistaPreviaEvaluacionCruzada estructura={estructuraCruzada} />
+          ) : !hayContenidoPreview ? (
+            <div className="text-center py-8 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Esta plantilla todavía no tiene categorías.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => esInstitucional
+                  ? setEstructura({ categorias: [nuevaCategoriaInstitucional()], checklist: [] })
+                  : setEstructura({ categorias: [nuevaCategoriaCruzada()] })}
+              >
+                <Plus className="h-4 w-4 mr-2" />Agregar la primera categoría
+              </Button>
+            </div>
           ) : esInstitucional ? (
             <TemplateInstitucionalBuilder
               estructura={estructuraInst}
