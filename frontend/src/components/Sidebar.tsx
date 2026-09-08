@@ -8,7 +8,6 @@ import {
   FolderOpen,
   Users,
   ChevronLeft,
-  ClipboardList,
   UserCheck,
   LayoutTemplate,
   // CalendarCheck,
@@ -122,22 +121,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 {!collapsed && <span className="text-sm">Plantillas</span>}
               </Button>
             )}
-            <Button
-              key="/proyectos?revision=true"
-              variant={
-                location.pathname === '/proyectos' && location.search.includes('revision=true')
-                  ? 'secondary'
-                  : 'ghost'
-              }
-              className={cn(
-                'w-full justify-start gap-3',
-                collapsed && 'justify-center px-2',
-              )}
-              onClick={() => navigate('/proyectos?revision=true')}
-            >
-              <ClipboardList className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="text-sm">Revisión</span>}
-            </Button>
           </>
         )}
         {!esGestion && (

@@ -104,8 +104,8 @@ Cuando la Secretaría te valida, ya podés crear proyectos y ser asignado como D
   - **Proyectos** — tus proyectos (o todos, si sos gestión).
   - **Evaluación** — evaluaciones y orden de mérito.
   - **Usuarios** — solo roles de gestión.
-  - Sección **Gestión** (solo gestión): *Validación Docente* (Secretaría),
-    *Plantillas de presentación / evaluación / autoevaluación* (Rectorado) y *Revisión*.
+  - Sección **Gestión** (solo gestión): *Validación Docente* (Secretaría) y
+    *Plantillas de presentación / evaluación / autoevaluación* (Rectorado).
   - Sección **Participación** (Estudiante / Docente): *Mis Participaciones*.
   - El botón `‹` colapsa/expande la barra.
 - **Header (arriba):**

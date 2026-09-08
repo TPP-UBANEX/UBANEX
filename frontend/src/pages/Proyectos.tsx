@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,15 +39,13 @@ const pipelineColumns = [
 
 export function Proyectos() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { user } = useAuth()
-  const esRevision = searchParams.get('revision') === 'true'
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [kanbanEdiciones, setKanbanEdiciones] = useState<Edicion[]>([])
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filtroEtapa, setFiltroEtapa] = useState(esRevision ? EstadoEdicion.Presentado : 'todas')
+  const [filtroEtapa, setFiltroEtapa] = useState<EstadoEdicion | 'todas'>('todas')
   const [filtroConv, setFiltroConv] = useState('todas')
   const [filtroAnio, setFiltroAnio] = useState('todas')
   const [page, setPage] = useState(1)
@@ -107,11 +105,6 @@ export function Proyectos() {
   }, [])
 
   useEffect(() => {
-    setFiltroEtapa(esRevision ? EstadoEdicion.Presentado : 'todas')
-    setPage(1)
-  }, [esRevision])
-
-  useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(search)
       setPage(1)
@@ -146,7 +139,7 @@ export function Proyectos() {
 
   const anios = [...new Set(convocatorias.map(c => c.anio))].sort((a, b) => b - a)
 
-  const cambiarEtapa = (v: string) => { setFiltroEtapa(v); setPage(1) }
+  const cambiarEtapa = (v: string) => { setFiltroEtapa(v as EstadoEdicion | 'todas'); setPage(1) }
   const cambiarConv = (v: string) => { setFiltroConv(v); setPage(1) }
   const cambiarAnio = (v: string) => { setFiltroAnio(v); setPage(1) }
 
@@ -154,11 +147,7 @@ export function Proyectos() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">
-            {esRevision
-              ? 'Proyectos presentados pendientes de revisión'
-              : 'Pipeline de proyectos de extensión'}
-          </p>
+          <p className="text-sm text-muted-foreground">Pipeline de proyectos de extensión</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant={vista === 'tabla' ? 'default' : 'outline'} onClick={() => setVista('tabla')}>Tabla</Button>

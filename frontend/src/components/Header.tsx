@@ -17,11 +17,11 @@ import { rolUsuarioLabel, rolUsuarioColor, rolUsuarioPrincipal } from '@/data/pe
 import { cn } from '@/lib/utils'
 import { LogOut, User } from 'lucide-react'
 
-function tituloSeccion(pathname: string, search: string, userId?: string): string {
+function tituloSeccion(pathname: string, userId?: string): string {
   if (pathname === '/') return 'Dashboard'
   if (pathname === '/convocatorias') return 'Convocatorias'
   if (pathname.startsWith('/convocatorias/')) return 'Convocatoria'
-  if (pathname === '/proyectos') return search.includes('revision=true') ? 'Revisión de proyectos' : 'Proyectos'
+  if (pathname === '/proyectos') return 'Proyectos'
   if (pathname.startsWith('/proyectos/')) return 'Proyecto'
   if (pathname === '/evaluacion') return 'Evaluación'
   if (pathname === '/plantillas') return 'Plantillas'
@@ -59,7 +59,7 @@ export function Header() {
     <header className="border-b bg-background px-6 h-16 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <span className="text-2xl font-semibold text-heading">
-          {tituloSeccion(location.pathname, location.search, user?.id)}
+          {tituloSeccion(location.pathname, user?.id)}
         </span>
       </div>
 
