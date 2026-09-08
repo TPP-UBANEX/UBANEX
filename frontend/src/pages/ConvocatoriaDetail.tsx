@@ -133,7 +133,6 @@ export function ConvocatoriaDetail() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filtroEtapa, setFiltroEtapa] = useState('todas');
-  const [filtroAnio, setFiltroAnio] = useState('todas');
   const [filtroAval, setFiltroAval] = useState('todas');
   const [filtroUA, setFiltroUA] = useState('todas');
   const [invitacionEvaluador, setInvitacionEvaluador] = useState<ParticipacionConvocatoria | null>(
@@ -273,7 +272,6 @@ export function ConvocatoriaDetail() {
         limit: 10,
         search: debouncedSearch || undefined,
         estado: filtroEtapa !== 'todas' ? filtroEtapa : undefined,
-        anio: filtroAnio !== 'todas' ? Number(filtroAnio) : undefined,
         tieneAval: filtroAval !== 'todas' ? filtroAval === 'si' : undefined,
       })
       .then((res) => {
@@ -282,7 +280,7 @@ export function ConvocatoriaDetail() {
       })
       .catch(() => {})
       .finally(() => setLoadingTabla(false));
-  }, [id, page, debouncedSearch, filtroEtapa, filtroAnio, filtroAval, refreshKey]);
+  }, [id, page, debouncedSearch, filtroEtapa, filtroAval, refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -294,10 +292,6 @@ export function ConvocatoriaDetail() {
 
   const cambiarEtapa = (v: string) => {
     setFiltroEtapa(v);
-    setPage(1);
-  };
-  const cambiarAnio = (v: string) => {
-    setFiltroAnio(v);
     setPage(1);
   };
   const cambiarAval = (v: string) => {
@@ -648,10 +642,6 @@ export function ConvocatoriaDetail() {
   Object.values(EstadoEdicion).forEach((estado) => {
     conteo[estado] = todasEdiciones.filter((e) => e.estado === estado).length;
   });
-
-  const anios = [
-    ...new Set(todasEdiciones.map((e) => e.anioEdicion).filter((a): a is number => a != null)),
-  ].sort((a, b) => b - a);
 
   return (
     <div className="p-6 space-y-6">
@@ -1244,19 +1234,6 @@ export function ConvocatoriaDetail() {
                   {Object.values(EstadoEdicion).map((s) => (
                     <SelectItem key={s} value={s}>
                       {estadoEdicionLabel[s] || s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filtroAnio} onValueChange={cambiarAnio}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Edición" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas las ediciones</SelectItem>
-                  {anios.map((a) => (
-                    <SelectItem key={a} value={String(a)}>
-                      {a}
                     </SelectItem>
                   ))}
                 </SelectContent>

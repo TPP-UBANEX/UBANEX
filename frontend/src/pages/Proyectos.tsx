@@ -183,9 +183,9 @@ export function Proyectos() {
           </SelectContent>
         </Select>
         <Select value={filtroAnio} onValueChange={cambiarAnio}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Edición" /></SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Año" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas las ediciones</SelectItem>
+            <SelectItem value="todas">Todos los años</SelectItem>
             {anios.map(a => (
               <SelectItem key={a} value={String(a)}>{a}</SelectItem>
             ))}
@@ -226,6 +226,7 @@ export function Proyectos() {
                       <TableHead>Proyecto</TableHead>
                       <TableHead>Creado por</TableHead>
                       <TableHead>Facultad</TableHead>
+                      <TableHead>Año</TableHead>
                       <TableHead>Etapa</TableHead>
                       <TableHead>Aval</TableHead>
                       <TableHead></TableHead>
@@ -261,6 +262,7 @@ export function Proyectos() {
                               ? `${e.unidadAcademica?.nombre} y ${e.proyecto.unidadAcademicaAdicional.nombre}`
                               : e.unidadAcademica?.nombre || '-'}
                           </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{e.anioEdicion ?? '-'}</TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
                           <TableCell><AvalBadge avalUrl={e.avalUrl} /></TableCell>
                           <TableCell>
@@ -280,7 +282,7 @@ export function Proyectos() {
                         </TableRow>
                         {expandidaId === e.id && (
                           <TableRow key={`${e.id}-detalle`}>
-                            <TableCell colSpan={esAdmin ? 7 : 6}>
+                            <TableCell colSpan={esAdmin ? 8 : 7}>
                               <div className="py-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                                   Hitos de ejecución
