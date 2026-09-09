@@ -604,6 +604,15 @@ export const api = {
     eliminar: (id: string) =>
       del(`/rendiciones/${id}`),
   },
+  organizaciones: {
+    listar: (edicionId: string) =>
+      get<import('@/data/types').OrganizacionAsociada[]>(`/organizaciones-asociadas/ediciones/${edicionId}`),
+    crear: (edicionId: string, data: import('@/data/types').CrearOrganizacionAsociadaDto) =>
+      post<import('@/data/types').OrganizacionAsociada>(`/organizaciones-asociadas/ediciones/${edicionId}`, data),
+    actualizar: (id: string, data: import('@/data/types').ActualizarOrganizacionAsociadaDto) =>
+      request<import('@/data/types').OrganizacionAsociada>('PUT', `/organizaciones-asociadas/${id}`, data),
+    eliminar: (id: string) => del(`/organizaciones-asociadas/${id}`),
+  },
   ejecucion: {
     hitos: {
       listar: (edicionId: string) =>
