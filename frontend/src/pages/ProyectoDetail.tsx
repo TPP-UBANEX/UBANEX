@@ -16,9 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
-import { conProtocolo } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
-import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, UnidadAcademica, CampoFormulario, SugerenciaCambio } from '@/data/types'
+import type { Proyecto, Edicion, Presupuesto, ViaticoPresupuesto, BienPresupuesto, ParticipacionConvocatoria, UnidadAcademica, CampoFormulario, SugerenciaCambio, OrganizacionAsociada } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, TipoRubro, TipoPersona, RolUsuario, RolEjecucion, EstadoSugerencia, TipoCampo, MAX_LONGITUD_POR_TIPO, TIPOS_VALOR_OBJETO } from '@/data/types'
 import { cargoDocenteLabel, tipoDesignacionDocenteLabel } from '@/data/perfil'
 import { CampoSugerible } from '@/components/CampoSugerible'
@@ -31,6 +30,8 @@ import { HitosEjecucionTab } from '@/components/HitosEjecucionTab'
 import { ComprobantesTab } from '@/components/ComprobantesTab'
 import { AutoevaluacionTab } from '@/components/AutoevaluacionTab'
 import { InformeFinalTab } from '@/components/InformeFinalTab'
+import { AvalesTab } from '@/components/AvalesTab'
+import { OrganizacionesTab } from '@/components/OrganizacionesTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
 import { useDireccionEdicion, DireccionEditor } from '@/components/DireccionEditor'
 import { GestionarDireccionModal } from '@/components/GestionarDireccionModal'
@@ -65,7 +66,7 @@ const OPCIONES_ES_INSUMO = [
   { value: 'false', label: 'No' },
 ]
 
-const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'rendicion', 'autoevaluacion', 'informe-final', 'sugerencias', 'historial']
+const TABS_FIJAS_POST = ['direccion', 'avales', 'presupuesto', 'organizaciones', 'evaluaciones', 'ejecucion-hitos', 'rendicion', 'autoevaluacion', 'informe-final', 'sugerencias', 'historial']
 
 
 interface ModalConfigSugerencia {
@@ -124,9 +125,6 @@ export function ProyectoDetail() {
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
   const [guardando, setGuardando] = useState(false)
   const [iniciandoEvaluacion, setIniciandoEvaluacion] = useState(false)
-  const [avalInput, setAvalInput] = useState('')
-  const [avalModo, setAvalModo] = useState<'si' | 'no'>('no')
-  const [guardandoAval, setGuardandoAval] = useState(false)
 
   const [camposFormulario, setCamposFormulario] = useState<CampoFormulario[]>([])
   const secciones = useMemo(() => agruparCamposEnSecciones(camposFormulario), [camposFormulario])
@@ -151,7 +149,6 @@ export function ProyectoDetail() {
 
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showGestionarDireccion, setShowGestionarDireccion] = useState(false)
-  const [showGestionarAval, setShowGestionarAval] = useState(false)
 
   const [uas, setUas] = useState<UnidadAcademica[]>([])
 
@@ -292,8 +289,15 @@ export function ProyectoDetail() {
     )
   }
 
-  const descargarProyecto = () => {
+  const descargarProyecto = async () => {
     if (!proyecto || !edicion) return
+    // Las organizaciones se traen bajo demanda; si el usuario no tiene acceso, se omiten.
+    let organizaciones: OrganizacionAsociada[] = []
+    try {
+      organizaciones = await api.organizaciones.listar(edicion.id)
+    } catch {
+      organizaciones = []
+    }
     try {
       exportarProyectoPdf({
         proyecto,
@@ -314,6 +318,7 @@ export function ProyectoDetail() {
             telefono: d.usuario?.telefono,
             email: d.usuario?.email,
           })),
+        organizaciones,
       })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo generar el PDF del proyecto')
@@ -324,13 +329,25 @@ export function ProyectoDetail() {
     .filter(d => d.rol === RolEjecucion.DirectorDeProyecto)
     .map(d => ({ nombre: nombreConUA(d), esPrincipal: !!d.esDirectorPrincipal }))
 
-  const descargarAval = (enBlanco = false) => {
+  // Trae las organizaciones de la edición para los PDF; si no hay acceso o no hay edición, [].
+  const cargarOrganizaciones = async (): Promise<OrganizacionAsociada[]> => {
+    if (!edicion) return []
+    try {
+      return await api.organizaciones.listar(edicion.id)
+    } catch {
+      return []
+    }
+  }
+
+  const descargarAval = async (enBlanco = false) => {
+    const organizaciones = enBlanco ? [] : await cargarOrganizaciones()
     try {
       exportarAvalPdf({
         proyecto: proyecto ?? undefined,
         edicion: edicion ?? undefined,
         unidadAcademica: nombreUnidadesAcademicas(),
         directores: directoresParaPdf(),
+        organizaciones,
         enBlanco,
       })
     } catch (err) {
@@ -338,13 +355,14 @@ export function ProyectoDetail() {
     }
   }
 
-  const descargarCartaCompromiso = (enBlanco = false) => {
+  const descargarCartaCompromiso = async (enBlanco = false) => {
+    const organizaciones = enBlanco ? [] : await cargarOrganizaciones()
     try {
       exportarCartaCompromisoPdf({
         proyecto: proyecto ?? undefined,
-        edicion: edicion ?? undefined,
         unidadAcademica: nombreUnidadesAcademicas(),
         directores: directoresParaPdf(),
+        organizaciones,
         enBlanco,
       })
     } catch (err) {
@@ -416,11 +434,6 @@ export function ProyectoDetail() {
       .catch(() => toast.error('Error al cargar sugerencias'))
   }, [modoSugerencia, edicion?.id, user?.id])
 
-  useEffect(() => {
-    setAvalInput(edicion?.avalUrl ?? '')
-    setAvalModo(edicion?.avalUrl ? 'si' : 'no')
-  }, [edicion?.id, edicion?.avalUrl])
-
   const direccion = useDireccionEdicion({ proyecto, edicion, directores, uas })
 
   const iniciarEdicion = () => {
@@ -450,22 +463,6 @@ export function ProyectoDetail() {
       cargarDatos()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al actualizar el consolidado')
-    }
-  }
-
-  const guardarAval = async () => {
-    if (!id || !edicion) return
-    setGuardandoAval(true)
-    try {
-      const nuevoValor = avalModo === 'si' && avalInput.trim() ? conProtocolo(avalInput) : null
-      await api.proyectos.actualizarAval(id, edicion.id, { avalUrl: nuevoValor })
-      toast.success('Aval actualizado')
-      setShowGestionarAval(false)
-      cargarDatos()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al actualizar el aval')
-    } finally {
-      setGuardandoAval(false)
     }
   }
 
@@ -863,32 +860,6 @@ export function ProyectoDetail() {
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Edición</CardTitle></CardHeader>
           <CardContent><p className="text-sm">{edicion?.anioEdicion || '-'}</p></CardContent>
         </Card>
-        <Card
-          className={esSecretariaMismaUA && puedeEditarAval ? 'cursor-pointer hover:bg-muted/50 transition-colors' : undefined}
-          onClick={esSecretariaMismaUA && puedeEditarAval ? () => setShowGestionarAval(true) : undefined}
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium flex items-center gap-1.5">
-              Aval
-              {esSecretariaMismaUA && puedeEditarAval && <Pencil className="h-3 w-3 text-muted-foreground" />}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {edicion?.avalUrl
-              ? (
-                <a
-                  href={conProtocolo(edicion.avalUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-bold text-primary underline"
-                  onClick={e => e.stopPropagation()}
-                >
-                  Ver aval
-                </a>
-              )
-              : <p className="text-sm font-bold">Sin aval</p>}
-          </CardContent>
-        </Card>
         {puedeGestionarDireccion && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowGestionarDireccion(true)}>
             <CardHeader className="pb-2">
@@ -909,7 +880,9 @@ export function ProyectoDetail() {
             <TabsTrigger key={seccion.id} value={`seccion-${seccion.id}`}>{seccion.nombre}</TabsTrigger>
           ))}
           <TabsTrigger value="direccion">Dirección</TabsTrigger>
+          <TabsTrigger value="avales">Avales</TabsTrigger>
           <TabsTrigger value="presupuesto">Presupuesto solicitado</TabsTrigger>
+          <TabsTrigger value="organizaciones">Organizaciones</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
           <TabsTrigger value="rendicion">Rendición de fondos</TabsTrigger>
@@ -1074,6 +1047,17 @@ export function ProyectoDetail() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="avales" className="mt-4">
+          {edicion && (
+            <AvalesTab
+              proyectoId={id!}
+              edicion={edicion}
+              puedeEditar={Boolean(esSecretariaMismaUA && puedeEditarAval)}
+              onGuardado={cargarDatos}
+            />
+          )}
+        </TabsContent>
+
         <TabsContent value="presupuesto" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -1096,6 +1080,14 @@ export function ProyectoDetail() {
               }, { activo: modoSugerencia, onSugerir: handleSugerirClick })}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="organizaciones" className="mt-4">
+          <OrganizacionesTab
+            edicionId={edicion?.id}
+            estado={edicion?.estado}
+            puedeEditar={esPropietario || esDirector}
+          />
         </TabsContent>
 
         <TabsContent value="evaluaciones" className="mt-4">
@@ -1208,40 +1200,6 @@ export function ProyectoDetail() {
         opciones={modalConfig.opciones}
       />
 
-      <Dialog open={showGestionarAval} onOpenChange={setShowGestionarAval}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Aval</DialogTitle>
-            <DialogDescription>
-              Link al PDF firmado por el decano, requisito para adjudicar el proyecto.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <div className="flex gap-1">
-              <Button type="button" size="sm" variant={avalModo === 'si' ? 'default' : 'outline'} onClick={() => setAvalModo('si')}>Sí</Button>
-              <Button type="button" size="sm" variant={avalModo === 'no' ? 'default' : 'outline'} onClick={() => setAvalModo('no')}>No</Button>
-            </div>
-            {avalModo === 'si' && (
-              <Input
-                placeholder="https://..."
-                maxLength={2048}
-                value={avalInput}
-                onChange={e => setAvalInput(e.target.value)}
-              />
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGestionarAval(false)}>Cancelar</Button>
-            <Button
-              onClick={guardarAval}
-              disabled={guardandoAval || (avalModo === 'si' && !avalInput.trim())}
-            >
-              {guardandoAval ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Guardar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {proyecto && edicion && (
         <GestionarDireccionModal
