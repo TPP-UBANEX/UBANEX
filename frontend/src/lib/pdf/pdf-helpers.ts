@@ -17,6 +17,8 @@ export interface OpcionesTabla {
   altoFila?: number
   /** Alineación del texto de cada columna. Default: 'left'. */
   alineaciones?: ('left' | 'center')[]
+  /** Si es true, no dibuja la fila de encabezado (grilla tipo recuadro de formulario). */
+  sinEncabezado?: boolean
 }
 
 export interface PdfHelpers {
@@ -207,7 +209,7 @@ export function crearDocPdf(): PdfHelpers {
       y += alto
     }
 
-    dibujarFila(headers, true)
+    if (!opciones.sinEncabezado) dibujarFila(headers, true)
     for (const fila of filas) {
       // Si la fila no entra y salta de página, reponer el encabezado arriba.
       const { alto } = preparar(fila, altoFilaMin)

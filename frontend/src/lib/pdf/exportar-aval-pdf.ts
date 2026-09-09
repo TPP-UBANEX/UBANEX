@@ -1,5 +1,6 @@
-import type { Edicion, Proyecto } from '@/data/types'
+import type { Edicion, OrganizacionAsociada, Proyecto } from '@/data/types'
 import { crearDocPdf, slugArchivo } from './pdf-helpers'
+import { renderOrganizacionesPdf } from './organizaciones-pdf'
 
 interface OpcionesExportarAval {
   proyecto?: Proyecto
@@ -7,6 +8,7 @@ interface OpcionesExportarAval {
   /** Nombre(s) de la(s) unidad(es) académica(s), como se muestran en el detalle del proyecto. */
   unidadAcademica?: string
   directores?: { nombre: string; esPrincipal: boolean }[]
+  organizaciones?: OrganizacionAsociada[]
   /** Si es true, se genera la planilla en blanco (modelo FORMULARIO 15) para completar a mano. */
   enBlanco?: boolean
 }
@@ -27,6 +29,7 @@ export function exportarAvalPdf({
   edicion,
   unidadAcademica,
   directores = [],
+  organizaciones = [],
   enBlanco = false,
 }: OpcionesExportarAval = {}): void {
   const h = crearDocPdf()
@@ -63,6 +66,9 @@ export function exportarAvalPdf({
     ],
     { anchosRelativos: [1.2, 1, 1], altoFila: 54 },
   )
+
+  // Información institucional de las organizaciones participantes (no en la versión en blanco).
+  if (!enBlanco) renderOrganizacionesPdf(h, organizaciones)
 
   const slug = enBlanco ? 'en-blanco' : slugArchivo(proyecto?.nombre ?? '', 'proyecto')
   h.guardar(`aval-${slug}.pdf`)

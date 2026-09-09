@@ -1,9 +1,10 @@
-import type { CampoFormulario, ColumnaTabla, Edicion, Proyecto } from '@/data/types'
+import type { CampoFormulario, ColumnaTabla, Edicion, OrganizacionAsociada, Proyecto } from '@/data/types'
 import { TipoCampo, TipoRubro, estadoEdicionLabel } from '@/data/types'
 import { formatearValorCampoFormulario } from '@/components/CampoFormularioInput'
 import { agruparCamposEnSecciones } from '@/lib/secciones-formulario'
 import { formatearMoneda, LABELS_RUBRO } from '@/lib/presupuesto'
 import { crearDocPdf, slugArchivo } from '@/lib/pdf/pdf-helpers'
+import { renderOrganizacionesPdf } from '@/lib/pdf/organizaciones-pdf'
 
 /** Datos de un director/co-director para la tabla "Datos del Director" del formulario oficial. */
 export interface DirectorProyectoPdf {
@@ -24,6 +25,7 @@ interface OpcionesExportar {
   /** Nombre(s) de la(s) unidad(es) académica(s), tal como se muestran en el detalle del proyecto. */
   unidadAcademica: string
   directores?: DirectorProyectoPdf[]
+  organizaciones?: OrganizacionAsociada[]
 }
 
 /**
@@ -38,6 +40,7 @@ export function exportarProyectoPdf({
   campos,
   unidadAcademica,
   directores = [],
+  organizaciones = [],
 }: OpcionesExportar): void {
   const h = crearDocPdf()
 
@@ -116,6 +119,9 @@ export function exportarProyectoPdf({
       }
     }
   }
+
+  // ── Organizaciones asociadas ──
+  renderOrganizacionesPdf(h, organizaciones)
 
   // ── Presupuesto solicitado ──
   const presupuesto = edicion.presupuestoSolicitado
