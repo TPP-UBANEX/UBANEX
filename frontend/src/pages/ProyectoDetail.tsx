@@ -31,7 +31,9 @@ import { ComprobantesTab } from '@/components/ComprobantesTab'
 import { AutoevaluacionTab } from '@/components/AutoevaluacionTab'
 import { InformeFinalTab } from '@/components/InformeFinalTab'
 import { AvalesTab } from '@/components/AvalesTab'
-import { OrganizacionesTab } from '@/components/OrganizacionesTab'
+import {
+  OrganizacionesTab, organizacionAEdit, editAPayload, type OrganizacionEdit,
+} from '@/components/OrganizacionesTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
 import { useDireccionEdicion, DireccionEditor } from '@/components/DireccionEditor'
 import { GestionarDireccionModal } from '@/components/GestionarDireccionModal'
@@ -123,6 +125,8 @@ export function ProyectoDetail() {
   const [editAnioEdicion, setEditAnioEdicion] = useState<number | null>(null)
   const [editPresupuesto, setEditPresupuesto] = useState<Presupuesto | null>(null)
   const [editDatosFormulario, setEditDatosFormulario] = useState<Record<string, unknown>>({})
+  const [organizaciones, setOrganizaciones] = useState<OrganizacionAsociada[]>([])
+  const [editOrganizaciones, setEditOrganizaciones] = useState<OrganizacionEdit[]>([])
   const [guardando, setGuardando] = useState(false)
   const [iniciandoEvaluacion, setIniciandoEvaluacion] = useState(false)
 
@@ -403,6 +407,11 @@ export function ProyectoDetail() {
           setDirectores(participaciones.filter(p => p.rol === RolEjecucion.DirectorDeProyecto && p.edicionId === ed.id))
           setCamposFormulario((formulario.campos ?? []).slice().sort((a, b) => a.orden - b.orden))
         }
+        try {
+          setOrganizaciones(await api.organizaciones.listar(ed.id))
+        } catch {
+          setOrganizaciones([])
+        }
       }
     } catch {
       toast.error('Error al cargar el proyecto')
@@ -444,6 +453,7 @@ export function ProyectoDetail() {
       edicion.presupuestoSolicitado ? JSON.parse(JSON.stringify(edicion.presupuestoSolicitado)) : null,
     )
     setEditDatosFormulario(edicion.datosFormulario ? JSON.parse(JSON.stringify(edicion.datosFormulario)) : {})
+    setEditOrganizaciones(organizaciones.map(organizacionAEdit))
     setPrevisualizando(false)
     setEditando(true)
     direccion.reset()
@@ -466,6 +476,22 @@ export function ProyectoDetail() {
     }
   }
 
+  /** Persiste el diff de organizaciones (staged) contra las persistidas, vía sus endpoints. */
+  const sincronizarOrganizaciones = async () => {
+    if (!edicion) return
+    const originalesIds = new Set(organizaciones.map(o => o.id))
+    const editadasIds = new Set(editOrganizaciones.map(o => o.id).filter(Boolean) as string[])
+    // Eliminar las que estaban y ya no están.
+    const aEliminar = organizaciones.filter(o => !editadasIds.has(o.id))
+    // Crear (sin id) y actualizar (con id).
+    for (const org of editOrganizaciones) {
+      const payload = editAPayload(org)
+      if (org.id && originalesIds.has(org.id)) await api.organizaciones.actualizar(org.id, payload)
+      else if (!org.id) await api.organizaciones.crear(edicion.id, payload)
+    }
+    for (const org of aEliminar) await api.organizaciones.eliminar(org.id)
+  }
+
   const handleGuardar = async () => {
     if (!id || !edicion) return
     if (direccion.motivoDireccion) {
@@ -483,6 +509,7 @@ export function ProyectoDetail() {
         datosFormulario: editDatosFormulario,
       })
       await direccion.sincronizar()
+      await sincronizarOrganizaciones()
       toast.success('Proyecto actualizado')
       setPrevisualizando(false)
       setEditando(false)
@@ -1084,9 +1111,10 @@ export function ProyectoDetail() {
 
         <TabsContent value="organizaciones" className="mt-4">
           <OrganizacionesTab
-            edicionId={edicion?.id}
-            estado={edicion?.estado}
-            puedeEditar={esPropietario || esDirector}
+            organizaciones={organizaciones}
+            editando={editandoEfectivo}
+            value={editOrganizaciones}
+            onChange={setEditOrganizaciones}
           />
         </TabsContent>
 

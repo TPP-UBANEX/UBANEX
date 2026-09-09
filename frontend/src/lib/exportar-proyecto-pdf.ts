@@ -165,6 +165,7 @@ export function exportarProyectoPdf({
         )
       }
     }
+    h.espacio(10)
     h.addPageIfNeeded(18)
     h.doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 30, 30)
     h.doc.text(`Total solicitado: ${formatearMoneda(presupuesto.montoTotal)}`, h.margin, h.getY())

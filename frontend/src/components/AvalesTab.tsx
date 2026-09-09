@@ -45,13 +45,13 @@ export function AvalesTab({ proyectoId, edicion, puedeEditar, onGuardado }: Aval
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Aval de la Unidad Académica</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
+        <CardTitle className="text-sm font-medium">Aval de la Unidad Académica</CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
           Link al PDF del aval firmado por el decano. Es requisito para adjudicar el proyecto y
           lo carga la Secretaría de Extensión de la unidad académica del proyecto.
         </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
 
         <div>
           <p className="text-xs font-medium text-muted-foreground mb-1">Estado</p>
