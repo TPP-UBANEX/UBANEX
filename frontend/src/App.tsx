@@ -13,6 +13,8 @@ import { ConvocatoriaDetail } from '@/pages/ConvocatoriaDetail'
 import { Proyectos } from '@/pages/Proyectos'
 import { ProyectoDetail } from '@/pages/ProyectoDetail'
 import { Evaluacion } from '@/pages/Evaluacion'
+import { EvaluacionDetail } from '@/pages/EvaluacionDetail'
+import { Plantillas } from '@/pages/Plantillas'
 import { PlantillasEvaluacion } from '@/pages/PlantillasEvaluacion'
 import { PlantillasAutoevaluacion } from '@/pages/PlantillasAutoevaluacion'
 import { Usuarios } from '@/pages/Usuarios'
@@ -20,14 +22,10 @@ import { UsuarioDetail } from '@/pages/UsuarioDetail'
 import { ValidacionDocente } from '@/pages/ValidacionDocente'
 import { PlantillasFormulario } from '@/pages/PlantillasFormulario'
 import { PlantillaFormularioDetail } from '@/pages/PlantillaFormularioDetail'
+import { PlantillaEvaluacionDetail } from '@/pages/PlantillaEvaluacionDetail'
+import { PlantillaAutoevaluacionDetail } from '@/pages/PlantillaAutoevaluacionDetail'
 import { RolUsuario } from '@/data/types'
-
-const ROLES_GESTION = [
-  RolUsuario.AutoridadDeRectorado,
-  RolUsuario.AsistenteDeRectorado,
-  RolUsuario.AutoridadDeSecretaria,
-  RolUsuario.AsistenteDeSecretaria,
-]
+import { ROLES_GESTION } from '@/data/perfil'
 
 const ROLES_RECTORADO = [
   RolUsuario.AutoridadDeRectorado,
@@ -45,7 +43,7 @@ function Layout({ children }: { children: React.ReactNode }) {
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto bg-muted/20">
+        <main className="flex-1 overflow-y-auto bg-muted/20 flex flex-col">
           {children}
         </main>
       </div>
@@ -77,13 +75,17 @@ function App() {
                   <Route path="/proyectos" element={<Proyectos />} />
                   <Route path="/proyectos/:id" element={<ProyectoDetail />} />
                   <Route path="/evaluacion" element={<Evaluacion />} />
-                  <Route path="/plantillas-evaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasEvaluacion /></ProtectedRoute>} />
-                  <Route path="/plantillas-autoevaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasAutoevaluacion /></ProtectedRoute>} />
+                  <Route path="/evaluacion/:edicionId" element={<EvaluacionDetail />} />
+                  <Route path="/plantillas" element={<ProtectedRoute roles={ROLES_RECTORADO}><Plantillas /></ProtectedRoute>} />
+                  <Route path="/plantillas/presentacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasFormulario /></ProtectedRoute>} />
+                  <Route path="/plantillas/presentacion/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaFormularioDetail /></ProtectedRoute>} />
+                  <Route path="/plantillas/evaluacion" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasEvaluacion /></ProtectedRoute>} />
+                  <Route path="/plantillas/evaluacion/:tipo/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaEvaluacionDetail /></ProtectedRoute>} />
+                  <Route path="/plantillas/impacto" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasAutoevaluacion /></ProtectedRoute>} />
+                  <Route path="/plantillas/impacto/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaAutoevaluacionDetail /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<ProtectedRoute roles={ROLES_GESTION}><Usuarios /></ProtectedRoute>} />
                   <Route path="/usuarios/:id" element={<ProtectedRoute roles={ROLES_GESTION} allowOwnId><UsuarioDetail /></ProtectedRoute>} />
                   <Route path="/validacion-docente" element={<ValidacionDocente />} />
-                <Route path="/plantillas-formulario" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillasFormulario /></ProtectedRoute>} />
-                <Route path="/plantillas-formulario/:id" element={<ProtectedRoute roles={ROLES_RECTORADO}><PlantillaFormularioDetail /></ProtectedRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

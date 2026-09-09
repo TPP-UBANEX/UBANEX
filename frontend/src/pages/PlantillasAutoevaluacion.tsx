@@ -1,188 +1,242 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
+  DialogTrigger,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { TableSkeleton } from '@/components/TableSkeleton'
 import { api } from '@/lib/api'
-import type {
-  EstructuraTemplateAutoevaluacion,
-  TemplateAutoevaluacionImpacto,
-} from '@/data/types'
-import { TemplateAutoevaluacionBuilder } from '@/components/TemplateAutoevaluacionBuilder'
-import { ClipboardCheck, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import type { TemplateAutoevaluacionImpacto } from '@/data/types'
+import { ArrowLeft, Loader2, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface DialogAutoState {
-  open: boolean
-  id?: string
-  nombre: string
-  esDefault: boolean
-  estructura: EstructuraTemplateAutoevaluacion | null
-}
-
-const dialogAutoVacio: DialogAutoState = {
-  open: false,
-  nombre: '',
-  esDefault: false,
-  estructura: null,
-}
-
 export function PlantillasAutoevaluacion() {
+  const navigate = useNavigate()
   const [templates, setTemplates] = useState<TemplateAutoevaluacionImpacto[]>([])
   const [loading, setLoading] = useState(true)
-  const [guardando, setGuardando] = useState(false)
-  const [dialog, setDialog] = useState<DialogAutoState>(dialogAutoVacio)
+  const [nuevaOpen, setNuevaOpen] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const [esDefault, setEsDefault] = useState(false)
+  const [creando, setCreando] = useState(false)
+  const [aEliminar, setAEliminar] = useState<TemplateAutoevaluacionImpacto | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
-  const cargar = useCallback(async () => {
-    const list = await api.templatesAutoevaluacion.list()
-    setTemplates(list)
+  const cargar = useCallback(() => {
+    return api.templatesAutoevaluacion.list()
+      .then(setTemplates)
+      .catch(err => toast.error(err instanceof Error ? err.message : 'Error al cargar las plantillas'))
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
-    cargar().finally(() => setLoading(false))
-  }, [cargar])
+  useEffect(() => { cargar() }, [cargar])
 
-  const abrirNuevo = () => setDialog({ ...dialogAutoVacio, open: true })
-  const abrirEditar = (t: TemplateAutoevaluacionImpacto) =>
-    setDialog({
-      open: true,
-      id: t.id,
-      nombre: t.nombre,
-      esDefault: t.esDefault,
-      estructura: t.estructura,
-    })
-
-  const guardar = async () => {
-    if (!dialog.nombre.trim()) {
-      toast.error('La plantilla debe tener un nombre')
+  const handleCrear = async () => {
+    if (!nombre.trim()) {
+      toast.error('La plantilla necesita un nombre')
       return
     }
-    setGuardando(true)
+    setCreando(true)
     try {
-      const dto = {
-        nombre: dialog.nombre.trim(),
-        esDefault: dialog.esDefault,
-        estructura: dialog.estructura ?? undefined,
-      }
-      if (dialog.id) {
-        await api.templatesAutoevaluacion.actualizar(dialog.id, dto)
-        toast.success('Plantilla actualizada')
-      } else {
-        await api.templatesAutoevaluacion.crear(dto)
-        toast.success('Plantilla creada')
-      }
-      setDialog(dialogAutoVacio)
-      await cargar()
+      const creada = await api.templatesAutoevaluacion.crear({ nombre: nombre.trim(), esDefault })
+      toast.success('Plantilla creada correctamente')
+      setNuevaOpen(false)
+      setNombre('')
+      setEsDefault(false)
+      navigate(`/plantillas/impacto/${creada.id}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar la plantilla')
+      toast.error(err instanceof Error ? err.message : 'Error al crear la plantilla')
     } finally {
-      setGuardando(false)
+      setCreando(false)
     }
   }
 
-  const eliminar = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar la plantilla "${nombre}"?`)) return
+  const marcarDefault = async (t: TemplateAutoevaluacionImpacto) => {
     try {
-      await api.templatesAutoevaluacion.eliminar(id)
-      toast.success('Plantilla eliminada')
+      await api.templatesAutoevaluacion.actualizar(t.id, {
+        nombre: t.nombre,
+        esDefault: true,
+        estructura: t.estructura ?? undefined,
+      })
+      toast.success(`"${t.nombre}" es la nueva plantilla por defecto`)
+      await cargar()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al marcar la plantilla')
+    }
+  }
+
+  const ejecutarEliminar = async () => {
+    if (!aEliminar) return
+    setEliminando(true)
+    try {
+      await api.templatesAutoevaluacion.eliminar(aEliminar.id)
+      toast.success('Plantilla eliminada correctamente')
+      setAEliminar(null)
       await cargar()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar la plantilla')
+    } finally {
+      setEliminando(false)
     }
   }
 
   return (
     <div className="p-6 space-y-6">
-      {loading ? (
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            Acá podés crear las plantillas de autoevaluación de impacto que después se configuran
+            en cada convocatoria.
+          </p>
         </div>
-      ) : (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Plantillas de autoevaluación de impacto</CardTitle>
-            <Button size="sm" onClick={abrirNuevo}>
+        <Dialog open={nuevaOpen} onOpenChange={setNuevaOpen}>
+          <DialogTrigger asChild>
+            <Button>
               <Plus className="h-4 w-4 mr-2" />Nueva plantilla
             </Button>
-          </CardHeader>
-          <CardContent>
-            {templates.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Todavía no hay plantillas de autoevaluación de impacto.
-              </p>
-            ) : (
-              <div className="space-y-2">
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Nueva plantilla</DialogTitle>
+              <DialogDescription>
+                Después de crearla vas a poder cargarle las preguntas.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Nombre</p>
+                <Input
+                  value={nombre}
+                  onChange={e => setNombre(e.target.value)}
+                  placeholder="Ej: Plantilla de autoevaluación estándar"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">¿Es la plantilla por defecto?</p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={esDefault ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEsDefault(true)}
+                  >
+                    Sí
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!esDefault ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEsDefault(false)}
+                  >
+                    No
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Solo puede haber una por defecto: si marcás esta, se desmarca la anterior.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNuevaOpen(false)}>Cancelar</Button>
+              <Button onClick={handleCrear} disabled={creando}>
+                {creando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {creando ? 'Creando...' : 'Crear'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <TableSkeleton columns={3} />
+          ) : templates.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No hay plantillas cargadas.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Preguntas</TableHead>
+                  <TableHead>Por defecto</TableHead>
+                  <TableHead className="w-32 text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {templates.map(t => (
-                  <div key={t.id} className="flex items-center justify-between border rounded-lg p-3">
-                    <div>
-                      <p className="text-sm font-medium">{t.nombre}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t.estructura?.preguntas.length ?? 0} preguntas
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {t.esDefault && <Badge variant="default">Por defecto</Badge>}
-                      <Button variant="outline" size="icon" onClick={() => abrirEditar(t)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => eliminar(t.id, t.nombre)}>
+                  <TableRow
+                    key={t.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/plantillas/impacto/${t.id}`)}
+                  >
+                    <TableCell className="font-medium">{t.nombre}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.estructura?.preguntas.length ?? 0}</TableCell>
+                    <TableCell>
+                      {t.esDefault && <Badge variant="secondary">Por defecto</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                      {!t.esDefault && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Marcar como por defecto"
+                          onClick={() => marcarDefault(t)}
+                        >
+                          <Star className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Eliminar plantilla"
+                        onClick={() => setAEliminar(t)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </div>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-      <Dialog open={dialog.open} onOpenChange={v => setDialog(d => ({ ...d, open: v }))}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <Dialog open={aEliminar !== null} onOpenChange={open => !open && setAEliminar(null)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              <ClipboardCheck className="h-4 w-4 mr-2 inline" />
-              {dialog.id ? 'Editar plantilla de autoevaluación' : 'Nueva plantilla de autoevaluación'}
-            </DialogTitle>
+            <DialogTitle>Eliminar plantilla</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de eliminar "{aEliminar?.nombre}"? Esta acción no se puede deshacer.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Nombre</span>
-              <Input
-                value={dialog.nombre}
-                onChange={e => setDialog(d => ({ ...d, nombre: e.target.value }))}
-                placeholder="Ej: Plantilla de autoevaluación estándar"
-              />
-            </div>
-            <TemplateAutoevaluacionBuilder
-              estructura={dialog.estructura}
-              onChange={estructura => setDialog(d => ({ ...d, estructura }))}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Establecer como plantilla por defecto</span>
-              <Button
-                type="button"
-                variant={dialog.esDefault ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setDialog(d => ({ ...d, esDefault: !d.esDefault }))}
-              >
-                {dialog.esDefault ? 'Sí' : 'No'}
-              </Button>
-            </div>
-          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog(dialogAutoVacio)}>Cancelar</Button>
-            <Button onClick={guardar} disabled={guardando}>
-              {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Guardar
+            <Button variant="outline" onClick={() => setAEliminar(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={ejecutarEliminar} disabled={eliminando}>
+              {eliminando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

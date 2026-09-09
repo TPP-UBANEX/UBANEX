@@ -12,21 +12,34 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { DetailSkeleton } from '@/components/TableSkeleton'
-import { CamposFormularioEditor, campoVacio, validarCampos } from '@/components/CamposFormularioEditor'
-import { VistaPreviaFormulario } from '@/components/VistaPreviaFormulario'
+import { TemplateAutoevaluacionBuilder } from '@/components/TemplateAutoevaluacionBuilder'
+import { VistaPreviaAutoevaluacion } from '@/components/VistaPreviaAutoevaluacion'
 import { api } from '@/lib/api'
-import type { CampoFormulario, Formulario } from '@/data/types'
+import type { EstructuraTemplateAutoevaluacion, PreguntaAutoevaluacion, TemplateAutoevaluacionImpacto } from '@/data/types'
 import { ArrowLeft, Eye, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-export function PlantillaFormularioDetail() {
+function preguntaVacia(): PreguntaAutoevaluacion {
+  return {
+    id: crypto.randomUUID(),
+    tipo: 'texto',
+    texto: '',
+    esObligatorio: true,
+    orden: 0,
+    opciones: null,
+    escalaMin: null,
+    escalaMax: null,
+  }
+}
+
+export function PlantillaAutoevaluacionDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const [plantilla, setPlantilla] = useState<Formulario | null>(null)
+  const [plantilla, setPlantilla] = useState<TemplateAutoevaluacionImpacto | null>(null)
   const [nombre, setNombre] = useState('')
   const [esDefault, setEsDefault] = useState(false)
-  const [campos, setCampos] = useState<CampoFormulario[]>([])
+  const [estructura, setEstructura] = useState<EstructuraTemplateAutoevaluacion | null>(null)
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
@@ -35,11 +48,11 @@ export function PlantillaFormularioDetail() {
 
   const cargarDatos = useCallback(async () => {
     if (!id) return
-    const datos = await api.formularios.get(id)
+    const datos = await api.templatesAutoevaluacion.get(id)
     setPlantilla(datos)
     setNombre(datos.nombre)
     setEsDefault(datos.esDefault)
-    setCampos(datos.campos ?? [])
+    setEstructura(datos.estructura ?? null)
   }, [id])
 
   useEffect(() => {
@@ -51,14 +64,16 @@ export function PlantillaFormularioDetail() {
   const handleGuardar = async () => {
     if (!id) return
     if (!nombre.trim()) {
-      toast.error('La plantilla necesita un nombre')
+      toast.error('La plantilla debe tener un nombre')
       return
     }
-    if (!validarCampos(campos)) return
-
     setGuardando(true)
     try {
-      await api.formularios.actualizar(id, { nombre: nombre.trim(), esDefault, campos })
+      await api.templatesAutoevaluacion.actualizar(id, {
+        nombre: nombre.trim(),
+        esDefault,
+        estructura: estructura ?? undefined,
+      })
       toast.success('Plantilla guardada correctamente')
       await cargarDatos()
     } catch (err) {
@@ -72,9 +87,9 @@ export function PlantillaFormularioDetail() {
     if (!id) return
     setEliminando(true)
     try {
-      await api.formularios.eliminar(id)
+      await api.templatesAutoevaluacion.eliminar(id)
       toast.success('Plantilla eliminada correctamente')
-      navigate('/plantillas/presentacion')
+      navigate('/plantillas/impacto')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar la plantilla')
       setEliminando(false)
@@ -86,7 +101,7 @@ export function PlantillaFormularioDetail() {
   if (!plantilla) {
     return (
       <div className="p-6 space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/plantillas/presentacion')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/plantillas/impacto')}>
           <ArrowLeft className="h-4 w-4 mr-2" />Volver
         </Button>
         <p className="text-muted-foreground">Plantilla no encontrada</p>
@@ -98,13 +113,13 @@ export function PlantillaFormularioDetail() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas/presentacion')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas/impacto')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <h2 className="text-lg font-semibold">{plantilla.nombre}</h2>
             <p className="text-sm text-muted-foreground">
-              {campos.length} {campos.length === 1 ? 'campo' : 'campos'}
+              {estructura?.preguntas.length ?? 0} preguntas
             </p>
           </div>
         </div>
@@ -123,7 +138,7 @@ export function PlantillaFormularioDetail() {
             <Input value={nombre} onChange={e => setNombre(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">¿Es la plantilla default?</span>
+            <span className="text-xs text-muted-foreground">¿Es la plantilla por defecto?</span>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -143,7 +158,7 @@ export function PlantillaFormularioDetail() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Solo puede haber una default: si marcás esta, se desmarca la anterior.
+              Solo puede haber una por defecto: si marcás esta, se desmarca la anterior.
             </p>
           </div>
         </CardContent>
@@ -151,8 +166,8 @@ export function PlantillaFormularioDetail() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">Formulario de presentación</CardTitle>
-          {campos.length > 0 && (
+          <CardTitle className="text-sm font-medium">Formulario de autoevaluación de impacto</CardTitle>
+          {(estructura?.preguntas.length ?? 0) > 0 && (
             <Button
               type="button"
               variant={preview ? 'default' : 'outline'}
@@ -167,19 +182,19 @@ export function PlantillaFormularioDetail() {
         </CardHeader>
         <CardContent className="space-y-4">
           {preview ? (
-            <VistaPreviaFormulario campos={campos} />
+            <VistaPreviaAutoevaluacion estructura={estructura} />
           ) : (
-            <CamposFormularioEditor
-              campos={campos}
-              onChange={setCampos}
+            <TemplateAutoevaluacionBuilder
+              estructura={estructura}
+              onChange={setEstructura}
               editable
               slotVacio={
                 <div className="text-center py-8 space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Esta plantilla todavía no tiene campos.
+                    Esta plantilla todavía no tiene preguntas.
                   </p>
-                  <Button type="button" variant="outline" onClick={() => setCampos([campoVacio()])}>
-                    <Plus className="h-4 w-4 mr-2" />Agregar el primer campo
+                  <Button type="button" variant="outline" onClick={() => setEstructura({ preguntas: [preguntaVacia()] })}>
+                    <Plus className="h-4 w-4 mr-2" />Agregar la primera pregunta
                   </Button>
                 </div>
               }
@@ -200,7 +215,6 @@ export function PlantillaFormularioDetail() {
             <DialogTitle>Eliminar plantilla</DialogTitle>
             <DialogDescription>
               ¿Estás seguro de eliminar "{plantilla.nombre}"? Esta acción no se puede deshacer.
-              Las convocatorias que ya la importaron no se ven afectadas.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

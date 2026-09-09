@@ -9,20 +9,39 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { api } from '@/lib/api'
-import type { CampoFormulario, Formulario } from '@/data/types'
 import { FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface Props {
+export interface PlantillaSeleccionable {
+  id: string
+  nombre: string
+  esDefault: boolean
+}
+
+interface Props<T extends PlantillaSeleccionable> {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSeleccionar: (campos: CampoFormulario[]) => void
+  /** Se invoca al abrir el diálogo; mantiene la carga perezosa de la lista de plantillas. */
+  cargarPlantillas: () => Promise<T[]>
+  /** Texto al final de cada fila, ej. "12 campos" o "4 categorías". */
+  detalle: (plantilla: T) => string
+  /** Puede ser async: el diálogo muestra el spinner y cierra al terminar. */
+  onSeleccionar: (plantilla: T) => void | Promise<void>
+  descripcion?: string
   advertencia?: string
 }
 
-export function SeleccionarPlantillaDialog({ open, onOpenChange, onSeleccionar, advertencia }: Props) {
-  const [plantillas, setPlantillas] = useState<Formulario[]>([])
+/** Diálogo genérico para elegir una plantilla de biblioteca (formularios de presentación o de evaluación). */
+export function SeleccionarPlantillaDialog<T extends PlantillaSeleccionable>({
+  open,
+  onOpenChange,
+  cargarPlantillas,
+  detalle,
+  onSeleccionar,
+  descripcion = 'Los campos de la plantilla se cargan como punto de partida y después podés editarlos libremente.',
+  advertencia,
+}: Props<T>) {
+  const [plantillas, setPlantillas] = useState<T[]>([])
   const [seleccionadaId, setSeleccionadaId] = useState('')
   const [loading, setLoading] = useState(false)
   const [importando, setImportando] = useState(false)
@@ -31,23 +50,18 @@ export function SeleccionarPlantillaDialog({ open, onOpenChange, onSeleccionar, 
     if (!open) return
     setSeleccionadaId('')
     setLoading(true)
-    api.formularios.list()
+    cargarPlantillas()
       .then(setPlantillas)
       .catch(() => toast.error('Error al cargar las plantillas'))
       .finally(() => setLoading(false))
   }, [open])
 
   const handleConfirmar = async () => {
-    if (!seleccionadaId) return
+    const plantilla = plantillas.find(p => p.id === seleccionadaId)
+    if (!plantilla) return
     setImportando(true)
     try {
-      const plantilla = await api.formularios.get(seleccionadaId)
-      const campos = (plantilla.campos ?? []).map((campo, index) => ({
-        ...campo,
-        id: crypto.randomUUID(),
-        orden: index,
-      }))
-      onSeleccionar(campos)
+      await onSeleccionar(plantilla)
       onOpenChange(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al cargar la plantilla')
@@ -61,9 +75,7 @@ export function SeleccionarPlantillaDialog({ open, onOpenChange, onSeleccionar, 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Elegir plantilla</DialogTitle>
-          <DialogDescription>
-            Los campos de la plantilla se cargan como punto de partida y después podés editarlos libremente.
-          </DialogDescription>
+          <DialogDescription>{descripcion}</DialogDescription>
         </DialogHeader>
 
         {advertencia && (
@@ -95,7 +107,7 @@ export function SeleccionarPlantillaDialog({ open, onOpenChange, onSeleccionar, 
                   <FileText className="h-4 w-4 shrink-0" />
                   <span className="truncate">{p.nombre}</span>
                   <span className="text-xs opacity-70 ml-auto shrink-0">
-                    {p.campos?.length ?? 0} campos
+                    {detalle(p)}
                     {p.esDefault && ' · Default'}
                   </span>
                 </button>

@@ -24,7 +24,7 @@ import {
 import { TableSkeleton } from '@/components/TableSkeleton'
 import { api } from '@/lib/api'
 import type { Formulario } from '@/data/types'
-import { Loader2, Plus, Star, Trash2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function PlantillasFormulario() {
@@ -59,7 +59,7 @@ export function PlantillasFormulario() {
       setNuevaOpen(false)
       setNombre('')
       setEsDefault(false)
-      navigate(`/plantillas-formulario/${creada.id}`)
+      navigate(`/plantillas/presentacion/${creada.id}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al crear la plantilla')
     } finally {
@@ -70,7 +70,7 @@ export function PlantillasFormulario() {
   const marcarDefault = async (plantilla: Formulario) => {
     try {
       await api.formularios.actualizar(plantilla.id, { esDefault: true })
-      toast.success(`"${plantilla.nombre}" es la nueva plantilla default`)
+      toast.success(`"${plantilla.nombre}" es la nueva plantilla por defecto`)
       await cargar()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al marcar la plantilla')
@@ -95,9 +95,14 @@ export function PlantillasFormulario() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Acá podés crear formularios de presentación que luego te sirven como plantillas para el momento de configurar una convocatoria.
-        </p>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/plantillas')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            Acá podés crear formularios de presentación que luego te sirven como plantillas para el momento de configurar una convocatoria.
+          </p>
+        </div>
         <Dialog open={nuevaOpen} onOpenChange={setNuevaOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -170,7 +175,7 @@ export function PlantillasFormulario() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Campos</TableHead>
-                  <TableHead>Default</TableHead>
+                  <TableHead>Por defecto</TableHead>
                   <TableHead className="w-32 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -179,12 +184,12 @@ export function PlantillasFormulario() {
                   <TableRow
                     key={p.id}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/plantillas-formulario/${p.id}`)}
+                    onClick={() => navigate(`/plantillas/presentacion/${p.id}`)}
                   >
                     <TableCell className="font-medium">{p.nombre}</TableCell>
                     <TableCell className="text-muted-foreground">{p.campos?.length ?? 0}</TableCell>
                     <TableCell>
-                      {p.esDefault && <Badge variant="secondary">Default</Badge>}
+                      {p.esDefault && <Badge variant="secondary">Por defecto</Badge>}
                     </TableCell>
                     <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       {!p.esDefault && (

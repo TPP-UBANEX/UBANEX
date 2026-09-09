@@ -10,6 +10,7 @@ import {
 import { ROLES_USUARIO_BUSCABLES, TipoCampo, tipoCampoLabels } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
 import { tipoCampoIconos } from '@/lib/tipo-campo-iconos'
+import { cn } from '@/lib/utils'
 import { OpcionesCampoEditor, RangoNumericoEditor, RolesUsuarioEditor } from '@/components/ConfigTipoCampoEditor'
 import { ColumnasTablaEditor, columnaVacia } from '@/components/ColumnasTablaEditor'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
@@ -171,18 +172,29 @@ export function CamposFormularioEditor({
   return (
     <div className="space-y-4">
       {campos.length === 0 ? slotVacio : (
-      <div className="space-y-3">
+      <div className="-mx-6 border-y divide-y">
         {campos.map((campo, index) => {
           const esSeccion = campo.tipo === TipoCampo.Seccion
+          const IconoSeccion = tipoCampoIconos[TipoCampo.Seccion]
           return (
             <div
               key={campo.id}
-              className={esSeccion ? 'border rounded-lg p-4 space-y-3 bg-primary/5 border-primary/30' : 'border rounded-lg p-4 space-y-3 bg-muted/30'}
+              className={cn(
+                'px-6 py-4 space-y-3',
+                esSeccion && 'bg-blue-50 dark:bg-blue-950/40 border-l-4 border-l-blue-500 dark:border-l-blue-400 pl-5',
+              )}
             >
               <div className="flex items-start gap-2">
                 <div className="flex-[2] space-y-1">
-                  <span className="text-xs text-muted-foreground">Etiqueta</span>
+                  {esSeccion ? (
+                    <span className="h-4 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                      <IconoSeccion className="h-3.5 w-3.5" />Sección
+                    </span>
+                  ) : (
+                    <span className="h-4 text-xs text-muted-foreground flex items-center">Etiqueta</span>
+                  )}
                   <Input
+                    className={esSeccion ? 'bg-background' : 'bg-muted/40'}
                     value={campo.nombre}
                     disabled={!editable}
                     onChange={e => actualizarCampo(campo.id, { nombre: e.target.value })}
@@ -190,13 +202,13 @@ export function CamposFormularioEditor({
                   />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <span className="text-xs text-muted-foreground">Tipo</span>
+                  <span className="h-4 text-xs text-muted-foreground flex items-center">Tipo</span>
                   <Select
                     value={campo.tipo}
                     disabled={!editable}
                     onValueChange={v => actualizarCampo(campo.id, { tipo: v as TipoCampo })}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className={esSeccion ? 'bg-background' : 'bg-muted/40'}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.values(TipoCampo).filter(t => t !== TipoCampo.Archivo).map(t => {
                         const Icono = tipoCampoIconos[t]
@@ -233,6 +245,7 @@ export function CamposFormularioEditor({
                     {esSeccion ? 'Descripción (opcional)' : 'Texto de ayuda (opcional)'}
                   </span>
                   <Input
+                    className={esSeccion ? 'bg-background' : 'bg-muted/40'}
                     value={campo.textoAyuda ?? ''}
                     disabled={!editable}
                     onChange={e => actualizarCampo(campo.id, { textoAyuda: e.target.value })}

@@ -450,6 +450,12 @@ export enum TipoEvaluacionCruzada {
   TerceraUa = 'TerceraUa',
 }
 
+export const tipoCruzadaLabel: Record<TipoEvaluacionCruzada, string> = {
+  [TipoEvaluacionCruzada.Propia]: 'Propia',
+  [TipoEvaluacionCruzada.Ajena]: 'Ajena',
+  [TipoEvaluacionCruzada.TerceraUa]: 'Tercera UA',
+}
+
 export type TipoValorSubcategoria = 'numerico' | 'booleano';
 
 export interface SubcategoriaInstitucional {

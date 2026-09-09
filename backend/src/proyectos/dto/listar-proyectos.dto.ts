@@ -1,5 +1,5 @@
-import { IsOptional, IsEnum, IsString, IsInt } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsEnum, IsString, IsInt, IsBoolean } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { ListarPaginadoDto } from '../../common/dto/listar-paginado.dto';
 import { EstadoEdicion } from '../../common/enums/estado-edicion.enum';
 
@@ -16,4 +16,9 @@ export class ListarProyectosDto extends ListarPaginadoDto {
   @Type(() => Number)
   @IsInt()
   anio?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  tieneAval?: boolean;
 }

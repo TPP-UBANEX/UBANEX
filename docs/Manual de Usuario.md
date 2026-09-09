@@ -104,8 +104,8 @@ Cuando la Secretaría te valida, ya podés crear proyectos y ser asignado como D
   - **Proyectos** — tus proyectos (o todos, si sos gestión).
   - **Evaluación** — evaluaciones y orden de mérito.
   - **Usuarios** — solo roles de gestión.
-  - Sección **Gestión** (solo gestión): *Validación Docente* (Secretaría),
-    *Plantillas de presentación / evaluación / autoevaluación* (Rectorado) y *Revisión*.
+  - Sección **Gestión** (solo gestión): *Validación Docente* (Secretaría) y
+    *Plantillas de presentación / evaluación / autoevaluación* (Rectorado).
   - Sección **Participación** (Estudiante / Docente): *Mis Participaciones*.
   - El botón `‹` colapsa/expande la barra.
 - **Header (arriba):**
@@ -139,7 +139,7 @@ Ejecución → Cierre**. Casi toda la configuración se hace en **Configuración
 
 ### 4.2 Formulario de presentación
 
-En el detalle de la convocatoria, pestaña **Formulario** (Autoridad **o** Asistente de
+En el detalle de la convocatoria, pestaña **Presentación** (Autoridad **o** Asistente de
 Rectorado):
 
 1. Podés partir de una **plantilla** (*Plantillas de presentación* en la barra lateral) o
@@ -174,6 +174,11 @@ convocatoria desde su detalle:
   checkbox.
 
 Podés marcar una plantilla como **default** para reutilizarla en la próxima convocatoria.
+
+Tanto en la pestaña **Evaluación** de la convocatoria como en la edición de plantillas de
+biblioteca, el botón **Vista previa** de cada formulario (institucional y cruzada, por
+separado) muestra cómo lo verá quien evalúe: categorías, subcategorías/ítems y checklist
+en solo lectura y sin valores. **Volver al editor** regresa al builder sin guardar nada.
 
 ![Builder de plantilla de evaluación cruzada](assets/manual/plantilla-evaluacion.png)
 
@@ -323,14 +328,6 @@ El botón **Descargar proyecto** (arriba a la derecha del detalle) genera un PDF
 detalle del proyecto, el formulario de presentación por secciones y el presupuesto
 solicitado. Está disponible para cualquier usuario que pueda ver el proyecto.
 
-### 7.5 Historial de trazabilidad
-
-En el detalle del proyecto, la pestaña **Historial** muestra una línea de tiempo con los
-cambios de estado (presentación, pase a evaluación, adjudicación, cierre), las
-observaciones (sugerencias de cambio) y la actividad de las evaluaciones, cada evento con
-su fecha y responsable. La ven la dirección del proyecto, la Secretaría de su UA y el
-Rectorado.
-
 ### 7.4 Enviar (presentar)
 
 Botón **Enviar** / **Presentar**. La edición pasa de **Borrador** a **Presentado**.
@@ -344,6 +341,14 @@ Si la Secretaría te devuelve la edición con cambios, pasa a **Pendiente de cam
 1. Revisá las **sugerencias** (pestaña *Sugerencias*, ver §11.2) y/o los comentarios.
 2. Corregí lo que haga falta.
 3. Botón **Resubir** para volver a **Presentado**.
+
+### 7.6 Historial de trazabilidad
+
+En el detalle del proyecto, la pestaña **Historial** muestra una línea de tiempo con los
+cambios de estado (presentación, pase a evaluación, adjudicación, cierre), las
+observaciones (sugerencias de cambio) y la actividad de las evaluaciones, cada evento con
+su fecha y responsable. La ven la dirección del proyecto, la Secretaría de su UA y el
+Rectorado.
 
 ---
 
@@ -370,7 +375,7 @@ solo los ven el director, la Secretaría de la UA y Rectorado.
 
 ### 8.2 Autoevaluación de impacto
 
-Pestaña **Autoevaluación**. Respondé el cuestionario de la convocatoria. Se puede guardar
+Pestaña **Impacto**. Respondé el cuestionario de la convocatoria. Se puede guardar
 como **Borrador** y retomar. Cuando esté lista, **Completar**.
 
 ![Pestaña de autoevaluación de impacto](assets/manual/autoevaluacion.png)
@@ -385,7 +390,7 @@ el texto libremente y, si querés, adjuntá un PDF (como link). Cuando esté lis
 
 ### 8.4 Comprobantes de rendición
 
-Mientras el proyecto está en ejecución, en la pestaña **Comprobantes** del detalle del
+Mientras el proyecto está en ejecución, en la pestaña **Rendición de fondos** del detalle del
 proyecto el director/codirector carga los comprobantes de gastos por rubro
 (**Cargar comprobante**), indicando rubro, monto, fecha y un link al comprobante. La
 pestaña muestra el **consumo del presupuesto** por rubro contra lo adjudicado.
@@ -494,10 +499,10 @@ congelado.
 Le falta alguna evaluación confirmada (institucional, propia o ajena), o hay una
 inconsistencia sin resolver.
 
-**Como Rectorado no veo un proyecto en borrador o pendiente de cambios.**
-Rectorado ve esos estados solo cuando la Secretaría de su UA carga el **aval**. Los
-proyectos **Presentado**, en cambio, aparecen con o sin aval, para que Rectorado pueda
-pasarlos a evaluación.
+**Como Rectorado no veo un proyecto en borrador.**
+Rectorado no ve los proyectos en **Borrador** porque todavía no fueron presentados. Los
+proyectos **Presentado** y **Pendiente de cambios** sí aparecen, con o sin aval — el aval
+no afecta la visibilidad, solo es requisito para adjudicar.
 
 **La aplicación tardó mucho en abrir.**
 El entorno de producción "se duerme" por inactividad; la primera carga puede demorar hasta

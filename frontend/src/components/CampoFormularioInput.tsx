@@ -14,6 +14,7 @@ import type { CampoFormulario, ColumnaTabla, ValorGeolocalizacion, ValorUsuario 
 import { LocalidadAutocomplete } from '@/components/LocalidadAutocomplete'
 import { UsuarioAutocomplete } from '@/components/UsuarioAutocomplete'
 import { TablaCampoFormulario } from '@/components/TablaCampoFormulario'
+import { formatearFechaISO } from '@/lib/utils'
 
 export function EtiquetaCampoFormulario({ campo }: { campo: Pick<CampoFormulario, 'nombre' | 'esObligatorio'> }) {
   return (
@@ -42,12 +43,6 @@ export function campoFormularioVacio(campo: CampoFormulario | ColumnaTabla, valo
   }
   if (typeof valor === 'string') return valor.trim() === ''
   return false
-}
-
-/** Pasa una fecha ISO (AAAA-MM-DD) a dd/mm/aaaa sin usar Date, que la interpretaria como UTC y correria el dia. */
-export function formatearFechaISO(valor: string): string {
-  const [anio, mes, dia] = valor.split('-')
-  return anio && mes && dia ? `${dia}/${mes}/${anio}` : valor
 }
 
 export function formatearValorCampoFormulario(campo: CampoFormulario | ColumnaTabla, valor: unknown): string {

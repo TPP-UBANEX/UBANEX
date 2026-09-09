@@ -16,3 +16,9 @@ export function conProtocolo(url: string): string {
   const u = url.trim()
   return /^https?:\/\//i.test(u) ? u : `https://${u}`
 }
+
+/** Pasa una fecha ISO (AAAA-MM-DD) a dd/mm/aaaa sin usar Date, que la interpretaria como UTC y correria el dia. */
+export function formatearFechaISO(valor: string): string {
+  const [anio, mes, dia] = valor.split('-')
+  return anio && mes && dia ? `${dia}/${mes}/${anio}` : valor
+}

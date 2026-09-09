@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -7,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2 } from 'lucide-react'
+import { Layers, Plus, Trash2 } from 'lucide-react'
 import type {
   CategoriaInstitucional,
   EstructuraTemplateInstitucional,
@@ -33,7 +34,7 @@ function nuevaSubcategoria(): SubcategoriaInstitucional {
   }
 }
 
-function nuevaCategoria(): CategoriaInstitucional {
+export function nuevaCategoriaInstitucional(): CategoriaInstitucional {
   return { id: crypto.randomUUID(), nombre: '', subcategorias: [nuevaSubcategoria()] }
 }
 
@@ -74,7 +75,7 @@ export function TemplateInstitucionalBuilder({ estructura, onChange, editable = 
   }
 
   const agregarCategoria = () =>
-    onChange({ ...base, categorias: [...categorias, nuevaCategoria()] })
+    onChange({ ...base, categorias: [...categorias, nuevaCategoriaInstitucional()] })
 
   const eliminarCategoria = (id: string) =>
     onChange({ ...base, categorias: categorias.filter(c => c.id !== id) })
@@ -122,51 +123,55 @@ export function TemplateInstitucionalBuilder({ estructura, onChange, editable = 
           <p className="text-sm text-muted-foreground">Sin categorías definidas.</p>
         )}
 
-        {categorias.map(categoria => (
-          <div key={categoria.id} className="border rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex-1 space-y-1">
-                <span className="text-xs text-muted-foreground">Nombre de la categoría</span>
-                <Input
-                  value={categoria.nombre}
-                  disabled={!editable}
-                  onChange={e => actualizarCategoria(categoria.id, { nombre: e.target.value })}
-                  placeholder="Ej: Puntaje diferencial"
-                />
+        {categorias.length > 0 && (
+        <div className="-mx-6 border-y divide-y">
+          {categorias.map(categoria => (
+            <Fragment key={categoria.id}>
+              <div className="flex items-center gap-2 pl-5 pr-6 py-4 bg-muted/50 border-l-4 border-l-muted-foreground/40">
+                <div className="flex-1 space-y-1">
+                  <span className="h-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    <Layers className="h-3.5 w-3.5" />Categoría
+                  </span>
+                  <Input
+                    className="bg-background"
+                    value={categoria.nombre}
+                    disabled={!editable}
+                    onChange={e => actualizarCategoria(categoria.id, { nombre: e.target.value })}
+                    placeholder="Ej: Puntaje diferencial"
+                  />
+                </div>
+                {editable && (
+                  <Button type="button" variant="ghost" size="icon" className="mt-5" onClick={() => eliminarCategoria(categoria.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-              {editable && (
-                <Button type="button" variant="ghost" size="icon" className="mt-5" onClick={() => eliminarCategoria(categoria.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
 
-            <div className="space-y-2 pl-2 border-l-2">
-              <span className="text-xs text-muted-foreground">Subcategorías</span>
+              {categoria.subcategorias.length === 0 && (
+                <p className="px-6 py-4 text-sm text-muted-foreground">Sin subcategorías.</p>
+              )}
+
               {categoria.subcategorias.map(sub => (
-                <div key={sub.id} className="border rounded-md p-3 space-y-2">
+                <div key={sub.id} className="px-6 py-4 space-y-2">
                   <div className="flex items-start gap-2">
-                    <div className="flex-1 space-y-1">
-                      <Input
-                        value={sub.texto}
-                        disabled={!editable}
-                        onChange={e => actualizarSubcategoria(categoria.id, sub.id, { texto: e.target.value })}
-                        placeholder="Texto de la subcategoría"
-                      />
-                    </div>
-                    <div className="w-32 space-y-1">
-                      <Select
-                        value={sub.tipoValor}
-                        disabled={!editable}
-                        onValueChange={v => actualizarSubcategoria(categoria.id, sub.id, { tipoValor: v as TipoValorSubcategoria })}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="numerico">Numérico</SelectItem>
-                          <SelectItem value="booleano">Sí / No</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Input
+                      className="bg-muted/40 flex-1"
+                      value={sub.texto}
+                      disabled={!editable}
+                      onChange={e => actualizarSubcategoria(categoria.id, sub.id, { texto: e.target.value })}
+                      placeholder="Texto de la subcategoría"
+                    />
+                    <Select
+                      value={sub.tipoValor}
+                      disabled={!editable}
+                      onValueChange={v => actualizarSubcategoria(categoria.id, sub.id, { tipoValor: v as TipoValorSubcategoria })}
+                    >
+                      <SelectTrigger className="bg-muted/40 w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="numerico">Numérico</SelectItem>
+                        <SelectItem value="booleano">Sí / No</SelectItem>
+                      </SelectContent>
+                    </Select>
                     {editable && (
                       <Button type="button" variant="ghost" size="icon" onClick={() => eliminarSubcategoria(categoria.id, sub.id)}>
                         <Trash2 className="h-4 w-4" />
@@ -178,6 +183,7 @@ export function TemplateInstitucionalBuilder({ estructura, onChange, editable = 
                       <div className="w-24 space-y-1">
                         <span className="text-xs text-muted-foreground">Mínimo</span>
                         <Input
+                          className="bg-muted/40"
                           type="number"
                           value={sub.minimo ?? ''}
                           disabled={!editable}
@@ -187,6 +193,7 @@ export function TemplateInstitucionalBuilder({ estructura, onChange, editable = 
                       <div className="w-24 space-y-1">
                         <span className="text-xs text-muted-foreground">Máximo</span>
                         <Input
+                          className="bg-muted/40"
                           type="number"
                           value={sub.maximo ?? ''}
                           disabled={!editable}
@@ -197,14 +204,18 @@ export function TemplateInstitucionalBuilder({ estructura, onChange, editable = 
                   )}
                 </div>
               ))}
+
               {editable && (
-                <Button type="button" variant="outline" size="sm" onClick={() => agregarSubcategoria(categoria.id)}>
-                  <Plus className="h-3 w-3 mr-1" />Agregar subcategoría
-                </Button>
+                <div className="px-6 py-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => agregarSubcategoria(categoria.id)}>
+                    <Plus className="h-3 w-3 mr-1" />Agregar subcategoría
+                  </Button>
+                </div>
               )}
-            </div>
-          </div>
-        ))}
+            </Fragment>
+          ))}
+        </div>
+        )}
       </div>
 
       <div className="space-y-3">

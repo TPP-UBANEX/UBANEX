@@ -41,7 +41,6 @@ import type {
 } from '@/data/types';
 import {
   estadoBadge,
-  estadoConvocatoriaLabel,
   estadoEdicionLabel,
   EstadoEdicion,
   EstadoConvocatoria,
@@ -49,13 +48,21 @@ import {
   RolEjecucion,
 } from '@/data/types';
 import { NuevoProyectoDialog } from '@/components/NuevoProyectoDialog';
+import { LineaTiempoConvocatoria } from '@/components/LineaTiempoConvocatoria';
 import { ResubirProyectoDialog } from '@/components/ResubirProyectoDialog';
+import { AvalBadge } from '@/components/AvalBadge';
 import { EmparejamientoTab } from '@/components/EmparejamientoTab';
 import { AsignacionEvaluadores } from '@/components/AsignacionEvaluadores';
 import { FormularioBuilderTab } from '@/components/FormularioBuilderTab';
 import { EvaluacionConfigTab } from '@/components/EvaluacionConfigTab';
 import { AdjudicacionResolucionTab } from '@/components/AdjudicacionResolucionTab';
-import { calcularPresupuestoAAdjudicar, formatearMoneda } from '@/lib/presupuesto';
+import {
+  calcularPresupuestoAAdjudicar,
+  formatearMoneda,
+  PORCENTAJE_EXTRA_INSUMOS_DEFAULT,
+  UMBRAL_INSUMOS_DEFAULT,
+  PORCENTAJE_EXTRA_PSE_DEFAULT,
+} from '@/lib/presupuesto';
 import { exportarResolucionPdf } from '@/lib/exportar-resolucion-pdf';
 import {
   ArrowLeft,
@@ -69,6 +76,10 @@ import {
   Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Default aplicado en backend/src/evaluaciones/evaluaciones.service.ts cuando el campo
+// umbralInconsistenciaCruzada de la convocatoria queda vacío.
+const UMBRAL_INCONSISTENCIA_DEFAULT = 40;
 
 function erroresFechas(f: {
   fechaInicioPresentacion: string;
@@ -113,7 +124,7 @@ export function ConvocatoriaDetail() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filtroEtapa, setFiltroEtapa] = useState('todas');
-  const [filtroAnio, setFiltroAnio] = useState('todas');
+  const [filtroAval, setFiltroAval] = useState('todas');
   const [filtroUA, setFiltroUA] = useState('todas');
   const [invitacionEvaluador, setInvitacionEvaluador] = useState<ParticipacionConvocatoria | null>(
     null,
@@ -150,7 +161,7 @@ export function ConvocatoriaDetail() {
   const [confirmarMeritoOpen, setConfirmarMeritoOpen] = useState(false);
   const [meritoIncompleto, setMeritoIncompleto] = useState<DetalleMeritoIncompleto | null>(null);
   const [ordenMeritoSort, setOrdenMeritoSort] = useState('puntaje-desc');
-  const [tab, setTab] = useState('proyectos');
+  const [tab, setTab] = useState('detalle');
 
   const esUsuarioEjecucion = user?.roles.some(
     (r) => r === RolUsuario.Estudiante || r === RolUsuario.Docente,
@@ -159,6 +170,22 @@ export function ConvocatoriaDetail() {
     (r) => r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
   );
   const esAutoridadRectorado = user?.roles.includes(RolUsuario.AutoridadDeRectorado);
+  // El orden de mérito recién tiene sentido a partir de la evaluación; se
+  // mantiene visible en ejecución y cierre para consultar el resultado confirmado.
+  const etapasConOrdenMerito = [
+    EstadoConvocatoria.Evaluacion,
+    EstadoConvocatoria.Ejecucion,
+    EstadoConvocatoria.Cierre,
+  ];
+  const puedeVerOrdenMerito =
+    !!esRectorado && !!conv && etapasConOrdenMerito.includes(conv.estado);
+  // En configuración todavía no puede existir ningún proyecto presentado,
+  // así que la pestaña no aporta nada.
+  const puedeVerProyectos = !!conv && conv.estado !== EstadoConvocatoria.Configuracion;
+  // Espeja validarAccesoResolucion del backend: Rectorado siempre; el resto (Secretaría con
+  // proyectos en su UA, director o evaluador) queda reflejado en que `todasEdiciones` -ya
+  // filtrado por rol al cargar la convocatoria- no venga vacío.
+  const puedeDescargarResolucion = !!esRectorado || todasEdiciones.length > 0;
   const errores = erroresFechas(editForm);
 
   const [pasandoEvaluacionId, setPasandoEvaluacionId] = useState<string | null>(null);
@@ -179,6 +206,11 @@ export function ConvocatoriaDetail() {
   };
 
   const esEvaluadorActivo = invitacionEvaluador !== null;
+
+  useEffect(() => {
+    if (tab === 'merito' && !puedeVerOrdenMerito) setTab('detalle');
+    if (tab === 'proyectos' && !puedeVerProyectos) setTab('detalle');
+  }, [tab, puedeVerOrdenMerito, puedeVerProyectos]);
 
   const [descargandoResolucion, setDescargandoResolucion] = useState(false);
   const descargarResolucion = async () => {
@@ -231,7 +263,7 @@ export function ConvocatoriaDetail() {
         limit: 10,
         search: debouncedSearch || undefined,
         estado: filtroEtapa !== 'todas' ? filtroEtapa : undefined,
-        anio: filtroAnio !== 'todas' ? Number(filtroAnio) : undefined,
+        tieneAval: filtroAval !== 'todas' ? filtroAval === 'si' : undefined,
       })
       .then((res) => {
         setEdiciones(res.data);
@@ -239,7 +271,7 @@ export function ConvocatoriaDetail() {
       })
       .catch(() => {})
       .finally(() => setLoadingTabla(false));
-  }, [id, page, debouncedSearch, filtroEtapa, filtroAnio, refreshKey]);
+  }, [id, page, debouncedSearch, filtroEtapa, filtroAval, refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -253,8 +285,8 @@ export function ConvocatoriaDetail() {
     setFiltroEtapa(v);
     setPage(1);
   };
-  const cambiarAnio = (v: string) => {
-    setFiltroAnio(v);
+  const cambiarAval = (v: string) => {
+    setFiltroAval(v);
     setPage(1);
   };
   const cambiarUA = (v: string) => {
@@ -413,6 +445,7 @@ export function ConvocatoriaDetail() {
           String(e.ordenMerito ?? ''),
           e.proyecto?.nombre || 'Sin nombre',
           e.unidadAcademica?.nombre || '-',
+          e.avalUrl ? 'Sí' : 'No',
           e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1).replace('.', ',') : '-',
           aAdjudicar.solicitado.toFixed(2).replace('.', ','),
           aAdjudicar.porcentajeInsumos.toFixed(1).replace('.', ','),
@@ -435,6 +468,7 @@ export function ConvocatoriaDetail() {
       'Orden',
       'Proyecto',
       'Unidad Académica',
+      'Aval',
       'Puntaje',
       'Presupuesto solicitado',
       '% insumos',
@@ -595,15 +629,6 @@ export function ConvocatoriaDetail() {
       </div>
     );
 
-  const conteo: Record<string, number> = {};
-  Object.values(EstadoEdicion).forEach((estado) => {
-    conteo[estado] = todasEdiciones.filter((e) => e.estado === estado).length;
-  });
-
-  const anios = [
-    ...new Set(todasEdiciones.map((e) => e.anioEdicion).filter((a): a is number => a != null)),
-  ].sort((a, b) => b - a);
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
@@ -611,19 +636,11 @@ export function ConvocatoriaDetail() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-foreground truncate" title={conv.nombre}>
-              {conv.nombre}
-            </h2>
-            <Badge variant={estadoBadge[conv.estado]} className="shrink-0">
-              {estadoConvocatoriaLabel[conv.estado] || conv.estado}
-            </Badge>
-          </div>
-          {conv.descripcion && (
-            <p className="text-sm text-muted-foreground truncate">{conv.descripcion}</p>
-          )}
+          <h2 className="text-xl font-semibold text-foreground truncate" title={conv.nombre}>
+            {conv.nombre}
+          </h2>
         </div>
-        {conv.adjudicacionEmitida && (
+        {conv.adjudicacionEmitida && puedeDescargarResolucion && (
           <Button
             variant="outline"
             className="shrink-0"
@@ -902,13 +919,14 @@ export function ConvocatoriaDetail() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Umbral de inconsistencia (3ra UA) · vacío = default 40 pts
+                        Umbral de inconsistencia (3ra UA) · vacío = default{' '}
+                        {UMBRAL_INCONSISTENCIA_DEFAULT} pts
                       </p>
                       <Input
                         type="number"
                         min={0}
                         className="mt-1"
-                        placeholder="40"
+                        placeholder={String(UMBRAL_INCONSISTENCIA_DEFAULT)}
                         value={editForm.umbralInconsistenciaCruzada}
                         onChange={e => setEditForm(f => ({ ...f, umbralInconsistenciaCruzada: e.target.value }))}
                       />
@@ -1112,34 +1130,24 @@ export function ConvocatoriaDetail() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        {Object.entries(conteo).map(([etapa, count]) => (
-          <Card key={etapa}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium">
-                {estadoEdicionLabel[etapa] || etapa}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{count}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <LineaTiempoConvocatoria convocatoria={conv} />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
-          {esRectorado && <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>}
+          <TabsTrigger value="detalle">Detalle</TabsTrigger>
+          {puedeVerProyectos && (
+            <TabsTrigger value="proyectos">Proyectos ({todasEdiciones.length})</TabsTrigger>
+          )}
+          {puedeVerOrdenMerito && <TabsTrigger value="merito">Orden de Mérito</TabsTrigger>}
           {esRectorado && conv?.ordenMeritoConfirmado && (
             <TabsTrigger value="adjudicacion">Adjudicación</TabsTrigger>
           )}
-          {!esUsuarioEjecucion && <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>}
-          <TabsTrigger value="detalle">Detalle</TabsTrigger>
-          <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
-          {esRectorado && <TabsTrigger value="formulario">Formulario</TabsTrigger>}
+          {esRectorado && <TabsTrigger value="formulario">Presentación</TabsTrigger>}
           {esRectorado && <TabsTrigger value="evaluacion">Evaluación</TabsTrigger>}
+          <TabsTrigger value="emparejamiento">Emparejamiento</TabsTrigger>
+          {!esUsuarioEjecucion && <TabsTrigger value="evaluadores">Evaluadores</TabsTrigger>}
         </TabsList>
+        {puedeVerProyectos && (
         <TabsContent value="proyectos" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -1198,17 +1206,14 @@ export function ConvocatoriaDetail() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={filtroAnio} onValueChange={cambiarAnio}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Edición" />
+              <Select value={filtroAval} onValueChange={cambiarAval}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Aval" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas las ediciones</SelectItem>
-                  {anios.map((a) => (
-                    <SelectItem key={a} value={String(a)}>
-                      {a}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="todas">Aval: todos</SelectItem>
+                  <SelectItem value="si">Con aval</SelectItem>
+                  <SelectItem value="no">Sin aval</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1217,7 +1222,7 @@ export function ConvocatoriaDetail() {
                 <div className="space-y-3">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="flex gap-4">
-                      {[...Array(5)].map((_, j) => (
+                      {[...Array(4)].map((_, j) => (
                         <Skeleton key={j} className="h-4 flex-1" />
                       ))}
                     </div>
@@ -1237,8 +1242,8 @@ export function ConvocatoriaDetail() {
                         <TableHead>Creado por</TableHead>
                         <TableHead>Facultad</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Aval</TableHead>
                         {conv?.ordenMeritoConfirmado && <TableHead>Adjudicación</TableHead>}
-                        <TableHead>Presupuesto solicitado</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1268,6 +1273,9 @@ export function ConvocatoriaDetail() {
                               {estadoEdicionLabel[e.estado] || e.estado}
                             </Badge>
                           </TableCell>
+                          <TableCell>
+                            <AvalBadge avalUrl={e.avalUrl} />
+                          </TableCell>
                           {conv?.ordenMeritoConfirmado && (
                             <TableCell>
                               {e.adjudicacionPropuesta === null ? (
@@ -1279,9 +1287,6 @@ export function ConvocatoriaDetail() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-sm">
-                            {formatearMoneda(e.presupuestoSolicitado?.montoTotal)}
-                          </TableCell>
                           <TableCell>
                             <div className="flex gap-1 justify-end">
                               {esRectorado &&
@@ -1299,18 +1304,6 @@ export function ConvocatoriaDetail() {
                                     Pasar a evaluación
                                   </Button>
                                 )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e2) => {
-                                  e2.stopPropagation();
-                                  navigate(
-                                    `/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`,
-                                  );
-                                }}
-                              >
-                                Ver
-                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1359,7 +1352,8 @@ export function ConvocatoriaDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        {esRectorado && (
+        )}
+        {puedeVerOrdenMerito && (
           <TabsContent value="merito" className="mt-4">
             <Card>
               <CardHeader className="flex flex-col gap-3 space-y-0">
@@ -1463,6 +1457,7 @@ export function ConvocatoriaDetail() {
                       <TableHead>Orden</TableHead>
                       <TableHead>Proyecto</TableHead>
                       <TableHead>Unidad académica</TableHead>
+                      <TableHead>Aval</TableHead>
                       <TableHead className="text-right">Puntaje</TableHead>
                       <TableHead className="text-right">Solicitado</TableHead>
                       <TableHead className="text-right">A adjudicar</TableHead>
@@ -1489,6 +1484,9 @@ export function ConvocatoriaDetail() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {e.unidadAcademica?.nombre || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <AvalBadge avalUrl={e.avalUrl} />
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {e.puntajeMerito != null ? Number(e.puntajeMerito).toFixed(1) : '-'}
@@ -1608,70 +1606,92 @@ export function ConvocatoriaDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="detalle" className="mt-4">
+        <TabsContent value="detalle" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium">Información</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-muted-foreground">Año:</span> {conv.anio}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Estado:</span>{' '}
-                  {estadoConvocatoriaLabel[conv.estado] || conv.estado}
-                </div>
+              <div>
+                <span className="text-muted-foreground">Descripción:</span>{' '}
+                <span className="whitespace-pre-wrap break-words">
+                  {conv.descripcion || '-'}
+                </span>
               </div>
-              <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Presentación</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioPresentacion || '-'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinPresentacion || '-'}
-                  </div>
-                </div>
-              </div>
-              <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Evaluación</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioEvaluacion || '-'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinEvaluacion || '-'}
-                  </div>
-                </div>
-              </div>
-              <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Ejecución</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-muted-foreground">Inicio:</span>{' '}
-                    {conv.fechaInicioEjecucion || '-'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin:</span>{' '}
-                    {conv.fechaFinEjecucion || '-'}
-                  </div>
-                </div>
-              </div>
-              <div className="border-t pt-3">
-                <p className="text-sm font-medium mb-2">Formulario</p>
-                <p>
-                  {conv.formulario?.campos?.length
-                    ? `${conv.formulario.campos.length} campos definidos`
-                    : 'Sin campos definidos'}
-                </p>
+              <div>
+                <span className="text-muted-foreground">Año:</span> {conv.anio}
               </div>
             </CardContent>
           </Card>
+          {esRectorado && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Configuración</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <p className="text-sm font-medium mb-2">Presupuesto</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Presupuesto total máximo:</span>{' '}
+                      {conv.presupuestoTotal ? formatearMoneda(conv.presupuestoTotal) : 'Sin tope'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Tope por proyecto (no consolidado):
+                      </span>{' '}
+                      {conv.topePresupuestoNoConsolidado
+                        ? formatearMoneda(conv.topePresupuestoNoConsolidado)
+                        : 'Sin tope'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Tope por proyecto (consolidado):
+                      </span>{' '}
+                      {conv.topePresupuestoConsolidado
+                        ? formatearMoneda(conv.topePresupuestoConsolidado)
+                        : 'Sin tope'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Extra por insumos:</span>{' '}
+                      {(() => {
+                        const porcentaje = conv.porcentajeExtraInsumos ?? PORCENTAJE_EXTRA_INSUMOS_DEFAULT;
+                        const umbral = conv.umbralInsumos ?? UMBRAL_INSUMOS_DEFAULT;
+                        return porcentaje
+                          ? `${porcentaje}% si los insumos representan al menos el ${umbral}% del solicitado`
+                          : 'Desactivado';
+                      })()}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Extra por PSE:</span>{' '}
+                      {(() => {
+                        const porcentaje = conv.porcentajeExtraPse ?? PORCENTAJE_EXTRA_PSE_DEFAULT;
+                        return porcentaje ? `${porcentaje}%` : 'Desactivado';
+                      })()}
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <p className="text-sm font-medium mb-2">Reglas de adjudicación</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Cuota federativa:</span>{' '}
+                      {conv.cuotaFederativa
+                        ? `${conv.cuotaFederativa} proyecto(s) adjudicado(s) como mínimo por unidad académica`
+                        : 'Sin mínimo'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Umbral de inconsistencia cruzada:
+                      </span>{' '}
+                      {conv.umbralInconsistenciaCruzada ?? UMBRAL_INCONSISTENCIA_DEFAULT} pts
+                      {conv.umbralInconsistenciaCruzada == null && ' (por defecto)'}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
