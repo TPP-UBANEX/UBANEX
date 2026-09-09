@@ -51,10 +51,11 @@ import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
 import { Notificacion } from '../sugerencias/notificacion.entity';
 import { SugerenciaCambio } from '../sugerencias/sugerencia-cambio.entity';
 import { Hito } from '../ejecucion/hito.entity';
+import { OrganizacionAsociada } from '../organizaciones-asociadas/organizacion-asociada.entity';
 import { AutoevaluacionImpacto } from '../ejecucion/autoevaluacion-impacto.entity';
 import { InformeFinal } from '../ejecucion/informe-final.entity';
 import { TemplateAutoevaluacionImpacto } from '../ejecucion/template-autoevaluacion.entity';
-import { UAS_NOMBRES, CARRERAS_POR_UA, AREAS_DOCENTE } from './seed.data';
+import { UAS_NOMBRES, CARRERAS_POR_UA, AREAS_DOCENTE, DOMINIOS_POR_UA } from './seed.data';
 import { clonarCamposConIdsNuevos, crearPresupuesto } from './seed.utils';
 
 /** Password única para todos los usuarios sembrados (incluido el admin). */
@@ -140,6 +141,7 @@ export class SeedService {
   private readonly notificacionRepo: Repository<Notificacion>;
   private readonly sugerenciaRepo: Repository<SugerenciaCambio>;
   private readonly hitoRepo: Repository<Hito>;
+  private readonly organizacionRepo: Repository<OrganizacionAsociada>;
   private readonly autoevaluacionRepo: Repository<AutoevaluacionImpacto>;
   private readonly informeRepo: Repository<InformeFinal>;
   private readonly templateAutoevalRepo: Repository<TemplateAutoevaluacionImpacto>;
@@ -179,6 +181,7 @@ export class SeedService {
     this.notificacionRepo = dataSource.getRepository(Notificacion);
     this.sugerenciaRepo = dataSource.getRepository(SugerenciaCambio);
     this.hitoRepo = dataSource.getRepository(Hito);
+    this.organizacionRepo = dataSource.getRepository(OrganizacionAsociada);
     this.autoevaluacionRepo = dataSource.getRepository(AutoevaluacionImpacto);
     this.informeRepo = dataSource.getRepository(InformeFinal);
     this.templateAutoevalRepo = dataSource.getRepository(TemplateAutoevaluacionImpacto);
@@ -225,8 +228,12 @@ export class SeedService {
 
   private async seedUnidadesAcademicaYCarreras(): Promise<void> {
     for (const nombre of UAS_NOMBRES) {
+      const dominioEmail = DOMINIOS_POR_UA[nombre];
       const existente = await this.uasService.obtenerPorNombre(nombre);
-      const ua = existente ?? (await this.uasService.crear({ nombre }));
+      let ua = existente ?? (await this.uasService.crear({ nombre, dominioEmail }));
+      if (existente && dominioEmail && existente.dominioEmail !== dominioEmail) {
+        ua = await this.uasService.actualizar(existente.id, { dominioEmail });
+      }
       this.uaMap.set(ua.nombre, ua);
     }
 
@@ -377,6 +384,8 @@ export class SeedService {
     estudiantes: Array<[string, string]>; // 2 nombres/apellidos
   }): Promise<void> {
     const ua = this.uaMap.get(opts.nombreUa)!;
+    // Docentes/estudiantes usan el correo institucional de la UA (restricción de registro).
+    const dom = ua.dominioEmail ?? 'uba.ar';
 
     const autoridad = await this.seedUsuario({
       nombreCompleto: `${opts.autoridad[0]} ${opts.autoridad[1]}`,
@@ -402,7 +411,7 @@ export class SeedService {
         await this.seedDocenteValidado({
           nombre,
           apellido,
-          email: `docente-${i + 1}-${opts.slug}@uba.ar`,
+          email: `docente-${i + 1}-${opts.slug}@${dom}`,
           ua,
           indice: i,
         }),
@@ -412,13 +421,13 @@ export class SeedService {
     const incompleto = await this.seedDocenteIncompleto({
       nombre: opts.incompleto[0],
       apellido: opts.incompleto[1],
-      email: `docente-incompleto-${opts.slug}@uba.ar`,
+      email: `docente-incompleto-${opts.slug}@${dom}`,
       ua,
     });
     const pendiente = await this.seedDocentePendiente({
       nombre: opts.pendiente[0],
       apellido: opts.pendiente[1],
-      email: `docente-pendiente-${opts.slug}@uba.ar`,
+      email: `docente-pendiente-${opts.slug}@${dom}`,
       ua,
     });
 
@@ -429,7 +438,7 @@ export class SeedService {
         await this.seedEstudiante({
           nombre,
           apellido,
-          email: `estudiante-${i + 1}-${opts.slug}@uba.ar`,
+          email: `estudiante-${i + 1}-${opts.slug}@${dom}`,
           ua,
           indice: i,
         }),
@@ -799,7 +808,10 @@ export class SeedService {
       const existente = await this.edicionRepo.findOne({
         where: { proyectoId: proyecto.id, convocatoriaId: opts.convocatoria.id },
       });
-      if (existente) return existente;
+      if (existente) {
+        await this.seedOrganizaciones(existente, opts.creadoPor.id);
+        return existente;
+      }
     } else {
       proyecto = await this.proyectoRepo.save(
         this.proyectoRepo.create({
@@ -827,6 +839,7 @@ export class SeedService {
     );
     console.log(`  ${opts.nombreProyecto} (${opts.estado})`);
     await this.seedTrazaEstados(edicion, opts.creadoPor, opts.convocatoria.anio);
+    await this.seedOrganizaciones(edicion, opts.creadoPor.id);
     return edicion;
   }
 
@@ -1217,6 +1230,59 @@ export class SeedService {
       links: ['https://drive.google.com/file/d/gacetilla-difusion-seed/view'],
     },
   ];
+
+  // Pool de organizaciones sociales de ejemplo (estilo formulario oficial VEIGA/RUSSO).
+  private readonly organizacionesSeed: Array<Partial<OrganizacionAsociada>> = [
+    {
+      nombre: 'Escuela de Educación Media N° 6', tipo: 'Escuela pública',
+      responsableNombre: 'Jordana Secondi', responsableCargo: 'Directora',
+      direccion: 'Av. Gral. Tomás de Iriarte 3500', localidad: 'CABA', codigoPostal: '1437',
+      provincia: 'Buenos Aires', telefonos: '011 4302-6296', email: 'eem6@bue.edu.ar',
+      objetivos: 'Escuela pública de nivel secundario.', actividades: 'Educativas.',
+    },
+    {
+      nombre: 'Escuela Comercial N° 18 "Reino de Suecia"', tipo: 'Escuela pública',
+      responsableNombre: 'Valeria M. Guillén', responsableCargo: 'Rectora',
+      direccion: 'Juan Carlos Gómez 253', localidad: 'CABA', codigoPostal: '1282',
+      provincia: 'Buenos Aires', telefonos: '011 4304-8491', email: 'dem_ec18_de5@bue.edu.ar',
+      objetivos: 'Escuela pública de nivel secundario.', actividades: 'Educativas.',
+    },
+    {
+      nombre: 'Asociación Civil Barrios del Sur', tipo: 'Asociación civil',
+      personeriaJuridica: 'IGJ 12345/18',
+      responsableNombre: 'María López', responsableCargo: 'Presidenta',
+      direccion: 'Av. Montes de Oca 1200', localidad: 'CABA', codigoPostal: '1270',
+      provincia: 'Buenos Aires', telefonos: '011 4301-7788', email: 'contacto@barriosdelsur.org.ar',
+      objetivos: 'Promoción de derechos y acompañamiento escolar en barrios vulnerables.',
+      actividades: 'Talleres comunitarios, apoyo escolar y actividades recreativas.',
+    },
+    {
+      nombre: 'Cooperativa de Trabajo El Progreso', tipo: 'Cooperativa',
+      personeriaJuridica: 'INAES 45678',
+      responsableNombre: 'Luis Pereyra', responsableCargo: 'Coordinador',
+      direccion: 'Calle 8 N° 1450', localidad: 'La Plata', codigoPostal: '1900',
+      provincia: 'Buenos Aires', telefonos: '0221 555-1234', email: 'info@elprogreso.coop',
+      objetivos: 'Producción y capacitación laboral de la comunidad.',
+      actividades: 'Capacitación en oficios y emprendedurismo.',
+    },
+  ];
+
+  /**
+   * Seedea 1–2 organizaciones asociadas para una edición (idempotente: si ya tiene, no hace
+   * nada). El contenido varía de forma determinística según el id de la edición.
+   */
+  private async seedOrganizaciones(edicion: Edicion, creadoPorId: string): Promise<void> {
+    const yaTiene = await this.organizacionRepo.count({ where: { edicionId: edicion.id } });
+    if (yaTiene > 0) return;
+    const hash = [...edicion.id].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const cantidad = (hash % 2) + 1; // 1 o 2
+    const filas: OrganizacionAsociada[] = [];
+    for (let i = 0; i < cantidad; i++) {
+      const base = this.organizacionesSeed[(hash + i) % this.organizacionesSeed.length];
+      filas.push(this.organizacionRepo.create({ ...base, edicionId: edicion.id, creadoPorId }));
+    }
+    await this.organizacionRepo.save(filas);
+  }
 
   private async seedHitos(edicion: Edicion, fechas: string[]): Promise<Hito[]> {
     const existentes = await this.hitoRepo.find({ where: { edicionId: edicion.id } });
