@@ -324,9 +324,7 @@ function TablaConvocatorias({ data, convocatoriasEvaluador, meta, page, onPage, 
                   <TableHead>Nombre</TableHead>
                   <TableHead>Año</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Presentación</TableHead>
                   <TableHead>Formulario</TableHead>
-                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -341,17 +339,9 @@ function TablaConvocatorias({ data, convocatoriasEvaluador, meta, page, onPage, 
                     <TableCell className="text-sm text-muted-foreground">{c.anio}</TableCell>
                     <TableCell><Badge variant={estadoBadge[c.estado]}>{estadoConvocatoriaLabel[c.estado] || c.estado}</Badge></TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {c.fechaInicioPresentacion && c.fechaFinPresentacion
-                        ? `${c.fechaInicioPresentacion} — ${c.fechaFinPresentacion}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
                       {c.formulario?.campos?.length
                         ? `${c.formulario.campos.length} campos`
                         : 'Sin configurar'}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onClick(c.id) }}>Ver</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -409,7 +399,7 @@ function TableSkeleton() {
         <div className="space-y-3">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="flex gap-4">
-              {[...Array(5)].map((_, j) => (
+              {[...Array(4)].map((_, j) => (
                 <Skeleton key={j} className="h-4 flex-1" />
               ))}
             </div>

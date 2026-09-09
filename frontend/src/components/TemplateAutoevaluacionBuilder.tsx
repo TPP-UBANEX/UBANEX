@@ -7,7 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2 } from 'lucide-react'
+import { OpcionesCampoEditor } from '@/components/ConfigTipoCampoEditor'
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import type {
   EstructuraTemplateAutoevaluacion,
   PreguntaAutoevaluacion,
@@ -18,11 +19,22 @@ interface Props {
   estructura: EstructuraTemplateAutoevaluacion | null
   onChange: (estructura: EstructuraTemplateAutoevaluacion) => void
   editable?: boolean
+  /** Qué mostrar cuando todavía no hay preguntas cargadas. */
+  slotVacio?: React.ReactNode
+  /** Acciones propias del contenedor (ej. "Guardar"), alineadas a la derecha del pie. */
+  slotAcciones?: React.ReactNode
 }
 
 const TIPOS = ['texto', 'booleano', 'escalaNumerica', 'select', 'checkbox'] as const
+const TIPOS_CON_OPCIONES = ['select', 'checkbox']
 
-export function TemplateAutoevaluacionBuilder({ estructura, onChange, editable = true }: Props) {
+export function TemplateAutoevaluacionBuilder({
+  estructura,
+  onChange,
+  editable = true,
+  slotVacio,
+  slotAcciones,
+}: Props) {
   const base: EstructuraTemplateAutoevaluacion = estructura ?? { preguntas: [] }
   const preguntas = base.preguntas
 
@@ -55,6 +67,15 @@ export function TemplateAutoevaluacionBuilder({ estructura, onChange, editable =
     onChange({ preguntas: restantes.map((p, i) => ({ ...p, orden: i })) })
   }
 
+  const moverPregunta = (index: number, direccion: -1 | 1) => {
+    const destino = index + direccion
+    if (destino < 0 || destino >= preguntas.length) return
+    const copia = [...preguntas]
+    const [pregunta] = copia.splice(index, 1)
+    copia.splice(destino, 0, pregunta)
+    onChange({ preguntas: copia.map((p, i) => ({ ...p, orden: i })) })
+  }
+
   const cambiarTipo = (id: string, tipo: PreguntaAutoevaluacion['tipo']) => {
     actualizarPregunta(id, {
       tipo,
@@ -64,135 +85,129 @@ export function TemplateAutoevaluacionBuilder({ estructura, onChange, editable =
     })
   }
 
-  const agregarOpcion = (id: string) =>
-    actualizarPregunta(id, { opciones: [...(preguntas.find(p => p.id === id)?.opciones ?? []), ''] })
-
-  const actualizarOpcion = (id: string, idx: number, valor: string) => {
-    const opciones = [...(preguntas.find(p => p.id === id)?.opciones ?? [])]
-    opciones[idx] = valor
-    actualizarPregunta(id, { opciones })
-  }
-
-  const eliminarOpcion = (id: string, idx: number) => {
-    const opciones = [...(preguntas.find(p => p.id === id)?.opciones ?? [])]
-    opciones.splice(idx, 1)
-    actualizarPregunta(id, { opciones })
-  }
-
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium">Preguntas de autoevaluación</h4>
-        {editable && (
-          <Button type="button" variant="outline" size="sm" onClick={agregarPregunta}>
-            <Plus className="h-4 w-4 mr-1" />Agregar pregunta
-          </Button>
-        )}
-      </div>
-
-      {preguntas.length === 0 && (
-        <p className="text-sm text-muted-foreground">Sin preguntas definidas.</p>
-      )}
-
-      {preguntas.map(pregunta => (
-        <div key={pregunta.id} className="border rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-40 space-y-1">
-              <span className="text-xs text-muted-foreground">Tipo</span>
-              <Select
-                value={pregunta.tipo}
-                disabled={!editable}
-                onValueChange={v => cambiarTipo(pregunta.id, v as PreguntaAutoevaluacion['tipo'])}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TIPOS.map(t => (
-                    <SelectItem key={t} value={t}>{tipoPreguntaLabel[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-[2] space-y-1">
-              <span className="text-xs text-muted-foreground">Enunciado</span>
-              <Input
-                value={pregunta.texto}
-                disabled={!editable}
-                onChange={e => actualizarPregunta(pregunta.id, { texto: e.target.value })}
-                placeholder="Ej: ¿En qué medida el proyecto logró su impacto esperado?"
-              />
-            </div>
-            {editable && (
-              <Button type="button" variant="ghost" size="icon" className="mt-5" onClick={() => eliminarPregunta(pregunta.id)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm">¿Obligatoria?</span>
-            <Button
-              type="button"
-              size="sm"
-              variant={pregunta.esObligatorio ? 'default' : 'outline'}
-              disabled={!editable}
-              onClick={() => actualizarPregunta(pregunta.id, { esObligatorio: !pregunta.esObligatorio })}
-            >
-              {pregunta.esObligatorio ? 'Sí' : 'No'}
-            </Button>
-          </div>
-
-          {pregunta.tipo === 'escalaNumerica' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Mínimo</span>
+    <div className="space-y-4">
+      {preguntas.length === 0 ? slotVacio : (
+      <div className="-mx-6 border-y divide-y">
+        {preguntas.map((pregunta, index) => (
+          <div key={pregunta.id} className="px-6 py-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="flex-[2] space-y-1">
+                <span className="h-4 text-xs text-muted-foreground flex items-center">Enunciado</span>
                 <Input
-                  type="number"
-                  value={pregunta.escalaMin ?? ''}
+                  className="bg-muted/40"
+                  value={pregunta.texto}
                   disabled={!editable}
-                  onChange={e => actualizarPregunta(pregunta.id, { escalaMin: e.target.value === '' ? null : Number(e.target.value) })}
+                  onChange={e => actualizarPregunta(pregunta.id, { texto: e.target.value })}
+                  placeholder="Ej: ¿En qué medida el proyecto logró su impacto esperado?"
                 />
               </div>
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Máximo</span>
-                <Input
-                  type="number"
-                  value={pregunta.escalaMax ?? ''}
+              <div className="flex-1 space-y-1">
+                <span className="h-4 text-xs text-muted-foreground flex items-center">Tipo</span>
+                <Select
+                  value={pregunta.tipo}
                   disabled={!editable}
-                  onChange={e => actualizarPregunta(pregunta.id, { escalaMax: e.target.value === '' ? null : Number(e.target.value) })}
-                />
+                  onValueChange={v => cambiarTipo(pregunta.id, v as PreguntaAutoevaluacion['tipo'])}
+                >
+                  <SelectTrigger className="bg-muted/40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS.map(t => (
+                      <SelectItem key={t} value={t}>{tipoPreguntaLabel[t]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-          )}
-
-          {(pregunta.tipo === 'select' || pregunta.tipo === 'checkbox') && (
-            <div className="space-y-2 pl-2 border-l-2">
-              <span className="text-xs text-muted-foreground">Opciones predefinidas</span>
-              {(pregunta.opciones ?? []).map((opcion, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <div className="flex-[2]">
-                    <Input
-                      value={opcion}
-                      disabled={!editable}
-                      onChange={e => actualizarOpcion(pregunta.id, idx, e.target.value)}
-                      placeholder={`Opción ${idx + 1}`}
-                    />
-                  </div>
-                  {editable && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => eliminarOpcion(pregunta.id, idx)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
               {editable && (
-                <Button type="button" variant="outline" size="sm" onClick={() => agregarOpcion(pregunta.id)}>
-                  <Plus className="h-3 w-3 mr-1" />Agregar opción
-                </Button>
+                <div className="flex items-center gap-1 pt-5">
+                  <Button type="button" variant="ghost" size="icon" disabled={index === 0} onClick={() => moverPregunta(index, -1)}>
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" disabled={index === preguntas.length - 1} onClick={() => moverPregunta(index, 1)}>
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => eliminarPregunta(pregunta.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
             </div>
-          )}
+
+            <div className="flex items-end gap-2">
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground">¿Obligatoria?</span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={pregunta.esObligatorio ? 'default' : 'outline'}
+                    size="sm"
+                    disabled={!editable}
+                    onClick={() => actualizarPregunta(pregunta.id, { esObligatorio: true })}
+                  >
+                    Sí
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!pregunta.esObligatorio ? 'default' : 'outline'}
+                    size="sm"
+                    disabled={!editable}
+                    onClick={() => actualizarPregunta(pregunta.id, { esObligatorio: false })}
+                  >
+                    No
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {pregunta.tipo === 'escalaNumerica' && (
+              <div className="space-y-2 pl-3 border-l border-muted-foreground/20">
+                <span className="text-xs text-muted-foreground">Escala (opcional)</span>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 space-y-1">
+                    <span className="text-xs text-muted-foreground">Mínimo</span>
+                    <Input
+                      className="bg-muted/40"
+                      type="number"
+                      value={pregunta.escalaMin ?? ''}
+                      disabled={!editable}
+                      onChange={e => actualizarPregunta(pregunta.id, { escalaMin: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <span className="text-xs text-muted-foreground">Máximo</span>
+                    <Input
+                      className="bg-muted/40"
+                      type="number"
+                      value={pregunta.escalaMax ?? ''}
+                      disabled={!editable}
+                      onChange={e => actualizarPregunta(pregunta.id, { escalaMax: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {TIPOS_CON_OPCIONES.includes(pregunta.tipo) && (
+              <OpcionesCampoEditor
+                opciones={pregunta.opciones ?? undefined}
+                editable={editable}
+                onChange={opciones => actualizarPregunta(pregunta.id, { opciones })}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      )}
+
+      {editable && (
+        <div className="flex items-center justify-between pt-2">
+          {preguntas.length > 0 ? (
+            <Button type="button" variant="outline" onClick={agregarPregunta}>
+              <Plus className="h-4 w-4 mr-2" />Agregar pregunta
+            </Button>
+          ) : <span />}
+          {slotAcciones}
         </div>
-      ))}
+      )}
     </div>
   )
 }

@@ -327,7 +327,7 @@ export function ComprobantesTab({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-sm font-medium">Comprobantes de gastos</CardTitle>
+        <CardTitle className="text-sm font-medium">Rendición de fondos</CardTitle>
         {permitidoEditar && (
           <Button size="sm" onClick={abrirNuevo} disabled={rubrosDisponibles.length === 0}>
             <Plus className="h-3 w-3 mr-1" />Cargar comprobante

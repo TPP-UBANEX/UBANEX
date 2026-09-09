@@ -8,11 +8,8 @@ import {
   FolderOpen,
   Users,
   ChevronLeft,
-  ClipboardList,
   UserCheck,
   LayoutTemplate,
-  Library,
-  ListChecks,
   // CalendarCheck,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
@@ -112,62 +109,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             )}
             {esRectorado && (
               <Button
-                key="/plantillas-formulario"
-                variant={location.pathname.startsWith('/plantillas-formulario') ? 'secondary' : 'ghost'}
+                key="/plantillas"
+                variant={location.pathname.startsWith('/plantillas') ? 'secondary' : 'ghost'}
                 className={cn(
                   'w-full justify-start gap-3',
                   collapsed && 'justify-center px-2',
                 )}
-                onClick={() => navigate('/plantillas-formulario')}
+                onClick={() => navigate('/plantillas')}
               >
                 <LayoutTemplate className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="text-sm">Plantillas presentación</span>}
+                {!collapsed && <span className="text-sm">Plantillas</span>}
               </Button>
             )}
-            {esRectorado && (
-              <Button
-                key="/plantillas-evaluacion"
-                variant={location.pathname === '/plantillas-evaluacion' ? 'secondary' : 'ghost'}
-                className={cn(
-                  'w-full justify-start gap-3',
-                  collapsed && 'justify-center px-2',
-                )}
-                onClick={() => navigate('/plantillas-evaluacion')}
-              >
-                <Library className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="text-sm">Plantillas evaluación</span>}
-              </Button>
-            )}
-            {esRectorado && (
-              <Button
-                key="/plantillas-autoevaluacion"
-                variant={location.pathname === '/plantillas-autoevaluacion' ? 'secondary' : 'ghost'}
-                className={cn(
-                  'w-full justify-start gap-3',
-                  collapsed && 'justify-center px-2',
-                )}
-                onClick={() => navigate('/plantillas-autoevaluacion')}
-              >
-                <ListChecks className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="text-sm">Plantillas autoevaluación</span>}
-              </Button>
-            )}
-            <Button
-              key="/proyectos?revision=true"
-              variant={
-                location.pathname === '/proyectos' && location.search.includes('revision=true')
-                  ? 'secondary'
-                  : 'ghost'
-              }
-              className={cn(
-                'w-full justify-start gap-3',
-                collapsed && 'justify-center px-2',
-              )}
-              onClick={() => navigate('/proyectos?revision=true')}
-            >
-              <ClipboardList className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="text-sm">Revisión</span>}
-            </Button>
           </>
         )}
         {!esGestion && (

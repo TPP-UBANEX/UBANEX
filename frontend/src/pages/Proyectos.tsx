@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,11 +20,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AvalBadge } from '@/components/AvalBadge'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Edicion, Convocatoria, PaginatedResponse, Hito } from '@/data/types'
 import { estadoBadge, estadoEdicionLabel, EstadoEdicion, EstadoConvocatoria, RolUsuario, categoriaHitoLabel } from '@/data/types'
-import { formatearMoneda } from '@/lib/presupuesto'
 import { toast } from 'sonner'
 import { Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 
@@ -40,17 +40,16 @@ const pipelineColumns = [
 
 export function Proyectos() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { user } = useAuth()
-  const esRevision = searchParams.get('revision') === 'true'
   const [ediciones, setEdiciones] = useState<Edicion[]>([])
   const [kanbanEdiciones, setKanbanEdiciones] = useState<Edicion[]>([])
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([])
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filtroEtapa, setFiltroEtapa] = useState(esRevision ? EstadoEdicion.Presentado : 'todas')
+  const [filtroEtapa, setFiltroEtapa] = useState<EstadoEdicion | 'todas'>('todas')
   const [filtroConv, setFiltroConv] = useState('todas')
   const [filtroAnio, setFiltroAnio] = useState('todas')
+  const [filtroAval, setFiltroAval] = useState('todas')
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PaginatedResponse<Edicion>['meta'] | null>(null)
   const [vista, setVista] = useState<'tabla' | 'kanban'>('tabla')
@@ -108,11 +107,6 @@ export function Proyectos() {
   }, [])
 
   useEffect(() => {
-    setFiltroEtapa(esRevision ? EstadoEdicion.Presentado : 'todas')
-    setPage(1)
-  }, [esRevision])
-
-  useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(search)
       setPage(1)
@@ -130,6 +124,7 @@ export function Proyectos() {
       estado: filtroEtapa !== 'todas' ? filtroEtapa : undefined,
       convocatoriaId: filtroConv !== 'todas' ? filtroConv : undefined,
       anio: filtroAnio !== 'todas' ? Number(filtroAnio) : undefined,
+      tieneAval: filtroAval !== 'todas' ? filtroAval === 'si' : undefined,
     })
       .then(res => {
         setEdiciones(res.data)
@@ -137,7 +132,7 @@ export function Proyectos() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [page, debouncedSearch, filtroEtapa, filtroConv, filtroAnio, vista, refreshKey])
+  }, [page, debouncedSearch, filtroEtapa, filtroConv, filtroAnio, filtroAval, vista, refreshKey])
 
   useEffect(() => {
     if (vista !== 'kanban') return
@@ -147,19 +142,16 @@ export function Proyectos() {
 
   const anios = [...new Set(convocatorias.map(c => c.anio))].sort((a, b) => b - a)
 
-  const cambiarEtapa = (v: string) => { setFiltroEtapa(v); setPage(1) }
+  const cambiarEtapa = (v: string) => { setFiltroEtapa(v as EstadoEdicion | 'todas'); setPage(1) }
   const cambiarConv = (v: string) => { setFiltroConv(v); setPage(1) }
   const cambiarAnio = (v: string) => { setFiltroAnio(v); setPage(1) }
+  const cambiarAval = (v: string) => { setFiltroAval(v); setPage(1) }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">
-            {esRevision
-              ? 'Proyectos presentados pendientes de revisión'
-              : 'Pipeline de proyectos de extensión'}
-          </p>
+          <p className="text-sm text-muted-foreground">Pipeline de proyectos de extensión</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant={vista === 'tabla' ? 'default' : 'outline'} onClick={() => setVista('tabla')}>Tabla</Button>
@@ -191,12 +183,20 @@ export function Proyectos() {
           </SelectContent>
         </Select>
         <Select value={filtroAnio} onValueChange={cambiarAnio}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Edición" /></SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Año" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas las ediciones</SelectItem>
+            <SelectItem value="todas">Todos los años</SelectItem>
             {anios.map(a => (
               <SelectItem key={a} value={String(a)}>{a}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroAval} onValueChange={cambiarAval}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Aval" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Aval: todos</SelectItem>
+            <SelectItem value="si">Con aval</SelectItem>
+            <SelectItem value="no">Sin aval</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -209,7 +209,7 @@ export function Proyectos() {
               <div className="space-y-3">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="flex gap-4">
-                    {[...Array(5)].map((_, j) => (
+                    {[...Array(4)].map((_, j) => (
                       <Skeleton key={j} className="h-4 flex-1" />
                     ))}
                   </div>
@@ -226,8 +226,9 @@ export function Proyectos() {
                       <TableHead>Proyecto</TableHead>
                       <TableHead>Creado por</TableHead>
                       <TableHead>Facultad</TableHead>
+                      <TableHead>Año</TableHead>
                       <TableHead>Etapa</TableHead>
-                      <TableHead>Presupuesto solicitado</TableHead>
+                      <TableHead>Aval</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -261,8 +262,9 @@ export function Proyectos() {
                               ? `${e.unidadAcademica?.nombre} y ${e.proyecto.unidadAcademicaAdicional.nombre}`
                               : e.unidadAcademica?.nombre || '-'}
                           </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{e.anioEdicion ?? '-'}</TableCell>
                           <TableCell><Badge variant={estadoBadge[e.estado]}>{estadoEdicionLabel[e.estado] || e.estado}</Badge></TableCell>
-                          <TableCell className="text-sm">{formatearMoneda(e.presupuestoSolicitado?.montoTotal)}</TableCell>
+                          <TableCell><AvalBadge avalUrl={e.avalUrl} /></TableCell>
                           <TableCell>
                             <div className="flex gap-1 justify-end">
                               {esRectorado && e.estado === EstadoEdicion.Presentado && e.convocatoria?.estado === EstadoConvocatoria.Evaluacion && (
@@ -275,13 +277,12 @@ export function Proyectos() {
                                   Pasar a evaluación
                                 </Button>
                               )}
-                              <Button variant="ghost" size="sm" onClick={e2 => { e2.stopPropagation(); navigate(`/proyectos/${e.proyectoId}?convocatoria=${e.convocatoriaId}`) }}>Ver</Button>
                             </div>
                           </TableCell>
                         </TableRow>
                         {expandidaId === e.id && (
                           <TableRow key={`${e.id}-detalle`}>
-                            <TableCell colSpan={esAdmin ? 7 : 6}>
+                            <TableCell colSpan={esAdmin ? 8 : 7}>
                               <div className="py-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                                   Hitos de ejecución
@@ -363,11 +364,6 @@ export function Proyectos() {
                       <CardContent className="p-3 space-y-1">
                         <p className="text-sm font-medium leading-tight">{e.proyecto?.nombre || 'Sin nombre'}</p>
                         <p className="text-xs text-muted-foreground">{e.creadoPor?.nombreCompleto || '-'}</p>
-                        {e.presupuestoSolicitado && (
-                          <Badge variant="outline" className="text-xs">
-                            {formatearMoneda(e.presupuestoSolicitado.montoTotal)}
-                          </Badge>
-                        )}
                       </CardContent>
                     </Card>
                   ))}

@@ -3,20 +3,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
+import { EnlaceUsuario } from '@/components/EnlaceUsuario';
 import {
   EstadoEdicion,
   EstadoEvaluacion,
-  TipoEvaluacionCruzada,
   estadoBadge,
   estadoConvocatoriaLabel,
+  tipoCruzadaLabel,
 } from '@/data/types';
 import type { EvaluacionEdicionDetalle } from '@/data/types';
-
-const tipoCruzadaLabel: Record<TipoEvaluacionCruzada, string> = {
-  [TipoEvaluacionCruzada.Propia]: 'Propia',
-  [TipoEvaluacionCruzada.Ajena]: 'Ajena',
-  [TipoEvaluacionCruzada.TerceraUa]: 'Tercera UA',
-};
 
 const estadosSinEvaluacion = [
   EstadoEdicion.Borrador,
@@ -267,10 +262,10 @@ export function EvaluacionesProyectoTab({
                   {(inst.realizadoPor || inst.confirmadoPor) && (
                     <div className="text-xs text-muted-foreground space-y-1">
                       {inst.realizadoPor && (
-                        <p>Realizada por: {inst.realizadoPor.nombreCompleto}</p>
+                        <p>Realizada por: <EnlaceUsuario usuarioId={inst.realizadoPor.id} nombre={inst.realizadoPor.nombreCompleto} /></p>
                       )}
                       {inst.confirmadoPor && (
-                        <p>Confirmada por: {inst.confirmadoPor.nombreCompleto}</p>
+                        <p>Confirmada por: <EnlaceUsuario usuarioId={inst.confirmadoPor.id} nombre={inst.confirmadoPor.nombreCompleto} /></p>
                       )}
                     </div>
                   )}
@@ -299,7 +294,7 @@ export function EvaluacionesProyectoTab({
                         <span className="text-sm font-medium">{tipoCruzadaLabel[c.tipo]}</span>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {c.evaluador?.nombreCompleto ?? 'Sin evaluador'}
+                        {c.evaluador ? <EnlaceUsuario usuarioId={c.evaluador.id} nombre={c.evaluador.nombreCompleto} /> : 'Sin evaluador'}
                       </span>
                     </div>
                     {c.items && data.estructuraCruzada ? (

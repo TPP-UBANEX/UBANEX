@@ -39,25 +39,12 @@ import {
   cargoDocenteOptions,
   tipoDesignacionDocenteOptions,
   personaConDiscapacidadOptions,
+  rolUsuarioLabels,
+  rolUsuarioLabel,
+  rolUsuarioColor,
 } from '@/data/perfil'
 import { Plus, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
-
-const rolLabels: Record<string, string> = {
-  [RolUsuario.AutoridadDeRectorado]: 'Autoridad Rectorado',
-  [RolUsuario.AsistenteDeRectorado]: 'Asistente Rectorado',
-  [RolUsuario.AutoridadDeSecretaria]: 'Autoridad Secretaría',
-  [RolUsuario.AsistenteDeSecretaria]: 'Asistente Secretaría',
-  [RolUsuario.Estudiante]: 'Estudiante',
-  [RolUsuario.Docente]: 'Docente',
-}
-
-function rolColor(rol: string): string {
-  if (rol.includes('Rectorado')) return 'text-blue-600'
-  if (rol.includes('Secretaria')) return 'text-green-600'
-  if (rol === RolUsuario.Docente) return 'text-purple-600'
-  return 'text-amber-600'
-}
 
 const rolesDisponibles: Record<string, RolUsuario[]> = {
   [RolUsuario.AutoridadDeRectorado]: [
@@ -265,8 +252,8 @@ export function Usuarios() {
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">
                         {u.roles.map(r => (
-                          <Badge key={r} variant="outline" className={rolColor(r)}>
-                            {rolLabels[r] || r}
+                          <Badge key={r} variant="outline" className={rolUsuarioColor(r)}>
+                            {rolUsuarioLabel(r)}
                           </Badge>
                         ))}
                       </div>
@@ -549,7 +536,7 @@ function NuevoUsuarioDialog({
               <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
               <SelectContent>
                 {rolesCreables.map(r => (
-                  <SelectItem key={r} value={r}>{rolLabels[r]}</SelectItem>
+                  <SelectItem key={r} value={r}>{rolUsuarioLabels[r]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

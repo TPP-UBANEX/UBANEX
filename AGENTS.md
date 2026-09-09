@@ -75,6 +75,29 @@ UBANEX/
 - Tipos: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `style`.
 - Ejemplo: `feat(convocatorias): agregar POST para crear convocatoria`.
 
+## Entorno de desarrollo local
+
+El desarrollo local corre en **Docker Compose**, no en el host. Para ejecutar cualquier
+comando (tests, build, lint, scripts puntuales) hacerlo **dentro de los contenedores** con
+`docker exec`, nunca directo en la máquina host:
+
+```bash
+docker exec ubanex-backend-1 <comando>    # ej: npx jest, npm run lint
+docker exec ubanex-frontend-1 <comando>   # ej: npm run build, npm run lint
+```
+
+## Tests del backend — correr siempre después de tocar código del backend
+
+**Toda modificación al código de `backend/` debe cerrarse corriendo la suite completa de
+tests del backend antes de continuar**, para confirmar que no se rompió nada:
+
+```bash
+docker exec ubanex-backend-1 npx jest
+```
+
+Si algún test falla por el cambio, corregirlo (código o fixture, según corresponda) antes de
+dar la tarea por terminada — no dejar tests rotos para después.
+
 ## Comandos
 
 ```bash
@@ -84,17 +107,18 @@ make seed         # Igual que dev, forzando el seed
 make reset-seed   # Borra volúmenes y levanta desde cero con el seed completo
 make help         # Lista todos los targets
 
-# Backend
-cd backend && npm run start:dev   # Desarrollo (hot reload)
-cd backend && npm run build        # Build
-cd backend && npm run lint         # ESLint
-cd backend && npm run format       # Prettier
+# Backend (dentro del contenedor ubanex-backend-1, ver arriba)
+npm run start:dev   # Desarrollo (hot reload)
+npm run build        # Build
+npm run lint         # ESLint
+npm run format       # Prettier
+npx jest              # Tests (usar --testPathPatterns=<patron>, no --testPathPattern)
 
-# Frontend
-cd frontend && npm run dev         # Desarrollo (Vite)
-cd frontend && npm run build       # Build
-cd frontend && npm run lint        # ESLint
-cd frontend && npm run format      # Prettier
+# Frontend (dentro del contenedor ubanex-frontend-1, ver arriba)
+npm run dev         # Desarrollo (Vite)
+npm run build       # Build
+npm run lint         # ESLint
+npm run format       # Prettier
 ```
 
 ## Seed

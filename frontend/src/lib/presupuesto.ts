@@ -226,9 +226,9 @@ export interface PresupuestoAAdjudicar {
   total: number
 }
 
-const PORCENTAJE_EXTRA_INSUMOS_DEFAULT = 35
-const UMBRAL_INSUMOS_DEFAULT = 40
-const PORCENTAJE_EXTRA_PSE_DEFAULT = 15
+export const PORCENTAJE_EXTRA_INSUMOS_DEFAULT = 35
+export const UMBRAL_INSUMOS_DEFAULT = 40
+export const PORCENTAJE_EXTRA_PSE_DEFAULT = 15
 
 /**
  * Espejo de backend/src/proyectos/presupuesto.util.ts#calcularPresupuestoAAdjudicar.

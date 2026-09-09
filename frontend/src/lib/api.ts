@@ -278,6 +278,7 @@ export const api = {
       estado?: string;
       convocatoriaId?: string;
       anio?: number;
+      tieneAval?: boolean;
     }) => {
       const qs = params
         ? '?' +
@@ -443,6 +444,7 @@ export const api = {
         get<{
           evaluacion: import('@/data/types').EvaluacionInstitucional | null;
           template: import('@/data/types').TemplateEvaluacionInstitucional | null;
+          edicion: import('@/data/types').Edicion;
         }>(`/evaluaciones/institucionales/${edicionId}?convocatoriaId=${convocatoriaId}`),
       guardar: (
         convocatoriaId: string,
@@ -481,6 +483,8 @@ export const api = {
         get<{
           evaluacion: import('@/data/types').EvaluacionCruzada | null;
           template: import('@/data/types').TemplateEvaluacionCruzada | null;
+          edicion: import('@/data/types').Edicion;
+          tipo: import('@/data/types').TipoEvaluacionCruzada;
         }>(`/evaluaciones/cruzadas/${edicionId}?convocatoriaId=${convocatoriaId}`),
       guardar: (
         convocatoriaId: string,
@@ -530,7 +534,8 @@ export const api = {
         id: string,
         data: Partial<import('@/data/types').GuardarTemplateInstitucionalDto>,
       ) =>
-        patch<import('@/data/types').TemplateEvaluacionInstitucional>(
+        request<import('@/data/types').TemplateEvaluacionInstitucional>(
+          'PUT',
           `/templates-evaluacion-institucional/${id}`,
           data,
         ),
@@ -549,7 +554,8 @@ export const api = {
           data,
         ),
       actualizar: (id: string, data: Partial<import('@/data/types').GuardarTemplateCruzadaDto>) =>
-        patch<import('@/data/types').TemplateEvaluacionCruzada>(
+        request<import('@/data/types').TemplateEvaluacionCruzada>(
+          'PUT',
           `/templates-evaluacion-cruzada/${id}`,
           data,
         ),

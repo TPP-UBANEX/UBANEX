@@ -33,6 +33,7 @@ import { InformeFinalTab } from '@/components/InformeFinalTab'
 import { TablaPartidasPresupuesto } from '@/components/TablaPartidasPresupuesto'
 import { useDireccionEdicion, DireccionEditor } from '@/components/DireccionEditor'
 import { GestionarDireccionModal } from '@/components/GestionarDireccionModal'
+import { EnlaceUsuario } from '@/components/EnlaceUsuario'
 import {
   CampoFormularioInput,
   camposIncompletosParaEnvio,
@@ -58,7 +59,7 @@ const OPCIONES_ES_INSUMO = [
   { value: 'false', label: 'No' },
 ]
 
-const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'comprobantes', 'autoevaluacion', 'informe-final', 'sugerencias', 'historial']
+const TABS_FIJAS_POST = ['direccion', 'presupuesto', 'evaluaciones', 'ejecucion-hitos', 'rendicion', 'autoevaluacion', 'informe-final', 'sugerencias', 'historial']
 
 
 interface ModalConfigSugerencia {
@@ -125,6 +126,7 @@ export function ProyectoDetail() {
 
   const [directores, setDirectores] = useState<ParticipacionConvocatoria[]>([])
   const [showGestionarDireccion, setShowGestionarDireccion] = useState(false)
+  const [showGestionarAval, setShowGestionarAval] = useState(false)
 
   const [uas, setUas] = useState<UnidadAcademica[]>([])
 
@@ -219,6 +221,9 @@ export function ProyectoDetail() {
   const esDocente = user?.roles.includes(RolUsuario.Docente)
   const esMismaUA = user?.unidadAcademicaId === edicion?.unidadAcademicaId
   const esSecretariaMismaUA = esSecretaria && esMismaUA
+  const puedeEditarAval = [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios, EstadoEdicion.EnEvaluacion].includes(
+    edicion?.estado as EstadoEdicion,
+  )
   const esDirector = directores.some(d => d.usuarioId === user?.id)
   const puedeEditarEjecucion = esPropietario || esDirector
   // Aceptar/rechazar comprobantes es exclusivo de Rectorado; la lectura la resuelve el backend
@@ -249,6 +254,17 @@ export function ProyectoDetail() {
     if (!d?.usuario) return '-'
     const ua = d.usuario.unidadAcademica?.nombre
     return ua ? `${d.usuario.nombreCompleto} (${ua})` : d.usuario.nombreCompleto
+  }
+
+  const enlaceDirector = (d: ParticipacionConvocatoria | undefined) => {
+    if (!d?.usuario) return '-'
+    const ua = d.usuario.unidadAcademica?.nombre
+    return (
+      <>
+        <EnlaceUsuario usuarioId={d.usuarioId} nombre={d.usuario.nombreCompleto} />
+        {ua ? ` (${ua})` : ''}
+      </>
+    )
   }
 
   const descargarProyecto = () => {
@@ -376,6 +392,7 @@ export function ProyectoDetail() {
       const nuevoValor = avalModo === 'si' && avalInput.trim() ? conProtocolo(avalInput) : null
       await api.proyectos.actualizarAval(id, edicion.id, { avalUrl: nuevoValor })
       toast.success('Aval actualizado')
+      setShowGestionarAval(false)
       cargarDatos()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al actualizar el aval')
@@ -701,7 +718,7 @@ export function ProyectoDetail() {
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Creado por</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{edicion?.creadoPor?.nombreCompleto || '-'}</p></CardContent>
+          <CardContent><p className="text-sm"><EnlaceUsuario usuarioId={edicion?.creadoPorId} nombre={edicion?.creadoPor?.nombreCompleto} /></p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Unidad Académica</CardTitle></CardHeader>
@@ -713,11 +730,11 @@ export function ProyectoDetail() {
             <div className="space-y-1 text-sm">
               <div>
                 <span className="text-muted-foreground">Dirección:</span>{' '}
-                {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
+                {enlaceDirector(directores.find(d => d.esDirectorPrincipal))}
               </div>
               <div>
                 <span className="text-muted-foreground">Codirección:</span>{' '}
-                {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
+                {enlaceDirector(directores.find(d => !d.esDirectorPrincipal))}
               </div>
             </div>
           </CardContent>
@@ -726,9 +743,31 @@ export function ProyectoDetail() {
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Edición</CardTitle></CardHeader>
           <CardContent><p className="text-sm">{edicion?.anioEdicion || '-'}</p></CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium">Presupuesto solicitado</CardTitle></CardHeader>
-          <CardContent><p className="text-sm font-bold">{formatearMoneda(edicion?.presupuestoSolicitado?.montoTotal)}</p></CardContent>
+        <Card
+          className={esSecretariaMismaUA && puedeEditarAval ? 'cursor-pointer hover:bg-muted/50 transition-colors' : undefined}
+          onClick={esSecretariaMismaUA && puedeEditarAval ? () => setShowGestionarAval(true) : undefined}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+              Aval
+              {esSecretariaMismaUA && puedeEditarAval && <Pencil className="h-3 w-3 text-muted-foreground" />}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {edicion?.avalUrl
+              ? (
+                <a
+                  href={conProtocolo(edicion.avalUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-bold text-primary underline"
+                  onClick={e => e.stopPropagation()}
+                >
+                  Ver aval
+                </a>
+              )
+              : <p className="text-sm font-bold">Sin aval</p>}
+          </CardContent>
         </Card>
         {puedeGestionarDireccion && (
           <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setShowGestionarDireccion(true)}>
@@ -753,8 +792,8 @@ export function ProyectoDetail() {
           <TabsTrigger value="presupuesto">Presupuesto solicitado</TabsTrigger>
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="ejecucion-hitos">Hitos</TabsTrigger>
-          <TabsTrigger value="comprobantes">Comprobantes</TabsTrigger>
-          <TabsTrigger value="autoevaluacion">Autoevaluación</TabsTrigger>
+          <TabsTrigger value="rendicion">Rendición de fondos</TabsTrigger>
+          <TabsTrigger value="autoevaluacion">Impacto</TabsTrigger>
           <TabsTrigger value="informe-final">Informe final</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
           {(esSecretariaMismaUA || esRectoradoAmplio || esPropietario || esDirector) && (
@@ -805,7 +844,7 @@ export function ProyectoDetail() {
                         {previsualizando ? editNombre : proyecto.nombre}
                       </CampoSugerible>
                     </div>
-                    <div><span className="text-muted-foreground">Creado por:</span> {edicion?.creadoPor?.nombreCompleto || '-'}</div>
+                    <div><span className="text-muted-foreground">Creado por:</span> <EnlaceUsuario usuarioId={edicion?.creadoPorId} nombre={edicion?.creadoPor?.nombreCompleto} /></div>
                     <div><span className="text-muted-foreground">Unidad Académica:</span> {nombreUnidadesAcademicas()}</div>
                     <div><span className="text-muted-foreground">Convocatoria:</span> {edicion?.convocatoria?.nombre || '-'}</div>
                     <div>
@@ -815,37 +854,6 @@ export function ProyectoDetail() {
                       </CampoSugerible>
                     </div>
                     <div><span className="text-muted-foreground">Estado:</span> {estadoEdicionLabel[edicion?.estado ?? ''] || edicion?.estado || '-'}</div>
-                    <div>
-                      <span className="text-muted-foreground">Tiene aval:</span>{' '}
-                      {edicion?.avalUrl
-                        ? <a href={conProtocolo(edicion.avalUrl)} target="_blank" rel="noreferrer" className="text-primary underline">Sí — ver aval</a>
-                        : 'No'}
-                      {esSecretariaMismaUA && [EstadoEdicion.Presentado, EstadoEdicion.PendienteDeCambios, EstadoEdicion.EnEvaluacion].includes(edicion?.estado as EstadoEdicion) && (
-                        <div className="mt-1 space-y-1">
-                          <div className="flex gap-1">
-                            <Button type="button" size="sm" variant={avalModo === 'si' ? 'default' : 'outline'} onClick={() => setAvalModo('si')}>Sí</Button>
-                            <Button type="button" size="sm" variant={avalModo === 'no' ? 'default' : 'outline'} onClick={() => setAvalModo('no')}>No</Button>
-                          </div>
-                          {avalModo === 'si' && (
-                            <Input
-                              className="h-8 text-xs"
-                              placeholder="https://..."
-                              maxLength={2048}
-                              value={avalInput}
-                              onChange={e => setAvalInput(e.target.value)}
-                            />
-                          )}
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={guardarAval}
-                            disabled={guardandoAval || (avalModo === 'si' && !avalInput.trim())}
-                          >
-                            {guardandoAval ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
                     <div>
                       <span className="text-muted-foreground">Consolidado:</span>{' '}
                       {proyecto.esConsolidadoEfectivo ? 'Sí' : 'No'}
@@ -929,11 +937,11 @@ export function ProyectoDetail() {
                   )}
                   <div>
                     <span className="text-muted-foreground">Dirección:</span>{' '}
-                    {nombreConUA(directores.find(d => d.esDirectorPrincipal))}
+                    {enlaceDirector(directores.find(d => d.esDirectorPrincipal))}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Codirección:</span>{' '}
-                    {nombreConUA(directores.find(d => !d.esDirectorPrincipal))}
+                    {enlaceDirector(directores.find(d => !d.esDirectorPrincipal))}
                   </div>
                   {!esEditable && (
                     <p className="text-muted-foreground text-xs col-span-2">
@@ -988,7 +996,7 @@ export function ProyectoDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="comprobantes" className="mt-4">
+        <TabsContent value="rendicion" className="mt-4">
           {edicion ? (
             <ComprobantesTab
               edicionId={edicion.id}
@@ -1079,6 +1087,41 @@ export function ProyectoDetail() {
         soloComentario={modalConfig.soloComentario}
         opciones={modalConfig.opciones}
       />
+
+      <Dialog open={showGestionarAval} onOpenChange={setShowGestionarAval}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Aval</DialogTitle>
+            <DialogDescription>
+              Link al PDF firmado por el decano, requisito para adjudicar el proyecto.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div className="flex gap-1">
+              <Button type="button" size="sm" variant={avalModo === 'si' ? 'default' : 'outline'} onClick={() => setAvalModo('si')}>Sí</Button>
+              <Button type="button" size="sm" variant={avalModo === 'no' ? 'default' : 'outline'} onClick={() => setAvalModo('no')}>No</Button>
+            </div>
+            {avalModo === 'si' && (
+              <Input
+                placeholder="https://..."
+                maxLength={2048}
+                value={avalInput}
+                onChange={e => setAvalInput(e.target.value)}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGestionarAval(false)}>Cancelar</Button>
+            <Button
+              onClick={guardarAval}
+              disabled={guardandoAval || (avalModo === 'si' && !avalInput.trim())}
+            >
+              {guardandoAval ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {proyecto && edicion && (
         <GestionarDireccionModal

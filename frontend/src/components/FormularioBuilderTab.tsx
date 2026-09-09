@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { EstadoConvocatoria } from '@/data/types'
-import type { CampoFormulario } from '@/data/types'
+import type { CampoFormulario, Formulario } from '@/data/types'
 import { CamposFormularioEditor, campoVacio, validarCampos } from '@/components/CamposFormularioEditor'
 import { VistaPreviaFormulario } from '@/components/VistaPreviaFormulario'
 import { SeleccionarPlantillaDialog } from '@/components/SeleccionarPlantillaDialog'
@@ -34,7 +34,13 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
     cargarDatos().finally(() => setLoading(false))
   }, [cargarDatos])
 
-  const importarPlantilla = (camposPlantilla: CampoFormulario[]) => {
+  const importarPlantilla = async (plantilla: Formulario) => {
+    const detalle = await api.formularios.get(plantilla.id)
+    const camposPlantilla = (detalle.campos ?? []).map((campo, index) => ({
+      ...campo,
+      id: crypto.randomUUID(),
+      orden: index,
+    }))
     setCampos(camposPlantilla)
     toast.success('Plantilla cargada. Revisá los campos y guardá para confirmar.')
   }
@@ -136,6 +142,8 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
       <SeleccionarPlantillaDialog
         open={plantillaDialogOpen}
         onOpenChange={setPlantillaDialogOpen}
+        cargarPlantillas={api.formularios.list}
+        detalle={p => `${p.campos?.length ?? 0} campos`}
         onSeleccionar={importarPlantilla}
         advertencia={campos.length > 0
           ? 'Los campos que tenés cargados se reemplazan por los de la plantilla. El cambio no se aplica hasta que guardes.'

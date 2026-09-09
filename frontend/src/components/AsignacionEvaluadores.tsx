@@ -29,8 +29,8 @@ import { RolUsuario, RolEjecucion } from '@/data/types'
 import type { ParticipacionConvocatoria, Usuario, UnidadAcademica } from '@/data/types'
 import { camposPerfilFaltantes } from '@/data/perfil'
 import { useAuth } from '@/lib/auth-context'
-import { EvaluadorPerfilDialog } from '@/components/EvaluadorPerfilDialog'
-import { Loader2, Trash2, Plus, UserRound } from 'lucide-react'
+import { EnlaceUsuario } from '@/components/EnlaceUsuario'
+import { Loader2, Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CANTIDAD_EVALUADORES_POR_UA = 3
@@ -44,8 +44,6 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const [idsConProyecto, setIdsConProyecto] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [confirmarEliminar, setConfirmarEliminar] = useState<ParticipacionConvocatoria | null>(null)
-  const [perfilUsuarioId, setPerfilUsuarioId] = useState<string | null>(null)
-  const [perfilOpen, setPerfilOpen] = useState(false)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [uaSeleccionadaId, setUaSeleccionadaId] = useState<string>('')
@@ -54,12 +52,6 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  const abrirPerfil = (usuarioId?: string) => {
-    if (!usuarioId) return
-    setPerfilUsuarioId(usuarioId)
-    setPerfilOpen(true)
-  }
 
   const evaluadores = participaciones.filter(p => p.rol === RolEjecucion.Evaluador)
 
@@ -348,7 +340,6 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
                 {esRectorado && <TableHead className="text-right">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
@@ -356,7 +347,7 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
               {porUA.map(grupo => (
                 <Fragment key={grupo.nombre}>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableCell colSpan={esRectorado ? 3 : 2} className="font-semibold">
+                    <TableCell colSpan={esRectorado ? 2 : 1} className="font-semibold">
                       {grupo.nombre}
                       <span className="ml-2 text-sm font-normal text-muted-foreground">
                         {grupo.lista.length}/{CANTIDAD_EVALUADORES_POR_UA}
@@ -366,16 +357,10 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
                   {grupo.lista.map(p => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 text-left hover:text-primary hover:underline"
-                          onClick={() => abrirPerfil(p.usuario?.id)}
-                        >
-                          <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
-                          {p.usuario?.nombreCompleto || '—'}
-                        </button>
+                        {p.usuario?.nombreCompleto
+                          ? <EnlaceUsuario usuarioId={p.usuario.id} nombre={p.usuario.nombreCompleto} />
+                          : '—'}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{p.usuario?.email || '—'}</TableCell>
                       {esRectorado && (
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" onClick={() => setConfirmarEliminar(p)}>
@@ -415,12 +400,6 @@ export function AsignacionEvaluadores({ convocatoriaId }: { convocatoriaId: stri
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <EvaluadorPerfilDialog
-        usuarioId={perfilUsuarioId}
-        open={perfilOpen}
-        onOpenChange={setPerfilOpen}
-      />
     </div>
   )
 }
