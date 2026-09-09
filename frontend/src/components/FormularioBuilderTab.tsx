@@ -6,8 +6,9 @@ import { api } from '@/lib/api'
 import { EstadoConvocatoria } from '@/data/types'
 import type { CampoFormulario } from '@/data/types'
 import { CamposFormularioEditor, campoVacio, validarCampos } from '@/components/CamposFormularioEditor'
+import { VistaPreviaFormulario } from '@/components/VistaPreviaFormulario'
 import { SeleccionarPlantillaDialog } from '@/components/SeleccionarPlantillaDialog'
-import { FileText, Loader2, Plus } from 'lucide-react'
+import { Eye, FileText, Loader2, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -20,6 +21,7 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [plantillaDialogOpen, setPlantillaDialogOpen] = useState(false)
+  const [preview, setPreview] = useState(false)
 
   const editable = estadoConvocatoria === EstadoConvocatoria.Configuracion
 
@@ -86,11 +88,25 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium">Formulario de presentación</CardTitle>
-        {editable && campos.length > 0 && (
-          <Button type="button" variant="outline" size="sm" onClick={() => setPlantillaDialogOpen(true)}>
-            <FileText className="h-4 w-4 mr-2" />Reemplazar por plantilla
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {editable && !preview && campos.length > 0 && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setPlantillaDialogOpen(true)}>
+              <FileText className="h-4 w-4 mr-2" />Reemplazar por plantilla
+            </Button>
+          )}
+          {campos.length > 0 && (
+            <Button
+              type="button"
+              variant={preview ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPreview(v => !v)}
+            >
+              {preview
+                ? <><Pencil className="h-4 w-4 mr-2" />Volver al editor</>
+                : <><Eye className="h-4 w-4 mr-2" />Vista previa</>}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {!editable && (
@@ -99,18 +115,22 @@ export function FormularioBuilderTab({ convocatoriaId, estadoConvocatoria }: Pro
           </p>
         )}
 
-        <CamposFormularioEditor
-          campos={campos}
-          onChange={setCampos}
-          editable={editable}
-          slotVacio={slotVacio}
-          slotAcciones={
-            <Button onClick={handleGuardar} disabled={guardando}>
-              {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {guardando ? 'Guardando...' : 'Guardar formulario'}
-            </Button>
-          }
-        />
+        {preview ? (
+          <VistaPreviaFormulario campos={campos} />
+        ) : (
+          <CamposFormularioEditor
+            campos={campos}
+            onChange={setCampos}
+            editable={editable}
+            slotVacio={slotVacio}
+            slotAcciones={
+              <Button onClick={handleGuardar} disabled={guardando}>
+                {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {guardando ? 'Guardando...' : 'Guardar formulario'}
+              </Button>
+            }
+          />
+        )}
       </CardContent>
 
       <SeleccionarPlantillaDialog

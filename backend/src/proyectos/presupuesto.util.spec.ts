@@ -20,8 +20,7 @@ function presupuestoValido(): Presupuesto {
           {
             tipoPersona: TipoPersona.Docente,
             descripcion: 'Viáticos docentes',
-            periodoInicio: '2027-08-01',
-            periodoFin: '2027-09-01',
+            periodo: '2do cuatrimestre 2027',
             monto: 1000,
           },
         ],
@@ -93,25 +92,23 @@ describe('validarPresupuesto', () => {
     expect(() => validarPresupuesto(p)).toThrow(BadRequestException);
   });
 
-  it('rechaza una fecha con formato invalido', () => {
+  it('rechaza un periodo que no es texto', () => {
     const p = presupuestoValido();
-    (p.rubros[0].partidas[0] as { periodoInicio: string }).periodoInicio = '01/08/2027';
+    (p.rubros[0].partidas[0] as { periodo: unknown }).periodo = 20270801;
     expect(() => validarPresupuesto(p)).toThrow(BadRequestException);
   });
 
-  it('rechaza un periodo invertido (inicio posterior al fin)', () => {
+  it('rechaza un periodo mas largo que el maximo permitido', () => {
     const p = presupuestoValido();
-    const viatico = p.rubros[0].partidas[0] as { periodoInicio: string; periodoFin: string };
-    viatico.periodoInicio = '2027-09-01';
-    viatico.periodoFin = '2027-08-01';
+    (p.rubros[0].partidas[0] as { periodo: string }).periodo = 'a'.repeat(201);
     expect(() => validarPresupuesto(p)).toThrow(BadRequestException);
   });
 
-  it('acepta un periodo vacio (borrador a medio cargar)', () => {
+  it('acepta cualquier texto libre como periodo, incluido vacio (borrador a medio cargar)', () => {
     const p = presupuestoValido();
-    const viatico = p.rubros[0].partidas[0] as { periodoInicio: string; periodoFin: string };
-    viatico.periodoInicio = '';
-    viatico.periodoFin = '';
+    (p.rubros[0].partidas[0] as { periodo: string }).periodo = '';
+    expect(() => validarPresupuesto(p)).not.toThrow();
+    (p.rubros[0].partidas[0] as { periodo: string }).periodo = 'Segundo semestre, con prórroga a marzo';
     expect(() => validarPresupuesto(p)).not.toThrow();
   });
 
@@ -190,15 +187,13 @@ describe('normalizarPresupuesto', () => {
 });
 
 describe('presupuestoIncompletoParaEnvio', () => {
-  const convocatoriaConEjecucion = {
-    fechaInicioEjecucion: '2027-08-01',
-    fechaFinEjecucion: '2028-02-28',
-    topePresupuestoConsolidado: 100000,
-    topePresupuestoNoConsolidado: 100000,
+  const sinTope = {
+    topePresupuestoConsolidado: null as number | null,
+    topePresupuestoNoConsolidado: null as number | null,
   };
 
   it('reporta presupuesto vacio cuando es null', () => {
-    expect(presupuestoIncompletoParaEnvio(null, convocatoriaConEjecucion)).toEqual([
+    expect(presupuestoIncompletoParaEnvio(null, sinTope)).toEqual([
       'El presupuesto está vacío',
     ]);
   });
@@ -212,14 +207,14 @@ describe('presupuestoIncompletoParaEnvio', () => {
         { tipo: TipoRubro.BienesDeUso, subtotal: 0, partidas: [] },
       ],
     };
-    expect(presupuestoIncompletoParaEnvio(p, convocatoriaConEjecucion)).toEqual([
+    expect(presupuestoIncompletoParaEnvio(p, sinTope)).toEqual([
       'El presupuesto está vacío',
     ]);
   });
 
   it('exige que los 3 rubros tengan al menos una partida', () => {
     const p = normalizarPresupuesto(presupuestoValido());
-    const motivos = presupuestoIncompletoParaEnvio(p, convocatoriaConEjecucion);
+    const motivos = presupuestoIncompletoParaEnvio(p, sinTope);
     expect(motivos).toContain('"Bienes de Uso" no tiene ninguna partida');
   });
 
@@ -227,59 +222,37 @@ describe('presupuestoIncompletoParaEnvio', () => {
     const p = presupuestoValido();
     (p.rubros[1].partidas[0] as { descripcion: string }).descripcion = '';
     const normalizado = normalizarPresupuesto(p);
-    const motivos = presupuestoIncompletoParaEnvio(normalizado, convocatoriaConEjecucion);
+    const motivos = presupuestoIncompletoParaEnvio(normalizado, sinTope);
     expect(motivos).toContain('"Bienes de Consumo": a la partida 1 le falta la descripción');
   });
 
   it('exige monto mayor a 0 en cada partida', () => {
     const p = presupuestoValido();
     (p.rubros[0].partidas[0] as { monto: number }).monto = 0;
-    const motivos = presupuestoIncompletoParaEnvio(p, convocatoriaConEjecucion);
+    const motivos = presupuestoIncompletoParaEnvio(p, sinTope);
     expect(motivos).toContain('"Viáticos y Seguros": la partida 1 tiene un monto de $0');
   });
 
-  it('exige periodo completo en los viaticos', () => {
+  it('exige el periodo cargado en los viaticos', () => {
     const p = presupuestoValido();
-    const viatico = p.rubros[0].partidas[0] as { periodoInicio: string; periodoFin: string };
-    viatico.periodoInicio = '';
-    const motivos = presupuestoIncompletoParaEnvio(p, convocatoriaConEjecucion);
+    (p.rubros[0].partidas[0] as { periodo: string }).periodo = '   ';
+    const motivos = presupuestoIncompletoParaEnvio(p, sinTope);
     expect(motivos).toContain('"Viáticos y Seguros": a la partida 1 le falta el período');
   });
 
-  it('rechaza un periodo fuera de la ejecucion de la convocatoria', () => {
-    const p = presupuestoValido();
-    const viatico = p.rubros[0].partidas[0] as { periodoInicio: string; periodoFin: string };
-    viatico.periodoInicio = '2026-01-01';
-    viatico.periodoFin = '2026-02-01';
-    const motivos = presupuestoIncompletoParaEnvio(p, convocatoriaConEjecucion);
-    expect(motivos).toContain(
-      '"Viáticos y Seguros": el período de la partida 1 está fuera del período de ejecución de la convocatoria',
-    );
-  });
-
-  it('acepta un periodo dentro de la ejecucion de la convocatoria', () => {
+  it('acepta cualquier texto como periodo de los viaticos', () => {
     const p = normalizarPresupuesto(presupuestoValido());
     p.rubros[2].partidas = [{ descripcion: 'Equipamiento', cantidad: 1, precioUnitario: 100, monto: 100 }];
-    const motivos = presupuestoIncompletoParaEnvio(p, convocatoriaConEjecucion);
+    (p.rubros[0].partidas[0] as { periodo: string }).periodo = 'Marzo a julio, con receso en enero';
+    const motivos = presupuestoIncompletoParaEnvio(p, sinTope);
     expect(motivos).toEqual([]);
-  });
-
-  it('si la convocatoria no tiene fechas de ejecucion, exige que el periodo no sea anterior a hoy', () => {
-    const p = presupuestoValido();
-    const viatico = p.rubros[0].partidas[0] as { periodoInicio: string; periodoFin: string };
-    viatico.periodoInicio = '2000-01-01';
-    viatico.periodoFin = '2000-02-01';
-    const motivos = presupuestoIncompletoParaEnvio(p, { ...convocatoriaConEjecucion, fechaInicioEjecucion: null, fechaFinEjecucion: null });
-    expect(motivos).toContain(
-      '"Viáticos y Seguros": el período de la partida 1 no puede comenzar antes de hoy',
-    );
   });
 
   it('reporta el total excedido cuando supera el tope de no consolidado', () => {
     const p = normalizarPresupuesto(presupuestoValido());
     const motivos = presupuestoIncompletoParaEnvio(
       p,
-      { ...convocatoriaConEjecucion, topePresupuestoNoConsolidado: 1000, topePresupuestoConsolidado: 100000 },
+      { topePresupuestoNoConsolidado: 1000, topePresupuestoConsolidado: 100000 },
       false,
     );
     expect(motivos).toContain(
@@ -293,7 +266,7 @@ describe('presupuestoIncompletoParaEnvio', () => {
     p.rubros[2].partidas = [{ descripcion: 'Equipamiento', cantidad: 1, precioUnitario: 100, monto: 100 }];
     const motivos = presupuestoIncompletoParaEnvio(
       p,
-      { ...convocatoriaConEjecucion, topePresupuestoNoConsolidado: 1000, topePresupuestoConsolidado: 100000 },
+      { topePresupuestoNoConsolidado: 1000, topePresupuestoConsolidado: 100000 },
       true,
     );
     expect(motivos).toEqual([]);
@@ -417,8 +390,7 @@ describe('calcularPresupuestoAAdjudicar', () => {
           partidas: [{
             tipoPersona: TipoPersona.Docente,
             descripcion: 'Viáticos',
-            periodoInicio: '2027-08-01',
-            periodoFin: '2027-09-01',
+            periodo: '2do cuatrimestre 2027',
             monto: 1000,
           }],
         },

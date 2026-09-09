@@ -1,13 +1,13 @@
-import { Fragment } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CampoSugerible } from '@/components/CampoSugerible'
-import type { BienPresupuesto, Convocatoria, RubroPresupuesto, ViaticoPresupuesto } from '@/data/types'
+import type { BienPresupuesto, RubroPresupuesto, ViaticoPresupuesto } from '@/data/types'
 import { TipoRubro } from '@/data/types'
 import {
-  formatearMoneda, LABELS_CAMPO_PARTIDA, LABELS_RUBRO, numeroNoNegativo, PREFIJO_RUTA_PRESUPUESTO,
+  formatearMoneda, LABELS_CAMPO_PARTIDA, LABELS_RUBRO, MAX_LONGITUD_PERIODO_PARTIDA,
+  numeroNoNegativo, PREFIJO_RUTA_PRESUPUESTO,
 } from '@/lib/presupuesto'
 import { cn } from '@/lib/utils'
 import { Trash2 } from 'lucide-react'
@@ -16,7 +16,6 @@ interface Props {
   rubro: RubroPresupuesto
   rubroIdx: number
   editando: boolean
-  convocatoria?: Convocatoria
   handlers?: {
     removePartida: (rubroIdx: number, partidaIdx: number) => void
     updateViatico: (rubroIdx: number, pIdx: number, field: keyof ViaticoPresupuesto, value: string | number) => void
@@ -28,21 +27,8 @@ interface Props {
   }
 }
 
-function periodoInvalido(p: ViaticoPresupuesto, convocatoria: Convocatoria | undefined): string | null {
-  if (!p.periodoInicio || !p.periodoFin) return null
-  if (p.periodoInicio > p.periodoFin) return 'El inicio del período debe ser anterior o igual al fin'
-  const { fechaInicioEjecucion, fechaFinEjecucion } = convocatoria ?? {}
-  if (
-    fechaInicioEjecucion && fechaFinEjecucion
-    && (p.periodoInicio < fechaInicioEjecucion || p.periodoFin > fechaFinEjecucion)
-  ) {
-    return 'El período está fuera de la ejecución de la convocatoria'
-  }
-  return null
-}
-
 /** Grilla de las partidas de un rubro del presupuesto, con el mismo estilo que TablaCampoFormulario. */
-export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocatoria, handlers, sugerencia }: Props) {
+export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, handlers, sugerencia }: Props) {
   const esViatico = rubro.tipo === TipoRubro.ViaticosYSeguros
   const rubroLabel = LABELS_RUBRO[rubro.tipo]
 
@@ -51,7 +37,7 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
   const labelPartida = (campo: string) => `${rubroLabel} > ${LABELS_CAMPO_PARTIDA[campo]}`
 
   const columnas = esViatico
-    ? ['Tipo', 'Descripción', 'Inicio', 'Fin', 'Monto']
+    ? ['Tipo', 'Descripción', 'Período', 'Monto']
     : ['Descripción', 'Cantidad', 'Precio unit.', 'Monto', 'Insumo']
   const colSpan = columnas.length + (editando ? 1 : 0)
 
@@ -60,8 +46,7 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
   const anchoColumna: Record<string, string> = {
     Tipo: 'w-32',
     Descripción: 'min-w-[10rem] max-w-xs',
-    Inicio: 'w-36',
-    Fin: 'w-36',
+    Período: 'w-48',
     Cantidad: 'w-24',
     'Precio unit.': 'w-32',
     Monto: 'w-32',
@@ -105,58 +90,49 @@ export function TablaPartidasPresupuesto({ rubro, rubroIdx, editando, convocator
           )}
 
           {esViatico
-            ? (rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => {
-              const error = editando ? periodoInvalido(p, convocatoria) : null
-              return (
-                <Fragment key={pIdx}>
-                  <TableRow className={error ? 'border-b-0' : undefined}>
-                    {editando && handlers ? (
-                      <>
-                        <TableCell>
-                          <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Docente">Docente</SelectItem>
-                              <SelectItem value="Estudiante">Estudiante</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="min-w-[10rem]">
-                          <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
-                        </TableCell>
-                        <TableCell>
-                          <Input type="date" value={p.periodoInicio} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoInicio', e.target.value)} />
-                        </TableCell>
-                        <TableCell>
-                          <Input type="date" value={p.periodoFin} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodoFin', e.target.value)} />
-                        </TableCell>
-                        <TableCell>
-                          <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', numeroNoNegativo(e.target.value))} />
-                        </TableCell>
-                        <TableCell>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </>
-                    ) : (
-                      <>
-                        <TableCell>{celdaSugerible(pIdx, 'tipoPersona', p.tipoPersona, p.tipoPersona)}</TableCell>
-                        <TableCell className="min-w-[10rem]">{celdaSugerible(pIdx, 'descripcion', p.descripcion, p.descripcion)}</TableCell>
-                        <TableCell>{celdaSugerible(pIdx, 'periodoInicio', p.periodoInicio, p.periodoInicio)}</TableCell>
-                        <TableCell>{celdaSugerible(pIdx, 'periodoFin', p.periodoFin, p.periodoFin)}</TableCell>
-                        <TableCell>{celdaSugerible(pIdx, 'monto', String(p.monto), formatearMoneda(p.monto))}</TableCell>
-                      </>
-                    )}
-                  </TableRow>
-                  {error && (
-                    <TableRow>
-                      <TableCell colSpan={colSpan} className="pt-0 text-xs text-destructive">{error}</TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
-              )
-            })
+            ? (rubro.partidas as ViaticoPresupuesto[]).map((p, pIdx) => (
+              <TableRow key={pIdx}>
+                {editando && handlers ? (
+                  <>
+                    <TableCell>
+                      <Select value={p.tipoPersona} onValueChange={v => handlers.updateViatico(rubroIdx, pIdx, 'tipoPersona', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Docente">Docente</SelectItem>
+                          <SelectItem value="Estudiante">Estudiante</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="min-w-[10rem]">
+                      <Input value={p.descripcion} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'descripcion', e.target.value)} placeholder="Ej: Viaje a..." />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={p.periodo ?? ''}
+                        maxLength={MAX_LONGITUD_PERIODO_PARTIDA}
+                        onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'periodo', e.target.value)}
+                        placeholder="Ej: 2do cuatrimestre 2026"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input type="number" min="0" step="0.01" value={p.monto || ''} onChange={e => handlers.updateViatico(rubroIdx, pIdx, 'monto', numeroNoNegativo(e.target.value))} />
+                    </TableCell>
+                    <TableCell>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handlers.removePartida(rubroIdx, pIdx)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell>{celdaSugerible(pIdx, 'tipoPersona', p.tipoPersona, p.tipoPersona)}</TableCell>
+                    <TableCell className="min-w-[10rem]">{celdaSugerible(pIdx, 'descripcion', p.descripcion, p.descripcion)}</TableCell>
+                    <TableCell>{celdaSugerible(pIdx, 'periodo', p.periodo ?? '', p.periodo ?? '')}</TableCell>
+                    <TableCell>{celdaSugerible(pIdx, 'monto', String(p.monto), formatearMoneda(p.monto))}</TableCell>
+                  </>
+                )}
+              </TableRow>
+            ))
             : (rubro.partidas as BienPresupuesto[]).map((p, pIdx) => (
               <TableRow key={pIdx}>
                 {editando && handlers ? (

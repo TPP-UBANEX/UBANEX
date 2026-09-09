@@ -69,7 +69,7 @@ Cada carpeta bajo `backend/src/` es un módulo de NestJS con el patrón:
 | `templates-evaluacion/` | Plantillas configurables de evaluación institucional y cruzada |
 | `participaciones-convocatoria/` | Alta/baja de directores y evaluadores por convocatoria |
 | `ejecucion/` | Hitos, informe final, autoevaluación de impacto y sus plantillas |
-| `rendiciones/` | Rendición (hoy solo lectura, ver §10 — sin flujo de revisión) |
+| `rendiciones/` | Rendición: carga de comprobantes por rubro y revisión (aceptar/rechazar) por Rectorado |
 | `sugerencias/` | Sugerencias de cambio y notificaciones |
 | `auditoria/` | Registro de acciones de auditoría |
 | `unidades-academicas/`, `carreras/`, `geo/` | Catálogos de referencia |
@@ -121,6 +121,7 @@ Más allá del CRUD estándar (`GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DEL
 | `proyectos` | `DELETE /proyectos/:id/ediciones/:edicionId` | Elimina una edición (solo aplicable en estados tempranos, ej. `Borrador`) |
 | `proyectos` | `PATCH /proyectos/:id/ediciones/:edicionId/aval` | Carga la URL del aval firmado |
 | `proyectos` | `POST /proyectos/:id/ediciones/:edicionId/iniciar-evaluacion` | Pasa la edición a `EnEvaluacion` |
+| `proyectos` | `GET /proyectos/:id/ediciones/:edicionId/historial` | Timeline de trazabilidad (cambios de estado + sugerencias + evaluaciones) para dirección/Secretaría de la UA/Rectorado |
 | `evaluaciones` | `GET /evaluaciones` | Monitoreo agregado de evaluaciones por convocatoria (rectorado) |
 | `evaluaciones` | `GET /evaluaciones/convocatoria/:id/orden-merito/ua` \| `/docente` | Orden de mérito agrupado por UA o por docente |
 | `evaluaciones` | `POST /evaluaciones/convocatoria/:id/orden-merito` | Genera/recalcula el orden de mérito (on demand) |
@@ -128,6 +129,7 @@ Más allá del CRUD estándar (`GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DEL
 | `evaluaciones` | `GET/PUT /evaluaciones/convocatoria/:id/adjudicacion` | Consultar/ajustar la propuesta de adjudicación |
 | `evaluaciones` | `POST /evaluaciones/convocatoria/:id/confirmar-orden-merito` | Fija el resultado y dispara notificaciones |
 | `evaluaciones` | `POST /evaluaciones/convocatoria/:id/adjudicacion/emitir` | Emite la resolución formal de adjudicación |
+| `evaluaciones` | `GET /evaluaciones/convocatoria/:id/resolucion` | Resumen de la resolución emitida para los relacionados (Rectorado, Secretaría de la UA, dirección) — insumo del PDF de la resolución |
 | `evaluaciones` | `GET /evaluaciones/institucionales` \| `/cruzadas/disponibles` | Listados de evaluaciones institucionales/cruzadas pendientes para el evaluador actual |
 | `evaluaciones` | `PUT/POST /evaluaciones/institucionales/:edicionId` \| `/confirmar` | Cargar y confirmar evaluación institucional |
 | `evaluaciones` | `PUT/POST /evaluaciones/cruzadas/:edicionId` \| `/confirmar` | Cargar y confirmar evaluación cruzada |
@@ -176,8 +178,8 @@ frontend/src/
 
 ### 3.4 Componentes destacados
 
-- **Builders de configuración**: `FormularioBuilderTab`, `TemplateInstitucionalBuilder`, `TemplateCruzadaBuilder`, `TemplateAutoevaluacionBuilder`, `ColumnasTablaEditor`, `ConfigTipoCampoEditor`.
-- **Flujo de edición/proyecto**: `NuevoProyectoDialog`, `ResubirProyectoDialog`, `TablaPartidasPresupuesto`, `CampoFormularioInput` / `CampoFormularioLectura`, `TablaCampoFormulario` (campos tipo tabla), `SeleccionarPlantillaDialog`, `ListaCamposFaltantes`, `CampoSugerible`, `SugerirCambioModal`, `SugerenciasTab`.
+- **Builders de configuración**: `FormularioBuilderTab`, `TemplateInstitucionalBuilder`, `TemplateCruzadaBuilder`, `TemplateAutoevaluacionBuilder`, `ColumnasTablaEditor`, `ConfigTipoCampoEditor`. `FormularioBuilderTab` y `PlantillaFormularioDetail` tienen un interruptor Editor/Vista previa que monta `VistaPreviaFormulario` (agrupa los campos en tabs por sección con `agruparCamposEnSecciones` y los muestra en solo lectura, más mocks de las tabs fijas Dirección y Presupuesto).
+- **Flujo de edición/proyecto**: `NuevoProyectoDialog`, `ResubirProyectoDialog`, `TablaPartidasPresupuesto`, `CampoFormularioInput` / `CampoFormularioLectura`, `TablaCampoFormulario` (campos tipo tabla), `SeleccionarPlantillaDialog`, `ListaCamposFaltantes`, `CampoSugerible`, `SugerirCambioModal`, `SugerenciasTab`. En `ProyectoDetail`, el modo edición tiene un interruptor **Editar / Vista previa** que renderiza las tabs de presentación en modo lectura con los datos sin guardar, y `lib/exportar-proyecto-pdf.ts` genera el PDF del proyecto (detalle + formulario + presupuesto) con `jsPDF`.
 - **Evaluación y adjudicación**: `ProyectoEvaluablePanel`, `EvaluacionesProyectoTab`, `EvaluacionConfigTab`, `EmparejamientoTab`, `AdjudicacionResolucionTab`, `AsignacionEvaluadores`, `EvaluadorPerfilDialog`.
 - **Ejecución y cierre**: `HitosEjecucionTab`, `InformeFinalTab`, `AutoevaluacionTab`.
 - **Usuarios**: `EditarUsuarioDialog`, `UsuarioAutocomplete`, `UsuarioHistorial`, `GestionarDireccionModal`, `DireccionEditor`, `LocalidadAutocomplete`.
@@ -218,9 +220,9 @@ frontend/src/
 
 ## 6. Seed de datos
 
-- `backend/src/seed/` puebla datos de desarrollo (usuarios, convocatorias, proyectos, evaluaciones, etc.) de forma **idempotente** (no duplica si se corre más de una vez).
+- `backend/src/seed/` puebla un dataset **chico y curado a mano** (no generado por RNG) pensado para demo: ~46 usuarios (varios por rol y unidad académica, alguno con perfil incompleto o pendiente de validación) y una convocatoria por cada etapa del ciclo (`Configuracion`, `Presentacion`, `Evaluacion`, `Ejecucion`, `Cierre`), con proyectos/ediciones, evaluaciones, hitos, rendiciones, sugerencias y notificaciones coherentes con la etapa de cada una. Es **idempotente** (no duplica si se corre más de una vez).
 - Se activa con `UBANEX_SEED=true` **y** requiere `RENDER !== 'true'` (ver §4.1); en Render queda desactivado sin importar el valor de `UBANEX_SEED`.
-- No siembra datos de `Rendicion`: la tabla queda vacía en una base recién sembrada (ver §9 y §10).
+- El usuario `admin@uba.ar` se preserva siempre; todos los usuarios sembrados (incluido el admin) comparten la misma password (`admin`).
 - **Riesgo documentado**: el seed escribe con `repo.save()` directo, sin pasar por DTOs ni `class-validator`, y puede insertar datos que la API rechazaría; las columnas `json` no están tipadas por TypeScript. Ver tabla de mantenimiento en [`AGENTS.md`](../AGENTS.md#seed) — cualquier cambio en `Formulario.campos`, `Edicion.presupuesto`, `templates-default.ts` o entidades debe revisar el seed correspondiente y validarse con `make reset-seed`.
 
 ## 7. Testing
@@ -234,7 +236,7 @@ frontend/src/
   - `sugerencias/sugerencias.service.spec.ts` — creación de sugerencias y validación de rutas de presupuesto, respuesta/aceptación.
   - `formularios/campo-formulario.util.spec.ts` — validación de valores y campos incompletos de formularios dinámicos (incluye geolocalización y campos tipo usuario).
   - `common/dto/validador-campos-formulario.spec.ts` — validación de campos de formulario a nivel DTO (tabla y usuario).
-  - `proyectos/presupuesto.util.spec.ts` — validación de presupuestos (rubros faltantes/duplicados, montos negativos o NaN, cantidades, fechas y períodos de viáticos).
+  - `proyectos/presupuesto.util.spec.ts` — validación de presupuestos (rubros faltantes/duplicados, montos negativos o NaN, cantidades y período de viáticos como texto libre).
   - `proyectos/proyectos.service.spec.ts` — eliminación de ediciones y permisos, y normalización/tope de presupuesto al actualizar y enviar una edición.
   - `usuarios/usuarios.service.spec.ts` — reglas de grupos de roles excluyentes, cupos de autoridades por UA y búsqueda de usuarios para formularios.
 - Comandos: `npm run test`, `npm run test:watch` (backend). El frontend no tiene suite de tests configurada actualmente.
@@ -264,14 +266,14 @@ Resumen operativo (detalle completo en [`AGENTS.md`](../AGENTS.md)):
 | Evaluación institucional/cruzada, orden de mérito, adjudicación | `evaluaciones/`, `templates-evaluacion/` | `Evaluacion`, `ProyectoEvaluablePanel`, `EvaluacionesProyectoTab`, `AdjudicacionResolucionTab` |
 | Alta/baja de directores y evaluadores | `participaciones-convocatoria/` | `AsignacionEvaluadores`, `EvaluadorPerfilDialog` |
 | Hitos, informe final, autoevaluación | `ejecucion/` | `HitosEjecucionTab`, `InformeFinalTab`, `AutoevaluacionTab` |
-| Rendición (solo lectura, esquema real ver §10) | `rendiciones/` | — (sin UI dedicada aún) |
+| Rendición de comprobantes | `rendiciones/` | `ComprobantesTab` |
 | Sugerencias y notificaciones | `sugerencias/` | `SugerenciasTab`, `SugerirCambioModal`, `NotificacionesDropdown` |
 | Usuarios, validación docente, catálogos | `usuarios/`, `carreras/`, `geo/`, `unidades-academicas/` | `Usuarios`, `UsuarioDetail`, `ValidacionDocente` |
 | Auditoría | `auditoria/` | `UsuarioHistorial` |
 
 ## 10. Deuda técnica conocida
 
-- **Rendición**: la entidad real (`rendicion.entity.ts`) ya tiene columnas por fila (`proyectoId`, `rubro`, `monto`, `fecha`, `comprobanteUrl`, `estado` default `'pendiente'`), pero se relaciona con `Proyecto` y no con `Edicion` como plantea el diseño objetivo; falta entidad `Comprobante` separada, endpoints de alta/revisión y UI. `rendiciones.service.ts` solo expone `findAll`; el seed no la puebla.
+- **Rendición**: falta el historial/reemplazo de comprobantes rechazados (hoy un comprobante rechazado se re-edita en su misma fila) y la subida de archivos reales (el comprobante es un link). Ver [`dominio/modelo.md`](dominio/modelo.md#rendición) para el estado real de la entidad y el flujo implementado.
 - **Cierre automático de Edición**: no existe la transición que valida los 3 requisitos de cierre (informe + autoevaluación + rendición); hoy el estado `Cerrado` solo lo produce el seed.
 - **Almacenamiento de adjuntos**: no hay integración de storage de archivos; `TipoCampo.archivo` deshabilitado, avales se cargan como URL de texto.
 - **Frontend sin tests automatizados**: solo el backend tiene specs de Jest.

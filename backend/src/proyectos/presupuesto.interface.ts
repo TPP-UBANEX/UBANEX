@@ -4,8 +4,8 @@ import { TipoPersona } from '../common/enums/tipo-persona.enum';
 export interface ViaticoPresupuesto {
   tipoPersona: TipoPersona;
   descripcion: string;
-  periodoInicio: string;
-  periodoFin: string;
+  /** Texto libre: el docente describe el período (ej. "2do cuatrimestre 2026"), no fechas. */
+  periodo: string;
   monto: number;
 }
 

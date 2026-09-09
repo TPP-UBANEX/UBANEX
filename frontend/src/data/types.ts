@@ -324,9 +324,6 @@ export interface Edicion {
   anioEdicion?: number;
   datosFormulario?: Record<string, unknown>;
   avalUrl?: string | null;
-  // El director decide si la Unidad Académica puede ver (solo lectura) los
-  // comprobantes de rendición de esta edición.
-  uaPuedeVerComprobantes?: boolean;
   ordenMerito?: number | null;
   adjudicacionPropuesta?: boolean | null;
   mecanismoAdjudicacion?: 'MERITO' | 'CUOTA_FEDERATIVA' | null;
@@ -361,6 +358,16 @@ export interface AdjudicacionResumenItem {
   montoAdjudicado: number | null;
   presupuestoAAdjudicar: number;
   tieneAval: boolean;
+}
+
+export interface EventoHistorialEdicion {
+  fecha: string;
+  tipo: 'estado' | 'sugerencia' | 'evaluacion';
+  descripcion: string;
+  responsableNombre: string | null;
+  // Presente solo en la creación de una observación: clave del campo observado (se traduce a
+  // etiqueta legible con nombreCampoSugerencia).
+  campo?: string;
 }
 
 export interface AdjudicacionResumen {
@@ -398,8 +405,8 @@ export interface RubroPresupuesto {
 export interface ViaticoPresupuesto {
   tipoPersona: TipoPersona;
   descripcion: string;
-  periodoInicio: string;
-  periodoFin: string;
+  /** Texto libre: el docente describe el período (ej. "2do cuatrimestre 2026"), no fechas. */
+  periodo: string;
   monto: number;
 }
 
@@ -427,10 +434,6 @@ export interface ActualizarEdicionDto {
   unidadAcademicaAdicionalId?: string | null;
   presupuestoSolicitado?: Presupuesto;
   datosFormulario?: Record<string, unknown>;
-}
-
-export interface ActualizarVisibilidadComprobantesDto {
-  uaPuedeVerComprobantes: boolean;
 }
 
 export interface Evaluacion {

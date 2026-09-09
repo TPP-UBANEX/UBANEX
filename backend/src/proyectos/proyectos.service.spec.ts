@@ -59,10 +59,22 @@ describe('ProyectosService', () => {
   const findInstitucionales = jest.fn<() => Promise<EvaluacionInstitucional[]>>().mockResolvedValue([]);
   const institucionalRepo = {
     find: findInstitucionales,
+    findOne: jest.fn<() => Promise<EvaluacionInstitucional | null>>().mockResolvedValue(null),
   } as unknown as Repository<EvaluacionInstitucional>;
+  const sugerenciaRepo = {
+    find: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  } as unknown as Repository<never>;
+  const cruzadaRepo = {
+    find: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  } as unknown as Repository<never>;
+  const auditoria = {
+    registrar: jest.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
+    listarPorEntidad: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  } as unknown as import('../auditoria/auditoria.service').AuditoriaService;
 
   const service = new ProyectosService(
     proyectoRepo, edicionRepo, participacionRepo, emparejamientoRepo, formularioRepo, institucionalRepo,
+    sugerenciaRepo, cruzadaRepo, auditoria,
   );
 
   function edicion(overrides: Partial<Edicion> = {}): Edicion {
@@ -286,8 +298,7 @@ describe('ProyectosService', () => {
             partidas: [{
               tipoPersona: TipoPersona.Docente,
               descripcion: 'Viáticos',
-              periodoInicio: '2027-08-01',
-              periodoFin: '2027-09-01',
+              periodo: '2do cuatrimestre 2027',
               monto: 1000,
             }],
           },
@@ -328,8 +339,7 @@ describe('ProyectosService', () => {
             partidas: [{
               tipoPersona: TipoPersona.Docente,
               descripcion: 'Viáticos',
-              periodoInicio: '2027-08-01',
-              periodoFin: '2027-09-01',
+              periodo: '2do cuatrimestre 2027',
               monto: 1000,
             }],
           },

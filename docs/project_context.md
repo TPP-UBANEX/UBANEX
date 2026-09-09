@@ -291,7 +291,7 @@ Comienza cuando se firma la resolución de adjudicación.
 
 #### Rubro 1: Viáticos y Seguros
 - Desglosado por **tipo de persona** (Docente / Estudiante).
-- Cada partida incluye: descripción, período, monto.
+- Cada partida incluye: descripción, período (texto libre, ej. "2do cuatrimestre 2026"), monto.
 - El subtotal del rubro suma los montos de ambos tipos de persona.
 
 #### Rubro 2: Bienes de Consumo
@@ -883,14 +883,27 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   `ParticipacionConvocatoria`; alta directa de evaluadores por Rectorado.
 * CRUD de usuarios con paginación, filtros y perfil académico/docente; auditoría de
   acciones; catálogos de unidades académicas, carreras y geo.
+* Perfil docente completo: CUIL + resumen del CV + links de Google Drive (fotocopia DNI,
+  constancia CUIL, constancia de cargo) obligatorios al crear vía gestión y al guardar el
+  perfil propio; el registro público crea la cuenta con datos básicos y el perfil se
+  completa vía "Editar perfil". Visible en `/usuarios/{id}` sin abrir el diálogo.
 * CRUD de convocatorias con estados y fechas por etapa.
 * Reglas de cierre de convocatoria: solo se cierra cuando la fecha actual es igual o
   posterior a la fecha de fin de ejecución y no quedan comprobantes en revisión.
 * Formularios dinámicos con 12 tipos de campo, tablas, y plantillas reutilizables;
   se congelan al pasar a `Presentacion`.
-* Proyectos y ediciones con presupuesto de 3 rubros (recálculo en backend), tope de
-  presupuesto solicitado por convocatoria, aval de edición y reenvío ("resubir").
+* Proyectos y ediciones con presupuesto de 3 rubros (recálculo en backend; el período de
+  Viáticos y Seguros es texto libre), tope de presupuesto solicitado por convocatoria,
+  aval de edición y reenvío ("resubir").
+* Vista previa del formulario de presentación: para quien presenta (interruptor Editar /
+  Vista previa sobre las tabs del proyecto con los datos sin guardar) y para Rectorado en
+  el constructor de formulario y en las plantillas (tabs por sección en solo lectura +
+  mocks de Dirección y Presupuesto). Descarga del proyecto en PDF (detalle + formulario +
+  presupuesto).
 * Sugerencias de cambio sobre ediciones presentadas + notificaciones in-app / mail.
+* Visibilidad de proyectos para Rectorado: ve todas las ediciones de la convocatoria excepto
+  los `Borrador` (aún no presentados). Los `Presentado` y `PendienteDeCambios` se ven con o sin
+  aval; el aval no gatea la visibilidad ni bloquea el pase a evaluación.
 * Emparejamiento de unidades académicas por convocatoria.
 * Evaluación institucional y cruzada con estado `Borrador | Confirmada` y plantillas
   configurables por convocatoria.
@@ -898,17 +911,22 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   consolidados.
 * Orden de mérito y adjudicación propuesta (mérito / cuota federativa) con presupuesto a
   adjudicar (topes, extra por insumos, extra por PSE); confirmación que fija el resultado
-  y notifica a los directores.
+  y notifica a los directores. Una vez **emitida** la resolución, los usuarios relacionados
+  (Rectorado, Secretaría de la UA y la dirección de cada proyecto) pueden **descargar la
+  resolución de adjudicación en PDF** desde la convocatoria.
 * Desempate por tercera evaluación: umbral de inconsistencia cruzada y designación de un
   evaluador de una tercera unidad académica.
 * Hitos de ejecución.
 * Comprobantes de rendición: carga por rubro con consumo del presupuesto y estados
   `EnRevision → Aceptado | Rechazado`; **aceptar/rechazar es solo de Rectorado** (con
-  motivo de rechazo) y el director controla si la Secretaría de la UA puede ver la
-  sección en modo lectura (`Edicion.uaPuedeVerComprobantes`, default `false`); si no la
-  habilita, la Secretaría ve un aviso al abrir la pestaña.
+  motivo de rechazo). La sección la ven el Rectorado y quienes están relacionados al
+  proyecto: creador, dirección/codirección y Secretaría de una UA del proyecto.
 * Autoevaluación de impacto (plantillas configurables) e informe final (autogenerado
   desde hitos), cada uno con su confirmación.
+* Historial de trazabilidad por proyecto: pestaña que consolida en una línea de tiempo los
+  cambios de estado de la edición (auditados con responsable y fecha), las observaciones
+  (sugerencias de cambio) y la actividad de las evaluaciones. Visible para la dirección del
+  proyecto, la Secretaría de la UA y el Rectorado.
 
 ## Falta / incompleto
 

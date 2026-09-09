@@ -5,9 +5,9 @@ import {
 import { TipoRubro } from '../common/enums/tipo-rubro.enum';
 import { TipoPersona } from '../common/enums/tipo-persona.enum';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
-import { esFechaValida } from '../formularios/campo-formulario.util';
 import {
-  MAX_LONGITUD_DESCRIPCION_PARTIDA, MAX_PARTIDAS_POR_RUBRO, MONTO_MAXIMO_PARTIDA,
+  MAX_LONGITUD_DESCRIPCION_PARTIDA, MAX_LONGITUD_PERIODO_PARTIDA, MAX_PARTIDAS_POR_RUBRO,
+  MONTO_MAXIMO_PARTIDA,
 } from '../common/constantes';
 
 const ORDEN_RUBROS: TipoRubro[] = [
@@ -24,7 +24,7 @@ export const LABELS_RUBRO: Record<TipoRubro, string> = {
 
 /** Campos de una partida sobre los que se puede sugerir un cambio (ver sugerencias.service.ts). */
 export const CAMPOS_PARTIDA_PERMITIDOS = [
-  'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodoInicio', 'periodoFin', 'tipoPersona',
+  'descripcion', 'monto', 'cantidad', 'precioUnitario', 'periodo', 'tipoPersona',
   'esInsumo',
 ] as const;
 
@@ -33,8 +33,7 @@ export const LABELS_CAMPO_PARTIDA: Record<string, string> = {
   monto: 'Monto',
   cantidad: 'Cantidad',
   precioUnitario: 'Precio unitario',
-  periodoInicio: 'Inicio del período',
-  periodoFin: 'Fin del período',
+  periodo: 'Período',
   tipoPersona: 'Tipo de persona',
   esInsumo: 'Es insumo',
 };
@@ -122,23 +121,13 @@ function validarDescripcion(label: string, indice: number, descripcion: unknown)
   }
 }
 
-function validarPeriodo(label: string, indice: number, inicio: unknown, fin: unknown): void {
-  if (typeof inicio !== 'string' || typeof fin !== 'string') {
+function validarPeriodo(label: string, indice: number, periodo: unknown): void {
+  if (typeof periodo !== 'string') {
     throw new BadRequestException(`"${label}": la partida ${indice + 1} tiene un período inválido`);
   }
-  if (inicio !== '' && !esFechaValida(inicio)) {
+  if (periodo.length > MAX_LONGITUD_PERIODO_PARTIDA) {
     throw new BadRequestException(
-      `"${label}": la partida ${indice + 1} tiene una fecha de inicio inválida (AAAA-MM-DD)`,
-    );
-  }
-  if (fin !== '' && !esFechaValida(fin)) {
-    throw new BadRequestException(
-      `"${label}": la partida ${indice + 1} tiene una fecha de fin inválida (AAAA-MM-DD)`,
-    );
-  }
-  if (inicio !== '' && fin !== '' && inicio > fin) {
-    throw new BadRequestException(
-      `"${label}": en la partida ${indice + 1} el inicio del período debe ser anterior o igual al fin`,
+      `"${label}": el período de la partida ${indice + 1} no puede superar los ${MAX_LONGITUD_PERIODO_PARTIDA} caracteres`,
     );
   }
 }
@@ -155,7 +144,7 @@ function validarViatico(label: string, partida: unknown, indice: number): void {
   if (!esMontoValido(v.monto)) {
     throw new BadRequestException(`"${label}": la partida ${indice + 1} tiene un monto inválido`);
   }
-  validarPeriodo(label, indice, v.periodoInicio, v.periodoFin);
+  validarPeriodo(label, indice, v.periodo);
 }
 
 function validarBien(label: string, partida: unknown, indice: number): void {
@@ -179,8 +168,9 @@ function validarBien(label: string, partida: unknown, indice: number): void {
 
 /**
  * Valida la forma del presupuesto: los 3 rubros fijos sin duplicados, partidas del tipo que
- * corresponde a cada rubro, montos finitos y no negativos, y períodos con inicio <= fin.
- * No exige montos > 0 ni períodos completos: eso se exige recién al enviar la edición
+ * corresponde a cada rubro, montos finitos y no negativos, y el período de los viáticos como
+ * texto dentro del límite de longitud.
+ * No exige montos > 0 ni el período cargado: eso se exige recién al enviar la edición
  * (ver presupuestoIncompletoParaEnvio), para permitir guardar un borrador a medio cargar.
  */
 export function validarPresupuesto(presupuesto: unknown): asserts presupuesto is Presupuesto {
@@ -240,6 +230,7 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
       const partidas = (rubro.partidas as ViaticoPresupuesto[]).map((p) => ({
         ...p,
         descripcion: p.descripcion.trim(),
+        periodo: (p.periodo ?? '').trim(),
         monto: redondear2(p.monto),
       }));
       return { tipo, partidas, subtotal: redondear2(partidas.reduce((sum, p) => sum + p.monto, 0)) };
@@ -259,8 +250,7 @@ export function normalizarPresupuesto(presupuesto: Presupuesto): Presupuesto {
 /**
  * Describe, en texto legible, qué falta completar del presupuesto para poder enviar la edición:
  * los 3 rubros deben tener al menos una partida, cada partida debe tener descripción y monto > 0,
- * los viáticos deben tener período completo y dentro de la ejecución de la convocatoria (o, si
- * la convocatoria todavía no tiene esas fechas cargadas, no comenzar antes de hoy), y el total no
+ * los viáticos deben tener el período cargado (texto libre), y el total no
  * debe superar el tope de la convocatoria para proyectos consolidados/no consolidados (`esConsolidado`,
  * ver consolidacion.ts#esConsolidadoParaTope). Guardar el presupuesto (actualizarEdicion) ya
  * bloquea esto mismo antes; se repite acá porque una edición puede llegar excedida sin pasar por
@@ -270,7 +260,7 @@ export function presupuestoIncompletoParaEnvio(
   presupuesto: Presupuesto | null,
   convocatoria?: Pick<
     Convocatoria,
-    'fechaInicioEjecucion' | 'fechaFinEjecucion' | 'topePresupuestoConsolidado' | 'topePresupuestoNoConsolidado'
+    'topePresupuestoConsolidado' | 'topePresupuestoNoConsolidado'
   > | null,
   esConsolidado = false,
 ): string[] {
@@ -279,9 +269,6 @@ export function presupuestoIncompletoParaEnvio(
   }
 
   const motivos: string[] = [];
-  const fechaInicioEjecucion = convocatoria?.fechaInicioEjecucion ?? null;
-  const fechaFinEjecucion = convocatoria?.fechaFinEjecucion ?? null;
-  const hoy = new Date().toISOString().slice(0, 10);
 
   for (const rubro of presupuesto.rubros) {
     const label = LABELS_RUBRO[rubro.tipo];
@@ -299,17 +286,8 @@ export function presupuestoIncompletoParaEnvio(
       }
       if (rubro.tipo === TipoRubro.ViaticosYSeguros) {
         const v = partida as ViaticoPresupuesto;
-        if (!v.periodoInicio || !v.periodoFin) {
+        if (!v.periodo || v.periodo.trim() === '') {
           motivos.push(`"${label}": a la partida ${indice + 1} le falta el período`);
-        } else if (fechaInicioEjecucion && fechaFinEjecucion) {
-          if (v.periodoInicio < fechaInicioEjecucion || v.periodoFin > fechaFinEjecucion) {
-            motivos.push(
-              `"${label}": el período de la partida ${indice + 1} está fuera del período de `
-              + 'ejecución de la convocatoria',
-            );
-          }
-        } else if (v.periodoInicio < hoy) {
-          motivos.push(`"${label}": el período de la partida ${indice + 1} no puede comenzar antes de hoy`);
         }
       }
     });

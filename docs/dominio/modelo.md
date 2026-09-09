@@ -190,8 +190,7 @@ classDiagram
         <<value object>>
         +tipoPersona: TipoPersona
         +descripcion: string
-        +periodoInicio: string
-        +periodoFin: string
+        +periodo: string
         +monto: number
     }
 
@@ -250,7 +249,7 @@ classDiagram
 - Las partidas de presupuesto no pueden tener montos negativos, y cada rubro presenta un reporte solo si tiene al menos una partida por completo (todos sus campos obligatorios completos).
 - Cada `Bien` (Bienes de Consumo y de Uso) puede marcarse como `esInsumo`. Si los insumos superan el `umbralInsumos` % del total solicitado, la edición gana un extra de `porcentajeExtraInsumos` % en su presupuesto **a adjudicar** (no en el solicitado). Ver §Adjudicación y Orden de Mérito.
 - El backend recalcula siempre los subtotales por rubro y el total (ignora los montos que envía el front), así que el total es la suma exacta de las partidas.
-- Un `Viatico` lleva `periodoInicio` y `periodoFin` (fechas que deben caer dentro del rango de `fechasEjecucion` de la convocatoria).
+- Un `Viatico` lleva un `periodo` de texto libre (ej. "2do cuatrimestre 2026"); el docente lo describe con sus palabras y no se valida contra fechas.
 - Las sugerencias de cambio de presupuesto (así como las de demás campos de la edición) se implementan con el patrón de ediciones entrantes (ver sección Sugerencias).
 - `Edicion` tiene un `creadoPor` (usuario que creó la edición). Los directores se asignan mediante `ParticipacionConvocatoria` con rol `DirectorDeProyecto`.
 
@@ -595,7 +594,7 @@ classDiagram
 - El director/codirector (o creador con permisos de ejecución) carga comprobantes durante `Ejecucion`, cada uno asociado a un rubro del presupuesto, y puede editarlos o eliminarlos mientras estén `EnRevision`.
 - Cada comprobante tiene un estado individual: `EnRevision → Aceptado | Rechazado`.
 - **Aceptar y rechazar es exclusivo de Rectorado** (`AutoridadDeRectorado` o `AsistenteDeRectorado`). Al rechazar es obligatorio dejar un `motivoRechazo` explicativo.
-- `Edicion.uaPuedeVerComprobantes` (default `false`) habilita a la **Secretaría de la misma unidad académica** a **ver** la sección de comprobantes en modo lectura. Si es `false`, esa Secretaría no tiene acceso de lectura (la API responde 403) y el frontend le muestra un aviso al abrir la pestaña de que el director no la habilitó. El toggle lo controla el director mientras la edición está en ejecución. Rectorado siempre ve la sección.
+- Los comprobantes los ven el **Rectorado** (cualquier UA) y quienes están **relacionados al proyecto**: el creador de la edición, su dirección/codirección y la **Secretaría de una unidad académica del proyecto** (la UA de la edición y, en interfacultad, la UA adicional). Cualquier otro usuario recibe 403. No hay toggle por edición.
 - `Rendicion` no tiene estado global — se considera "en curso" mientras la convocatoria esté en `Ejecucion`.
 
 ---

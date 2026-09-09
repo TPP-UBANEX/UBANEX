@@ -12,7 +12,6 @@ import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { ResubirProyectoDto } from './dto/resubir-proyecto.dto';
 import { ActualizarEdicionDto } from './dto/actualizar-edicion.dto';
 import { ActualizarAvalDto } from './dto/actualizar-aval.dto';
-import { ActualizarVisibilidadComprobantesDto } from './dto/actualizar-visibilidad-comprobantes.dto';
 import { Usuario } from '../usuarios/usuario.entity';
 import { EvaluacionInstitucional } from '../evaluaciones/evaluacion-institucional.entity';
 import { Convocatoria } from '../convocatorias/convocatoria.entity';
@@ -30,6 +29,11 @@ import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { EstadoPropuestaEvaluador } from '../common/enums/estado-propuesta-evaluador.enum';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { ListarProyectosDto } from './dto/listar-proyectos.dto';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
+import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
+import { SugerenciaCambio } from '../sugerencias/sugerencia-cambio.entity';
+import { EvaluacionCruzada } from '../evaluaciones/evaluacion-cruzada.entity';
 import { camposIncompletosParaEnvio, validarValoresFormulario } from '../formularios/campo-formulario.util';
 import { CampoFormulario } from '../formularios/campo-formulario.interface';
 import {
@@ -71,6 +75,11 @@ export class ProyectosService {
     private readonly formularioRepo: Repository<Formulario>,
     @InjectRepository(EvaluacionInstitucional)
     private readonly institucionalRepo: Repository<EvaluacionInstitucional>,
+    @InjectRepository(SugerenciaCambio)
+    private readonly sugerenciaRepo: Repository<SugerenciaCambio>,
+    @InjectRepository(EvaluacionCruzada)
+    private readonly cruzadaRepo: Repository<EvaluacionCruzada>,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async crearProyecto(dto: CrearProyectoDto, usuario: Usuario) {
@@ -254,7 +263,10 @@ export class ProyectosService {
       .orderBy('edicion.actualizadoEn', 'DESC');
 
     if (esRectorado) {
-      // Rectorado ve todos los proyectos
+      // Rectorado ve todas las ediciones de una convocatoria excepto los borradores
+      // (que todavía no fueron presentados). Presentado y PendienteDeCambios se ven con
+      // o sin aval; el aval no gatea la visibilidad.
+      query.andWhere('edicion.estado != :borrador', { borrador: EstadoEdicion.Borrador });
     } else if (esSecretaria) {
       query.andWhere('edicion.unidadAcademicaId = :uaId', { uaId: usuario.unidadAcademicaId });
     } else {
@@ -591,6 +603,7 @@ export class ProyectosService {
 
     edicion.estado = EstadoEdicion.Presentado;
     await this.edicionRepo.save(edicion);
+    await this.registrarCambioEstado(edicion, 'El proyecto fue presentado', usuario);
 
     return this.obtenerProyecto(proyectoId);
   }
@@ -763,6 +776,7 @@ export class ProyectosService {
 
     edicion.estado = EstadoEdicion.EnEvaluacion;
     await this.edicionRepo.save(edicion);
+    await this.registrarCambioEstado(edicion, 'El proyecto pasó a evaluación', usuario);
 
     return this.obtenerProyecto(proyectoId);
   }
@@ -803,22 +817,23 @@ export class ProyectosService {
   }
 
   /**
-   * El director decide si la Unidad Académica puede ver (solo lectura) los
-   * comprobantes de rendición de la edición. Solo creador/director lo puede
-   * togglear; la gestión de estados sigue siendo exclusiva de Rectorado.
+   * Registra en auditoría un cambio de estado de la edición, con responsable y fecha, para
+   * alimentar la timeline de trazabilidad del proyecto (entidad='edicion', entidadId=edicionId).
    */
-  async actualizarVisibilidadComprobantes(
-    proyectoId: string,
-    edicionId: string,
-    dto: ActualizarVisibilidadComprobantesDto,
-    usuario: Usuario,
-  ) {
-    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
-    if (!(await this.esCreadorODirector(edicion, usuario))) {
-      throw new ForbiddenException('Solo el director del proyecto puede configurar esta visualización');
-    }
-    edicion.uaPuedeVerComprobantes = dto.uaPuedeVerComprobantes;
-    return this.edicionRepo.save(edicion);
+  private async registrarCambioEstado(
+    edicion: Edicion,
+    descripcion: string,
+    responsable: Usuario,
+  ): Promise<void> {
+    await this.auditoria.registrar({
+      usuarioId: edicion.creadoPorId,
+      accion: TipoAccionAuditoria.CAMBIO_ESTADO,
+      descripcion,
+      responsableId: responsable.id,
+      responsableNombre: responsable.nombreCompleto,
+      entidad: TipoEntidadAuditoria.EDICION,
+      entidadId: edicion.id,
+    });
   }
 
   async cerrarEdicion(proyectoId: string, edicionId: string, usuario: Usuario) {
@@ -871,7 +886,121 @@ export class ProyectosService {
 
     edicion.estado = EstadoEdicion.Cerrado;
     await this.edicionRepo.save(edicion);
+    await this.registrarCambioEstado(edicion, 'El proyecto fue cerrado', usuario);
 
     return this.obtenerProyecto(proyectoId);
+  }
+
+  /**
+   * Timeline de trazabilidad de una edición: consolida, ordenados por fecha, los cambios de
+   * estado auditados, las observaciones (sugerencias de cambio) y la actividad de las
+   * evaluaciones institucional y cruzada. Visible para la dirección del proyecto, la Secretaría
+   * de la UA y el Rectorado.
+   */
+  async historialEdicion(proyectoId: string, edicionId: string, usuario: Usuario) {
+    const edicion = await this.obtenerEdicion(proyectoId, edicionId);
+    await this.validarAccesoHistorial(edicion, usuario);
+
+    const eventos: {
+      fecha: Date;
+      tipo: 'estado' | 'sugerencia' | 'evaluacion';
+      descripcion: string;
+      responsableNombre: string | null;
+      // Solo en la creación de una observación: la clave del campo observado. El frontend la
+      // traduce a una etiqueta legible (ver lib/nombre-campo.ts).
+      campo?: string;
+    }[] = [];
+
+    // 1. Cambios de estado de la edición.
+    const cambios = await this.auditoria.listarPorEntidad(
+      TipoEntidadAuditoria.EDICION,
+      edicionId,
+    );
+    for (const a of cambios) {
+      eventos.push({
+        fecha: a.fecha,
+        tipo: 'estado',
+        descripcion: a.descripcion,
+        responsableNombre: a.responsableNombre,
+      });
+    }
+
+    // 2. Observaciones (sugerencias de cambio) y sus respuestas.
+    const sugerencias = await this.sugerenciaRepo.find({
+      where: { edicionId },
+      relations: { sugeridoPor: true },
+    });
+    for (const s of sugerencias) {
+      eventos.push({
+        fecha: s.creadoEn,
+        tipo: 'sugerencia',
+        descripcion: s.comentario,
+        responsableNombre: s.sugeridoPor?.nombreCompleto ?? null,
+        campo: s.campo,
+      });
+      if (s.respondidoEn) {
+        eventos.push({
+          fecha: s.respondidoEn,
+          tipo: 'sugerencia',
+          descripcion: `Respuesta a la observación${
+            s.respuestaDirector ? `: ${s.respuestaDirector}` : ''
+          }`,
+          responsableNombre: edicion.creadoPor?.nombreCompleto ?? null,
+        });
+      }
+    }
+
+    // 3. Actividad de las evaluaciones (auditadas por id de evaluación).
+    const institucional = await this.institucionalRepo.findOne({ where: { edicionId } });
+    if (institucional) {
+      const audInst = await this.auditoria.listarPorEntidad(
+        TipoEntidadAuditoria.EVALUACION_INSTITUCIONAL,
+        institucional.id,
+      );
+      for (const a of audInst) {
+        eventos.push({
+          fecha: a.fecha,
+          tipo: 'evaluacion',
+          descripcion: `Evaluación institucional: ${a.descripcion}`,
+          responsableNombre: a.responsableNombre,
+        });
+      }
+    }
+    const cruzadas = await this.cruzadaRepo.find({ where: { edicionId } });
+    for (const c of cruzadas) {
+      const audCruz = await this.auditoria.listarPorEntidad(
+        TipoEntidadAuditoria.EVALUACION_CRUZADA,
+        c.id,
+      );
+      for (const a of audCruz) {
+        eventos.push({
+          fecha: a.fecha,
+          tipo: 'evaluacion',
+          descripcion: `Evaluación cruzada: ${a.descripcion}`,
+          responsableNombre: a.responsableNombre,
+        });
+      }
+    }
+
+    eventos.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+    return eventos;
+  }
+
+  private async validarAccesoHistorial(edicion: Edicion, usuario: Usuario): Promise<void> {
+    const esRectorado = usuario.roles.some(
+      r =>
+        r === RolUsuario.AutoridadDeRectorado || r === RolUsuario.AsistenteDeRectorado,
+    );
+    const esSecretariaUA =
+      usuario.roles.some(
+        r =>
+          r === RolUsuario.AutoridadDeSecretaria || r === RolUsuario.AsistenteDeSecretaria,
+      ) && usuario.unidadAcademicaId === edicion.unidadAcademicaId;
+    const esDireccion = esRectorado || esSecretariaUA
+      ? false
+      : await this.esCreadorODirector(edicion, usuario);
+    if (!esRectorado && !esSecretariaUA && !esDireccion) {
+      throw new ForbiddenException('No tenés permisos para ver el historial de este proyecto');
+    }
   }
 }

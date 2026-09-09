@@ -1,4 +1,5 @@
 export enum TipoEntidadAuditoria {
+  EDICION = 'edicion',
   EVALUACION_INSTITUCIONAL = 'evaluacion-institucional',
   EVALUACION_CRUZADA = 'evaluacion-cruzada',
   HITO = 'hito',

@@ -36,6 +36,9 @@ describe('ParticipacionConvocatoriaService', () => {
   const findOneEdicion = jest.fn<() => Promise<Edicion | null>>();
 
   const registrarAuditoria = jest.fn<(params: unknown) => Promise<unknown>>();
+  const createNotificacion = jest.fn();
+  const saveNotificacion = jest.fn();
+  const deleteNotificacion = jest.fn();
 
   const participacionRepo = {
     find: findParticipaciones,
@@ -65,7 +68,9 @@ describe('ParticipacionConvocatoriaService', () => {
   } as unknown as AuditoriaService;
 
   const notificacionRepo = {
-    delete: jest.fn<(criteria: Record<string, string>) => Promise<unknown>>().mockResolvedValue({}),
+    create: createNotificacion,
+    save: saveNotificacion,
+    delete: deleteNotificacion,
   } as unknown as Repository<Notificacion>;
   const mail = {} as unknown as MailService;
 

@@ -149,7 +149,12 @@ Rectorado):
    visual). El tipo *archivo* está deshabilitado por ahora.
 3. Marcá cada campo como **obligatorio** u opcional. Para *tabla*, definí sus columnas y
    los mínimos/máximos de filas.
-4. Guardá.
+4. El botón **Vista previa** (arriba a la derecha del builder) muestra el formulario tal
+   como lo verá quien presente un proyecto: las tabs "Resumen" + una por cada campo de tipo
+   **sección**, más las tabs fijas "Dirección" y "Presupuesto solicitado" a modo de
+   referencia. Es solo lectura y no guarda nada; **Volver al editor** regresa a la lista de
+   campos. El mismo botón está en la edición de plantillas (*Plantillas de presentación*).
+5. Guardá.
 
 ![Builder de formulario dinámico](assets/manual/formulario-builder.png)
 
@@ -212,7 +217,10 @@ Se trabaja desde la barra lateral → **Evaluación**, eligiendo la convocatoria
 4. **Confirmar el orden de mérito.** Fija el resultado (ya no se regenera ni ajusta) y
    **notifica a cada director** si su proyecto quedó adjudicado o no.
 5. **Emitir la resolución de adjudicación** (Autoridad de Rectorado). Es el acto formal
-   posterior a la confirmación.
+   posterior a la confirmación. Una vez emitida, aparece el botón **Descargar resolución**
+   en la convocatoria: genera el PDF con el resultado de todos los proyectos (orden de
+   mérito, adjudicado/no y monto). Lo pueden descargar Rectorado, la Secretaría de la UA y
+   la dirección de cada proyecto.
 
 ![Orden de mérito con la propuesta de adjudicación](assets/manual/orden-merito.png)
 
@@ -242,8 +250,9 @@ Para cada uno: **Validar** o **Rechazar**. Solo la **Autoridad** de Secretaría 
 ### 6.2 Cargar el aval de una edición
 
 En el detalle de un proyecto de tu UA, pestaña **Resumen**: **cargar el aval** (link al
-PDF firmado por el decano). Es requisito para adjudicar, pero no bloquea el pase a
-evaluación.
+PDF firmado por el decano). Es requisito para adjudicar. No afecta la visibilidad: Rectorado
+ve los proyectos **Presentado** y **Pendiente de cambios** con o sin aval (solo los
+**Borrador**, aún no presentados, no los ve).
 
 ### 6.3 Evaluación institucional
 
@@ -296,7 +305,7 @@ En el detalle de la edición:
 - **Dirección:** ubicación del proyecto (si el formulario lo pide).
 - **Presupuesto solicitado:** cargá las partidas de los 3 rubros:
   - **Viáticos y Seguros** — por tipo de persona (Docente / Estudiante): descripción,
-    período (dentro de las fechas de ejecución) y monto.
+    período (texto libre, ej. "2do cuatrimestre 2026") y monto.
   - **Bienes de Consumo** y **Bienes de Uso** — descripción, cantidad, precio unitario;
     marcá **insumo** cuando corresponda.
   - El sistema **recalcula** subtotales y total automáticamente. Respetá el **tope** de
@@ -304,13 +313,31 @@ En el detalle de la edición:
 
 ![Pestaña de presupuesto solicitado con las partidas por rubro](assets/manual/presupuesto.png)
 
-### 7.3 Enviar (presentar)
+Mientras editás, el botón **Vista previa** muestra las pestañas del proyecto (Resumen,
+secciones, Dirección, Presupuesto) tal como se verían presentadas, con los datos que
+tenés sin guardar; **Volver a editar** regresa a los campos.
+
+### 7.3 Descargar el proyecto
+
+El botón **Descargar proyecto** (arriba a la derecha del detalle) genera un PDF con el
+detalle del proyecto, el formulario de presentación por secciones y el presupuesto
+solicitado. Está disponible para cualquier usuario que pueda ver el proyecto.
+
+### 7.5 Historial de trazabilidad
+
+En el detalle del proyecto, la pestaña **Historial** muestra una línea de tiempo con los
+cambios de estado (presentación, pase a evaluación, adjudicación, cierre), las
+observaciones (sugerencias de cambio) y la actividad de las evaluaciones, cada evento con
+su fecha y responsable. La ven la dirección del proyecto, la Secretaría de su UA y el
+Rectorado.
+
+### 7.4 Enviar (presentar)
 
 Botón **Enviar** / **Presentar**. La edición pasa de **Borrador** a **Presentado**.
 Validaciones al enviar: campos obligatorios completos, presupuesto dentro del tope y bien
 formado, fechas coherentes.
 
-### 7.4 Responder observaciones y reenviar
+### 7.5 Responder observaciones y reenviar
 
 Si la Secretaría te devuelve la edición con cambios, pasa a **Pendiente de cambios**.
 
@@ -373,11 +400,11 @@ Cada comprobante pasa por estados:
 **Aceptar y rechazar es solo de Rectorado.** Ni la Secretaría de la UA ni el director
 pueden cambiar el estado de un comprobante.
 
-El director decide si la Secretaría de su Unidad Académica puede **ver** la sección en
-modo lectura mediante el interruptor *"Comprobantes visibles para la Unidad Académica"*.
-Si está apagado, al abrir la pestaña la Secretaría ve un aviso de que el director no
-habilitó la visualización (no accede a los comprobantes); Rectorado siempre la ve. Al
-cerrar la convocatoria, solo se permite hacerlo si no quedan comprobantes en revisión.
+La sección de comprobantes la ven el **Rectorado** y quienes están relacionados al
+proyecto: su creador, la dirección/codirección y la **Secretaría de una Unidad Académica
+del proyecto** (la de la edición y, en interfacultad, la adicional). Cualquier otro
+usuario no accede. Al cerrar la convocatoria, solo se permite hacerlo si no quedan
+comprobantes en revisión.
 
 ---
 
@@ -466,6 +493,11 @@ congelado.
 **Generé el orden de mérito pero una edición no aparece.**
 Le falta alguna evaluación confirmada (institucional, propia o ajena), o hay una
 inconsistencia sin resolver.
+
+**Como Rectorado no veo un proyecto en borrador o pendiente de cambios.**
+Rectorado ve esos estados solo cuando la Secretaría de su UA carga el **aval**. Los
+proyectos **Presentado**, en cambio, aparecen con o sin aval, para que Rectorado pueda
+pasarlos a evaluación.
 
 **La aplicación tardó mucho en abrir.**
 El entorno de producción "se duerme" por inactividad; la primera carga puede demorar hasta
