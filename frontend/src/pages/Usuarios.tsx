@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Table,
   TableBody,
@@ -29,7 +30,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { esTelefonoValido } from '@/lib/utils'
+import { esTelefonoValido, esGoogleDrive } from '@/lib/utils'
 
 import type { Usuario, UnidadAcademica, Carrera, CrearUsuarioDto, PaginatedResponse, Genero, CargoDocente, TipoDesignacionDocente } from '@/data/types'
 import { RolUsuario } from '@/data/types'
@@ -349,6 +350,11 @@ function NuevoUsuarioDialog({
   const [tipoDesignacionDocente, setTipoDesignacionDocente] = useState('')
   const [areaDocente, setAreaDocente] = useState('')
   const [direccionLocalidad, setDireccionLocalidad] = useState('')
+  const [cuil, setCuil] = useState('')
+  const [resumenCv, setResumenCv] = useState('')
+  const [linkFotocopiaDni, setLinkFotocopiaDni] = useState('')
+  const [linkConstanciaCuil, setLinkConstanciaCuil] = useState('')
+  const [linkConstanciaCargo, setLinkConstanciaCargo] = useState('')
   const [porcentajeCarrera, setPorcentajeCarrera] = useState('')
   const [carreraId, setCarreraId] = useState('')
   const [carreras, setCarreras] = useState<Carrera[]>([])
@@ -384,6 +390,11 @@ function NuevoUsuarioDialog({
     setTipoDesignacionDocente('')
     setAreaDocente('')
     setDireccionLocalidad('')
+    setCuil('')
+    setResumenCv('')
+    setLinkFotocopiaDni('')
+    setLinkConstanciaCuil('')
+    setLinkConstanciaCargo('')
     setPorcentajeCarrera('')
     setCarreraId('')
   }
@@ -398,6 +409,41 @@ function NuevoUsuarioDialog({
     if (esDocente && telefono.trim() && !esTelefonoValido(telefono.trim())) {
       setError('El teléfono no tiene un formato válido')
       return
+    }
+    if (esDocente && !cuil.trim()) {
+      setError('El CUIL es obligatorio para docentes')
+      return
+    }
+    if (esDocente && !cuil.trim().match(/^[\d-]{9,13}$/)) {
+      setError('El CUIL no tiene un formato válido')
+      return
+    }
+    if (esDocente && !resumenCv.trim()) {
+      setError('El resumen del CV es obligatorio para docentes')
+      return
+    }
+    if (esDocente) {
+      const linksDocente: Array<[string, string]> = [
+        ['CUIL', 'El link a la constancia de CUIL es obligatorio'],
+        ['DNI', 'El link a la fotocopia del DNI es obligatorio'],
+        ['Cargo', 'El link a la constancia que avala el cargo es obligatorio'],
+      ]
+      const valores = [linkConstanciaCuil, linkFotocopiaDni, linkConstanciaCargo]
+      for (let i = 0; i < linksDocente.length; i++) {
+        if (!valores[i].trim()) {
+          setError(linksDocente[i][1])
+          return
+        }
+        if (!esGoogleDrive(valores[i])) {
+          setError(
+            linksDocente[i][1].replace(
+              'es obligatorio',
+              'debe ser de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com)',
+            ),
+          )
+          return
+        }
+      }
     }
     setError('')
     setSubmitting(true)
@@ -420,6 +466,11 @@ function NuevoUsuarioDialog({
         payload.tipoDesignacionDocente = tipoDesignacionDocente ? tipoDesignacionDocente as TipoDesignacionDocente : undefined
         payload.areaDocente = areaDocente.trim() || undefined
         payload.direccionLocalidad = direccionLocalidad.trim() || undefined
+        payload.cuil = cuil.trim()
+        payload.resumenCv = resumenCv.trim()
+        payload.linkFotocopiaDni = linkFotocopiaDni.trim()
+        payload.linkConstanciaCuil = linkConstanciaCuil.trim()
+        payload.linkConstanciaCargo = linkConstanciaCargo.trim()
       }
       if (esEstudiante) {
         payload.porcentajeCarrera = porcentajeCarrera === ''
@@ -591,6 +642,59 @@ function NuevoUsuarioDialog({
                   onChange={e => setDireccionLocalidad(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">CUIL *</label>
+                <Input
+                  placeholder="20-12345678-9"
+                  maxLength={13}
+                  value={cuil}
+                  onChange={e => setCuil(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-sm font-medium">Resumen del CV *</label>
+                <Textarea
+                  placeholder="Ej: Doctor en Ciencias Biológicas, con 15 años de experiencia en docencia e investigación en la UBA..."
+                  maxLength={2048}
+                  rows={3}
+                  value={resumenCv}
+                  onChange={e => setResumenCv(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Link a la fotocopia del DNI *</label>
+                <Input
+                  placeholder="https://drive.google.com/file/d/..."
+                  maxLength={2048}
+                  value={linkFotocopiaDni}
+                  onChange={e => setLinkFotocopiaDni(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Link a la constancia de CUIL *</label>
+                <Input
+                  placeholder="https://drive.google.com/file/d/..."
+                  maxLength={2048}
+                  value={linkConstanciaCuil}
+                  onChange={e => setLinkConstanciaCuil(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-sm font-medium">
+                  Link a la constancia que avala el cargo *
+                </label>
+                <Input
+                  placeholder="https://drive.google.com/file/d/..."
+                  maxLength={2048}
+                  value={linkConstanciaCargo}
+                  onChange={e => setLinkConstanciaCargo(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Solo se aceptan links de Google Drive (drive.google.com, docs.google.com o
+                drive.usercontent.google.com). Si no llevan protocolo, se agrega https://
+                automáticamente.
+              </p>
             </>
           )}
           {esEstudiante && (

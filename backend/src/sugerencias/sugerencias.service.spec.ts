@@ -63,6 +63,7 @@ describe('SugerenciasService', () => {
     findOne: findOneSugerencia,
     save: saveSugerencia,
     create: createSugerencia,
+    count: jest.fn<() => Promise<number>>().mockResolvedValue(1),
   } as unknown as Repository<SugerenciaCambio>;
 
   const notificacionRepo = {

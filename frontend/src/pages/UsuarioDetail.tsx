@@ -25,7 +25,7 @@ import {
   tipoDesignacionDocenteLabel,
   personaConDiscapacidadLabel,
 } from '@/data/perfil'
-import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound, VenusAndMars, Accessibility, Building, Percent, Briefcase, Stamp, BookOpen, MapPin, UserPlus } from 'lucide-react'
+import { ArrowLeft, Mail, Calendar, Shield, UserCheck, KeyRound, Loader2, CheckCircle2, AlertTriangle, Phone, GraduationCap, UserRound, VenusAndMars, Accessibility, Building, Percent, Briefcase, Stamp, BookOpen, MapPin, UserPlus, IdCard, FileText, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 const rolLabels: Record<string, string> = {
@@ -381,6 +381,13 @@ export function UsuarioDetail() {
               <span className="text-muted-foreground">Persona con discapacidad:</span>
               <span>{personaConDiscapacidadLabel(usuario.personaConDiscapacidad)}</span>
             </div>
+            {usuario.roles.includes(RolUsuario.Docente) && (
+              <div className="flex items-center gap-2 text-sm">
+                <IdCard className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">CUIL:</span>
+                <span>{usuario.cuil || '—'}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -433,12 +440,52 @@ export function UsuarioDetail() {
                     <span className="text-muted-foreground">Materia / Área / Departamento:</span>
                     <span>{usuario.areaDocente || '—'}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Dirección o localidad:</span>
-                    <span>{usuario.direccionLocalidad || '—'}</span>
-                  </div>
-                </>
+<div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Dirección o localidad:</span>
+                <span>{usuario.direccionLocalidad || '—'}</span>
+              </div>
+              <div className="text-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Resumen del CV:</span>
+                </div>
+                <p className="pl-6 whitespace-pre-line">{usuario.resumenCv || '—'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Fotocopia del DNI:</span>
+                {usuario.linkFotocopiaDni ? (
+                  <a className="text-primary underline" href={usuario.linkFotocopiaDni} target="_blank" rel="noreferrer">
+                    Ver
+                  </a>
+                ) : (
+                  <span>—</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Constancia de CUIL:</span>
+                {usuario.linkConstanciaCuil ? (
+                  <a className="text-primary underline" href={usuario.linkConstanciaCuil} target="_blank" rel="noreferrer">
+                    Ver
+                  </a>
+                ) : (
+                  <span>—</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Constancia que avala el cargo:</span>
+                {usuario.linkConstanciaCargo ? (
+                  <a className="text-primary underline" href={usuario.linkConstanciaCargo} target="_blank" rel="noreferrer">
+                    Ver
+                  </a>
+                ) : (
+                  <span>—</span>
+                )}
+              </div>
+            </>
               )}
               <div className="flex items-center gap-2">
                 <UserPlus className="h-4 w-4 text-muted-foreground" />

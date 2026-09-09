@@ -68,6 +68,27 @@ export class CrearUsuarioDto {
   direccionLocalidad?: string;
 
   @IsOptional()
+  @IsString()
+  @Matches(/^[\d-]{9,13}$/, { message: 'El CUIL no tiene un formato válido' })
+  cuil?: string;
+
+  @IsOptional()
+  @IsString()
+  resumenCv?: string;
+
+  @IsOptional()
+  @IsString()
+  linkFotocopiaDni?: string;
+
+  @IsOptional()
+  @IsString()
+  linkConstanciaCuil?: string;
+
+  @IsOptional()
+  @IsString()
+  linkConstanciaCargo?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Max(100)

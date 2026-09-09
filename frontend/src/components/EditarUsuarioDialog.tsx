@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { esTelefonoValido } from '@/lib/utils'
+import { esTelefonoValido, esGoogleDrive } from '@/lib/utils'
 import type { Usuario, UnidadAcademica, Carrera } from '@/data/types'
 import { RolUsuario } from '@/data/types'
 import {
@@ -70,6 +71,11 @@ export function EditarUsuarioDialog({
   const [tipoDesignacionDocente, setTipoDesignacionDocente] = useState(usuario.tipoDesignacionDocente ?? '')
   const [areaDocente, setAreaDocente] = useState(usuario.areaDocente ?? '')
   const [direccionLocalidad, setDireccionLocalidad] = useState(usuario.direccionLocalidad ?? '')
+  const [cuil, setCuil] = useState(usuario.cuil ?? '')
+  const [resumenCv, setResumenCv] = useState(usuario.resumenCv ?? '')
+  const [linkFotocopiaDni, setLinkFotocopiaDni] = useState(usuario.linkFotocopiaDni ?? '')
+  const [linkConstanciaCuil, setLinkConstanciaCuil] = useState(usuario.linkConstanciaCuil ?? '')
+  const [linkConstanciaCargo, setLinkConstanciaCargo] = useState(usuario.linkConstanciaCargo ?? '')
   const [porcentajeCarrera, setPorcentajeCarrera] = useState(
     usuario.porcentajeCarrera === undefined || usuario.porcentajeCarrera === null
       ? ''
@@ -116,6 +122,11 @@ export function EditarUsuarioDialog({
     setTipoDesignacionDocente(usuario.tipoDesignacionDocente ?? '')
     setAreaDocente(usuario.areaDocente ?? '')
     setDireccionLocalidad(usuario.direccionLocalidad ?? '')
+    setCuil(usuario.cuil ?? '')
+    setResumenCv(usuario.resumenCv ?? '')
+    setLinkFotocopiaDni(usuario.linkFotocopiaDni ?? '')
+    setLinkConstanciaCuil(usuario.linkConstanciaCuil ?? '')
+    setLinkConstanciaCargo(usuario.linkConstanciaCargo ?? '')
     setPorcentajeCarrera(
       usuario.porcentajeCarrera === undefined || usuario.porcentajeCarrera === null
         ? ''
@@ -155,6 +166,39 @@ export function EditarUsuarioDialog({
         setSubmitting(false)
         return
       }
+      if (esAutoEdicion && esDocente) {
+        const requeridos: Array<{ valor: string; etiqueta: string }> = [
+          { valor: cuil, etiqueta: 'CUIL' },
+          { valor: resumenCv, etiqueta: 'Resumen del CV' },
+          { valor: linkFotocopiaDni, etiqueta: 'Link a la fotocopia del DNI' },
+          { valor: linkConstanciaCuil, etiqueta: 'Link a la constancia de CUIL' },
+          { valor: linkConstanciaCargo, etiqueta: 'Link a la constancia que avala el cargo' },
+        ]
+        const faltantes = requeridos.filter(r => !r.valor.trim()).map(r => r.etiqueta)
+        if (faltantes.length > 0) {
+          setError(
+            `Debés completar tus datos docentes para poder guardar: ${faltantes.join(', ')}`,
+          )
+          setSubmitting(false)
+          return
+        }
+        if (!cuil.trim().match(/^[\d-]{9,13}$/)) {
+          setError('El CUIL no tiene un formato válido')
+          setSubmitting(false)
+          return
+        }
+        const invalidos = requeridos
+          .slice(2)
+          .filter(r => !esGoogleDrive(r.valor))
+          .map(r => r.etiqueta)
+        if (invalidos.length > 0) {
+          setError(
+            `Los siguientes links deben ser de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com): ${invalidos.join(', ')}`,
+          )
+          setSubmitting(false)
+          return
+        }
+      }
       const data: Record<string, unknown> = { email }
       if (esAutoEdicion) {
         data.nombre = nombre.trim()
@@ -169,6 +213,11 @@ export function EditarUsuarioDialog({
           data.tipoDesignacionDocente = tipoDesignacionDocente || null
           data.areaDocente = areaDocente.trim() || null
           data.direccionLocalidad = direccionLocalidad.trim() || null
+          data.cuil = cuil.trim() || null
+          data.resumenCv = resumenCv.trim() || null
+          data.linkFotocopiaDni = linkFotocopiaDni.trim() || null
+          data.linkConstanciaCuil = linkConstanciaCuil.trim() || null
+          data.linkConstanciaCargo = linkConstanciaCargo.trim() || null
         }
         if (esEstudiante) {
           data.porcentajeCarrera = porcentajeCarrera === ''
@@ -202,7 +251,7 @@ export function EditarUsuarioDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {esAutoEdicion ? 'Mi Perfil' : `Editar: ${usuario.nombreCompleto}`}
@@ -315,6 +364,57 @@ export function EditarUsuarioDialog({
                       onChange={e => setDireccionLocalidad(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">CUIL *</label>
+                    <Input
+                      placeholder="20-12345678-9"
+                      maxLength={13}
+                      value={cuil}
+                      onChange={e => setCuil(e.target.value)}
+                      required={esDocente && !usuario.cuil ? true : undefined}
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-medium">Resumen del CV *</label>
+                    <Textarea
+                      placeholder="Ej: Doctor en Ciencias Biológicas, con 15 años de experiencia en docencia e investigación en la UBA..."
+                      maxLength={2048}
+                      rows={3}
+                      value={resumenCv}
+                      onChange={e => setResumenCv(e.target.value)}
+                      required={esDocente && !usuario.resumenCv ? true : undefined}
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-medium">Link a la fotocopia del DNI *</label>
+                    <Input
+                      placeholder="https://drive.google.com/file/d/..."
+                      value={linkFotocopiaDni}
+                      onChange={e => setLinkFotocopiaDni(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-medium">Link a la constancia de CUIL *</label>
+                    <Input
+                      placeholder="https://drive.google.com/file/d/..."
+                      value={linkConstanciaCuil}
+                      onChange={e => setLinkConstanciaCuil(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-medium">
+                      Link a la constancia que avala el cargo *
+                    </label>
+                    <Input
+                      placeholder="https://drive.google.com/file/d/..."
+                      value={linkConstanciaCargo}
+                      onChange={e => setLinkConstanciaCargo(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    Solo se aceptan links de Google Drive (drive.google.com, docs.google.com o
+                    drive.usercontent.google.com).
+                  </p>
                 </>
               )}
               {esEstudiante && (
@@ -405,6 +505,34 @@ export function EditarUsuarioDialog({
                         <dd>{usuario.areaDocente || '—'}</dd>
                         <dt className="text-muted-foreground">Dirección o localidad</dt>
                         <dd>{usuario.direccionLocalidad || '—'}</dd>
+                        <dt className="text-muted-foreground">CUIL</dt>
+                        <dd>{usuario.cuil || '—'}</dd>
+                        <dt className="text-muted-foreground">Resumen del CV</dt>
+                        <dd className="whitespace-pre-line">{usuario.resumenCv || '—'}</dd>
+                        <dt className="text-muted-foreground">Fotocopia del DNI</dt>
+                        <dd>
+                          {usuario.linkFotocopiaDni ? (
+                            <a className="text-primary underline" href={usuario.linkFotocopiaDni} target="_blank" rel="noreferrer">
+                              Ver
+                            </a>
+                          ) : '—'}
+                        </dd>
+                        <dt className="text-muted-foreground">Constancia de CUIL</dt>
+                        <dd>
+                          {usuario.linkConstanciaCuil ? (
+                            <a className="text-primary underline" href={usuario.linkConstanciaCuil} target="_blank" rel="noreferrer">
+                              Ver
+                            </a>
+                          ) : '—'}
+                        </dd>
+                        <dt className="text-muted-foreground">Constancia que avala el cargo</dt>
+                        <dd>
+                          {usuario.linkConstanciaCargo ? (
+                            <a className="text-primary underline" href={usuario.linkConstanciaCargo} target="_blank" rel="noreferrer">
+                              Ver
+                            </a>
+                          ) : '—'}
+                        </dd>
                       </>
                     )}
                     {esEstudiante && (

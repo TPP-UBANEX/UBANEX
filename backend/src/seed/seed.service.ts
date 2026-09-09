@@ -98,6 +98,11 @@ type DatosSeedUsuario = {
   tipoDesignacionDocente?: TipoDesignacionDocente;
   areaDocente?: string;
   direccionLocalidad?: string;
+  cuil?: string;
+  resumenCv?: string;
+  linkFotocopiaDni?: string;
+  linkConstanciaCuil?: string;
+  linkConstanciaCargo?: string;
 };
 
 type PoolUa = {
@@ -404,6 +409,25 @@ export class SeedService {
     estadoValidacion: EstadoValidacionDocente,
     opts?: { habilitado?: boolean },
   ): Promise<Usuario> {
+    // Los docentes de ejemplo se completan con CUIL + resumen de CV + links de Google
+    // Drive si no se definieron: `crear()` los exige para todo docente. Valores
+    // deterministas por email para que el seed siga siendo idempotente (no generan
+    // IDs aleatorios entre corridas).
+    const base = this.digitosDeterministas(data.email);
+    if (!data.cuil) {
+      data.cuil = `20-${String(10_000_000 + (base % 89_999_999))}-${base % 10}`;
+    }
+    if (!data.resumenCv) {
+      data.resumenCv =
+        `Docente con ${10 + (base % 25)} años de trayectoria en la UBA, dedicado a la ` +
+        'investigación y a la docencia. Participó en la dirección y evaluación de ' +
+        'proyectos acreditados y en la formación de recursos humanos.';
+    }
+    const prefijo = `https://drive.google.com/file/d/seed-${Math.abs(base) % 1_000_000}`;
+    if (!data.linkFotocopiaDni) data.linkFotocopiaDni = `${prefijo}-dni/view`;
+    if (!data.linkConstanciaCuil) data.linkConstanciaCuil = `${prefijo}-constancia-cuil/view`;
+    if (!data.linkConstanciaCargo) data.linkConstanciaCargo = `${prefijo}-constancia-cargo/view`;
+
     const user = await this.seedUsuario(data, opts);
     await this.usuarioRepo.update(user.id, { estadoValidacionDocente: estadoValidacion });
 
@@ -436,6 +460,15 @@ export class SeedService {
     return this.passwordHashCache;
   }
 
+  /** Hash simple y determinista de un string (estable entre corridas del seed). */
+  private digitosDeterministas(texto: string): number {
+    let h = 0;
+    for (let i = 0; i < texto.length; i++) {
+      h = (h * 31 + texto.charCodeAt(i)) % 2 ** 31;
+    }
+    return h;
+  }
+
   private async crearUsuariosMasivos(
     specs: Array<Partial<Usuario>>,
     emailsExistentes: Set<string>,
@@ -463,6 +496,11 @@ export class SeedService {
     personaConDiscapacidad?: boolean;
     telefono?: string;
     direccionLocalidad?: string;
+    cuil?: string;
+    resumenCv?: string;
+    linkFotocopiaDni?: string;
+    linkConstanciaCuil?: string;
+    linkConstanciaCargo?: string;
   } {
     const cargoes = [
       CargoDocente.ProfesorTitular,
@@ -490,10 +528,24 @@ export class SeedService {
       personaConDiscapacidad: this.rng.bool(0.05),
       telefono: `11 ${String(this.rng.entero(1000, 9999))} ${String(this.rng.entero(1000, 9999))}`,
       direccionLocalidad: this.rng.pick(localidades),
+      cuil: `20-${String(this.rng.entero(10_000_000, 99_999_999))}-${this.rng.entero(0, 9)}`,
+      resumenCv: `Docente con ${this.rng.entero(5, 30)} años de trayectoria en la UBA, orientado a la investigación y a la formación de recursos humanos. Cuenta con participación en proyectos acreditados y evaluaciones de pares.`,
+      linkFotocopiaDni: `https://drive.google.com/file/d/seed-dni-${this.rng.entero(100000, 999999)}/view`,
+      linkConstanciaCuil: `https://drive.google.com/file/d/seed-constancia-cuil-${this.rng.entero(100000, 999999)}/view`,
+      linkConstanciaCargo: `https://drive.google.com/file/d/seed-constancia-cargo-${this.rng.entero(100000, 999999)}/view`,
     };
-    // Un perfil "incompleto" deja sin cargar la dirección/localidad: alcanza para que
-    // el docente figure como "perfil incompleto" (ej. en el alta de evaluadores).
-    if (!completo) delete (perfil as { direccionLocalidad?: string }).direccionLocalidad;
+    // Un perfil "incompleto" deja sin cargar la dirección/localidad y los datos
+    // docentes obligatorios (CUIL + links): alcanza para que el docente figure
+    // como "perfil incompleto" (ej. en el alta de evaluadores) y para simular
+    // docentes ya cargados antes de la existencia de estos campos.
+    if (!completo) {
+      delete (perfil as { direccionLocalidad?: string }).direccionLocalidad;
+      delete (perfil as { cuil?: string }).cuil;
+      delete (perfil as { resumenCv?: string }).resumenCv;
+      delete (perfil as { linkFotocopiaDni?: string }).linkFotocopiaDni;
+      delete (perfil as { linkConstanciaCuil?: string }).linkConstanciaCuil;
+      delete (perfil as { linkConstanciaCargo?: string }).linkConstanciaCargo;
+    }
     return perfil;
   }
 

@@ -16,3 +16,18 @@ export function conProtocolo(url: string): string {
   const u = url.trim()
   return /^https?:\/\//i.test(u) ? u : `https://${u}`
 }
+
+const DOMINIOS_GOOGLE_DRIVE = ['drive.google.com', 'drive.usercontent.google.com', 'docs.google.com']
+
+/** Devuelve true si el link es de algún dominio de Google Drive (tras normalizar protocolo). */
+export function esGoogleDrive(url: string): boolean {
+  const v = url.trim()
+  if (!v) return false
+  let host: string
+  try {
+    host = new URL(conProtocolo(v)).hostname.toLowerCase()
+  } catch {
+    return false
+  }
+  return DOMINIOS_GOOGLE_DRIVE.some(d => host === d || host.endsWith(`.${d}`))
+}

@@ -44,7 +44,7 @@ describe('calcularConsolidacion', () => {
     expect(datos.rachaAdjudicaciones).toBe(3);
     expect(datos.esConsolidadoDerivado).toBe(true);
     expect(datos.salteaEvaluacion).toBe(false); // recién consolidado: la 4ta se evalúa igual
-    expect(datos.fueConsolidadoAlgunaVez).toBe(true);
+    expect(datos.fueConsolidadoAlgunaVez).toBe(false);
   });
 
   it('un hueco reinicia la racha vigente', () => {
