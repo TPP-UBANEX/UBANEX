@@ -18,6 +18,7 @@ import { SugerenciasModule } from './sugerencias/sugerencias.module';
 import { GeoModule } from './geo/geo.module';
 import { TemplatesEvaluacionModule } from './templates-evaluacion/templates-evaluacion.module';
 import { EjecucionModule } from './ejecucion/ejecucion.module';
+import { OrganizacionesAsociadasModule } from './organizaciones-asociadas/organizaciones-asociadas.module';
 import { SeedModule } from './seed/seed.module';
 
 @Module({
@@ -53,6 +54,7 @@ import { SeedModule } from './seed/seed.module';
     GeoModule,
     TemplatesEvaluacionModule,
     EjecucionModule,
+    OrganizacionesAsociadasModule,
     SeedModule,
   ],
   controllers: [AppController],
