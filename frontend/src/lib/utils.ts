@@ -30,7 +30,8 @@ export function esGoogleDrive(url: string): boolean {
     return false
   }
   return DOMINIOS_GOOGLE_DRIVE.some(d => host === d || host.endsWith(`.${d}`))
-/** Pasa una fecha ISO (AAAA-MM-DD) a dd/mm/aaaa sin usar Date, que la interpretaria como UTC y correria el dia. */
+}
+  /** Pasa una fecha ISO (AAAA-MM-DD) a dd/mm/aaaa sin usar Date, que la interpretaria como UTC y correria el dia. */
 export function formatearFechaISO(valor: string): string {
   const [anio, mes, dia] = valor.split('-')
   return anio && mes && dia ? `${dia}/${mes}/${anio}` : valor
