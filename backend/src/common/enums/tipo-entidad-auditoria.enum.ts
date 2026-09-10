@@ -7,4 +7,5 @@ export enum TipoEntidadAuditoria {
   INFORME_FINAL = 'informe-final',
   ADJUDICACION = 'adjudicacion',
   RENDICION = 'rendicion',
+  ORGANIZACION_ASOCIADA = 'organizacion-asociada',
 }

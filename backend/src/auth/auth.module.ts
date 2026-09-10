@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { CarrerasModule } from '../carreras/carreras.module';
+import { UnidadesAcademicasModule } from '../unidades-academicas/unidades-academicas.module';
 import { ParticipacionConvocatoria } from '../participaciones-convocatoria/participacion-convocatoria.entity';
 import { ParticipacionGuard } from './guards/participacion.guard';
 
@@ -15,6 +16,7 @@ import { ParticipacionGuard } from './guards/participacion.guard';
   imports: [
     UsuariosModule,
     CarrerasModule,
+    UnidadesAcademicasModule,
     TypeOrmModule.forFeature([ParticipacionConvocatoria]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({

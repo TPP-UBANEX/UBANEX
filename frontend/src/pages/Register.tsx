@@ -47,6 +47,11 @@ export function Register() {
     return deLaUa.length > 0 ? deLaUa : carreras
   }, [unidadAcademicaId, carreras])
 
+  const dominioUa = useMemo(
+    () => uaList.find(u => u.id === unidadAcademicaId)?.dominioEmail ?? null,
+    [unidadAcademicaId, uaList],
+  )
+
   const seleccionarTipo = (t: 'estudiante' | 'docente') => {
     setTipo(t)
     setStep('form')
@@ -68,6 +73,14 @@ export function Register() {
       setError('El teléfono no tiene un formato válido')
       return
     }
+    if (!unidadAcademicaId) {
+      setError('Elegí tu unidad académica')
+      return
+    }
+    if (dominioUa && !email.trim().toLowerCase().endsWith(`@${dominioUa.toLowerCase()}`)) {
+      setError(`El correo debe ser institucional de tu unidad académica (@${dominioUa})`)
+      return
+    }
 
     const payload: RegisterDto = {
       nombre: nombre.trim(),
@@ -75,7 +88,7 @@ export function Register() {
       email,
       password,
       tipo,
-      unidadAcademicaId: unidadAcademicaId || undefined,
+      unidadAcademicaId,
     }
     if (tipo === 'docente' && telefono.trim()) payload.telefono = telefono.trim()
     if (carreraId) payload.carreraId = carreraId
@@ -183,14 +196,19 @@ export function Register() {
                 />
               </div>
               <div className={cn('space-y-2', tipo === 'estudiante' && 'sm:col-span-2')}>
-                <label className="text-sm font-medium">Email</label>
+                <label className="text-sm font-medium">Email institucional</label>
                 <Input
                   type="email"
-                  placeholder="email@ejemplo.com"
+                  placeholder={dominioUa ? `nombre@${dominioUa}` : 'email@facultad.uba.ar'}
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  {dominioUa
+                    ? `Debe ser tu correo institucional @${dominioUa}`
+                    : 'Elegí tu unidad académica para ver el dominio de correo requerido.'}
+                </p>
               </div>
               {tipo === 'docente' && (
                 <div className="space-y-2">

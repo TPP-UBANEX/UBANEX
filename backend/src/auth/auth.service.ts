@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { CarrerasService } from '../carreras/carreras.service';
+import { UnidadesAcademicasService } from '../unidades-academicas/unidades-academicas.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RolUsuario } from '../common/enums/rol-usuario.enum';
@@ -14,6 +15,7 @@ export class AuthService {
   constructor(
     private readonly usuariosService: UsuariosService,
     private readonly carrerasService: CarrerasService,
+    private readonly unidadesAcademicasService: UnidadesAcademicasService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -50,6 +52,19 @@ export class AuthService {
 
     if (dto.tipo === 'docente' && !dto.telefono) {
       throw new BadRequestException('El teléfono es obligatorio para docentes');
+    }
+
+    // Correo institucional: el email debe corresponder al dominio de la UA elegida.
+    // Sólo aplica al auto-registro (docente/estudiante); el alta de otros usuarios va por
+    // usuariosService.crear y no pasa por acá.
+    const unidad = await this.unidadesAcademicasService.obtener(dto.unidadAcademicaId);
+    if (unidad.dominioEmail) {
+      const sufijo = `@${unidad.dominioEmail.toLowerCase()}`;
+      if (!dto.email.toLowerCase().endsWith(sufijo)) {
+        throw new BadRequestException(
+          `El correo debe ser institucional de ${unidad.nombre} (${sufijo})`,
+        );
+      }
     }
 
     if (dto.carreraId) {

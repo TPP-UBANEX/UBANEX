@@ -54,6 +54,8 @@ export enum TipoDesignacionDocente {
 export interface UnidadAcademica {
   id: string;
   nombre: string;
+  /** Dominio del correo institucional sin arroba (ej. `fi.uba.ar`). */
+  dominioEmail?: string | null;
 }
 
 export interface Carrera {
@@ -1025,6 +1027,37 @@ export interface Hito {
   creadoEn: string
   actualizadoEn: string
 }
+
+export interface OrganizacionAsociada {
+  id: string
+  edicionId: string
+  nombre: string
+  tipo: string | null
+  personeriaJuridica: string | null
+  fechaInicioActividades: string | null
+  responsableNombre: string | null
+  responsableCargo: string | null
+  direccion: string | null
+  localidad: string | null
+  codigoPostal: string | null
+  departamentoPartido: string | null
+  provincia: string | null
+  telefonos: string | null
+  email: string | null
+  web: string | null
+  objetivos: string | null
+  actividades: string | null
+  otraInfo: string | null
+  creadoPorId: string
+  creadoEn: string
+  actualizadoEn: string
+}
+
+export type CrearOrganizacionAsociadaDto = {
+  nombre: string
+} & Partial<Omit<OrganizacionAsociada, 'id' | 'edicionId' | 'creadoPorId' | 'creadoEn' | 'actualizadoEn' | 'nombre'>>
+
+export type ActualizarOrganizacionAsociadaDto = Partial<CrearOrganizacionAsociadaDto>
 
 export type TipoPregunta = 'texto' | 'booleano' | 'escalaNumerica' | 'select' | 'checkbox'
 

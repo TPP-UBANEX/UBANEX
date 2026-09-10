@@ -21,9 +21,8 @@ export class RegisterDto {
   @IsIn(['estudiante', 'docente'])
   tipo: 'estudiante' | 'docente';
 
-  @IsOptional()
-  @IsUUID()
-  unidadAcademicaId?: string;
+  @IsUUID(undefined, { message: 'Debés seleccionar una unidad académica' })
+  unidadAcademicaId: string;
 
   @IsOptional()
   @IsString()

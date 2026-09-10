@@ -20,6 +20,25 @@ export const UAS_NOMBRES: string[] = [
   'Ciclo Básico Común (CBC)',
 ];
 
+// Dominio del correo institucional de cada UA (sin arroba). Se usa para restringir el
+// auto-registro de docentes/estudiantes: su email debe terminar en `@<dominio>`.
+export const DOMINIOS_POR_UA: Record<string, string> = {
+  'Facultad de Derecho': 'derecho.uba.ar',
+  'Facultad de Ciencias Económicas': 'fce.uba.ar',
+  'Facultad de Ciencias Sociales': 'sociales.uba.ar',
+  'Facultad de Filosofía y Letras': 'filo.uba.ar',
+  'Facultad de Ingeniería': 'fi.uba.ar',
+  'Facultad de Medicina': 'fmed.uba.ar',
+  'Facultad de Ciencias Exactas y Naturales': 'exactas.uba.ar',
+  'Facultad de Arquitectura, Diseño y Urbanismo': 'fadu.uba.ar',
+  'Facultad de Agronomía': 'agro.uba.ar',
+  'Facultad de Farmacia y Bioquímica': 'ffyb.uba.ar',
+  'Facultad de Odontología': 'odontologia.uba.ar',
+  'Facultad de Psicología': 'psi.uba.ar',
+  'Facultad de Ciencias Veterinarias': 'fvet.uba.ar',
+  'Ciclo Básico Común (CBC)': 'cbc.uba.ar',
+};
+
 export const CARRERAS_POR_UA: Record<string, string[]> = {
   'Facultad de Derecho': ['Abogacía', 'Traductorado Público', 'Calígrafo Público'],
   'Facultad de Ciencias Económicas': [
