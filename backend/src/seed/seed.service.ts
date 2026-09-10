@@ -259,26 +259,38 @@ export class SeedService {
 
   // ─────────────────── Usuarios ───────────────────
 
-  private async seedUsuario(data: {
-    nombreCompleto: string;
-    nombre?: string;
-    apellido?: string;
-    email: string;
-    roles: RolUsuario[];
-    unidadAcademicaId?: string;
-    telefono?: string;
-    genero?: Genero;
-    personaConDiscapacidad?: boolean;
-    cargoDocente?: CargoDocente;
-    tipoDesignacionDocente?: TipoDesignacionDocente;
-    areaDocente?: string;
-    direccionLocalidad?: string;
-    porcentajeCarrera?: number;
-    carreraId?: string;
-  }): Promise<Usuario> {
+  private async seedUsuario(
+    data: {
+      nombreCompleto: string;
+      nombre?: string;
+      apellido?: string;
+      email: string;
+      roles: RolUsuario[];
+      unidadAcademicaId?: string;
+      telefono?: string;
+      genero?: Genero;
+      personaConDiscapacidad?: boolean;
+      cargoDocente?: CargoDocente;
+      tipoDesignacionDocente?: TipoDesignacionDocente;
+      areaDocente?: string;
+      direccionLocalidad?: string;
+      cuil?: string;
+      resumenCv?: string;
+      linkFotocopiaDni?: string;
+      linkConstanciaCuil?: string;
+      linkConstanciaCargo?: string;
+      porcentajeCarrera?: number;
+      carreraId?: string;
+    },
+    opciones: { exigirPerfilDocente?: boolean } = {},
+  ): Promise<Usuario> {
     const existe = await this.usuariosService.obtenerPorEmail(data.email);
     if (existe) return existe;
-    const user = await this.usuariosService.crear({ ...data, password: PASSWORD_SEED });
+    const user = await this.usuariosService.crear(
+      { ...data, password: PASSWORD_SEED },
+      undefined,
+      opciones,
+    );
     console.log(`  ${data.email} (${data.roles.join(', ')})`);
     return user;
   }
@@ -292,6 +304,10 @@ export class SeedService {
   }): Promise<Usuario> {
     const areas = AREAS_DOCENTE[opts.ua.nombre] ?? ['Extensión Universitaria'];
     const i = opts.indice;
+    // CUIL, resumen del CV y links de Google Drive deterministas por email: `crear()`
+    // los exige para todo docente y así el seed sigue siendo idempotente.
+    const base = this.digitosDeterministas(opts.email);
+    const prefijo = `https://drive.google.com/file/d/seed-${Math.abs(base) % 1_000_000}`;
     const usuario = await this.seedUsuario({
       nombreCompleto: `${opts.nombre} ${opts.apellido}`,
       nombre: opts.nombre,
@@ -306,9 +322,26 @@ export class SeedService {
       personaConDiscapacidad: i % 7 === 0,
       telefono: `11 4${String(1000 + i * 37).padStart(4, '0')} ${String(2000 + i * 53).padStart(4, '0')}`,
       direccionLocalidad: LOCALIDADES[i % LOCALIDADES.length],
+      cuil: `20-${String(10_000_000 + (base % 89_999_999))}-${base % 10}`,
+      resumenCv:
+        `Docente con ${10 + (base % 25)} años de trayectoria en la UBA, dedicado a la ` +
+        'investigación y a la docencia. Participó en la dirección y evaluación de ' +
+        'proyectos acreditados y en la formación de recursos humanos.',
+      linkFotocopiaDni: `${prefijo}-dni/view`,
+      linkConstanciaCuil: `${prefijo}-constancia-cuil/view`,
+      linkConstanciaCargo: `${prefijo}-constancia-cargo/view`,
     });
     await this.usuarioRepo.update(usuario.id, { estadoValidacionDocente: EstadoValidacionDocente.Validado });
     return usuario;
+  }
+
+  /** Hash simple y determinista de un string (estable entre corridas del seed). */
+  private digitosDeterministas(texto: string): number {
+    let h = 0;
+    for (let i = 0; i < texto.length; i++) {
+      h = (h * 31 + texto.charCodeAt(i)) % 2 ** 31;
+    }
+    return h;
   }
 
   private async seedDocenteIncompleto(opts: {
@@ -317,15 +350,19 @@ export class SeedService {
     email: string;
     ua: UnidadAcademica;
   }): Promise<Usuario> {
-    // Perfil deliberadamente incompleto: sin teléfono, localidad, área ni cargo docente.
-    const usuario = await this.seedUsuario({
-      nombreCompleto: `${opts.nombre} ${opts.apellido}`,
-      nombre: opts.nombre,
-      apellido: opts.apellido,
-      email: opts.email,
-      roles: [RolUsuario.Docente],
-      unidadAcademicaId: opts.ua.id,
-    });
+    // Perfil deliberadamente incompleto: sin teléfono, localidad, área, cargo docente
+    // ni CUIL/resumen del CV/links. Se crea sin exigir el perfil de docente.
+    const usuario = await this.seedUsuario(
+      {
+        nombreCompleto: `${opts.nombre} ${opts.apellido}`,
+        nombre: opts.nombre,
+        apellido: opts.apellido,
+        email: opts.email,
+        roles: [RolUsuario.Docente],
+        unidadAcademicaId: opts.ua.id,
+      },
+      { exigirPerfilDocente: false },
+    );
     await this.usuarioRepo.update(usuario.id, { estadoValidacionDocente: EstadoValidacionDocente.Validado });
     return usuario;
   }
@@ -336,15 +373,18 @@ export class SeedService {
     email: string;
     ua: UnidadAcademica;
   }): Promise<Usuario> {
-    const usuario = await this.seedUsuario({
-      nombreCompleto: `${opts.nombre} ${opts.apellido}`,
-      nombre: opts.nombre,
-      apellido: opts.apellido,
-      email: opts.email,
-      roles: [RolUsuario.Docente],
-      unidadAcademicaId: opts.ua.id,
-      genero: GENEROS[1],
-    });
+    const usuario = await this.seedUsuario(
+      {
+        nombreCompleto: `${opts.nombre} ${opts.apellido}`,
+        nombre: opts.nombre,
+        apellido: opts.apellido,
+        email: opts.email,
+        roles: [RolUsuario.Docente],
+        unidadAcademicaId: opts.ua.id,
+        genero: GENEROS[1],
+      },
+      { exigirPerfilDocente: false },
+    );
     await this.usuarioRepo.update(usuario.id, { estadoValidacionDocente: EstadoValidacionDocente.PendienteDeValidacion });
     return usuario;
   }

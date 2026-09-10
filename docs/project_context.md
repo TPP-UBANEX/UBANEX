@@ -883,6 +883,10 @@ dominio implementado en código (ver [`dominio/modelo.md`](dominio/modelo.md)).
   `ParticipacionConvocatoria`; alta directa de evaluadores por Rectorado.
 * CRUD de usuarios con paginación, filtros y perfil académico/docente; auditoría de
   acciones; catálogos de unidades académicas, carreras y geo.
+* Perfil docente completo: CUIL + resumen del CV + links de Google Drive (fotocopia DNI,
+  constancia CUIL, constancia de cargo) obligatorios al crear vía gestión y al guardar el
+  perfil propio; el registro público crea la cuenta con datos básicos y el perfil se
+  completa vía "Editar perfil". Visible en `/usuarios/{id}` sin abrir el diálogo.
 * CRUD de convocatorias con estados y fechas por etapa.
 * Reglas de cierre de convocatoria: solo se cierra cuando la fecha actual es igual o
   posterior a la fecha de fin de ejecución y no quedan comprobantes en revisión.

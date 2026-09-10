@@ -83,12 +83,16 @@ export class AuthService {
       ? [RolUsuario.Docente]
       : [RolUsuario.Estudiante];
 
-    const usuario = await this.usuariosService.crear({
-      ...dto,
-      roles,
-      unidadAcademicaId: dto.unidadAcademicaId,
-      nombreCompleto: `${dto.nombre} ${dto.apellido}`.trim(),
-    });
+    const usuario = await this.usuariosService.crear(
+      {
+        ...dto,
+        roles,
+        unidadAcademicaId: dto.unidadAcademicaId,
+        nombreCompleto: `${dto.nombre} ${dto.apellido}`.trim(),
+      },
+      undefined,
+      { exigirPerfilDocente: false },
+    );
 
     return this.generarToken(usuario);
   }

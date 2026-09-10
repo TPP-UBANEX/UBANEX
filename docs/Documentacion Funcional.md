@@ -271,6 +271,7 @@ Diseño objetivo (no operativo hoy):
 |---|---|
 | Autenticación JWT, registro Estudiante/Docente, roles y guards | ✅ Implementado |
 | CRUD de usuarios, validación de docentes, catálogos (UA, carreras, geo) | ✅ Implementado |
+| Perfil docente completo en alta/edición: **CUIL + resumen del CV + links de Google Drive** (fotocopia DNI, constancia CUIL, constancia de cargo) — obligatorios al crear vía gestión y al guardar el perfil propio de un docente. El registro público permite crear la cuenta con datos básicos y el perfil se completa después en "Editar perfil" | ✅ Implementado |
 | CRUD de convocatorias, estados y fechas por etapa | ✅ Implementado |
 | Formularios dinámicos (12 tipos de campo, tablas, plantillas) | ✅ Implementado |
 | Proyectos y ediciones, presupuesto de 3 rubros, aval, resubida | ✅ Implementado |
@@ -285,7 +286,7 @@ Diseño objetivo (no operativo hoy):
 | Auditoría de acciones | ✅ Implementado |
 | **Rendición de comprobantes** (entidad `Comprobante`, flujo de revisión) | ❌ No implementado — tabla mínima de solo lectura |
 | **Transición automática de Edición a `Cerrado`** validando los 3 requisitos | ❌ No implementado |
-| **Almacenamiento de adjuntos** (campo `archivo`, comprobantes, aval como archivo real) | ❌ No implementado — `archivo` deshabilitado, aval es URL |
+| **Almacenamiento de adjuntos** (campo `archivo`, comprobantes, aval como archivo real) | ❌ No implementado — `archivo` deshabilitado; el aval, los comprobantes y los documentos del perfil docente se guardan como **URL de Google Drive** en texto |
 
 ## 13. Preguntas abiertas / decisiones pendientes
 

@@ -32,6 +32,7 @@ import { api } from '@/lib/api'
 import type { Rendicion, CrearRendicionDto, ActualizarRendicionDto, Presupuesto } from '@/data/types'
 import { EstadoComprobante, TipoRubro, EstadoEdicion } from '@/data/types'
 import { formatearMoneda, LABELS_RUBRO } from '@/lib/presupuesto'
+import { esGoogleDrive } from '@/lib/utils'
 import { Plus, Pencil, Trash2, Loader2, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -70,20 +71,6 @@ const formVacio: FormState = {
 function conProtocolo(url: string) {
   const u = url.trim()
   return /^https?:\/\//i.test(u) ? u : `https://${u}`
-}
-
-function esGoogleDrive(url: string): boolean {
-  const v = url.trim()
-  if (!v) return false
-  const normalizado = /^https?:\/\//i.test(v) ? v : `https://${v}`
-  let host: string
-  try {
-    host = new URL(normalizado).hostname.toLowerCase()
-  } catch {
-    return false
-  }
-  const permitidos = ['drive.google.com', 'drive.usercontent.google.com', 'docs.google.com']
-  return permitidos.some(d => host === d || host.endsWith(`.${d}`))
 }
 
 export function ComprobantesTab({

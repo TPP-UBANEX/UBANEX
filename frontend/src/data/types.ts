@@ -87,6 +87,11 @@ export interface Usuario {
   tipoDesignacionDocente?: TipoDesignacionDocente;
   areaDocente?: string;
   direccionLocalidad?: string;
+  cuil?: string;
+  resumenCv?: string;
+  linkFotocopiaDni?: string;
+  linkConstanciaCuil?: string;
+  linkConstanciaCargo?: string;
   porcentajeCarrera?: number;
   carrera?: Carrera;
   carreraId?: string;
@@ -127,6 +132,11 @@ export interface CrearUsuarioDto {
   tipoDesignacionDocente?: TipoDesignacionDocente;
   areaDocente?: string;
   direccionLocalidad?: string;
+  cuil?: string;
+  resumenCv?: string;
+  linkFotocopiaDni?: string;
+  linkConstanciaCuil?: string;
+  linkConstanciaCargo?: string;
   porcentajeCarrera?: number;
   carreraId?: string;
 }
