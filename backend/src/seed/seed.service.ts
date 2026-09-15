@@ -282,14 +282,12 @@ export class SeedService {
       porcentajeCarrera?: number;
       carreraId?: string;
     },
-    opciones: { exigirPerfilDocente?: boolean } = {},
   ): Promise<Usuario> {
     const existe = await this.usuariosService.obtenerPorEmail(data.email);
     if (existe) return existe;
     const user = await this.usuariosService.crear(
       { ...data, password: PASSWORD_SEED },
       undefined,
-      opciones,
     );
     console.log(`  ${data.email} (${data.roles.join(', ')})`);
     return user;
@@ -304,8 +302,8 @@ export class SeedService {
   }): Promise<Usuario> {
     const areas = AREAS_DOCENTE[opts.ua.nombre] ?? ['Extensión Universitaria'];
     const i = opts.indice;
-    // CUIL, resumen del CV y links de Google Drive deterministas por email: `crear()`
-    // los exige para todo docente y así el seed sigue siendo idempotente.
+    // CUIL, resumen del CV y links de Google Drive deterministas por email: así el
+    // seed rellena el perfil completo de los docentes demo.
     const base = this.digitosDeterministas(opts.email);
     const prefijo = `https://drive.google.com/file/d/seed-${Math.abs(base) % 1_000_000}`;
     const usuario = await this.seedUsuario({
@@ -361,7 +359,6 @@ export class SeedService {
         roles: [RolUsuario.Docente],
         unidadAcademicaId: opts.ua.id,
       },
-      { exigirPerfilDocente: false },
     );
     await this.usuarioRepo.update(usuario.id, { estadoValidacionDocente: EstadoValidacionDocente.Validado });
     return usuario;
@@ -383,7 +380,6 @@ export class SeedService {
         unidadAcademicaId: opts.ua.id,
         genero: GENEROS[1],
       },
-      { exigirPerfilDocente: false },
     );
     await this.usuarioRepo.update(usuario.id, { estadoValidacionDocente: EstadoValidacionDocente.PendienteDeValidacion });
     return usuario;

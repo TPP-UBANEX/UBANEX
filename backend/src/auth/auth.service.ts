@@ -91,7 +91,6 @@ export class AuthService {
         nombreCompleto: `${dto.nombre} ${dto.apellido}`.trim(),
       },
       undefined,
-      { exigirPerfilDocente: false },
     );
 
     return this.generarToken(usuario);

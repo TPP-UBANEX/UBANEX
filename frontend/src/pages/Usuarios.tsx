@@ -397,39 +397,24 @@ function NuevoUsuarioDialog({
       setError('El teléfono no tiene un formato válido')
       return
     }
-    if (esDocente && !cuil.trim()) {
-      setError('El CUIL es obligatorio para docentes')
-      return
-    }
-    if (esDocente && !cuil.trim().match(/^[\d-]{9,13}$/)) {
+    if (esDocente && cuil.trim() && !cuil.trim().match(/^[\d-]{9,13}$/)) {
       setError('El CUIL no tiene un formato válido')
       return
     }
-    if (esDocente && !resumenCv.trim()) {
-      setError('El resumen del CV es obligatorio para docentes')
-      return
-    }
     if (esDocente) {
-      const linksDocente: Array<[string, string]> = [
-        ['CUIL', 'El link a la constancia de CUIL es obligatorio'],
-        ['DNI', 'El link a la fotocopia del DNI es obligatorio'],
-        ['Cargo', 'El link a la constancia que avala el cargo es obligatorio'],
+      const linksDocente: Array<{ valor: string; mensaje: string }> = [
+        { valor: linkConstanciaCuil, mensaje: 'constancia de CUIL' },
+        { valor: linkFotocopiaDni, mensaje: 'fotocopia del DNI' },
+        { valor: linkConstanciaCargo, mensaje: 'constancia que avala el cargo' },
       ]
-      const valores = [linkConstanciaCuil, linkFotocopiaDni, linkConstanciaCargo]
-      for (let i = 0; i < linksDocente.length; i++) {
-        if (!valores[i].trim()) {
-          setError(linksDocente[i][1])
-          return
-        }
-        if (!esGoogleDrive(valores[i])) {
-          setError(
-            linksDocente[i][1].replace(
-              'es obligatorio',
-              'debe ser de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com)',
-            ),
-          )
-          return
-        }
+      const invalidos = linksDocente
+        .filter(l => l.valor.trim() && !esGoogleDrive(l.valor))
+        .map(l => l.mensaje)
+      if (invalidos.length > 0) {
+        setError(
+          `Los siguientes links deben ser de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com): ${invalidos.join(', ')}`,
+        )
+        return
       }
     }
     setError('')
@@ -453,11 +438,13 @@ function NuevoUsuarioDialog({
         payload.tipoDesignacionDocente = tipoDesignacionDocente ? tipoDesignacionDocente as TipoDesignacionDocente : undefined
         payload.areaDocente = areaDocente.trim() || undefined
         payload.direccionLocalidad = direccionLocalidad.trim() || undefined
-        payload.cuil = cuil.trim()
-        payload.resumenCv = resumenCv.trim()
-        payload.linkFotocopiaDni = linkFotocopiaDni.trim()
-        payload.linkConstanciaCuil = linkConstanciaCuil.trim()
-        payload.linkConstanciaCargo = linkConstanciaCargo.trim()
+        const cuilValue = cuil.trim()
+        const resumenCvValue = resumenCv.trim()
+        if (cuilValue) payload.cuil = cuilValue
+        if (resumenCvValue) payload.resumenCv = resumenCvValue
+        if (linkFotocopiaDni.trim()) payload.linkFotocopiaDni = linkFotocopiaDni.trim()
+        if (linkConstanciaCuil.trim()) payload.linkConstanciaCuil = linkConstanciaCuil.trim()
+        if (linkConstanciaCargo.trim()) payload.linkConstanciaCargo = linkConstanciaCargo.trim()
       }
       if (esEstudiante) {
         payload.porcentajeCarrera = porcentajeCarrera === ''
@@ -630,7 +617,7 @@ function NuevoUsuarioDialog({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">CUIL *</label>
+                <label className="text-sm font-medium">CUIL</label>
                 <Input
                   placeholder="20-12345678-9"
                   maxLength={13}
@@ -639,7 +626,7 @@ function NuevoUsuarioDialog({
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <label className="text-sm font-medium">Resumen del CV *</label>
+                <label className="text-sm font-medium">Resumen del CV</label>
                 <Textarea
                   placeholder="Ej: Doctor en Ciencias Biológicas, con 15 años de experiencia en docencia e investigación en la UBA..."
                   maxLength={2048}
@@ -649,7 +636,7 @@ function NuevoUsuarioDialog({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Link a la fotocopia del DNI *</label>
+                <label className="text-sm font-medium">Link a la fotocopia del DNI</label>
                 <Input
                   placeholder="https://drive.google.com/file/d/..."
                   maxLength={2048}
@@ -658,7 +645,7 @@ function NuevoUsuarioDialog({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Link a la constancia de CUIL *</label>
+                <label className="text-sm font-medium">Link a la constancia de CUIL</label>
                 <Input
                   placeholder="https://drive.google.com/file/d/..."
                   maxLength={2048}
@@ -668,7 +655,7 @@ function NuevoUsuarioDialog({
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <label className="text-sm font-medium">
-                  Link a la constancia que avala el cargo *
+                  Link a la constancia que avala el cargo
                 </label>
                 <Input
                   placeholder="https://drive.google.com/file/d/..."

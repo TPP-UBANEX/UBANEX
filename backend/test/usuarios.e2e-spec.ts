@@ -55,7 +55,7 @@ describe('Gestión de usuarios y validación de docentes (e2e)', () => {
     expect(res.body.estadoValidacionDocente).toBe('PendienteDeValidacion');
   });
 
-  it('rechaza crear un docente sin CUIL, resumen del CV ni links (400)', async () => {
+  it('permite crear un docente sin perfil completo (los datos docentes son optativos)', async () => {
     const res = await peticion(app)
       .post('/usuarios')
       .set(await autenticar(app, base.admin))
@@ -67,7 +67,9 @@ describe('Gestión de usuarios y validación de docentes (e2e)', () => {
         apellido: 'Perfil',
         unidadAcademicaId: base.uaPorNombreId.get('Facultad de Derecho'),
       });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(res.body.cuil).toBe(null);
+    expect(res.body.resumenCv).toBe(null);
   });
 
   it('impide que un docente cree usuarios (403)', async () => {

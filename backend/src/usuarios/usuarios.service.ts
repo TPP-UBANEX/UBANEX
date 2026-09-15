@@ -89,11 +89,7 @@ export class UsuariosService {
     private readonly mail: MailService,
   ) {}
 
-  async crear(
-    dto: CrearUsuarioDto,
-    creador?: Usuario,
-    opciones: { exigirPerfilDocente?: boolean } = {},
-  ): Promise<Usuario> {
+  async crear(dto: CrearUsuarioDto, creador?: Usuario): Promise<Usuario> {
     validarGruposRoles(dto.roles);
     validarRolUnico(dto.roles);
 
@@ -135,10 +131,6 @@ export class UsuariosService {
 
     await this.validarCupoAutoridades(dto.roles, dto.unidadAcademicaId);
 
-    if (dto.roles.includes(RolUsuario.Docente) && opciones.exigirPerfilDocente !== false) {
-      this.exigirDatosDocenteCompletos(dto);
-    }
-
     const password = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const entity = this.repo.create({
       ...dto,
@@ -164,36 +156,6 @@ export class UsuariosService {
   }
 
   /**
-   * Valida y normaliza in-place los datos de perfil docente que son obligatorios
-   * (CUIL, resumen del CV y links a DNI, constancia de CUIL y constancia de cargo).
-   * Solo aplica cuando el usuario es Docente.
-   */
-  private exigirDatosDocenteCompletos(dto: {
-    cuil?: string;
-    resumenCv?: string;
-    linkFotocopiaDni?: string;
-    linkConstanciaCuil?: string;
-    linkConstanciaCargo?: string;
-  }): void {
-    const faltantes: string[] = [];
-    if (!dto.cuil?.trim()) faltantes.push('CUIL');
-    if (!dto.resumenCv?.trim()) faltantes.push('resumen del CV');
-    for (const { campo, etiqueta } of CAMPOS_LINK_DOCENTE) {
-      if (!dto[campo]?.trim()) faltantes.push(etiqueta);
-    }
-    if (faltantes.length > 0) {
-      throw new BadRequestException(
-        `Los docentes deben completar su CUIL, el resumen de su CV y la documentación respaldatoria. Faltan: ${faltantes.join(', ')}`,
-      );
-    }
-    if (dto.cuil) dto.cuil = dto.cuil.trim();
-    if (dto.resumenCv) dto.resumenCv = dto.resumenCv.trim();
-    for (const { campo, etiqueta } of CAMPOS_LINK_DOCENTE) {
-      if (dto[campo]) dto[campo] = validarLinkGoogleDrive(dto[campo], etiqueta);
-    }
-  }
-
-  /**
    * Aplica los campos de perfil docente (CUIL, resumen del CV y links) a la
    * entidad si vienen definidos en el DTO, normalizando los links. Si el valor
    * llega vacío se guarda null (no rompe a un docente ya cargado que no los tenga).
@@ -216,17 +178,6 @@ export class UsuariosService {
         entity[campo] = v ? validarLinkGoogleDrive(v, etiqueta) : null;
       }
     }
-  }
-
-  /** Devuelve las etiquetas de los campos docentes obligatorios que están vacíos en la entidad. */
-  private camposDocentesFaltantes(entity: Usuario): string[] {
-    const faltantes: string[] = [];
-    if (!entity.cuil?.trim()) faltantes.push('CUIL');
-    if (!entity.resumenCv?.trim()) faltantes.push('resumen del CV');
-    for (const { campo, etiqueta } of CAMPOS_LINK_DOCENTE) {
-      if (!entity[campo]?.trim()) faltantes.push(etiqueta);
-    }
-    return faltantes;
   }
 
   async listar(dto: PaginationDto, usuarioLogueado: Usuario): Promise<PaginatedResponse<Usuario>> {
@@ -350,15 +301,6 @@ export class UsuariosService {
         this.aplicarCamposDocentes(entity, dto);
       }
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
-      if (entity.roles.includes(RolUsuario.Docente)) {
-        const faltantes = this.camposDocentesFaltantes(entity);
-        if (faltantes.length > 0) {
-          throw new BadRequestException(
-            'Debés completar tu CUIL, el resumen de tu CV y la documentación respaldatoria antes de guardar cambios en tu perfil. Faltan: ' +
-              faltantes.join(', '),
-          );
-        }
-      }
       const saved = await this.repo.save(entity);
       await this.auditoria.registrar({
         usuarioId: id, accion: TipoAccionAuditoria.EDICION,

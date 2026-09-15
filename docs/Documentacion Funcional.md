@@ -271,7 +271,7 @@ Diseño objetivo (no operativo hoy):
 |---|---|
 | Autenticación JWT, registro Estudiante/Docente, roles y guards | ✅ Implementado |
 | CRUD de usuarios, validación de docentes, catálogos (UA, carreras, geo) | ✅ Implementado |
-| Perfil docente completo en alta/edición: **CUIL + resumen del CV + links de Google Drive** (fotocopia DNI, constancia CUIL, constancia de cargo) — obligatorios al crear vía gestión y al guardar el perfil propio de un docente. El registro público permite crear la cuenta con datos básicos y el perfil se completa después en "Editar perfil" | ✅ Implementado |
+| Perfil docente optativo: **CUIL + resumen del CV + links de Google Drive** (fotocopia DNI, constancia CUIL, constancia de cargo) son campos opcionales, se cargan en alta vía gestión o en "Editar perfil" y se validan solo si vienen completos (formato CUIL, links de Drive). El registro público crea la cuenta con datos básicos | ✅ Implementado |
 | CRUD de convocatorias, estados y fechas por etapa | ✅ Implementado |
 | Formularios dinámicos (12 tipos de campo, tablas, plantillas) | ✅ Implementado |
 | Proyectos y ediciones, presupuesto de 3 rubros, aval, resubida | ✅ Implementado |

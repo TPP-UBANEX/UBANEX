@@ -159,29 +159,21 @@ export function EditarUsuarioDialog({
         return
       }
       if (esAutoEdicion && esDocente) {
-        const requeridos: Array<{ valor: string; etiqueta: string }> = [
+        const datosDocente: Array<{ valor: string; etiqueta: string }> = [
           { valor: cuil, etiqueta: 'CUIL' },
           { valor: resumenCv, etiqueta: 'Resumen del CV' },
           { valor: linkFotocopiaDni, etiqueta: 'Link a la fotocopia del DNI' },
           { valor: linkConstanciaCuil, etiqueta: 'Link a la constancia de CUIL' },
           { valor: linkConstanciaCargo, etiqueta: 'Link a la constancia que avala el cargo' },
         ]
-        const faltantes = requeridos.filter(r => !r.valor.trim()).map(r => r.etiqueta)
-        if (faltantes.length > 0) {
-          setError(
-            `Debés completar tus datos docentes para poder guardar: ${faltantes.join(', ')}`,
-          )
-          setSubmitting(false)
-          return
-        }
-        if (!cuil.trim().match(/^[\d-]{9,13}$/)) {
+        if (cuil.trim() && !cuil.trim().match(/^[\d-]{9,13}$/)) {
           setError('El CUIL no tiene un formato válido')
           setSubmitting(false)
           return
         }
-        const invalidos = requeridos
+        const invalidos = datosDocente
           .slice(2)
-          .filter(r => !esGoogleDrive(r.valor))
+          .filter(r => r.valor.trim() && !esGoogleDrive(r.valor))
           .map(r => r.etiqueta)
         if (invalidos.length > 0) {
           setError(
@@ -357,28 +349,26 @@ export function EditarUsuarioDialog({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">CUIL *</label>
+                    <label className="text-sm font-medium">CUIL</label>
                     <Input
                       placeholder="20-12345678-9"
                       maxLength={13}
                       value={cuil}
                       onChange={e => setCuil(e.target.value)}
-                      required={esDocente && !usuario.cuil ? true : undefined}
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <label className="text-sm font-medium">Resumen del CV *</label>
+                    <label className="text-sm font-medium">Resumen del CV</label>
                     <Textarea
                       placeholder="Ej: Doctor en Ciencias Biológicas, con 15 años de experiencia en docencia e investigación en la UBA..."
                       maxLength={2048}
                       rows={3}
                       value={resumenCv}
                       onChange={e => setResumenCv(e.target.value)}
-                      required={esDocente && !usuario.resumenCv ? true : undefined}
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <label className="text-sm font-medium">Link a la fotocopia del DNI *</label>
+                    <label className="text-sm font-medium">Link a la fotocopia del DNI</label>
                     <Input
                       placeholder="https://drive.google.com/file/d/..."
                       value={linkFotocopiaDni}
@@ -386,7 +376,7 @@ export function EditarUsuarioDialog({
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <label className="text-sm font-medium">Link a la constancia de CUIL *</label>
+                    <label className="text-sm font-medium">Link a la constancia de CUIL</label>
                     <Input
                       placeholder="https://drive.google.com/file/d/..."
                       value={linkConstanciaCuil}
@@ -395,7 +385,7 @@ export function EditarUsuarioDialog({
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <label className="text-sm font-medium">
-                      Link a la constancia que avala el cargo *
+                      Link a la constancia que avala el cargo
                     </label>
                     <Input
                       placeholder="https://drive.google.com/file/d/..."
