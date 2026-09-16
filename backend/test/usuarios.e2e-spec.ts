@@ -44,10 +44,32 @@ describe('Gestión de usuarios y validación de docentes (e2e)', () => {
         nombre: 'Nueva',
         apellido: 'Docente',
         unidadAcademicaId: base.uaPorNombreId.get('Facultad de Derecho'),
+        cuil: '20-12345678-9',
+        resumenCv: 'Docente con trayectoria en extensión universitaria.',
+        linkFotocopiaDni: 'https://drive.google.com/file/d/test-dni/view',
+        linkConstanciaCuil: 'https://drive.google.com/file/d/test-cuil/view',
+        linkConstanciaCargo: 'https://drive.google.com/file/d/test-cargo/view',
       });
     expect(res.status).toBe(201);
     expect(res.body.roles).toEqual(['Docente']);
     expect(res.body.estadoValidacionDocente).toBe('PendienteDeValidacion');
+  });
+
+  it('permite crear un docente sin perfil completo (los datos docentes son optativos)', async () => {
+    const res = await peticion(app)
+      .post('/usuarios')
+      .set(await autenticar(app, base.admin))
+      .send({
+        email: 'docente-sin-perfil@uba.ar',
+        password: '123456',
+        roles: ['Docente'],
+        nombre: 'Sin',
+        apellido: 'Perfil',
+        unidadAcademicaId: base.uaPorNombreId.get('Facultad de Derecho'),
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.cuil).toBe(null);
+    expect(res.body.resumenCv).toBe(null);
   });
 
   it('impide que un docente cree usuarios (403)', async () => {

@@ -19,6 +19,7 @@ import { PaginatedResponse } from '../common/interfaces/paginated-response.inter
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { MailService } from '../common/mail/mail.service';
+import { validarLinkGoogleDrive } from '../common/validar-link.util';
 import { UsuarioSugerido } from './usuario-sugerido.interface';
 
 const SALT_ROUNDS = 10;
@@ -44,6 +45,16 @@ const GRUPO_GESTION: RolUsuario[] = [
 const GRUPO_EJECUCION: RolUsuario[] = [
   RolUsuario.Estudiante,
   RolUsuario.Docente,
+];
+
+/** Links que debe cargar un docente (repositorio de Drive) y su etiqueta para mensajes. */
+const CAMPOS_LINK_DOCENTE: Array<{
+  campo: 'linkFotocopiaDni' | 'linkConstanciaCuil' | 'linkConstanciaCargo';
+  etiqueta: string;
+}> = [
+  { campo: 'linkFotocopiaDni', etiqueta: 'link a la fotocopia del DNI' },
+  { campo: 'linkConstanciaCuil', etiqueta: 'link a la constancia de CUIL' },
+  { campo: 'linkConstanciaCargo', etiqueta: 'link a la constancia que avala el cargo' },
 ];
 
 const LIMITE_AUTORIDADES = 3;
@@ -142,6 +153,31 @@ export class UsuariosService {
     }
 
     return saved;
+  }
+
+  /**
+   * Aplica los campos de perfil docente (CUIL, resumen del CV y links) a la
+   * entidad si vienen definidos en el DTO, normalizando los links. Si el valor
+   * llega vacío se guarda null (no rompe a un docente ya cargado que no los tenga).
+   */
+  private aplicarCamposDocentes(
+    entity: Usuario,
+    dto: {
+      cuil?: string;
+      resumenCv?: string;
+      linkFotocopiaDni?: string;
+      linkConstanciaCuil?: string;
+      linkConstanciaCargo?: string;
+    },
+  ): void {
+    if (dto.cuil !== undefined) entity.cuil = (dto.cuil ?? '').trim() || null;
+    if (dto.resumenCv !== undefined) entity.resumenCv = (dto.resumenCv ?? '').trim() || null;
+    for (const { campo, etiqueta } of CAMPOS_LINK_DOCENTE) {
+      if (dto[campo] !== undefined) {
+        const v = (dto[campo] ?? '').trim();
+        entity[campo] = v ? validarLinkGoogleDrive(v, etiqueta) : null;
+      }
+    }
   }
 
   async listar(dto: PaginationDto, usuarioLogueado: Usuario): Promise<PaginatedResponse<Usuario>> {
@@ -261,6 +297,9 @@ export class UsuariosService {
           ? (await this.carreraRepo.findOne({ where: { id: dto.carreraId } })) ?? null
           : null;
       }
+      if (entity.roles.includes(RolUsuario.Docente)) {
+        this.aplicarCamposDocentes(entity, dto);
+      }
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
       const saved = await this.repo.save(entity);
       await this.auditoria.registrar({
@@ -308,6 +347,9 @@ export class UsuariosService {
         entity.unidadAcademica = dto.unidadAcademicaId
           ? (await this.unidadAcademicaRepo.findOne({ where: { id: dto.unidadAcademicaId } })) ?? null
           : null;
+      }
+      if (entity.roles.includes(RolUsuario.Docente)) {
+        this.aplicarCamposDocentes(entity, dto);
       }
       if (dto.habilitado !== undefined) entity.habilitado = dto.habilitado;
       if (dto.password) entity.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
@@ -357,6 +399,9 @@ export class UsuariosService {
         ) {
           entity.estadoValidacionDocente = EstadoValidacionDocente.PendienteDeValidacion;
         }
+      }
+      if (entity.roles.includes(RolUsuario.Docente)) {
+        this.aplicarCamposDocentes(entity, dto);
       }
       if (dto.habilitado !== undefined) {
         const gestionRoles = [

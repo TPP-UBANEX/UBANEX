@@ -63,7 +63,7 @@ describe('SugerenciasService', () => {
     findOne: findOneSugerencia,
     save: saveSugerencia,
     create: createSugerencia,
-    count: countSugerencia,
+count: countSugerencia,
   } as unknown as Repository<SugerenciaCambio>;
 
   const notificacionRepo = {

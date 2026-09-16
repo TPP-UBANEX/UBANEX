@@ -20,6 +20,7 @@ import { RolEjecucion } from '../common/enums/rol-ejecucion.enum';
 import { TipoAccionAuditoria } from '../common/enums/tipo-accion-auditoria.enum';
 import { TipoEntidadAuditoria } from '../common/enums/tipo-entidad-auditoria.enum';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { validarLinkGoogleDrive as validarLinkGoogleDriveUtil } from '../common/validar-link.util';
 import { Notificacion } from '../sugerencias/notificacion.entity';
 
 @Injectable()
@@ -266,28 +267,6 @@ export class RendicionesService {
     }
   }
 
-  /** Normaliza el link (agrega https:// si falta) y valida que sea de Google Drive. */
-  private validarLinkGoogleDrive(url: string): string {
-    const v = url.trim();
-    if (!v) {
-      throw new BadRequestException('El link al comprobante es obligatorio');
-    }
-    const normalizado = /^https?:\/\//i.test(v) ? v : `https://${v}`;
-    let host: string;
-    try {
-      host = new URL(normalizado).hostname.toLowerCase();
-    } catch {
-      throw new BadRequestException('El link al comprobante no es una URL válida');
-    }
-    const permitidos = ['drive.google.com', 'drive.usercontent.google.com', 'docs.google.com'];
-    if (!permitidos.some((d) => host === d || host.endsWith(`.${d}`))) {
-      throw new BadRequestException(
-        'El link al comprobante debe ser de Google Drive (drive.google.com, docs.google.com o drive.usercontent.google.com)',
-      );
-    }
-    return normalizado;
-  }
-
   async listarPorEdicion(edicionId: string, usuario: Usuario): Promise<Rendicion[]> {
     const edicion = await this.obtenerEdicion(edicionId);
     await this.validarAccesoLectura(edicion, usuario);
@@ -311,7 +290,7 @@ export class RendicionesService {
       monto: dto.monto,
       descripcion: dto.descripcion ?? null,
       fecha: dto.fecha,
-      comprobanteUrl: this.validarLinkGoogleDrive(dto.comprobanteUrl),
+      comprobanteUrl: validarLinkGoogleDriveUtil(dto.comprobanteUrl, 'link al comprobante'),
       motivoRechazo: null,
       estado: EstadoComprobante.EnRevision,
       creadoPorId: usuario.id,
@@ -407,7 +386,7 @@ export class RendicionesService {
     if (dto.descripcion !== undefined) rendicion.descripcion = dto.descripcion;
     if (dto.fecha !== undefined) rendicion.fecha = dto.fecha;
     if (dto.comprobanteUrl !== undefined) {
-      rendicion.comprobanteUrl = this.validarLinkGoogleDrive(dto.comprobanteUrl);
+      rendicion.comprobanteUrl = validarLinkGoogleDriveUtil(dto.comprobanteUrl, 'link al comprobante');
     }
     // Si estaba rechazado y el director lo vuelve a editar, pasa nuevamente a EnRevisión
     // y se limpia el motivo de rechazo.

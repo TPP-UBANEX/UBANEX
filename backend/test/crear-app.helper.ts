@@ -37,6 +37,7 @@ export async function crearApp(): Promise<INestApplication> {
     enviarEstadoEvaluador: jest.fn(),
     enviarRespuestaDocente: jest.fn(),
     enviarResultadoPropuestaEvaluador: jest.fn(),
+    enviarAltaEvaluador: jest.fn(),
   };
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })

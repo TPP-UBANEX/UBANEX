@@ -44,6 +44,21 @@ export class Usuario {
   @Column({ nullable: true, type: 'varchar' })
   direccionLocalidad: string | null;
 
+  @Column({ nullable: true, type: 'varchar' })
+  cuil: string | null;
+
+  @Column({ nullable: true, type: 'text' })
+  resumenCv: string | null;
+
+  @Column({ nullable: true, type: 'text' })
+  linkFotocopiaDni: string | null;
+
+  @Column({ nullable: true, type: 'text' })
+  linkConstanciaCuil: string | null;
+
+  @Column({ nullable: true, type: 'text' })
+  linkConstanciaCargo: string | null;
+
   @Column({ nullable: true, type: 'smallint' })
   porcentajeCarrera: number | null;
 
